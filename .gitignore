@@ -1,0 +1,75 @@
+# Allowlist-style: ignore everything by default, then explicitly un-ignore what's meant to be
+# tracked. Order matters below — later rules win, so re-ignores (personal backlog, junk) must
+# come after the allowlist.
+
+# ignore everything by default, but allow descending into directories to evaluate their contents
+*
+!*/
+
+# --- allowlist ---
+
+# this file itself
+!.gitignore
+
+# docs
+!docs/**
+
+# yandex hackathon case reference material — all file types, not just pdf/html
+!yandex_docs/**
+
+# sql
+!*.sql
+
+# go
+!*.go
+!go.mod
+!go.sum
+
+# react/frontend (covers html + tsconfig per project decision)
+!*.js
+!*.jsx
+!*.ts
+!*.tsx
+!*.html
+!*.css
+!package.json
+!package-lock.json
+!tsconfig*.json
+!*.config.js
+!*.config.ts
+
+# configs generally — kafka, s3, docker, ci, etc. (config files, not database data — see re-ignore
+# block below for data/volume directories)
+!*.yaml
+!*.yml
+!*.toml
+!*.json
+!.env.example
+!Dockerfile
+!Dockerfile.*
+!docker-compose*.yml
+!docker-compose*.yaml
+!*.dockerfile
+
+# hackathon case reference material
+!*.pdf
+!*.html
+
+# project markdown (AGENTS.md, etc.)
+!*.md
+
+# --- re-ignore: personal/local files that would otherwise match the allowlist above ---
+backlog/
+agents_memory/
+
+# --- re-ignore: junk/scratch/data that would otherwise match the allowlist above ---
+.DS_Store
+tmp/
+node_modules/
+vendor/
+dist/
+build/
+*.log
+data/
+*.db
+*volume*/
