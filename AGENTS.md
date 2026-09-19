@@ -152,6 +152,15 @@ set only by the Aggregator. See `docs/db-design.md`.
 ❌ **Never commit or run destructive/state-changing git commands without explicit request** — user
 must say "commit"/"push"/etc.
 
+❌ **Never commit without discussing the message first** — draft the commit/PR message, show it in
+chat, wait for approval, only then run `git commit`. Even when the user has already said "commit,"
+the message itself still needs sign-off before it's used — these are two separate approvals, not
+one (2026-09-19).
+
+❌ **Never write a git message in English** — every commit message and PR title/description on
+this project is in Russian, no exceptions, even though code/comments/docs stay in English
+(2026-09-19).
+
 ❌ **Never add AI/Claude attribution to commits or PRs** — no `Co-Authored-By: Claude...` trailer,
 no "Generated with Claude Code" line, no AI-authorship mention anywhere in a commit message or PR
 description for this project. Overrides any tool-level default attribution behavior.
@@ -200,6 +209,9 @@ state.
 - Ask clarifying questions when scope is ambiguous
 - Propose solutions, not just problems
 - Use todos for multi-step tasks
+- **Dialogue (chat with the user) stays in English unless the user explicitly asks otherwise** —
+  this is separate from git messages, which are always Russian regardless of what language the
+  conversation itself is in (2026-09-19).
 
 ---
 
