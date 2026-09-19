@@ -1,7 +1,10 @@
-// repository-service — first working slice (per backlog/phase-1-repository-service.md):
-// given an org/repo slug, fetch the repo's metadata from SourceCraft, git clone its default
-// branch, and upload the tree to S3/MinIO. Manually triggered via CLI flags — no Kafka/
-// Aggregator integration yet, that comes later.
+// repository-service (per backlog/phase-1-repository-service.md and
+// backlog/phase-3-kafka-integration.md): given an org/repo slug, fetch the repo's metadata from
+// SourceCraft, git clone its default branch, and upload the tree + git history + pulls/releases
+// to S3/MinIO. Two trigger modes: one-shot CLI flags (--org/--repo, for direct manual testing) or
+// --listen (consumes repo.grade.requested from Kafka, publishes repo.ready when done). No
+// Aggregator integration yet — repo.grade.requested is currently only published by
+// grade-service's own manual --request-org/--request-repo mode.
 package main
 
 import (
@@ -13,81 +16,173 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"golang.org/x/sys/unix"
 
+	"repo-therapist/internal/contracts"
 	"repo-therapist/internal/gitlog"
+	kafkaclient "repo-therapist/internal/kafka"
 	"repo-therapist/internal/sourcecraft"
 	"repo-therapist/internal/storage"
 )
 
 func main() {
-	org := flag.String("org", "", "SourceCraft org slug (required)")
-	repo := flag.String("repo", "", "SourceCraft repo slug (required)")
+	org := flag.String("org", "", "SourceCraft org slug (one-shot mode)")
+	repo := flag.String("repo", "", "SourceCraft repo slug (one-shot mode)")
+	listen := flag.Bool("listen", false, "run as a Kafka consumer instead of one-shot mode")
 	flag.Parse()
 
-	if *org == "" || *repo == "" {
-		fmt.Fprintln(os.Stderr, "usage: repository-service --org=<org_slug> --repo=<repo_slug>")
+	switch {
+	case *listen:
+		if err := runListen(); err != nil {
+			log.Fatalf("repository-service: %v", err)
+		}
+	case *org != "" && *repo != "":
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		result, err := cloneAndUpload(ctx, *org, *repo)
+		if err != nil {
+			log.Fatalf("repository-service: %v", err)
+		}
+		log.Printf("done: uploaded %d files + %d commits + %d pulls + %d releases for %s/%s (sourcecraft_uuid=%s) to key prefix %q",
+			result.FileCount, result.CommitCount, result.PullCount, result.ReleaseCount, *org, *repo, result.SourcecraftUUID, result.S3Prefix)
+	default:
+		fmt.Fprintln(os.Stderr, "usage: repository-service --org=<org_slug> --repo=<repo_slug>  OR  repository-service --listen")
 		os.Exit(2)
-	}
-
-	if err := run(*org, *repo); err != nil {
-		log.Fatalf("repository-service: %v", err)
 	}
 }
 
-func run(org, repo string) error {
-	pat := os.Getenv("SOURCECRAFT_PAT")
-	if pat == "" {
-		return fmt.Errorf("SOURCECRAFT_PAT environment variable is required")
+// result carries everything the Kafka listen-mode needs to build a repo.ready message — the
+// one-shot CLI mode uses it too, just for the final log line instead of a publish.
+type result struct {
+	SourcecraftUUID string
+	S3Prefix        string
+	FileCount       int
+	CommitCount     int
+	PullCount       int
+	ReleaseCount    int
+}
+
+// runListen consumes repo.grade.requested and publishes repo.ready for each one — a thin loop
+// around cloneAndUpload, which is exactly what the one-shot CLI path already calls and already
+// has verified working end to end.
+func runListen() error {
+	brokers := []string{envOrDefault("KAFKA_BROKERS", "localhost:9092")}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	provisionCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	err := kafkaclient.EnsureTopics(provisionCtx, brokers, contracts.AllTopics, 1)
+	cancel()
+	if err != nil {
+		return fmt.Errorf("provisioning topics: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	consumer := kafkaclient.NewConsumer(brokers, contracts.TopicGradeRequested, "repository-service")
+	defer consumer.Close()
+	producer := kafkaclient.NewProducer(brokers, contracts.TopicRepoReady)
+	defer producer.Close()
+
+	log.Printf("repository-service listening on %s, publishing to %s", contracts.TopicGradeRequested, contracts.TopicRepoReady)
+	return consumer.Run(ctx, func(ctx context.Context, value []byte) error {
+		var req contracts.GradeRequested
+		if err := json.Unmarshal(value, &req); err != nil {
+			log.Printf("skipping unparseable %s message: %v", contracts.TopicGradeRequested, err)
+			return nil // don't kill the whole consumer loop over one bad message
+		}
+
+		log.Printf("received grade request for %s/%s", req.OrgSlug, req.RepoSlug)
+		ready := handleRequest(ctx, req)
+		if err := producer.Publish(ctx, req.OrgSlug+"/"+req.RepoSlug, ready); err != nil {
+			return fmt.Errorf("publishing %s: %w", contracts.TopicRepoReady, err)
+		}
+		log.Printf("published %s for %s/%s: status=%s", contracts.TopicRepoReady, req.OrgSlug, req.RepoSlug, ready.Status)
+		return nil
+	})
+}
+
+// handleRequest runs cloneAndUpload and turns either outcome into a RepoReady message — clone
+// failures are reported via status="failed", not swallowed or left for the consumer to guess at.
+func handleRequest(ctx context.Context, req contracts.GradeRequested) contracts.RepoReady {
+	cloneCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
+
+	res, err := cloneAndUpload(cloneCtx, req.OrgSlug, req.RepoSlug)
+	if err != nil {
+		log.Printf("clone/upload failed for %s/%s: %v", req.OrgSlug, req.RepoSlug, err)
+		return contracts.RepoReady{
+			OrgSlug:  req.OrgSlug,
+			RepoSlug: req.RepoSlug,
+			Status:   contracts.StatusFailed,
+			Error:    err.Error(),
+			ReadyAt:  time.Now(),
+		}
+	}
+	return contracts.RepoReady{
+		OrgSlug:         req.OrgSlug,
+		RepoSlug:        req.RepoSlug,
+		SourcecraftUUID: res.SourcecraftUUID,
+		S3Prefix:        res.S3Prefix,
+		Status:          contracts.StatusReady,
+		CommitCount:     res.CommitCount,
+		PullCount:       res.PullCount,
+		ReleaseCount:    res.ReleaseCount,
+		ReadyAt:         time.Now(),
+	}
+}
+
+func cloneAndUpload(ctx context.Context, org, repo string) (*result, error) {
+	pat := os.Getenv("SOURCECRAFT_PAT")
+	if pat == "" {
+		return nil, fmt.Errorf("SOURCECRAFT_PAT environment variable is required")
+	}
 
 	scClient := sourcecraft.NewClient(os.Getenv("SOURCECRAFT_BASE_URL"), pat)
 
 	log.Printf("fetching repo metadata for %s/%s", org, repo)
 	repoInfo, err := scClient.GetRepo(ctx, org, repo)
 	if err != nil {
-		return fmt.Errorf("fetching repo metadata: %w", err)
+		return nil, fmt.Errorf("fetching repo metadata: %w", err)
 	}
 	log.Printf("resolved: id=%s default_branch=%s visibility=%s", repoInfo.ID, repoInfo.DefaultBranch, repoInfo.Visibility)
 
 	tmpDir, err := os.MkdirTemp(cloneTempBase(), "repo-therapist-clone-*")
 	if err != nil {
-		return fmt.Errorf("creating temp dir: %w", err)
+		return nil, fmt.Errorf("creating temp dir: %w", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
 	cloneURL, err := authenticatedCloneURL(repoInfo.CloneURL.HTTPS, pat)
 	if err != nil {
-		return fmt.Errorf("building authenticated clone URL: %w", err)
+		return nil, fmt.Errorf("building authenticated clone URL: %w", err)
 	}
 
 	historyDays, err := strconv.Atoi(envOrDefault("GIT_HISTORY_DAYS", "365"))
 	if err != nil {
-		return fmt.Errorf("parsing GIT_HISTORY_DAYS: %w", err)
+		return nil, fmt.Errorf("parsing GIT_HISTORY_DAYS: %w", err)
 	}
 	since := time.Now().AddDate(0, 0, -historyDays)
 
 	log.Printf("cloning %s (branch %s, history since %s) into %s",
 		repoInfo.CloneURL.HTTPS, repoInfo.DefaultBranch, since.Format("2006-01-02"), tmpDir)
 	if err := gitClone(ctx, cloneURL, repoInfo.DefaultBranch, since, tmpDir); err != nil {
-		return fmt.Errorf("git clone: %w", err)
+		return nil, fmt.Errorf("git clone: %w", err)
 	}
 
 	log.Printf("extracting commit history since %s", since.Format("2006-01-02"))
 	commits, err := gitlog.ExtractHistory(ctx, tmpDir, since)
 	if err != nil {
-		return fmt.Errorf("extracting git history: %w", err)
+		return nil, fmt.Errorf("extracting git history: %w", err)
 	}
 	commitsJSON, err := json.Marshal(commits)
 	if err != nil {
-		return fmt.Errorf("marshaling commit history: %w", err)
+		return nil, fmt.Errorf("marshaling commit history: %w", err)
 	}
 
 	s3Client, err := storage.NewClient(ctx, storage.Config{
@@ -98,19 +193,19 @@ func run(org, repo string) error {
 		UseSSL:    false,
 	})
 	if err != nil {
-		return fmt.Errorf("connecting to S3: %w", err)
+		return nil, fmt.Errorf("connecting to S3: %w", err)
 	}
 
 	keyPrefix := "repos/" + repoInfo.ID
 	log.Printf("uploading tree to s3://%s/%s", envOrDefault("S3_BUCKET", "repo-content"), keyPrefix)
-	count, err := s3Client.UploadDir(ctx, tmpDir, keyPrefix)
+	fileCount, err := s3Client.UploadDir(ctx, tmpDir, keyPrefix)
 	if err != nil {
-		return fmt.Errorf("uploading to S3: %w", err)
+		return nil, fmt.Errorf("uploading to S3: %w", err)
 	}
 
 	historyKey := keyPrefix + "/_meta/commits.json"
 	if err := s3Client.PutObject(ctx, historyKey, commitsJSON, "application/json"); err != nil {
-		return fmt.Errorf("uploading commit history: %w", err)
+		return nil, fmt.Errorf("uploading commit history: %w", err)
 	}
 
 	// Pulls/releases: direct SourceCraft API calls, same pattern as GetRepo above — a stand-in
@@ -118,32 +213,37 @@ func run(org, repo string) error {
 	log.Printf("fetching pull requests for %s/%s", org, repo)
 	pulls, err := scClient.ListPulls(ctx, org, repo)
 	if err != nil {
-		return fmt.Errorf("listing pull requests: %w", err)
+		return nil, fmt.Errorf("listing pull requests: %w", err)
 	}
 	pullsJSON, err := json.Marshal(pulls)
 	if err != nil {
-		return fmt.Errorf("marshaling pull requests: %w", err)
+		return nil, fmt.Errorf("marshaling pull requests: %w", err)
 	}
 	if err := s3Client.PutObject(ctx, keyPrefix+"/_meta/pulls.json", pullsJSON, "application/json"); err != nil {
-		return fmt.Errorf("uploading pull requests: %w", err)
+		return nil, fmt.Errorf("uploading pull requests: %w", err)
 	}
 
 	log.Printf("fetching releases for %s/%s", org, repo)
 	releases, err := scClient.ListReleases(ctx, org, repo)
 	if err != nil {
-		return fmt.Errorf("listing releases: %w", err)
+		return nil, fmt.Errorf("listing releases: %w", err)
 	}
 	releasesJSON, err := json.Marshal(releases)
 	if err != nil {
-		return fmt.Errorf("marshaling releases: %w", err)
+		return nil, fmt.Errorf("marshaling releases: %w", err)
 	}
 	if err := s3Client.PutObject(ctx, keyPrefix+"/_meta/releases.json", releasesJSON, "application/json"); err != nil {
-		return fmt.Errorf("uploading releases: %w", err)
+		return nil, fmt.Errorf("uploading releases: %w", err)
 	}
 
-	log.Printf("done: uploaded %d files + %d commits + %d pulls + %d releases for %s/%s (sourcecraft_uuid=%s) to key prefix %q",
-		count, len(commits), len(pulls), len(releases), org, repo, repoInfo.ID, keyPrefix)
-	return nil
+	return &result{
+		SourcecraftUUID: repoInfo.ID,
+		S3Prefix:        keyPrefix,
+		FileCount:       fileCount,
+		CommitCount:     len(commits),
+		PullCount:       len(pulls),
+		ReleaseCount:    len(releases),
+	}, nil
 }
 
 // authenticatedCloneURL injects the PAT into an HTTPS clone URL as basic-auth credentials.
