@@ -17,6 +17,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"repo-therapist/internal/gitlog"
 	"repo-therapist/internal/sourcecraft"
 	"repo-therapist/internal/storage"
@@ -55,7 +57,7 @@ func run(org, repo string) error {
 	}
 	log.Printf("resolved: id=%s default_branch=%s visibility=%s", repoInfo.ID, repoInfo.DefaultBranch, repoInfo.Visibility)
 
-	tmpDir, err := os.MkdirTemp("", "repo-therapist-clone-*")
+	tmpDir, err := os.MkdirTemp(cloneTempBase(), "repo-therapist-clone-*")
 	if err != nil {
 		return fmt.Errorf("creating temp dir: %w", err)
 	}
@@ -170,6 +172,66 @@ func gitClone(ctx context.Context, cloneURL, branch string, since time.Time, des
 		return fmt.Errorf("git %s: %w", strings.Join(redactURL(args), " "), err)
 	}
 	return nil
+}
+
+// defaultMinShmFreeBytes is the free-space floor cloneTempBase requires on /dev/shm before using
+// it — matches the container's recommended `--shm-size=150m` (docker-compose.yml doesn't set
+// this yet since no repository-service container exists there; set it to match when it does).
+// Overridable via CLONE_SHM_MIN_FREE_BYTES.
+const defaultMinShmFreeBytes = 150 * 1024 * 1024
+
+// cloneTempBase picks where the temporary clone gets written. Writing the full checked-out tree
+// to real disk on every analysis run, repeated on every periodic regrade, is real avoidable I/O —
+// so this prefers a RAM-backed tmpfs mount over disk when one's available and has enough room,
+// cutting that cost to near-zero. CLONE_TMP_DIR overrides explicitly.
+//
+// Rather than guessing a repo's size ahead of time (SourceCraft's API exposes counts — forks,
+// PRs, issues — not byte size or file count), this checks /dev/shm's actual free space right
+// before cloning and falls back to disk if it's too low. Self-adapting: no per-repo size to
+// predict, and it naturally protects against concurrent clones starving each other of the same
+// shared RAM, which a static per-repo threshold wouldn't catch.
+func cloneTempBase() string {
+	if dir := os.Getenv("CLONE_TMP_DIR"); dir != "" {
+		return dir
+	}
+
+	const shm = "/dev/shm"
+	info, err := os.Stat(shm)
+	if err != nil || !info.IsDir() {
+		return os.TempDir()
+	}
+
+	minFree := int64(defaultMinShmFreeBytes)
+	if v := os.Getenv("CLONE_SHM_MIN_FREE_BYTES"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+			minFree = n
+		}
+	}
+
+	free, err := shmFreeBytes(shm)
+	if err != nil {
+		log.Printf("could not stat %s free space (%v), falling back to disk for clone temp dir", shm, err)
+		return os.TempDir()
+	}
+	if free < uint64(minFree) {
+		log.Printf("%s has %d bytes free, below the %d byte floor — falling back to disk for clone temp dir", shm, free, minFree)
+		return os.TempDir()
+	}
+
+	if f, err := os.CreateTemp(shm, ".write-test-*"); err == nil {
+		f.Close()
+		os.Remove(f.Name())
+		return shm
+	}
+	return os.TempDir()
+}
+
+func shmFreeBytes(path string) (uint64, error) {
+	var stat unix.Statfs_t
+	if err := unix.Statfs(path, &stat); err != nil {
+		return 0, fmt.Errorf("statfs %s: %w", path, err)
+	}
+	return stat.Bavail * uint64(stat.Bsize), nil
 }
 
 // redactURL returns a copy of args with any element containing "://" (the clone URL, which
