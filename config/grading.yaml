@@ -1,0 +1,159 @@
+# Repo Health Score grading policy — machine-readable config.
+# See docs/grading-policy.md for the full rationale behind every choice here.
+#
+# Per-metric/category `status`: "calculated" | "not_calculated" — a config-time toggle, distinct
+# from a metric having no data for a particular repo at runtime. Both are treated identically at
+# combine-time (weight renormalized around them), but reported differently to the user.
+#
+# `provisional: true` on a formula marks a critical/healthy value as a first-guess placeholder,
+# not yet validated against real repos.
+
+version: 1
+
+categories:
+  activity:
+    weight: 0.15
+    public: true
+    status: calculated
+    metrics:
+      - id: commits_per_week
+        status: calculated
+        weight: 0.20
+        source: commits.json
+        aggregation:
+          type: rate_per_week
+          window_days: 180
+        formula:
+          type: linear_clamp
+          direction: "+"
+          critical: 0.5
+          healthy: 5
+          provisional: true
+
+      - id: days_since_last_activity
+        status: calculated
+        weight: 0.20
+        source: commits.json
+        aggregation:
+          type: days_since_last_event
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 40
+          healthy: 3
+          provisional: true
+
+      - id: unique_contributors
+        status: calculated
+        weight: 0.15
+        source: commits.json
+        aggregation:
+          type: unique_count
+          field: author_email
+          window_days: 180
+        formula:
+          type: linear_clamp
+          direction: "+"
+          critical: 1
+          healthy: 5
+          provisional: true
+
+      - id: mr_rate_per_week
+        status: calculated
+        weight: 0.15
+        source: pulls.json
+        aggregation:
+          type: rate_per_week
+          window_days: 180
+        formula:
+          type: linear_clamp
+          direction: "+"
+          critical: 0.2
+          healthy: 2
+          provisional: true
+
+      - id: releases_per_year
+        status: calculated
+        weight: 0.05
+        source: releases.json
+        aggregation:
+          type: rate_per_year
+          window_days: 365
+        formula:
+          type: linear_clamp
+          direction: "+"
+          critical: 1
+          healthy: 6
+          provisional: true
+
+      - id: days_since_last_release
+        status: calculated
+        weight: 0.10
+        source: releases.json
+        aggregation:
+          type: days_since_last_event
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 180
+          healthy: 30
+          provisional: true
+
+      - id: top_contributor_share
+        status: calculated
+        weight: 0.10
+        source: commits.json
+        aggregation:
+          type: max_share
+          field: author_email
+          window_days: 180
+          min_sample_size: 2 # need >=2 commits in-window to compute a share at all; a real
+          # 100% concentration (one person made every commit) still scores as genuine bus-factor
+          # risk, not excluded — see internal/scoring/aggregation.go's maxShare comment
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 1.0
+          healthy: 0.5
+          provisional: true
+
+      - id: net_lines_per_week
+        status: calculated
+        weight: 0.05
+        source: commits.json
+        aggregation:
+          type: rate_per_week
+          field: net_lines
+          window_days: 180
+        formula:
+          type: band
+          healthy_low: -2
+          healthy_high: 10
+          critical_low: -30
+          critical_high: 50
+          provisional: true
+
+  code_health:
+    weight: 0.20
+    public: true
+    status: not_calculated
+
+  issues:
+    weight: 0.15
+    public: true
+    status: not_calculated
+
+  ci_cd:
+    weight: 0.15
+    public: false
+    status: not_calculated
+
+  security:
+    weight: 0.20
+    public: false
+    status: not_calculated
+
+  documentation:
+    weight: 0.15
+    public: true
+    status: not_calculated
