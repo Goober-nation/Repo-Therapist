@@ -11,7 +11,7 @@ type Config struct {
 func LoadConfig() *Config {
 	return &Config{
 		AppPort:        getEnvDefault("APP_PORT", "8083"),
-		SourceCraftURL: getEnvDefault("SOURCECRAFT_URL", "https://api.sourcecraft.tech"),
+		SourceCraftURL: getEnvDefault("SOURCECRAFT_URL", ""),
 		ClientTimeout:  getEnvDefault("CLIENT_TIMEOUT", "5"),
 	}
 }

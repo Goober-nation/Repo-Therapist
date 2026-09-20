@@ -1,0 +1,244 @@
+syntax = "proto3";
+
+package code_health;
+
+option go_package = "code_health/backend/sourcecraft-wrapper-service/internal/transport/gen;pb";
+
+import "google/protobuf/timestamp.proto";
+
+service CodeHealth {
+  rpc GetRepoIDBySlugs(GetRepoIDBySlugsRequest)
+      returns (GetRepoIDBySlugsResponse);
+
+  rpc GetGitURL(GetGitURLRequest)
+      returns (GetGitURLResponse);
+
+  rpc GetCiCDRuns(GetCiCDRunsRequest)
+      returns (GetCiCDRunsResponse);
+
+  rpc GetIssues(GetIssuesRequest)
+      returns (GetIssuesResponse);
+
+  rpc GetMilestones(GetMilestonesRequest)
+      returns (GetMilestonesResponse);
+
+  rpc ListAllPublicRepoIDs(ListAllPublicRepoIDsRequest)
+      returns (ListAllPublicRepoIDsResponse);
+}
+
+
+message GetRepoIDBySlugsRequest {
+  string repo_slug = 1;
+  string org_slug = 2;
+}
+
+message GetRepoIDBySlugsResponse {
+  string repo_id = 1;
+}
+
+message GetGitURLRequest {
+  string repo_id = 1;
+}
+
+message GetGitURLResponse {
+  string http_url = 1;
+  string ssh_url = 2;
+}
+
+message ListAllPublicRepoIDsRequest {}
+
+message ListAllPublicRepoIDsResponse {
+  repeated string repo_ids = 1;
+}
+
+message GetCiCDRunsRequest {
+  string repo_id = 1;
+}
+
+message GetCiCDRunsResponse {
+  repeated Run runs = 1;
+  string next_page_token = 2;
+}
+
+message Run {
+  string id = 1;
+  string slug = 2;
+  Dates dates = 3;
+  string status = 4;
+  repeated Workflow workflows = 5;
+  string event_type = 6;
+  repeated string error_messages = 7;
+  Pull pull = 8;
+  RunUser user = 9;
+}
+
+message Workflow {
+  string id = 1;
+  string slug = 2;
+  string description = 3;
+  Dates dates = 4;
+  string status = 5;
+  repeated Task tasks = 6;
+  Progress progress = 7;
+  string environment_id = 8;
+}
+
+message Task {
+  string id = 1;
+  string slug = 2;
+  string description = 3;
+  Dates dates = 4;
+  string status = 5;
+  repeated Cube cubes = 6;
+  Progress progress = 7;
+  Relations relations = 8;
+}
+
+message Cube {
+  string id = 1;
+  string slug = 2;
+  Dates dates = 3;
+  string status = 4;
+  repeated Artifact artifacts = 5;
+  Relations relations = 6;
+}
+
+message Progress {
+  double percent = 1;
+  Cube current_cube = 2;
+}
+
+message Artifact {
+  string id = 1;
+  string local_path = 2;
+  Dates dates = 3;
+  string status = 4;
+  string download_url = 5;
+}
+
+message Relations {
+  repeated Relation needs = 1;
+}
+
+message Relation {
+  string id = 1;
+  string slug = 2;
+}
+
+message Dates {
+  google.protobuf.Timestamp created_at = 1;
+  google.protobuf.Timestamp started_at = 2;
+  google.protobuf.Timestamp finished_at = 3;
+  google.protobuf.Timestamp updated_at = 4;
+}
+
+message Pull {
+  string id = 1;
+  string slug = 2;
+}
+
+message RunUser {
+  string id = 1;
+  string slug = 2;
+}
+
+
+message GetIssuesRequest {
+  string repo_id = 1;
+}
+
+message GetIssuesResponse {
+  repeated Issue issues = 1;
+  string next_page_token = 2;
+}
+
+message Issue {
+  string id = 1;
+  string slug = 2;
+  string title = 3;
+  string description = 4;
+  IssueStatus status = 5;
+  IssueUser author = 6;
+  IssueUser updated_by = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  IssueUser assignee = 10;
+  repeated Label labels = 11;
+  repeated LinkedPR linked_prs = 12;
+  string priority = 13;
+  string visibility = 14;
+  IssueMilestone milestone = 15;
+  google.protobuf.Timestamp deadline = 16;
+  google.protobuf.Timestamp started_at = 17;
+  google.protobuf.Timestamp completed_at = 18;
+  RepositoryRef repository = 19;
+}
+
+message IssueStatus {
+  string id = 1;
+  string slug = 2;
+  string name = 3;
+  string status_type = 4;
+}
+
+message IssueUser {
+  string id = 1;
+  string slug = 2;
+}
+
+message Label {
+  string id = 1;
+  string slug = 2;
+  string name = 3;
+  string color = 4;
+}
+
+message LinkedPR {
+  string id = 1;
+  string slug = 2;
+}
+
+message IssueMilestone {
+  string id = 1;
+  string slug = 2;
+}
+
+message RepositoryRef {
+  string id = 1;
+  string slug = 2;
+  Organization organization = 3;
+}
+
+message Organization {
+  string id = 1;
+  string slug = 2;
+}
+
+
+message GetMilestonesRequest {
+  string repo_id = 1;
+}
+
+message GetMilestonesResponse {
+  repeated Milestone items = 1;
+  string next_page_token = 2;
+}
+
+message Milestone {
+  string id = 1;
+  string name = 2;
+  string slug = 3;
+  string description = 4;
+  google.protobuf.Timestamp start_date = 5;
+  google.protobuf.Timestamp deadline = 6;
+  string status = 7;
+  MilestoneUser author = 8;
+  MilestoneUser updated_by = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+message MilestoneUser {
+  string id = 1;
+  string slug = 2;
+}
