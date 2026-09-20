@@ -1,9 +1,10 @@
-// Package scoring implements the Repo Health Score grading policy (docs/grading-policy.md)
-// against config/grading.yaml. Every metric is layered: a `source` (which S3 _meta/*.json file),
-// an `aggregation` (raw timestamped events -> one number), and a `formula` (that number -> a 0-1
-// score) — each independently swappable, which is what lets a future formula or aggregation type
-// (e.g. time-decay) be added without touching existing metric definitions.
-package scoring
+// Package config defines and loads the Repo Health Score grading policy schema
+// (docs/grading-policy.md, config/grading.yaml). Every metric is layered: a `source` (which S3
+// _meta/*.json file), an `aggregation` (raw timestamped events -> one number), and a `formula`
+// (that number -> a 0-1 score) — each independently swappable, which is what lets a future
+// formula or aggregation type (e.g. time-decay) be added without touching existing metric
+// definitions. The scoring package (internal/scoring) computes against these types.
+package config
 
 import (
 	"fmt"

@@ -1,6 +1,10 @@
 package scoring
 
-import "time"
+import (
+	"time"
+
+	"repo-therapist/grade-service/internal/config"
+)
 
 // Event is the uniform shape every source (commits, pulls, releases, ...) converts into, so
 // aggregation logic doesn't need to know which source it came from. Only the fields a given
@@ -21,7 +25,7 @@ type aggResult struct {
 	NoData bool
 }
 
-func aggregate(cfg AggregationConfig, events []Event, now time.Time) aggResult {
+func aggregate(cfg config.AggregationConfig, events []Event, now time.Time) aggResult {
 	switch cfg.Type {
 	case "rate_per_week":
 		return ratePerWindow(cfg, events, now, 7)
@@ -56,7 +60,7 @@ func windowFilter(events []Event, now time.Time, windowDays int) []Event {
 // is a valid rate of 0 (the repo really did have no activity), not a data-availability problem —
 // as long as the source itself fetched successfully, which the caller already guarantees before
 // building events at all.
-func ratePerWindow(cfg AggregationConfig, events []Event, now time.Time, periodDays float64) aggResult {
+func ratePerWindow(cfg config.AggregationConfig, events []Event, now time.Time, periodDays float64) aggResult {
 	windowed := windowFilter(events, now, cfg.WindowDays)
 	periods := float64(cfg.WindowDays) / periodDays
 	if periods <= 0 {
@@ -91,7 +95,7 @@ func daysSinceLastEvent(events []Event) aggResult {
 	return aggResult{Value: time.Since(latest).Hours() / 24}
 }
 
-func uniqueCount(cfg AggregationConfig, events []Event, now time.Time) aggResult {
+func uniqueCount(cfg config.AggregationConfig, events []Event, now time.Time) aggResult {
 	windowed := windowFilter(events, now, cfg.WindowDays)
 	seen := make(map[string]struct{})
 	for _, e := range windowed {
@@ -106,7 +110,7 @@ func uniqueCount(cfg AggregationConfig, events []Event, now time.Time) aggResult
 // the metric is statistically meaningless (e.g. 1 contributor = 100% by construction for any
 // solo/new repo) — deliberately no-data, not a real measurement, per docs/grading-policy.md's
 // Activity table note.
-func maxShare(cfg AggregationConfig, events []Event, now time.Time) aggResult {
+func maxShare(cfg config.AggregationConfig, events []Event, now time.Time) aggResult {
 	windowed := windowFilter(events, now, cfg.WindowDays)
 	if len(windowed) < cfg.MinSampleSize {
 		return aggResult{NoData: true}

@@ -3,8 +3,9 @@ package scoring
 import (
 	"time"
 
-	"repo-therapist/internal/gitlog"
-	"repo-therapist/internal/sourcecraft"
+	"repo-therapist/grade-service/internal/config"
+	"repo-therapist/shared/gitlog"
+	"repo-therapist/shared/sourcecraft"
 )
 
 // ActivityInputs bundles the three S3 _meta sources Activity draws from, plus whether each one
@@ -25,8 +26,8 @@ type ActivityInputs struct {
 // combines them. Currently only Activity's sources (commits/pulls/releases) are wired up via
 // eventsForSource — categories whose sources aren't implemented yet report those metrics NoData,
 // which is the correct behavior (not an error) until they're built.
-func ComputeCategory(categoryID string, cfg CategoryConfig, inputs ActivityInputs, now time.Time) CategoryResult {
-	if cfg.Status != StatusCalculated {
+func ComputeCategory(categoryID string, cfg config.CategoryConfig, inputs ActivityInputs, now time.Time) CategoryResult {
+	if cfg.Status != config.StatusCalculated {
 		return CategoryResult{ID: categoryID, NoData: true}
 	}
 
@@ -39,9 +40,9 @@ func ComputeCategory(categoryID string, cfg CategoryConfig, inputs ActivityInput
 	return CategoryResult{ID: categoryID, Score: score, NoData: noData, Metrics: results}
 }
 
-func computeMetric(m MetricConfig, inputs ActivityInputs, now time.Time) MetricResult {
+func computeMetric(m config.MetricConfig, inputs ActivityInputs, now time.Time) MetricResult {
 	base := MetricResult{ID: m.ID, Weight: m.Weight}
-	if m.Status != StatusCalculated {
+	if m.Status != config.StatusCalculated {
 		base.NoData = true
 		return base
 	}

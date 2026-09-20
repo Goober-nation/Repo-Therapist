@@ -1,0 +1,50 @@
+// repository-service (per backlog/phase-1-repository-service.md and
+// backlog/phase-3-kafka-integration.md): given an org/repo slug, fetch the repo's metadata from
+// SourceCraft, git clone its default branch, and upload the tree + git history + pulls/releases
+// to S3/MinIO. Two trigger modes: one-shot CLI flags (--org/--repo, for direct manual testing) or
+// --listen (consumes repo.grade.requested from Kafka, publishes repo.ready when done). No
+// Aggregator integration yet — repo.grade.requested is currently only published by
+// grade-service's own manual --request-org/--request-repo mode.
+//
+// NOTE: pull/release fetching (internal/service) currently calls the SourceCraft REST API
+// directly — a placeholder until backend/security-wrapper-service (phase 4, SourceCraft
+// wrapper/RPC layer) exists. See the NOTE in internal/service/clone.go.
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"log"
+	"os"
+	"time"
+
+	"repo-therapist/repository-service/internal/service"
+	"repo-therapist/repository-service/internal/transport"
+)
+
+func main() {
+	org := flag.String("org", "", "SourceCraft org slug (one-shot mode)")
+	repo := flag.String("repo", "", "SourceCraft repo slug (one-shot mode)")
+	listen := flag.Bool("listen", false, "run as a Kafka consumer instead of one-shot mode")
+	flag.Parse()
+
+	switch {
+	case *listen:
+		if err := transport.RunListen(); err != nil {
+			log.Fatalf("repository-service: %v", err)
+		}
+	case *org != "" && *repo != "":
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		result, err := service.CloneAndUpload(ctx, *org, *repo)
+		if err != nil {
+			log.Fatalf("repository-service: %v", err)
+		}
+		log.Printf("done: uploaded %d files + %d commits + %d pulls + %d releases for %s/%s (sourcecraft_uuid=%s) to key prefix %q",
+			result.FileCount, result.CommitCount, result.PullCount, result.ReleaseCount, *org, *repo, result.SourcecraftUUID, result.S3Prefix)
+	default:
+		fmt.Fprintln(os.Stderr, "usage: repository-service --org=<org_slug> --repo=<repo_slug>  OR  repository-service --listen")
+		os.Exit(2)
+	}
+}

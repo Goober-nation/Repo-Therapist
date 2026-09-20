@@ -16,7 +16,7 @@ set -a && source .env && set +a
 Clones a repo, uploads its tree + git history + pulls/releases to S3.
 
 ```bash
-go run ./cmd/repository-service --org=examples --repo=vulnerable-repo
+go run ./backend/repository-service/cmd/repository-service --org=examples --repo=vulnerable-repo
 ```
 
 Check what landed in MinIO (console at `http://localhost:9001`, login from `.env`), or via `mc`:
@@ -36,7 +36,7 @@ docker run --rm --network <compose-project>_default --entrypoint sh quay.io/mini
 Reads a repo's S3 exports (from step 1) and computes the Activity score.
 
 ```bash
-go run ./cmd/grade-service --repo-id=<sourcecraft_uuid>
+go run ./backend/grade-service/cmd/grade-service --repo-id=<sourcecraft_uuid>
 ```
 
 Prints the full score breakdown as JSON — each metric's raw value, score, weight, and whether it
@@ -47,14 +47,14 @@ was no-data.
 Start both services in listen mode (separate terminals, or backgrounded):
 
 ```bash
-go run ./cmd/repository-service --listen
-go run ./cmd/grade-service --listen
+go run ./backend/repository-service/cmd/repository-service --listen
+go run ./backend/grade-service/cmd/grade-service --listen
 ```
 
 Then trigger a grade from a third terminal:
 
 ```bash
-go run ./cmd/grade-service --request-org=examples --request-repo=vulnerable-repo
+go run ./backend/grade-service/cmd/grade-service --request-org=examples --request-repo=vulnerable-repo
 ```
 
 Watch the two listener terminals: Repository service logs the clone/upload and publishes
@@ -67,10 +67,13 @@ start/stop.
 
 ## Build/lint checks
 
+Each backend service is its own Go module (linked via the root `go.work`), so run these per module:
+
 ```bash
-go build ./...
-go vet ./...
-gofmt -l .              # should print nothing
+for d in backend/shared backend/grade-service backend/repository-service backend/security-wrapper-service; do
+  (cd "$d" && go build ./... && go vet ./...)
+done
+gofmt -l backend         # should print nothing
 ```
 
 ## Manual-tagged tests
@@ -78,5 +81,5 @@ gofmt -l .              # should print nothing
 One test needs a live MinIO with data already uploaded (not run by default `go test ./...`):
 
 ```bash
-go test -tags=manual ./internal/storage/ -run TestBatchReadManual -v
+(cd backend/shared && go test -tags=manual ./storage/ -run TestBatchReadManual -v)
 ```

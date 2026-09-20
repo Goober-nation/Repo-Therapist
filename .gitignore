@@ -24,6 +24,8 @@
 !*.go
 !go.mod
 !go.sum
+!go.work
+!go.work.sum
 
 # react/frontend (covers html + tsconfig per project decision)
 !*.js
