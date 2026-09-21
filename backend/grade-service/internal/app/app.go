@@ -13,9 +13,9 @@ import (
 
 	"repo-therapist/grade-service/internal/config"
 	"repo-therapist/grade-service/internal/scoring"
-	"repo-therapist/shared/gitlog"
-	"repo-therapist/shared/sourcecraft"
-	"repo-therapist/shared/storage"
+	"repo-therapist/grade-service/internal/gitlog"
+	"repo-therapist/tmp-sourcecraft"
+	"repo-therapist/grade-service/internal/storage"
 )
 
 // Grade does the actual work: pull this repo's S3 exports, compute the Activity score.

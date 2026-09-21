@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"repo-therapist/repository-service/internal/service"
-	"repo-therapist/shared/contracts"
-	kafkaclient "repo-therapist/shared/kafka"
+	"repo-therapist/repository-service/internal/contracts"
+	kafkaclient "repo-therapist/repository-service/internal/kafka"
 )
 
 // RunListen consumes repo.grade.requested and publishes repo.ready for each one — a thin loop

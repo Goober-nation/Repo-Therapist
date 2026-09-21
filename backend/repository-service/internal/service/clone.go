@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"repo-therapist/shared/gitlog"
-	"repo-therapist/shared/sourcecraft"
-	"repo-therapist/shared/storage"
+	"repo-therapist/repository-service/internal/gitlog"
+	"repo-therapist/tmp-sourcecraft"
+	"repo-therapist/repository-service/internal/storage"
 )
 
 // Result carries everything the Kafka listen-mode needs to build a repo.ready message — the

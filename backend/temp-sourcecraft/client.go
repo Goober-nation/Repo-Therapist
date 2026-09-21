@@ -1,6 +1,10 @@
 // Package sourcecraft is a minimal client for the SourceCraft public REST API.
 // See agents_memory/topics/sourcecraft-api.md for the research behind these choices
 // (bearer PAT required on every call, no anonymous tier).
+//
+// TEMPORARY: lives outside any single service under backend/tmp because it's used by both
+// repository-service and grade-service; fold it into whichever service ends up owning
+// SourceCraft access once that's settled, instead of growing it here.
 package sourcecraft
 
 import (

@@ -3,8 +3,10 @@ module repo-therapist/grade-service
 go 1.27.1
 
 require (
+	github.com/minio/minio-go/v7 v7.3.0
+	github.com/segmentio/kafka-go v0.4.51
 	gopkg.in/yaml.v3 v3.0.1
-	repo-therapist/shared v0.0.0
+	repo-therapist/tmp-sourcecraft v0.0.0
 )
 
 require (
@@ -17,11 +19,9 @@ require (
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/minio/crc64nvme v1.1.1 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
-	github.com/minio/minio-go/v7 v7.3.0 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.15 // indirect
 	github.com/rs/xid v1.6.0 // indirect
-	github.com/segmentio/kafka-go v0.4.51 // indirect
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
@@ -33,4 +33,4 @@ require (
 	gopkg.in/ini.v1 v1.67.3 // indirect
 )
 
-replace repo-therapist/shared => ../shared
+replace repo-therapist/tmp-sourcecraft => ../temp-sourcecraft

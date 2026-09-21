@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"repo-therapist/grade-service/internal/config"
-	"repo-therapist/shared/gitlog"
-	"repo-therapist/shared/sourcecraft"
+	"repo-therapist/grade-service/internal/gitlog"
+	"repo-therapist/tmp-sourcecraft"
 )
 
 // ActivityInputs bundles the three S3 _meta sources Activity draws from, plus whether each one

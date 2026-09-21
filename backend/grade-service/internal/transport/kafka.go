@@ -15,8 +15,8 @@ import (
 
 	"repo-therapist/grade-service/internal/app"
 	"repo-therapist/grade-service/internal/config"
-	"repo-therapist/shared/contracts"
-	kafkaclient "repo-therapist/shared/kafka"
+	"repo-therapist/grade-service/internal/contracts"
+	kafkaclient "repo-therapist/grade-service/internal/kafka"
 )
 
 // RunRequest is the manual trigger point: publish repo.grade.requested and exit immediately. The
