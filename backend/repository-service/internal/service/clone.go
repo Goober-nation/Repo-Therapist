@@ -15,8 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/sys/unix"
-
 	"repo-therapist/shared/gitlog"
 	"repo-therapist/shared/sourcecraft"
 	"repo-therapist/shared/storage"
@@ -228,14 +226,6 @@ func cloneTempBase() string {
 		return shm
 	}
 	return os.TempDir()
-}
-
-func shmFreeBytes(path string) (uint64, error) {
-	var stat unix.Statfs_t
-	if err := unix.Statfs(path, &stat); err != nil {
-		return 0, fmt.Errorf("statfs %s: %w", path, err)
-	}
-	return stat.Bavail * uint64(stat.Bsize), nil
 }
 
 // redactURL returns a copy of args with any element containing "://" (the clone URL, which
