@@ -70,14 +70,14 @@ These contracts add two independent asynchronous workflows. They do not change t
 
 Repository contents are never placed in Kafka messages. Documentation requests contain a reference
 to an immutable, completed S3 snapshot. Report requests contain only final scores and verified
-reasons for point deductions; report generation does not read the repository snapshot.
+machine-readable deductions; report generation does not read the repository snapshot.
 
 ## LLM service boundary
 
 Documentation and best practices is the only analysis category assessed by LLM service. For this
 category, normal code performs objective checks and the model performs semantic checks. LLM service
 combines both parts using a versioned grading method and returns the final normalized Documentation
-score, reasons, and validated evidence. Grade service consumes that category score without
+score, deduction codes, and validated evidence. Grade service consumes that category score without
 recalculating its internal checks.
 
 Activity, Security, CI/CD, Issues, and Code Health are assessed algorithmically outside LLM service.
@@ -243,39 +243,50 @@ Topic: `llm.documentation.results`.
       "value": 68,
       "scale": 100
     },
+    "coverage": {
+      "applicable_points": 100,
+      "evaluated_points": 100,
+      "percent": 100
+    },
     "checks": [
       {
-        "check_id": "local_run",
+        "check_id": "local_run.environment",
         "check_type": "SEMANTIC",
-        "status": "PARTIAL",
-        "reason": "Команда запуска указана, но обязательные переменные окружения не описаны.",
-        "evidence": [
+        "outcome": "EVALUATED",
+        "points_awarded": 2,
+        "max_points": 4,
+        "deductions": [
           {
-            "type": "file_content",
-            "path": "README.md",
-            "start_line": 42,
-            "end_line": 42,
-            "quote": "docker compose up"
-          },
-          {
-            "type": "file_missing",
-            "path": ".env.example"
+            "code": "DOC_LOCAL_RUN_ENVIRONMENT_INCOMPLETE",
+            "raw_points_lost": 2,
+            "facts": {
+              "missing_aspects": [
+                "environment_variables"
+              ]
+            },
+            "evidence": [
+              {
+                "type": "file_content",
+                "path": "README.md",
+                "start_line": 30,
+                "end_line": 38,
+                "quote": "POSTGRES_USER=..."
+              },
+              {
+                "type": "file_missing",
+                "path": ".env.example"
+              }
+            ]
           }
-        ],
-        "recommended_action": "Добавить список обязательных переменных и пример конфигурации."
+        ]
       },
       {
-        "check_id": "license_exists",
+        "check_id": "license.exists",
         "check_type": "DETERMINISTIC",
-        "status": "PASS",
-        "reason": "В корне снимка найден файл LICENSE.",
-        "evidence": [
-          {
-            "type": "file_exists",
-            "path": "LICENSE"
-          }
-        ],
-        "recommended_action": null
+        "outcome": "EVALUATED",
+        "points_awarded": 5,
+        "max_points": 5,
+        "deductions": []
       }
     ],
     "warnings": []
@@ -285,8 +296,8 @@ Topic: `llm.documentation.results`.
 
 `check_id` values and their contribution to the category score belong to the named grading method
 version. Extending the method does not require a Kafka contract version change. Grade service does
-not interpret individual checks; it consumes `score`. Checks are included for explanation,
-evidence, auditing, and the final report.
+not interpret individual checks; it consumes `score`. Checks are included for auditing and as
+validated machine input for the final report.
 
 Score rules:
 
@@ -305,12 +316,23 @@ Check rules:
 | Field | Values / meaning |
 |---|---|
 | `check_type` | `DETERMINISTIC`, `SEMANTIC`, or `HYBRID` |
-| `status` | `PASS`, `PARTIAL`, `FAIL`, or `NO_DATA` |
+| `outcome` | `EVALUATED`, `NO_DATA`, or `NOT_APPLICABLE` |
+| `points_awarded` | Integer from 0 through the method-defined `max_points` for `EVALUATED`; otherwise `null` |
+| `deductions` | Machine-readable deduction codes, typed facts, and validated evidence; never user-facing prose |
 
-`NO_DATA` is distinct from `FAIL`: it means the available snapshot/context is insufficient for a
-reliable result. The internal criterion scales, weights, formulas, and missing-check normalization
-belong to `documentation-grading-v1` and will be specified with the grading method, not hard-coded
-into the Kafka schema.
+For every evaluated check, `raw_points_lost` values sum to
+`max_points - points_awarded`. `raw_points_lost` is an integer on that check's method-defined scale;
+after missing-data normalization it may differ from the deduction's contribution on the final
+category scale. A fully satisfied check has an empty `deductions` array. `NO_DATA` is distinct from
+a zero-point evaluated check: it means the available snapshot/context is insufficient for a
+reliable result. `NOT_APPLICABLE` means the check does not apply to this repository. Internal
+scales, weights, formulas, and normalization belong to `documentation-grading-v1`, not the Kafka
+schema.
+
+The documentation grading workflow emits no user-facing reason, title, or recommendation. Those
+are generated later, and only once, by the report workflow. Deduction `code`, typed `facts`, and
+validated evidence carry the machine-readable reason between the two workflows. The deduction
+code selects the allowed facts schema; arbitrary model-generated fact fields are rejected.
 
 Allowed evidence variants:
 
@@ -405,11 +427,16 @@ In contract v1, `output_language` is required and its only supported value is `r
       {
         "id": "DOC-LOCAL-RUN",
         "category": "documentation",
+        "code": "DOC_LOCAL_RUN_INCOMPLETE",
         "severity": "MEDIUM",
-        "title": "Не полностью описан локальный запуск",
-        "description": "Команда запуска есть, но обязательные переменные окружения не описаны.",
         "score_impact": {
           "category_points_lost": 32
+        },
+        "facts": {
+          "missing_aspects": [
+            "environment_variables",
+            "expected_result"
+          ]
         },
         "evidence": [
           {
@@ -419,17 +446,19 @@ In contract v1, `output_language` is required and its only supported value is `r
             "start_line": 42,
             "end_line": 42
           }
-        ],
-        "recommended_action": "Добавить список обязательных переменных и пример конфигурации."
+        ]
       },
       {
         "id": "ACT-RECENCY",
         "category": "activity",
+        "code": "LAST_ACTIVITY_TOO_OLD",
         "severity": "LOW",
-        "title": "Последняя активность была несколько дней назад",
-        "description": "Метрика давности последней активности снизила оценку категории.",
         "score_impact": {
           "category_points_lost": 9
+        },
+        "facts": {
+          "days_since_last_activity": 7,
+          "healthy_threshold_days": 3
         },
         "evidence": [
           {
@@ -439,8 +468,7 @@ In contract v1, `output_language` is required and its only supported value is `r
             "raw_value": 7,
             "unit": "days"
           }
-        ],
-        "recommended_action": "Поддерживать регулярный ритм изменений."
+        ]
       }
     ]
   }
@@ -466,8 +494,10 @@ Problem and deduction rules:
 - for every calculated category below 100, at least one problem for that category is required;
 - for each calculated category, its problem deductions sum to `100 - score` (within 0.01 for
   decimal rounding). A category at 100 has no scoring problems;
-- title, description, evidence, and recommended action are facts supplied by analyzers, not facts
-  invented by the report model;
+- `code` and `facts` are machine-readable inputs. Producers do not pre-generate a title,
+  explanation, or recommendation;
+- `code` selects a versioned, category-specific facts schema; unknown codes are invalid input;
+- evidence is supplied and verified by analyzers rather than invented by the report model;
 - evidence may reference a file, metric, AppSec problem, CI run, issue, commit, merge request, or
   release. Each evidence item has a short verified `summary` plus identifiers needed by the UI;
 - the complete request must remain below 512 KiB. Producers aggregate repeated raw occurrences into
