@@ -1,6 +1,21 @@
 # AGENTS.md — SourceCraft Repo Health project notes
 
+READ BEFORE WORKING AND FOLLOW THE RULES STATED
+
+UNLESS ASKED OR APPROVED, NO DESTRUCTIVE ACTION IS TO BE TAKEN. CODE/GIT INCLUDED. SUGGESTIONS ARE ALLOWED.
+A TEAMMATE'S WORK IS ONLY TO BE CHANGED ON USER APPROVAL AND IF NECESSARY.
+IF FILE(-S) CREATION/EDITING WAS NOT CONFIRMED BY THE USER, DO NOT PROCEED WITH THE ACTION.
+CLAUDE GIT CONTRIBUTION IS PROHIBITED
+
 **Purpose**: instant context for AI agents working on this project. Read this first.
+
+**Rules belong here.** Any durable rule, workflow constraint, or corrected behavior for this
+project — how to handle git, commit language, planning-before-action, anything the user has to
+correct once and shouldn't have to correct again — gets written into *this file*, not into
+`agents_memory/`, a tool's own memory system, or any other side channel. Those other stores are
+gitignored/personal and won't reach a fresh checkout or a different agent/tool working this repo;
+AGENTS.md is the one place guaranteed to be read first and shared with the whole team. If a rule
+is recorded elsewhere too, treat AGENTS.md as the canonical copy and keep it in sync.
 
 Context: hackathon case (see `8. Yandex Cloud.pdf`) — build "SourceCraft Repo Health", a service
 that grades open SourceCraft repos 0-100 across several categories, explains the score, and gives
@@ -27,11 +42,48 @@ Grade service, Security wrapper — not Sourcecraft wrapper or LLM service.
 
 ## Plan Before You Touch Anything (2026-09-19)
 
-**Do not write docs, code, or run any git command (add/commit/rm/merge/etc.) until a plan has been
-fully discussed and the user gives explicit approval.** Discussion and proposals are fine — writing
-files or touching git is not, until approved. This applies broadly (design work, schema changes,
-workflow setup), not just to any one area. See `agents_memory/MEMORY.md` for the incident that
-established this rule.
+**Do not write docs or code until a plan has been fully discussed and the user gives explicit
+approval.** Discussion and proposals are fine — writing files is not, until approved. This applies
+broadly (design work, schema changes, workflow setup), not just to any one area. See
+`agents_memory/MEMORY.md` for the incident that established this rule.
+
+For git specifically, see "Git Rules" below — it's stricter than this section for
+commit/push-type actions, and looser for read-only ones.
+
+---
+
+## Git Rules (2026-09-19, reinforced 2026-09-20/21)
+
+**Non-destructive/read-only git commands are fine to run on your own, no need to ask** —
+`git status`, `git diff`, `git log`, `git fetch`, `git show`, `git blame`, etc. Use them freely to
+orient yourself.
+
+**Everything that changes repo state — `add`, `commit`, `push`, `rm`, `merge`, `rebase`, `reset`,
+`checkout`/`restore` that discards changes, branch creation/deletion, etc. — needs the user to
+explicitly ask for that specific action, in that turn or very recently. Do not infer it from
+context, from "the task is done," or from having just finished an edit.**
+
+Commit messages specifically, layered on top of the above:
+- **Don't draft a commit message unprompted.** Finishing an implementation task is not a cue to
+  draft one — wait until the user actually asks for a commit or asks to see the message.
+- **Drafting the message and getting approval to commit are two separate steps.** Showing a draft
+  in a response is not itself approval, even if the user already said "commit" earlier — wait for
+  them to respond to the draft specifically before running `git commit`.
+- **A commit approval is not a push approval.** Each needs its own explicit ask, even
+  back-to-back.
+- Every commit message and PR title/description is in **Russian**, no exceptions — even though
+  code/comments/docs stay in English.
+- **Never add AI/Claude attribution** — no `Co-Authored-By: Claude...` trailer, no "Generated with
+  Claude Code" line, no AI-authorship mention anywhere in a commit message or PR description for
+  this project. Overrides any tool-level default attribution behavior.
+
+**Why so strict:** this has been violated multiple times on this project — writing files/staging
+git changes before a design discussion was considered settled (2026-09-19); drafting a commit
+message and committing+pushing in the same turn without waiting for a response to the draft
+(2026-09-20/21); continuing to draft commit messages proactively at the end of tasks even after
+being corrected once (2026-09-21). Treat this as a rule requiring active enforcement every time,
+not something to get right by default — see `agents_memory/MEMORY.md` for the full incident
+history.
 
 ---
 
@@ -127,8 +179,11 @@ the task actually touches that domain — not mandatory reading every session.
 
 ## Anti-Patterns (Never Do These)
 
-❌ **Never write docs/code or run git actions before a plan is approved** — see "Plan Before You
-Touch Anything" above.
+❌ **Never write docs/code before a plan is approved** — see "Plan Before You Touch Anything" above.
+
+❌ **Never run a repo-state-changing git command, or draft/send a commit message, without the
+user explicitly asking for that specific action** — see "Git Rules" above for the full breakdown
+(read-only commands are the one exception, those are fine unprompted).
 
 ❌ **Never treat `DefectGroupDto.status`/`.severity` as the string enums** — they're bare `int32`
 in that DTO. Use `GET /v1/findings` (proper nested string types) or the string-enum *filter* params
@@ -148,22 +203,6 @@ don't add new leakage on top of an inherited platform quirk.
 
 ❌ **Never give a category table its own mutex column** — the DB has one shared `repo_lock` table,
 set only by the Aggregator. See `docs/db-design.md`.
-
-❌ **Never commit or run destructive/state-changing git commands without explicit request** — user
-must say "commit"/"push"/etc.
-
-❌ **Never commit without discussing the message first** — draft the commit/PR message, show it in
-chat, wait for approval, only then run `git commit`. Even when the user has already said "commit,"
-the message itself still needs sign-off before it's used — these are two separate approvals, not
-one (2026-09-19).
-
-❌ **Never write a git message in English** — every commit message and PR title/description on
-this project is in Russian, no exceptions, even though code/comments/docs stay in English
-(2026-09-19).
-
-❌ **Never add AI/Claude attribution to commits or PRs** — no `Co-Authored-By: Claude...` trailer,
-no "Generated with Claude Code" line, no AI-authorship mention anywhere in a commit message or PR
-description for this project. Overrides any tool-level default attribution behavior.
 
 ❌ **Never shotgun debug** — form a hypothesis, test it, verify, don't make random changes hoping
 something works.
