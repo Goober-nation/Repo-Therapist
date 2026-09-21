@@ -132,3 +132,14 @@ limitation, see `agents_memory/topics/sourcecraft-api.md`).
 Real AppSec SourceCraft data only, per TZ §3.1's explicit warning against faking it. Open
 critical/high/medium/low counts, days since last scan. No scan ever run → whole category is "Нет
 данных," never a fabricated 0.
+
+**Access caveat, confirmed with organizers (2026-09-21):** AppSec is gated by repo visibility, not
+by repo ownership/role. Public repos get scanning and results with no extra setup. Private repos
+need an opt-in "Security Add-on" connected for that specific repo — owning/adminning the repo is
+not enough on its own (verified live against our own private repo: 403 everywhere on
+`appsec.sourcecraft.tech` until we made it public). See `agents_memory/topics/appsec-api.md` for
+the full test matrix. Practical effect: the "analyze my own repo" flow (TZ §5) will legitimately
+hit "Нет данных" for Security whenever the analyzed repo is private and hasn't had the add-on
+connected — this is expected platform behavior, not a bug, but worth surfacing to the user (e.g.
+"connect the Security Add-on to see this category") rather than a silent no-data card, if the team
+decides that's worth the UI work.

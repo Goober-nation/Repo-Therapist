@@ -14,23 +14,9 @@ CREATE TABLE repos (
   repo_slug          TEXT NOT NULL,
   UNIQUE (org_slug, repo_slug),
 
-  name               TEXT NOT NULL,
-  description        TEXT,
-  web_url            TEXT NOT NULL,
-  default_branch     TEXT NOT NULL,               -- only branch counted for activity/regrade
-
   visibility         TEXT NOT NULL CHECK (visibility IN ('public','internal','private')),
 
-  primary_language   TEXT,
-
-  rating_value       DOUBLE PRECISION,             -- SourceCraft's reaction-based rating
-  rating_percentile  DOUBLE PRECISION,
-  rating_reactions   JSONB,                        -- reaction_counts[], as returned
-
-  counters           JSONB,                        -- forks/pull_requests/issues/tags/branches
-
-  last_commit_at     TIMESTAMPTZ,                  -- default-branch HEAD — regrade trigger
-  last_activity_at   TIMESTAMPTZ                   -- broadest signal: commits+issues+PRs+releases
+  last_activity_at   TIMESTAMPTZ                   -- calculated: broadest signal, commits+issues+PRs+releases
 );
 
 CREATE INDEX ON repos (visibility);
