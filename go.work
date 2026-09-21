@@ -4,5 +4,5 @@ use (
 	./backend/grade-service
 	./backend/repository-service
 	./backend/security-wrapper-service
-	./backend/temp-sourcecraft
+	./backend/sourcecraft-wrapper-service
 )

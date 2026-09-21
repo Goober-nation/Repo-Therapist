@@ -41,8 +41,8 @@ func main() {
 		if err != nil {
 			log.Fatalf("repository-service: %v", err)
 		}
-		log.Printf("done: uploaded %d files + %d commits + %d pulls + %d releases for %s/%s (sourcecraft_uuid=%s) to key prefix %q",
-			result.FileCount, result.CommitCount, result.PullCount, result.ReleaseCount, *org, *repo, result.SourcecraftUUID, result.S3Prefix)
+		log.Printf("done: uploaded %d files + %d commits + %d issues + %d milestones for %s/%s (sourcecraft_uuid=%s) to key prefix %q",
+			result.FileCount, result.CommitCount, result.IssueCount, result.MilestoneCount, *org, *repo, result.SourcecraftUUID, result.S3Prefix)
 	default:
 		fmt.Fprintln(os.Stderr, "usage: repository-service --org=<org_slug> --repo=<repo_slug>  OR  repository-service --listen")
 		os.Exit(2)

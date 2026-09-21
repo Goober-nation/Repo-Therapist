@@ -6,7 +6,8 @@ require (
 	github.com/minio/minio-go/v7 v7.3.0
 	github.com/segmentio/kafka-go v0.4.51
 	golang.org/x/sys v0.48.0
-	repo-therapist/tmp-sourcecraft v0.0.0
+	google.golang.org/grpc v1.84.0
+	google.golang.org/protobuf v1.36.12
 )
 
 require (
@@ -27,7 +28,6 @@ require (
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
 	gopkg.in/ini.v1 v1.67.3 // indirect
 )
-
-replace repo-therapist/tmp-sourcecraft => ../temp-sourcecraft

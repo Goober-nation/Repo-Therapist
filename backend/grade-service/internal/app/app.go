@@ -12,9 +12,8 @@ import (
 	"time"
 
 	"repo-therapist/grade-service/internal/config"
-	"repo-therapist/grade-service/internal/scoring"
 	"repo-therapist/grade-service/internal/gitlog"
-	"repo-therapist/tmp-sourcecraft"
+	"repo-therapist/grade-service/internal/scoring"
 	"repo-therapist/grade-service/internal/storage"
 )
 
@@ -44,28 +43,26 @@ func Grade(ctx context.Context, repoID string, cfg *config.Config) (map[string]a
 		inputs.Commits, inputs.CommitsAvailable = commits, true
 	}
 
-	// Pulls/releases are read back from the SourceCraft-shaped JSON that repository-service wrote
-	// to S3. repository-service currently fetches them via direct SourceCraft API calls — a
-	// placeholder for the eventual sourcecraft-wrapper-service — but the shape on disk (and thus
-	// here) won't change when that swap happens.
-	if data, err := s3Client.GetObject(ctx, prefix+"/_meta/pulls.json"); err != nil {
-		log.Printf("pulls.json unavailable for %s: %v (Activity's MR-rate metric will be no-data)", repoID, err)
+	// Issues/milestones are read back from the sourcecraft-wrapper-shaped JSON that
+	// repository-service wrote to S3 via its scwrapper client.
+	if data, err := s3Client.GetObject(ctx, prefix+"/_meta/issues.json"); err != nil {
+		log.Printf("issues.json unavailable for %s: %v (Activity's issue-rate metric will be no-data)", repoID, err)
 	} else {
-		var pulls []sourcecraft.PullRequest
-		if err := json.Unmarshal(data, &pulls); err != nil {
-			return nil, fmt.Errorf("decoding pulls.json: %w", err)
+		var issues []scoring.Issue
+		if err := json.Unmarshal(data, &issues); err != nil {
+			return nil, fmt.Errorf("decoding issues.json: %w", err)
 		}
-		inputs.Pulls, inputs.PullsAvailable = pulls, true
+		inputs.Issues, inputs.IssuesAvailable = issues, true
 	}
 
-	if data, err := s3Client.GetObject(ctx, prefix+"/_meta/releases.json"); err != nil {
-		log.Printf("releases.json unavailable for %s: %v (Activity's release metrics will be no-data)", repoID, err)
+	if data, err := s3Client.GetObject(ctx, prefix+"/_meta/milestones.json"); err != nil {
+		log.Printf("milestones.json unavailable for %s: %v (Activity's milestone metrics will be no-data)", repoID, err)
 	} else {
-		var releases []sourcecraft.Release
-		if err := json.Unmarshal(data, &releases); err != nil {
-			return nil, fmt.Errorf("decoding releases.json: %w", err)
+		var milestones []scoring.Milestone
+		if err := json.Unmarshal(data, &milestones); err != nil {
+			return nil, fmt.Errorf("decoding milestones.json: %w", err)
 		}
-		inputs.Releases, inputs.ReleasesAvailable = releases, true
+		inputs.Milestones, inputs.MilestonesAvailable = milestones, true
 	}
 
 	activityCfg, ok := cfg.Categories["activity"]

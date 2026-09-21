@@ -40,7 +40,7 @@ type RepoReady struct {
 	Status          string    `json:"status"` // StatusReady | StatusFailed
 	Error           string    `json:"error,omitempty"`
 	CommitCount     int       `json:"commit_count,omitempty"`
-	PullCount       int       `json:"pull_count,omitempty"`
-	ReleaseCount    int       `json:"release_count,omitempty"`
+	IssueCount      int       `json:"issue_count,omitempty"`
+	MilestoneCount  int       `json:"milestone_count,omitempty"`
 	ReadyAt         time.Time `json:"ready_at"`
 }

@@ -5,25 +5,38 @@ import (
 
 	"repo-therapist/grade-service/internal/config"
 	"repo-therapist/grade-service/internal/gitlog"
-	"repo-therapist/tmp-sourcecraft"
 )
+
+// Issue is the subset of sourcecraft-wrapper-service's Issue data Activity's issue-rate metric
+// needs — matches the shape repository-service writes to _meta/issues.json.
+type Issue struct {
+	CreatedAt string `json:"created_at"`
+}
+
+// Milestone is the subset of sourcecraft-wrapper-service's Milestone data Activity's
+// milestone-cadence metrics need — matches the shape repository-service writes to
+// _meta/milestones.json.
+type Milestone struct {
+	Deadline  string `json:"deadline"`
+	CreatedAt string `json:"created_at"`
+}
 
 // ActivityInputs bundles the three S3 _meta sources Activity draws from, plus whether each one
 // was actually fetched successfully. That last part matters: a source that failed to fetch means
 // every metric sourced from it is NoData; a source that fetched fine but is empty (e.g. a repo
-// with genuinely zero releases) means its rate-type metrics compute a real, valid zero instead —
+// with genuinely zero milestones) means its rate-type metrics compute a real, valid zero instead —
 // see aggregation.go's ratePerWindow comment for why that distinction isn't optional.
 type ActivityInputs struct {
-	Commits           []gitlog.Commit
-	CommitsAvailable  bool
-	Pulls             []sourcecraft.PullRequest
-	PullsAvailable    bool
-	Releases          []sourcecraft.Release
-	ReleasesAvailable bool
+	Commits             []gitlog.Commit
+	CommitsAvailable    bool
+	Issues              []Issue
+	IssuesAvailable     bool
+	Milestones          []Milestone
+	MilestonesAvailable bool
 }
 
 // ComputeCategory runs every calculated metric in a category config against the given inputs and
-// combines them. Currently only Activity's sources (commits/pulls/releases) are wired up via
+// combines them. Currently only Activity's sources (commits/issues/milestones) are wired up via
 // eventsForSource — categories whose sources aren't implemented yet report those metrics NoData,
 // which is the correct behavior (not an error) until they're built.
 func ComputeCategory(categoryID string, cfg config.CategoryConfig, inputs ActivityInputs, now time.Time) CategoryResult {
@@ -71,16 +84,16 @@ func eventsForSource(source string, inputs ActivityInputs) ([]Event, bool) {
 			return nil, false
 		}
 		return commitsToEvents(inputs.Commits), true
-	case "pulls.json":
-		if !inputs.PullsAvailable {
+	case "issues.json":
+		if !inputs.IssuesAvailable {
 			return nil, false
 		}
-		return pullsToEvents(inputs.Pulls), true
-	case "releases.json":
-		if !inputs.ReleasesAvailable {
+		return issuesToEvents(inputs.Issues), true
+	case "milestones.json":
+		if !inputs.MilestonesAvailable {
 			return nil, false
 		}
-		return releasesToEvents(inputs.Releases), true
+		return milestonesToEvents(inputs.Milestones), true
 	default:
 		return nil, false
 	}
@@ -105,10 +118,10 @@ func commitsToEvents(commits []gitlog.Commit) []Event {
 	return events
 }
 
-func pullsToEvents(pulls []sourcecraft.PullRequest) []Event {
-	events := make([]Event, 0, len(pulls))
-	for _, p := range pulls {
-		ts, err := time.Parse(time.RFC3339Nano, p.CreatedAt)
+func issuesToEvents(issues []Issue) []Event {
+	events := make([]Event, 0, len(issues))
+	for _, i := range issues {
+		ts, err := time.Parse(time.RFC3339Nano, i.CreatedAt)
 		if err != nil {
 			continue // skip unparseable timestamps rather than fail the whole metric
 		}
@@ -117,12 +130,12 @@ func pullsToEvents(pulls []sourcecraft.PullRequest) []Event {
 	return events
 }
 
-func releasesToEvents(releases []sourcecraft.Release) []Event {
-	events := make([]Event, 0, len(releases))
-	for _, r := range releases {
-		raw := r.ReleasedAt
+func milestonesToEvents(milestones []Milestone) []Event {
+	events := make([]Event, 0, len(milestones))
+	for _, m := range milestones {
+		raw := m.Deadline
 		if raw == "" {
-			raw = r.CreatedAt
+			raw = m.CreatedAt
 		}
 		ts, err := time.Parse(time.RFC3339Nano, raw)
 		if err != nil {

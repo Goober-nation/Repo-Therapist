@@ -78,7 +78,7 @@ to validate against, which we don't have yet — shipping an untuned decay curve
 documented flat window.
 
 What v1 does to avoid this becoming tech debt: every `_meta/*.json` export
-(`commits.json`, `pulls.json`, `releases.json`) stores full per-event timestamps, never a
+(`commits.json`, `issues.json`, `milestones.json`) stores full per-event timestamps, never a
 pre-aggregated count — so switching an `aggregation.type` from `rate_per_week` to a future
 `exp_decay_rate` is a change inside one Go function, not a data re-export. The trap this avoids is
 building any future category's export as a pre-bucketed aggregate instead of an event list.
@@ -90,9 +90,9 @@ building any future category's export as a pre-bucketed aggregate instead of an 
 | Commits/week | + | 0.5 | 5 | 0.20 | commits.json | `rate_per_week` |
 | Days since last activity | − | 40 | 3 | 0.20 | commits.json | `days_since_last_event` |
 | Unique contributors | + | 1 | 5 | 0.15 | commits.json | `unique_count(author_email)` |
-| MR rate/week | + | 0.2 | 2 | 0.15 | pulls.json | `rate_per_week` |
-| Releases/year | + | 1 | 6 | 0.05 | releases.json | `rate_per_year` |
-| Days since last release | − | 180 | 30 | 0.10 | releases.json | `days_since_last_event` |
+| Issue rate/week | + | 0.2 | 2 | 0.15 | issues.json | `rate_per_week` |
+| Milestones/year | + | 1 | 6 | 0.05 | milestones.json | `rate_per_year` |
+| Days since last milestone | − | 180 | 30 | 0.10 | milestones.json | `days_since_last_event` |
 | Top-contributor share | − | 1.0 | 0.5 | 0.10 | commits.json | `max_share(author_email)` — no-data if <2 commits in window; a genuine 100% (one person, many commits) still scores as real bus-factor risk, not excluded |
 | Net lines/week (band) | healthy [-2,10], critical [-30,50] | — | — | 0.05 | commits.json | `rate_per_week(net_lines)` |
 

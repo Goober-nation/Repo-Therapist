@@ -81,8 +81,8 @@ func handleRequest(ctx context.Context, req contracts.GradeRequested) contracts.
 		S3Prefix:        res.S3Prefix,
 		Status:          contracts.StatusReady,
 		CommitCount:     res.CommitCount,
-		PullCount:       res.PullCount,
-		ReleaseCount:    res.ReleaseCount,
+		IssueCount:      res.IssueCount,
+		MilestoneCount:  res.MilestoneCount,
 		ReadyAt:         time.Now(),
 	}
 }

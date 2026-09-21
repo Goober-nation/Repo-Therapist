@@ -1,6 +1,6 @@
-// Package service implements repository-service's core work: given an org/repo slug, fetch the
-// repo's metadata from SourceCraft, git clone its default branch, and upload the tree + git
-// history + pulls/releases to S3/MinIO.
+// Package service implements repository-service's core work: given an org/repo slug, resolve the
+// repo via sourcecraft-wrapper-service, git clone it, and upload the tree + git history +
+// issues/milestones to S3/MinIO.
 package service
 
 import (
@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"repo-therapist/repository-service/internal/gitlog"
-	"repo-therapist/tmp-sourcecraft"
+	"repo-therapist/repository-service/internal/scwrapper"
 	"repo-therapist/repository-service/internal/storage"
 )
 
@@ -27,8 +27,8 @@ type Result struct {
 	S3Prefix        string
 	FileCount       int
 	CommitCount     int
-	PullCount       int
-	ReleaseCount    int
+	IssueCount      int
+	MilestoneCount  int
 }
 
 // CloneAndUpload is the shared entry point for both the one-shot CLI path and the Kafka listen
@@ -39,19 +39,22 @@ func CloneAndUpload(ctx context.Context, org, repo string) (*Result, error) {
 		return nil, fmt.Errorf("SOURCECRAFT_PAT environment variable is required")
 	}
 
-	// NOTE: pulls/releases below go straight to the SourceCraft REST API via this client — a
-	// placeholder for the eventual sourcecraft-wrapper-service RPC (see
-	// backend/security-wrapper-service and backlog/phase-4-security-wrapper.md), not a permanent
-	// architecture choice. Swap the calls below for the wrapper client once it exists; the S3
-	// output shape (_meta/pulls.json, _meta/releases.json) should stay the same.
-	scClient := sourcecraft.NewClient(os.Getenv("SOURCECRAFT_BASE_URL"), pat)
-
-	log.Printf("fetching repo metadata for %s/%s", org, repo)
-	repoInfo, err := scClient.GetRepo(ctx, org, repo)
+	scClient, err := scwrapper.Dial(envOrDefault("SC_WRAPPER_ADDR", "localhost:8083"), pat)
 	if err != nil {
-		return nil, fmt.Errorf("fetching repo metadata: %w", err)
+		return nil, fmt.Errorf("connecting to sourcecraft-wrapper-service: %w", err)
 	}
-	log.Printf("resolved: id=%s default_branch=%s visibility=%s", repoInfo.ID, repoInfo.DefaultBranch, repoInfo.Visibility)
+	defer scClient.Close()
+
+	log.Printf("resolving repo id for %s/%s", org, repo)
+	repoID, err := scClient.GetRepoID(ctx, org, repo)
+	if err != nil {
+		return nil, fmt.Errorf("resolving repo id: %w", err)
+	}
+	gitURLs, err := scClient.GetGitURL(ctx, repoID)
+	if err != nil {
+		return nil, fmt.Errorf("fetching git url: %w", err)
+	}
+	log.Printf("resolved: id=%s", repoID)
 
 	tmpDir, err := os.MkdirTemp(cloneTempBase(), "repo-therapist-clone-*")
 	if err != nil {
@@ -59,7 +62,7 @@ func CloneAndUpload(ctx context.Context, org, repo string) (*Result, error) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	cloneURL, err := authenticatedCloneURL(repoInfo.CloneURL.HTTPS, pat)
+	cloneURL, err := authenticatedCloneURL(gitURLs.HTTPURL, pat)
 	if err != nil {
 		return nil, fmt.Errorf("building authenticated clone URL: %w", err)
 	}
@@ -70,9 +73,10 @@ func CloneAndUpload(ctx context.Context, org, repo string) (*Result, error) {
 	}
 	since := time.Now().AddDate(0, 0, -historyDays)
 
-	log.Printf("cloning %s (branch %s, history since %s) into %s",
-		repoInfo.CloneURL.HTTPS, repoInfo.DefaultBranch, since.Format("2006-01-02"), tmpDir)
-	if err := gitClone(ctx, cloneURL, repoInfo.DefaultBranch, since, tmpDir); err != nil {
+	// No --branch: the wrapper doesn't report default_branch, so this relies on git clone's own
+	// default of checking out whatever HEAD points to on the remote.
+	log.Printf("cloning %s (history since %s) into %s", gitURLs.HTTPURL, since.Format("2006-01-02"), tmpDir)
+	if err := gitClone(ctx, cloneURL, since, tmpDir); err != nil {
 		return nil, fmt.Errorf("git clone: %w", err)
 	}
 
@@ -97,7 +101,7 @@ func CloneAndUpload(ctx context.Context, org, repo string) (*Result, error) {
 		return nil, fmt.Errorf("connecting to S3: %w", err)
 	}
 
-	keyPrefix := "repos/" + repoInfo.ID
+	keyPrefix := "repos/" + repoID
 	log.Printf("uploading tree to s3://%s/%s", envOrDefault("S3_BUCKET", "repo-content"), keyPrefix)
 	fileCount, err := s3Client.UploadDir(ctx, tmpDir, keyPrefix)
 	if err != nil {
@@ -109,42 +113,39 @@ func CloneAndUpload(ctx context.Context, org, repo string) (*Result, error) {
 		return nil, fmt.Errorf("uploading commit history: %w", err)
 	}
 
-	// Pulls/releases: direct SourceCraft API calls, same pattern as GetRepo above — a stand-in
-	// for the eventual sourcecraft-wrapper-service RPC (see the NOTE above), not a permanent
-	// architecture choice.
-	log.Printf("fetching pull requests for %s/%s", org, repo)
-	pulls, err := scClient.ListPulls(ctx, org, repo)
+	log.Printf("fetching issues for %s/%s", org, repo)
+	issues, err := scClient.GetIssues(ctx, repoID)
 	if err != nil {
-		return nil, fmt.Errorf("listing pull requests: %w", err)
+		return nil, fmt.Errorf("listing issues: %w", err)
 	}
-	pullsJSON, err := json.Marshal(pulls)
+	issuesJSON, err := json.Marshal(issues)
 	if err != nil {
-		return nil, fmt.Errorf("marshaling pull requests: %w", err)
+		return nil, fmt.Errorf("marshaling issues: %w", err)
 	}
-	if err := s3Client.PutObject(ctx, keyPrefix+"/_meta/pulls.json", pullsJSON, "application/json"); err != nil {
-		return nil, fmt.Errorf("uploading pull requests: %w", err)
+	if err := s3Client.PutObject(ctx, keyPrefix+"/_meta/issues.json", issuesJSON, "application/json"); err != nil {
+		return nil, fmt.Errorf("uploading issues: %w", err)
 	}
 
-	log.Printf("fetching releases for %s/%s", org, repo)
-	releases, err := scClient.ListReleases(ctx, org, repo)
+	log.Printf("fetching milestones for %s/%s", org, repo)
+	milestones, err := scClient.GetMilestones(ctx, repoID)
 	if err != nil {
-		return nil, fmt.Errorf("listing releases: %w", err)
+		return nil, fmt.Errorf("listing milestones: %w", err)
 	}
-	releasesJSON, err := json.Marshal(releases)
+	milestonesJSON, err := json.Marshal(milestones)
 	if err != nil {
-		return nil, fmt.Errorf("marshaling releases: %w", err)
+		return nil, fmt.Errorf("marshaling milestones: %w", err)
 	}
-	if err := s3Client.PutObject(ctx, keyPrefix+"/_meta/releases.json", releasesJSON, "application/json"); err != nil {
-		return nil, fmt.Errorf("uploading releases: %w", err)
+	if err := s3Client.PutObject(ctx, keyPrefix+"/_meta/milestones.json", milestonesJSON, "application/json"); err != nil {
+		return nil, fmt.Errorf("uploading milestones: %w", err)
 	}
 
 	return &Result{
-		SourcecraftUUID: repoInfo.ID,
+		SourcecraftUUID: repoID,
 		S3Prefix:        keyPrefix,
 		FileCount:       fileCount,
 		CommitCount:     len(commits),
-		PullCount:       len(pulls),
-		ReleaseCount:    len(releases),
+		IssueCount:      len(issues),
+		MilestoneCount:  len(milestones),
 	}, nil
 }
 
@@ -158,12 +159,14 @@ func authenticatedCloneURL(rawCloneURL, pat string) (string, error) {
 	return u.String(), nil
 }
 
-// gitClone clones only the given branch, and only commits authored on/after since — git's
-// --shallow-since does this natively server/client-side, no manual commit-by-commit walking
-// needed to bound history by date instead of by commit count.
-func gitClone(ctx context.Context, cloneURL, branch string, since time.Time, destDir string) error {
+// gitClone clones the remote's default branch (whatever HEAD points to — no default_branch is
+// available from the wrapper, so this relies on git's own default instead of naming one), and
+// only commits authored on/after since — git's --shallow-since does this natively
+// server/client-side, no manual commit-by-commit walking needed to bound history by date instead
+// of by commit count.
+func gitClone(ctx context.Context, cloneURL string, since time.Time, destDir string) error {
 	args := []string{
-		"clone", "--branch", branch, "--single-branch",
+		"clone", "--single-branch",
 		"--shallow-since=" + since.Format("2006-01-02"),
 		cloneURL, destDir,
 	}

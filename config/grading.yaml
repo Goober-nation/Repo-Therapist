@@ -58,10 +58,10 @@ categories:
           healthy: 5
           provisional: true
 
-      - id: mr_rate_per_week
+      - id: issue_rate_per_week
         status: calculated
         weight: 0.15
-        source: pulls.json
+        source: issues.json
         aggregation:
           type: rate_per_week
           window_days: 180
@@ -72,10 +72,10 @@ categories:
           healthy: 2
           provisional: true
 
-      - id: releases_per_year
+      - id: milestones_per_year
         status: calculated
         weight: 0.05
-        source: releases.json
+        source: milestones.json
         aggregation:
           type: rate_per_year
           window_days: 365
@@ -86,10 +86,10 @@ categories:
           healthy: 6
           provisional: true
 
-      - id: days_since_last_release
+      - id: days_since_last_milestone
         status: calculated
         weight: 0.10
-        source: releases.json
+        source: milestones.json
         aggregation:
           type: days_since_last_event
         formula:

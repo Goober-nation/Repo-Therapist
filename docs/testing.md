@@ -13,7 +13,10 @@ set -a && source .env && set +a
 
 ## 1. Repository service alone (one-shot)
 
-Clones a repo, uploads its tree + git history + pulls/releases to S3.
+Clones a repo, uploads its tree + git history + issues/milestones to S3. Needs
+sourcecraft-wrapper-service running too (`go run ./backend/sourcecraft-wrapper-service/cmd`,
+`SOURCECRAFT_URL=https://api.sourcecraft.tech`) — repository-service talks to it via
+`SC_WRAPPER_ADDR` (defaults to `localhost:8083`).
 
 ```bash
 go run ./backend/repository-service/cmd/repository-service --org=examples --repo=vulnerable-repo

@@ -5,11 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sourcecraft-wrapper-service/internal/domain"
 	"strings"
 
 	"google.golang.org/grpc/metadata"
 )
+
+// maxPages bounds pagination loops so a pathologically large repo (thousands of issues/
+// milestones) can't make a single fetch run unbounded.
+const maxPages = 50
 
 type SCService interface {
 	GetRepoIdBySlugs(ctx context.Context, repoSlug string, orgSlug string) (string, error)
@@ -73,7 +78,7 @@ func (scw *SCWrapper) GetGitUrl(ctx context.Context, repoID string) (domain.Clon
 	if err != nil {
 		return domain.CloneURL{}, fmt.Errorf("%w:%w", domain.ErrUnauthenticated, err)
 	}
-	url := fmt.Sprintf("%s/repos/%s", scw.apiURL, repoID)
+	url := fmt.Sprintf("%s/repos/id:%s", scw.apiURL, repoID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -98,11 +103,15 @@ func (scw *SCWrapper) GetGitUrl(ctx context.Context, repoID string) (domain.Clon
 			resp.Status,
 		)
 	}
-	var urlResponse domain.CloneURL
-	if err := json.NewDecoder(resp.Body).Decode(&urlResponse); err != nil {
+	// GET /repos/id:{id} returns the full repo object; the clone URLs are nested under
+	// its "clone_url" key, not top-level.
+	var repoResponse struct {
+		CloneURL domain.CloneURL `json:"clone_url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&repoResponse); err != nil {
 		return domain.CloneURL{}, fmt.Errorf("%w: %w", domain.ErrInternalError, err)
 	}
-	return urlResponse, nil
+	return repoResponse.CloneURL, nil
 }
 
 func (scw *SCWrapper) GetCiCdRuns(ctx context.Context, repoID string) (domain.Runs, error) {
@@ -110,7 +119,7 @@ func (scw *SCWrapper) GetCiCdRuns(ctx context.Context, repoID string) (domain.Ru
 	if err != nil {
 		return domain.Runs{}, fmt.Errorf("%w:%w", domain.ErrUnauthenticated, err)
 	}
-	url := fmt.Sprintf("%s/repos/%s/cicd/runs", scw.apiURL, repoID)
+	url := fmt.Sprintf("%s/repos/id:%s/cicd/runs", scw.apiURL, repoID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return domain.Runs{}, fmt.Errorf("%w: %w", domain.ErrInternalError, err)
@@ -148,37 +157,23 @@ func (scw *SCWrapper) GetIssues(ctx context.Context, repoID string) (domain.Issu
 	if err != nil {
 		return domain.Issues{}, fmt.Errorf("%w:%w", domain.ErrUnauthenticated, err)
 	}
-	url := fmt.Sprintf("%s/repos/%s/issues", scw.apiURL, repoID)
+	basePath := fmt.Sprintf("/repos/id:%s/issues", repoID)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return domain.Issues{}, fmt.Errorf("%w: %w", domain.ErrInternalError, err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := scw.client.Do(req)
-	if err != nil {
-		return domain.Issues{}, fmt.Errorf("%w: %w", domain.ErrExternalAPI, err)
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusNotFound {
-			return domain.Issues{}, domain.ErrRepositoryNotFound
+	var all domain.Issues
+	pageToken := ""
+	for page := 0; page < maxPages; page++ {
+		var resp domain.Issues
+		next, err := scw.getPage(ctx, token, basePath, pageToken, &resp, func() string { return resp.NextPageToken })
+		if err != nil {
+			return domain.Issues{}, err
 		}
-		return domain.Issues{}, fmt.Errorf(
-			"%w: external API returned status %s",
-			domain.ErrExternalAPI,
-			resp.Status,
-		)
+		all.Issues = append(all.Issues, resp.Issues...)
+		if next == "" {
+			break
+		}
+		pageToken = next
 	}
-	var issues domain.Issues
-
-	if err := json.NewDecoder(resp.Body).Decode(&issues); err != nil {
-		return domain.Issues{}, fmt.Errorf("%w: %w", domain.ErrInternalError, err)
-	}
-	return issues, nil
+	return all, nil
 }
 
 func (scw *SCWrapper) GetMilestones(ctx context.Context, repoID string) (domain.Milestones, error) {
@@ -186,37 +181,57 @@ func (scw *SCWrapper) GetMilestones(ctx context.Context, repoID string) (domain.
 	if err != nil {
 		return domain.Milestones{}, fmt.Errorf("%w:%w", domain.ErrUnauthenticated, err)
 	}
-	url := fmt.Sprintf("%s/repos/%s/milestones", scw.apiURL, repoID)
+	basePath := fmt.Sprintf("/repos/id:%s/milestones", repoID)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	var all domain.Milestones
+	pageToken := ""
+	for page := 0; page < maxPages; page++ {
+		var resp domain.Milestones
+		next, err := scw.getPage(ctx, token, basePath, pageToken, &resp, func() string { return resp.NextPageToken })
+		if err != nil {
+			return domain.Milestones{}, err
+		}
+		all.Items = append(all.Items, resp.Items...)
+		if next == "" {
+			break
+		}
+		pageToken = next
+	}
+	return all, nil
+}
+
+// getPage fetches one page of a paginated GET endpoint into out, returning the next page's token
+// ("" if this was the last page).
+func (scw *SCWrapper) getPage(ctx context.Context, token, path, pageToken string, out any, nextToken func() string) (string, error) {
+	u := scw.apiURL + path
+	params := url.Values{"page_size": {"100"}}
+	if pageToken != "" {
+		params.Set("page_token", pageToken)
+	}
+	u += "?" + params.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
-		return domain.Milestones{}, fmt.Errorf("%w: %w", domain.ErrInternalError, err)
+		return "", fmt.Errorf("%w: %w", domain.ErrInternalError, err)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := scw.client.Do(req)
 	if err != nil {
-		return domain.Milestones{}, fmt.Errorf("%w: %w", domain.ErrExternalAPI, err)
+		return "", fmt.Errorf("%w: %w", domain.ErrExternalAPI, err)
 	}
-
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusNotFound {
-			return domain.Milestones{}, domain.ErrRepositoryNotFound
+			return "", domain.ErrRepositoryNotFound
 		}
-		return domain.Milestones{}, fmt.Errorf(
-			"%w: external API returned status %s",
-			domain.ErrExternalAPI,
-			resp.Status,
-		)
+		return "", fmt.Errorf("%w: external API returned status %s", domain.ErrExternalAPI, resp.Status)
 	}
-	var milestones domain.Milestones
-
-	if err := json.NewDecoder(resp.Body).Decode(&milestones); err != nil {
-		return domain.Milestones{}, fmt.Errorf("%w: %w", domain.ErrInternalError, err)
+	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		return "", fmt.Errorf("%w: %w", domain.ErrInternalError, err)
 	}
-	return milestones, nil
+	return nextToken(), nil
 }
 
 func (scw *SCWrapper) ListAllPublicReposId(ctx context.Context) ([]string, error) {
