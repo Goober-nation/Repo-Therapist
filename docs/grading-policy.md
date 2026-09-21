@@ -100,12 +100,18 @@ building any future category's export as a pre-bucketed aggregate instead of an 
 repos. "MR rate/week" resolves a contradiction in the original draft (prose said per-month, its own
 table said per-week) — picking per-week, matching the table.
 
-## Documentation (15%, not yet implemented)
+## Documentation (15%, method defined; implementation pending)
 
-Snapshot metrics (no time window — it's project state, not an event rate), from TZ §3.1's own list:
-README existence + quality heuristic, LICENSE, local-run instructions detected, build/test
-instructions detected, CONTRIBUTING, CODEOWNERS, recognizable structure (src/tests/docs dirs).
-Deterministic presence/heuristic checks — no LLM needed for a v1 baseline.
+LLM service owns the category's versioned 0–100 method. Ordinary code performs deterministic file
+checks and verifies repository facts; the model awards integer points for semantic documentation
+quality. LLM service combines both parts and returns a final category score that Grade service does
+not recalculate.
+
+The method assigns 20 points to deterministic README, LICENSE, CONTRIBUTING, and CODEOWNERS checks,
+and 80 points to purpose, local-run, build, testing, usage, navigation, and consistency checks.
+Missing and inapplicable checks follow the global renormalization rule in design principle 2.
+Complete weights, codes, normalization, evidence rules, and control cases are defined in
+[`documentation-grading.md`](documentation-grading.md).
 
 ## Issues (15%, not yet implemented)
 

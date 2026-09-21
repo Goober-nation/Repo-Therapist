@@ -235,7 +235,7 @@ Topic: `llm.documentation.results`.
     },
     "score": {
       "status": "CALCULATED",
-      "value": 68,
+      "value": 98,
       "scale": 100
     },
     "coverage": {
@@ -245,14 +245,15 @@ Topic: `llm.documentation.results`.
     },
     "checks": [
       {
-        "check_id": "local_run.environment",
+        "check_id": "local_run.configuration",
         "check_type": "SEMANTIC",
         "outcome": "EVALUATED",
         "points_awarded": 2,
         "max_points": 4,
         "deductions": [
           {
-            "code": "DOC_LOCAL_RUN_ENVIRONMENT_INCOMPLETE",
+            "deduction_id": "local_run.configuration:environment",
+            "code": "DOC_LOCAL_RUN_CONFIGURATION_INCOMPLETE",
             "raw_points_lost": 2,
             "facts": {
               "missing_aspects": [
@@ -284,27 +285,78 @@ Topic: `llm.documentation.results`.
         "deductions": []
       }
     ],
+    "problems": [
+      {
+        "id": "DOC-LOCAL-RUN-CONFIGURATION",
+        "category": "documentation",
+        "code": "DOC_LOCAL_RUN_CONFIGURATION_INCOMPLETE",
+        "severity": "LOW",
+        "score_impact": {
+          "category_points_lost": 2
+        },
+        "facts": {
+          "missing_aspects": [
+            "environment_variables"
+          ]
+        },
+        "evidence": [
+          {
+            "type": "file_content",
+            "path": "README.md",
+            "start_line": 30,
+            "end_line": 38,
+            "quote": "POSTGRES_USER=..."
+          },
+          {
+            "type": "file_missing",
+            "path": ".env.example"
+          }
+        ],
+        "source_checks": [
+          "local_run.configuration"
+        ],
+        "source_deductions": [
+          "local_run.configuration:environment"
+        ]
+      }
+    ],
     "warnings": []
   }
 }
 ```
 
-`check_id` values and their contribution to the category score belong to the named grading method
-version. Extending the method does not require a Kafka contract version change. Grade service does
-not interpret individual checks; it consumes `score`. Checks are included for auditing and as
-validated machine input for the final report.
+The example abbreviates `checks`; a production event contains every check defined by
+`grading_method_version`. The omitted checks in this example are fully evaluated and receive their
+maximum points. `check_id` values and their contribution to the category score belong to the named
+grading method version. Extending the method does not require a Kafka contract version change.
+Grade service does not interpret individual checks; it consumes `score`. Checks and problems are
+included for auditing and as validated machine input for the final report.
 
 Score rules:
 
 - `category` is always `documentation`;
 - `scale` is always `100` in contract v1;
-- with `status: CALCULATED`, `value` is a number from 0 to 100;
-- with `status: NO_DATA`, `value` is `null` and Grade service excludes the category according to
-  the global missing-data policy;
+- `status` is `CALCULATED` when every applicable check was evaluated and `CALCULATED_PARTIAL` when
+  one or more applicable checks are `NO_DATA`;
+- both statuses carry a numeric `value` from 0 to 100;
 - LLM service calculates `value` from deterministic and semantic checks using the exact method
   identified by `grading_method_version`;
 - the model does not freely invent the final category score: normal service code validates model
   output and applies the versioned method.
+
+Normalization rules:
+
+```text
+applicable_max = sum(max_points where outcome != NOT_APPLICABLE)
+evaluated_max  = sum(max_points where outcome == EVALUATED)
+earned         = sum(points_awarded where outcome == EVALUATED)
+coverage       = evaluated_max / applicable_max * 100
+score          = earned / evaluated_max * 100
+```
+
+Missing data never counts as zero. If no applicable check can be evaluated, LLM service publishes a
+failed event instead of fabricating a completed result. Exact weights and applicability rules are
+defined by `documentation-grading-v1` in `docs/documentation-grading.md`.
 
 Check rules:
 
@@ -327,7 +379,21 @@ schema.
 The documentation grading workflow emits no user-facing reason, title, or recommendation. Those
 are generated later, and only once, by the report workflow. Deduction `code`, typed `facts`, and
 validated evidence carry the machine-readable reason between the two workflows. The deduction
-code selects the allowed facts schema; arbitrary model-generated fact fields are rejected.
+code selects the allowed facts schema; arbitrary model-generated fact fields are rejected. Every
+deduction has a `deduction_id` that is stable and unique within the result.
+
+Problem rules:
+
+- normal service code groups deductions by a shared root cause; the model does not perform this
+  grouping;
+- every deduction appears in exactly one problem's `source_deductions`;
+- `source_checks` lists all contributing checks;
+- `score_impact.category_points_lost` is the grouped raw loss normalized by `evaluated_points`;
+- problem impacts sum exactly to `100 - score.value`, with the final problem absorbing any rounding
+  remainder;
+- severity is computed after grouping: up to 10 lost points is `LOW`, more than 10 through 25 is
+  `MEDIUM`, more than 25 through 50 is `HIGH`, and more than 50 is `CRITICAL`;
+- a code-specific minimum severity may raise, but never lower, impact severity.
 
 Allowed evidence variants:
 
@@ -342,7 +408,9 @@ one-based and inclusive. LLM service validates file existence, line ranges, and 
 snapshot before publishing a completed event. Invalid model evidence is never forwarded.
 
 `warnings` reports non-fatal context limitations such as intentionally truncated documentation.
-When truncation prevents a reliable decision, the affected check is `NO_DATA`.
+When truncation prevents a reliable decision, the affected check is `NO_DATA`, coverage decreases,
+and the result becomes `CALCULATED_PARTIAL`. Missing-data warnings do not create deductions and do
+not reduce the normalized score.
 
 ### `documentation.analysis.failed`
 
@@ -412,7 +480,7 @@ In contract v1, `output_language` is required and its only supported value is `r
       "categories": [
         {"category": "security", "status": "NO_DATA", "score": null},
         {"category": "activity", "status": "CALCULATED", "score": 91},
-        {"category": "documentation", "status": "CALCULATED", "score": 68},
+        {"category": "documentation", "status": "CALCULATED", "score": 68, "coverage_percent": 100},
         {"category": "ci_cd", "status": "NO_DATA", "score": null},
         {"category": "issues", "status": "CALCULATED", "score": 100},
         {"category": "code_health", "status": "CALCULATED", "score": 100}
@@ -423,7 +491,7 @@ In contract v1, `output_language` is required and its only supported value is `r
         "id": "DOC-LOCAL-RUN",
         "category": "documentation",
         "code": "DOC_LOCAL_RUN_INCOMPLETE",
-        "severity": "MEDIUM",
+        "severity": "HIGH",
         "score_impact": {
           "category_points_lost": 32
         },
@@ -472,8 +540,11 @@ In contract v1, `output_language` is required and its only supported value is `r
 
 Score rules:
 
-- status is one of `CALCULATED`, `NO_DATA`, `NOT_CALCULATED`, or `FAILED`;
-- `score` is a number from 0 to 100 only for `CALCULATED`; otherwise it is `null`;
+- status is one of `CALCULATED`, `CALCULATED_PARTIAL`, `NO_DATA`, `NOT_CALCULATED`, or `FAILED`;
+- `score` is a number from 0 to 100 for `CALCULATED` and `CALCULATED_PARTIAL`; otherwise it is
+  `null`;
+- a partially calculated category includes `coverage_percent`; full results may include it for
+  consistency;
 - LLM service preserves every supplied score exactly and never derives a replacement;
 - all six categories are present, including unavailable ones, so missing data cannot disappear
   from the report;
@@ -486,9 +557,10 @@ Problem and deduction rules:
 - `category` is one of `security`, `activity`, `documentation`, `ci_cd`, `issues`, `code_health`;
 - `severity` is `CRITICAL`, `HIGH`, `MEDIUM`, or `LOW`; minor deductions are `LOW`, not omitted;
 - `score_impact.category_points_lost` is a positive number on that category's 0-100 scale;
-- for every calculated category below 100, at least one problem for that category is required;
-- for each calculated category, its problem deductions sum to `100 - score` (within 0.01 for
-  decimal rounding). A category at 100 has no scoring problems;
+- for every `CALCULATED` or `CALCULATED_PARTIAL` category below 100, at least one scoring problem
+  for that category is required;
+- for each `CALCULATED` or `CALCULATED_PARTIAL` category, its problem deductions sum to
+  `100 - score` (within 0.01 for decimal rounding). A category at 100 has no scoring problems;
 - `code` and `facts` are machine-readable inputs. Producers do not pre-generate a title,
   explanation, or recommendation;
 - `code` selects a versioned, category-specific facts schema; unknown codes are invalid input;
@@ -592,7 +664,7 @@ Topic: `llm.report.results`.
     ],
     "recommendations": [
       {
-        "priority": "MEDIUM",
+        "priority": "HIGH",
         "title": "Дополнить инструкцию локального запуска",
         "reason": "Без описания конфигурации запуск нельзя надёжно воспроизвести.",
         "action": "Перечислить обязательные переменные и добавить файл-пример.",
@@ -618,11 +690,12 @@ even a minor deduction remains visible. Recommendation sources must include at l
 Exact projected overall score changes are not generated because only Grade service can calculate
 cross-category and final score changes. LLM service owns only the Documentation category
 calculation.
-`category_assessments` contains every category with `CALCULATED` status exactly once, including
-categories scored at 100. A 100-point assessment may state only the score; it must not invent a
-detailed strength that was absent from the request.
+`category_assessments` contains every category with `CALCULATED` or `CALCULATED_PARTIAL` status
+exactly once, including categories scored at 100. A 100-point assessment may state only the score;
+it must not invent a detailed strength that was absent from the request.
 `missing_data` contains every category whose input status is `NO_DATA`, `NOT_CALCULATED`, or
-`FAILED`, and contains no category with `CALCULATED` status.
+`FAILED`, plus a coverage note for every `CALCULATED_PARTIAL` category. It contains no fully
+`CALCULATED` category.
 
 The contract intentionally returns structured report content rather than Markdown or PDF. A
 presentation layer can render the same validated content into web, Markdown, or PDF without another
