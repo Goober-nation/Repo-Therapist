@@ -380,7 +380,8 @@ The documentation grading workflow emits no user-facing reason, title, or recomm
 are generated later, and only once, by the report workflow. Deduction `code`, typed `facts`, and
 validated evidence carry the machine-readable reason between the two workflows. The deduction
 code selects the allowed facts schema; arbitrary model-generated fact fields are rejected. Every
-deduction has a `deduction_id` that is stable and unique within the result.
+deduction has a `deduction_id` that is stable and unique within the result. Documentation codes and
+their facts/evidence schemas are defined in `docs/documentation-codes.md`.
 
 Problem rules:
 
@@ -401,11 +402,14 @@ Allowed evidence variants:
 {"type":"file_content","path":"README.md","start_line":10,"end_line":12,"quote":"..."}
 {"type":"file_exists","path":"Dockerfile"}
 {"type":"file_missing","path":".env.example"}
+{"type":"document_review","paths":["README.md","docs/overview.md"],"context_sha256":"d5b389a2248c8a7f7054f4b22a70f56fcab12c56108a5f4cc1a9bcb870cc5462"}
 ```
 
 Paths are UTF-8, relative to the snapshot root, use `/`, and cannot contain `..`. Lines are
 one-based and inclusive. LLM service validates file existence, line ranges, and quotes against the
-snapshot before publishing a completed event. Invalid model evidence is never forwarded.
+snapshot before publishing a completed event. For `document_review`, every listed file must have
+been included completely in the hashed model context; it supports absence of semantic content in
+existing documents. Invalid model evidence is never forwarded.
 
 `warnings` reports non-fatal context limitations such as intentionally truncated documentation.
 When truncation prevents a reliable decision, the affected check is `NO_DATA`, coverage decreases,
