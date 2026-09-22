@@ -2,19 +2,19 @@ import copy
 import json
 import unittest
 
-from llm_service.context import ModelContext
+from llm_service.context import build_model_context
 from llm_service.grading import CHECKS, COMPONENTS
 from llm_service.model_response import InvalidModelResponse, validate_model_response
 from llm_service.snapshot import Snapshot
 
 
-HASH = "b" * 64
 FILES = {"README.md": "# Demo\n\nA small documented project.\n",
          "LICENSE": "MIT License\nPermission granted.\n",
          "CONTRIBUTING.md": "# Contributing\n\nOpen a PR.\n",
          "CODEOWNERS": "* @team\n"}
 SNAPSHOT = Snapshot(frozenset(FILES), FILES, {})
-CONTEXT = ModelContext("context", HASH, frozenset({"README.md"}), 4, 4)
+CONTEXT = build_model_context(SNAPSHOT)
+HASH = CONTEXT.sha256
 
 
 def full_checks():
@@ -97,7 +97,7 @@ class ModelResponseTests(unittest.TestCase):
             "evidence": [{"type": "file_missing", "path": "README.md"}],
         }]
         empty = Snapshot(frozenset(), {}, {})
-        context = ModelContext("{}", HASH, frozenset(), 0, 0)
+        context = build_model_context(empty)
         result = validate_model_response(json.dumps({"checks": checks}).encode(), empty, context)
         self.assertEqual(result["score"]["value"], 72)
         with self.assertRaises(InvalidModelResponse):

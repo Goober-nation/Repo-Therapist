@@ -15,6 +15,10 @@ fails explicitly; no document is silently truncated. `llm_service.model_response
 accepts only the 21 semantic/hybrid check objects, validates their deduction
 codes and typed facts against the closed registry, verifies evidence against
 the stable snapshot, and lets ordinary code calculate the final score.
+`llm_service.detectors` reads filenames and selected manifests without running
+repository code. Its verified facts are included in the hashed model context
+and inserted into deductions by Python after the model responds. A model
+response containing its own `detected_*` values is rejected.
 
 Model output is one JSON object with a `checks` array and no prose. Each check
 contains `check_id`, `check_type`, `outcome`, `points_awarded`, `max_points`,
@@ -25,8 +29,9 @@ decision before the model may return them.
 
 The service is **not ready to consume or publish Kafka events yet**. Model choice
 was intentionally deferred. The next implementation slice needs a model adapter,
-ordinary-code detectors for the remaining `detected_*` facts, an S3 client
-adapter, Kafka consumers/producers, and Russian report generation. A real S3
+expanded detectors for repository-specific inputs that static inspection cannot
+yet verify, an S3 client adapter, Kafka consumers/producers, and Russian report
+generation. A real S3
 service and model provider have not been used yet. The grading result must not
 be published until those integrations and their failure paths are tested.
 

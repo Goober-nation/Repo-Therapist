@@ -58,6 +58,23 @@ class ContextTests(unittest.TestCase):
         self.assertNotIn("build.commands", allowed)
         self.assertNotIn("testing.commands", allowed)
 
+    def test_nested_service_manifests_are_selected_but_dependency_manifests_are_not(self):
+        store = FakeStore()
+        store.objects = {
+            "repos/id/README.md": b"# Multi-service\n\nRead the service docs.\n",
+            "repos/id/backend/api/README.md": b"# API\n\nStart here.\n",
+            "repos/id/backend/api/go.mod": b"module example/api\n",
+            "repos/id/backend/api/Dockerfile": b"FROM golang:1.25\n",
+            "repos/id/node_modules/dependency/package.json": b'{"scripts":{"build":"evil"}}',
+        }
+        snapshot, context = prepare_documentation_context(store, "repos/id")
+        self.assertIn("backend/api/go.mod", snapshot.files)
+        self.assertIn("backend/api/Dockerfile", snapshot.files)
+        self.assertIn("backend/api/README.md", context.reviewed_paths)
+        self.assertNotIn("node_modules/dependency/package.json", snapshot.files)
+        facts = json.loads(context.text)["detected_facts"]
+        self.assertNotIn("npm", {item["kind"] for item in facts.get("detected_package_managers", [])})
+
 
 if __name__ == "__main__":
     unittest.main()
