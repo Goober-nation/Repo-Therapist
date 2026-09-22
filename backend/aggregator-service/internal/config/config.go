@@ -7,9 +7,10 @@ import (
 )
 
 type Config struct {
-	AppPort       string
-	ClientTimeout string
-	Dbc           *DatabaseConfig
+	AppPort               string
+	ClientTimeout         string
+	Dbc                   *DatabaseConfig
+	SourceCraftWrapperURL string
 }
 
 type DatabaseConfig struct {
@@ -39,6 +40,7 @@ func LoadConfig() *Config {
 			DBname:   getEnvDefault("DB_NAME", "postgres"),
 			SSLmode:  getEnvDefault("SSL_MODE", "disabled"),
 		},
+		SourceCraftWrapperURL: getEnvDefault("WRAPPER_URL"),
 	}
 }
 
