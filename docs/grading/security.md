@@ -73,6 +73,3 @@ repos (same caveat Activity's `provisional: true` flags carry).
 
 - Whether to surface "connect the Security Add-on" as an explicit UI call-to-action for the
   private-repo no-data case, vs. a silent no-data card — product decision, not yet made.
-- End-to-end verified (2026-09-22) against a real repo
-  (`timoxa102928/appsec-private-test`) via both direct `grpcurl` and the full grade-service client
-  path — not just compiled.

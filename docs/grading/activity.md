@@ -1,6 +1,6 @@
 # Activity (15%, public)
 
-**Status: implemented** (2026-09-19). Last updated 2026-09-19.
+**Status: implemented** (2026-09-19). Last updated 2026-09-22.
 
 ## What it measures
 
@@ -69,8 +69,23 @@ validated against real repos.
 - Releases (`_meta/releases.json`) were fetched but never found populated on any real repo tested
   — releases appear to be a largely-unused SourceCraft feature distinct from git tags; not
   currently wired into any metric.
+- `net_lines_per_week`'s healthy band ([-2, 10]) scores a repo with **zero commits in the
+  window** identically to one with healthy, balanced activity (0 net lines both clamp to score
+  1). Caught reviewing `yapb/yapb`'s real result: a fully dormant repo got this one metric's
+  maximum score purely from having nothing happen. In practice this doesn't distort the overall
+  score — `commits_per_week`/`days_since_last_activity` (0.20 weight each, vs. this metric's
+  0.05) already correctly punish zero activity hard — but it's a real inconsistency: "nothing
+  happened" and "healthy amount of change" aren't the same fact and shouldn't score the same.
+  Not fixed yet, flagged here rather than silently left in place.
+- SourceCraft's API returns Go's zero-value time (`"0001-01-01T00:00:00Z"`) for a milestone with
+  no deadline set, rather than omitting the field or returning null. `milestonesToEvents` treats
+  this sentinel (or an empty string) as unset and falls back to `created_at`
+  (`isUnsetDeadline` in `internal/scoring/activity.go`) — without it, `days_since_last_milestone`
+  silently computes from a ~2025-year-old fake deadline instead of the real date.
 
 ## Open questions
 
 - Threshold validation against real repos — tracked in `backlog/phase-2-grade-service.md`.
 - No automated unit tests yet for `internal/scoring` — same gap for every category.
+- Whether `net_lines_per_week` should require a minimum commit count in-window (like
+  `top_contributor_share`'s floor) before scoring at all, to close the gap above.

@@ -139,11 +139,25 @@ func issuesToEvents(issues []Issue) []Event {
 	return events
 }
 
+// isUnsetDeadline reports whether raw is empty or the platform's sentinel for "no deadline set"
+// — SourceCraft's API returns Go's zero-value time ("0001-01-01T00:00:00Z") rather than omitting
+// the field or nulling it, confirmed live (2026-09-22) against yapb/yapb's real milestones, all
+// of which carry this exact value despite having real, distinct created_at/updated_at dates. A
+// naive raw=="" check misses this and lets a "no deadline" milestone parse as a real ~2000-year-
+// old deadline, producing nonsense like days_since_last_milestone > 100000.
+func isUnsetDeadline(raw string) bool {
+	if raw == "" {
+		return true
+	}
+	ts, err := time.Parse(time.RFC3339Nano, raw)
+	return err == nil && ts.Year() <= 1
+}
+
 func milestonesToEvents(milestones []Milestone) []Event {
 	events := make([]Event, 0, len(milestones))
 	for _, m := range milestones {
 		raw := m.Deadline
-		if raw == "" {
+		if isUnsetDeadline(raw) {
 			raw = m.CreatedAt
 		}
 		ts, err := time.Parse(time.RFC3339Nano, raw)

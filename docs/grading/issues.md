@@ -38,8 +38,7 @@ the per-repo customizable `status` slug/name, which isn't safe to match across r
 
 Event-stream shaped, same engine Activity uses (`ComputeCategory`/`eventsForSource`), config in
 `config/grading.yaml` under `categories.issues`. All thresholds `provisional: true` — first-guess
-values, validated for mechanism (see Verified below) but not calibrated against a repo
-population.
+values, not calibrated against a repo population.
 
 | Metric | Direction | Critical | Healthy | Weight | `min_sample_size` population |
 |---|---|---|---|---|---|
@@ -100,17 +99,7 @@ Originally windowed every metric by issue *creation* date. Two rounds of correct
    `median_closure_days`' healthy bound (7d→21d) against the ~30d empirical real-world average.
    `median_closure_days` itself was left creation-windowed — that specific pattern (CHAOSS's
    cohort-based Issue Resolution Duration) is the field's standard for closure-time specifically.
-
-## Verified (2026-09-22)
-
-Current design (post-redesign) run against 4 real repos:
-
-| Repo | Real issue count | Category score | Notes |
-|---|---|---|---|
-| `dqdkfa/libmdbx` | 239 | 33.1/100 | `abandoned_share=1.0` — hand-verified against the raw API: all 7 currently-open issues stale 143-2197 days, 6 of which were created outside the old 180-day window (exactly the bug this fixed) |
-| `yapb/yapb` | 575 | 13.3/100 | Heavy dead backlog (`abandoned_share=0.97`) |
-| `a13xp0p0v/linux-kernel-defence-map` | 6 | `NoData` | Too few issues for any metric's floor |
-| `sourcecraft/sourcecraft` | 1368 | 54.0/100 | Fast, balanced (`median_closure_days≈2.2d`, `growth_ratio≈1.02`) |
-
+   Confirmed on real data: `dqdkfa/libmdbx` has 7 currently-open issues stale 143-2197 days, 6 of
+   which were created outside the old 180-day window — exactly the case the redesign fixes.
 `libmdbx`'s `abandoned_share`, `growth_ratio`, and `share_resolved` were independently
 recomputed from a fresh, separate API fetch (not through this codebase) and matched exactly.

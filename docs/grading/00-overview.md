@@ -79,6 +79,48 @@ decision, not a technical block (its data is viewer-readable on public repos).
    (we chose not to compute this, vs. we tried and this repo had nothing to compute) that the UI
    must be able to tell apart, even though they're combined identically for scoring (principle 2).
 
+## Implementation methodology
+
+The working method every implemented category so far has followed, kept here so it repeats for
+Code health/CI/CD/Documentation rather than being reinvented per category:
+
+1. **Before writing code: read the existing state, then propose a plan and get it confirmed.**
+   Read the TZ section the category maps to, the relevant platform-API research already recorded
+   (`agents_memory/topics/`), and any prior backlog notes — never start from a blank assumption
+   about what data is available. Lay out the concrete plan (data source, metric list, no-data
+   rule per metric) and get it confirmed before writing implementation code, not after.
+2. **Implementation is checked against this doc's own principles, not just "does it compile."**
+   Every metric gets an explicit no-data-vs-real-zero rule (principle 2/4) before it's considered
+   done — a metric with no stated floor is treated as unfinished, not just unpolished.
+3. **Testing has two independent layers, both required — neither substitutes for the other:**
+   - *Synthetic, targeted cases* — small hand-constructed inputs built to exercise one specific
+     behavior (a sample-size floor tripping, a specific edge case a fix is meant to catch) and
+     checked against a hand-computed expected result. Fast, precise, good for proving a specific
+     fix does what it claims.
+   - *Live, end-to-end runs against real repos* — the actual services (repository-service,
+     grade-service, any wrapper involved) run against real SourceCraft data, not mocks. Chosen to
+     cover a range of shapes (near-empty, small, large; healthy and neglected) rather than one
+     convenient example.
+4. **Real-repo results get independently cross-checked, not just trusted.** At least one
+   real-repo result is recomputed by hand from a fresh, separate fetch of the same raw data
+   (outside the codebase being tested — e.g. a standalone script hitting the platform API
+   directly) and compared number-for-number against the code's own output. A result is not
+   "verified" until it matches an independently-derived number, not just until the pipeline runs
+   without erroring.
+5. **When a design choice can't be settled from the TZ or first principles alone, look outward
+   before guessing.** For choices with real prior art (what counts as a "stale" issue, how a
+   metric should be windowed, what threshold values are defensible) a research pass over
+   external, real-world sources (established frameworks, tooling defaults, relevant literature)
+   is run and its findings are what change the design — not a from-scratch guess presented as if
+   it were informed. Every threshold adopted this way is still marked `provisional: true`: an
+   externally-sourced starting point, not a substitute for calibration against this project's own
+   repo population.
+6. **Self-review is part of the process, not a one-time gate.** Coming back to already-shipped
+   work and asking "is this actually defensible" — not just "does it run" — is expected to
+   surface real problems (a missing sample-size floor, a windowing choice that quietly hides the
+   exact cases a metric exists to catch). When it does, the fix, its reasoning, and what
+   triggered it are recorded in the category's own file (this directory), not just fixed silently.
+
 ## Future: time-decay (not implemented now, deliberately schema-ready)
 
 A flat time window (e.g. "commits in the last 180 days") has a hard cliff: a commit on day 179
