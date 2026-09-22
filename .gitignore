@@ -27,6 +27,9 @@
 !go.work
 !go.work.sum
 
+# python LLM service
+!*.py
+
 # react/frontend (covers html + tsconfig per project decision)
 !*.js
 !*.jsx
