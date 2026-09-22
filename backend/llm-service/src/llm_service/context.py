@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass
 from hashlib import sha256
 
+from .detectors import detect_repository_facts
 from .grading import required_file_paths
 from .snapshot import ObjectStore, Snapshot, load_snapshot
 
@@ -16,7 +17,10 @@ ROOT_DOCUMENTS = {"readme", "license", "licence", "contributing", "changelog",
 ARTIFACT_NAMES = {"pyproject.toml", "requirements.txt", "package.json", "go.mod",
                   "cargo.toml", "pom.xml", "build.gradle", "makefile", "dockerfile",
                   "docker-compose.yml", "docker-compose.yaml", "pytest.ini", "tox.ini",
-                  "setup.cfg", "setup.py", ".env.example"}
+                  "setup.cfg", "setup.py", ".env.example", "go.work",
+                  "build.gradle.kts"}
+IGNORED_DIRECTORIES = {"node_modules", "vendor", ".git", ".venv", "dist", "build",
+                       "target", ".next", ".cache"}
 
 
 class ContextBuildError(ValueError):
@@ -35,13 +39,15 @@ class ModelContext:
 
 def _is_document(path: str) -> bool:
     lower = path.lower()
+    if any(part in IGNORED_DIRECTORIES for part in lower.split("/")[:-1]):
+        return False
     basename = lower.rsplit("/", 1)[-1]
     stem = basename.split(".", 1)[0]
-    if lower.startswith("docs/") and lower.endswith(DOC_EXTENSIONS):
+    if (lower.startswith("docs/") or "/docs/" in lower) and lower.endswith(DOC_EXTENSIONS):
         return True
     if lower.startswith(".github/") and lower.endswith(DOC_EXTENSIONS):
         return True
-    return "/" not in lower and stem in ROOT_DOCUMENTS and (
+    return lower.count("/") <= 4 and stem in ROOT_DOCUMENTS and (
         "." not in basename or lower.endswith(DOC_EXTENSIONS)
     )
 
@@ -54,7 +60,12 @@ def select_context_paths(all_paths: frozenset[str], *, max_paths: int = 10_000) 
     selected = set(required)
     for path in all_paths:
         lower = path.lower()
-        if _is_document(path) or lower in ARTIFACT_NAMES or (
+        parts = lower.split("/")
+        if any(part in IGNORED_DIRECTORIES for part in parts[:-1]):
+            continue
+        artifact = parts[-1] in ARTIFACT_NAMES or parts[-1].startswith("requirements-") and (
+            parts[-1].endswith(".txt")) or parts[-1].startswith("dockerfile.")
+        if _is_document(path) or (artifact and len(parts) <= 5) or (
             lower.startswith(".github/workflows/") and lower.endswith((".yml", ".yaml"))
         ):
             selected.add(path)
@@ -71,6 +82,7 @@ def build_model_context(snapshot: Snapshot, *, max_context_bytes: int = 512_000)
         "repository_paths": sorted(snapshot.all_paths),
         "documents": {path: snapshot.files[path] for path in sorted(reviewed)},
         "artifacts": {path: snapshot.files[path] for path in sorted(selected - reviewed)},
+        "detected_facts": detect_repository_facts(snapshot),
     }
     text = json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     encoded = text.encode("utf-8")
@@ -127,6 +139,10 @@ def allowed_not_applicable_checks(snapshot: Snapshot, context: ModelContext) -> 
         name.endswith(test_suffixes) or name.startswith("tests/") or
         "/tests/" in name for name in paths
     ))
+    detected = detect_repository_facts(snapshot)
+    has_build = has_build or bool(detected.get("detected_build_systems"))
+    has_tests = has_tests or bool(detected.get("detected_test_types")) or bool(
+        detected.get("detected_test_commands"))
     allowed = set()
     if not has_build:
         allowed.update({"build.commands", "build.configuration", "build.output"})

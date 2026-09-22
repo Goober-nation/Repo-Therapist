@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
-from typing import Mapping
 
-from .context import ModelContext, allowed_not_applicable_checks
+from .context import (ContextBuildError, ModelContext, allowed_not_applicable_checks,
+                      build_model_context)
+from .deductions import RULES
+from .detectors import detect_repository_facts
 from .grading import COMPONENTS, grade_documentation
 from .snapshot import Snapshot
 
@@ -25,16 +27,23 @@ def _unique_pairs(pairs):
 
 def validate_model_response(raw: bytes, snapshot: Snapshot, context: ModelContext, *,
                             allowed_no_data: frozenset[str] = frozenset(),
-                            allowed_not_applicable: frozenset[str] | None = None,
-                            trusted_facts_by_deduction: Mapping[str, dict] | None = None) -> dict:
+                            allowed_not_applicable: frozenset[str] | None = None) -> dict:
     """Accept only the 21 model/hybrid checks, then recompute the category result.
 
     Applicability and unavailable-context decisions come from ordinary code, not
-    a model assertion. Until those detectors are implemented, the default is to
-    reject model-supplied NOT_APPLICABLE and NO_DATA outcomes.
+    a model assertion. Detector facts are injected by this service after parsing;
+    the model is never allowed to supply its own ``detected_*`` values.
     """
     if not isinstance(raw, bytes) or len(raw) > 512_000:
         raise InvalidModelResponse("model response is not bytes or is too large")
+    try:
+        current = build_model_context(snapshot)
+    except ContextBuildError as exc:
+        raise InvalidModelResponse("repository context cannot be rebuilt") from exc
+    if (current.sha256 != context.sha256 or current.reviewed_paths != context.reviewed_paths or
+            current.selected_file_count != context.selected_file_count or
+            current.total_file_count != context.total_file_count or current.text != context.text):
+        raise InvalidModelResponse("repository context changed after model input was prepared")
     try:
         body = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_pairs)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -60,11 +69,36 @@ def validate_model_response(raw: bytes, snapshot: Snapshot, context: ModelContex
         semantic[check_id] = check
     if set(semantic) != expected:
         raise InvalidModelResponse(f"missing model checks: {expected - set(semantic)}")
+    detected = detect_repository_facts(snapshot)
+    trusted_by_deduction = {}
+    for check in semantic.values():
+        enriched = []
+        deductions = check.get("deductions")
+        if not isinstance(deductions, list):
+            raise InvalidModelResponse("model deductions must be a list")
+        for deduction in deductions:
+            if not isinstance(deduction, dict) or not isinstance(deduction.get("facts"), dict):
+                raise InvalidModelResponse("invalid model deduction")
+            facts = dict(deduction["facts"])
+            if any(name.startswith("detected_") for name in facts):
+                raise InvalidModelResponse("model supplied a detector fact")
+            code = deduction.get("code")
+            rule = RULES.get(code) if isinstance(code, str) else None
+            if rule is not None:
+                for name in rule.required | rule.optional:
+                    if name.startswith("detected_") and name in detected:
+                        facts[name] = detected[name]
+            copy = dict(deduction)
+            copy["facts"] = facts
+            enriched.append(copy)
+            if isinstance(copy.get("deduction_id"), str):
+                trusted_by_deduction[copy["deduction_id"]] = detected
+        check["deductions"] = enriched
     try:
         result = grade_documentation(
             snapshot.files, semantic, context_sha256=context.sha256,
             reviewed_paths=set(context.reviewed_paths), all_paths=set(snapshot.all_paths),
-            trusted_facts_by_deduction=trusted_facts_by_deduction,
+            trusted_facts_by_deduction=trusted_by_deduction,
         )
     except ValueError as exc:
         raise InvalidModelResponse(str(exc)) from exc

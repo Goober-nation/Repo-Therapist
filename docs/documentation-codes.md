@@ -23,7 +23,8 @@ values, or evidence variants are invalid.
 - `facts` follows the registered schema and rejects additional properties;
 - `missing_aspects` and `unclear_aspects` contain only component IDs registered for the source
   check in `docs/documentation-grading.md`;
-- detector facts (`detected_*`) come from ordinary code, not free-form model output;
+- detector facts (`detected_*`) come from ordinary code, not free-form model output. The model
+  response omits them; the service inserts verified values after parsing the response;
 - at least one validated evidence item is required.
 
 ## Evidence variants
@@ -108,6 +109,9 @@ Artifact kinds are `binary`, `container_image`, `package`, `archive`, `frontend_
 | `DOC_TESTING_SCOPE_UNCLEAR` | `testing.scope` | `missing_aspects`, `detected_test_types` | documentation plus test evidence | `LOW` |
 
 Test types are `unit`, `integration`, `end_to_end`, `contract`, `smoke`, `performance`, or `other`.
+`detected_test_commands` may be an empty list when test files exist but no explicit command was
+found in selected manifests or CI configuration. An empty list does not mean no command exists
+anywhere in the repository.
 
 ## Usage
 
