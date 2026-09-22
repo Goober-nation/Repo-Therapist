@@ -45,6 +45,9 @@ type AggregationConfig struct {
 	WindowDays    int    `yaml:"window_days"`
 	Field         string `yaml:"field"`
 	MinSampleSize int    `yaml:"min_sample_size"`
+	// StalenessDays is abandoned_share's "untouched for N days" threshold — distinct from
+	// WindowDays (which issues to consider at all).
+	StalenessDays int `yaml:"staleness_days"`
 }
 
 type FormulaConfig struct {

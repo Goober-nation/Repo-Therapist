@@ -72,6 +72,11 @@ func Grade(ctx context.Context, repoID string, cfg *config.Config) (map[string]a
 	}
 	activityResult := scoring.ComputeCategory("activity", activityCfg, inputs, time.Now())
 
+	issuesResult := scoring.CategoryResult{ID: "issues", NoData: true}
+	if issuesCfg, ok := cfg.Categories["issues"]; ok && issuesCfg.Status == config.StatusCalculated {
+		issuesResult = scoring.ComputeCategory("issues", issuesCfg, inputs, time.Now())
+	}
+
 	securityResult := scoring.CategoryResult{ID: "security", NoData: true}
 	if securityCfg, ok := cfg.Categories["security"]; ok && securityCfg.Status == config.StatusCalculated {
 		securityResult = gradeSecurity(ctx, repoID)
@@ -81,6 +86,7 @@ func Grade(ctx context.Context, repoID string, cfg *config.Config) (map[string]a
 		"sourcecraft_uuid": repoID,
 		"categories": map[string]scoring.CategoryResult{
 			"activity": activityResult,
+			"issues":   issuesResult,
 			"security": securityResult,
 		},
 	}, nil

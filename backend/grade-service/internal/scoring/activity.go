@@ -8,9 +8,14 @@ import (
 )
 
 // Issue is the subset of sourcecraft-wrapper-service's Issue data Activity's issue-rate metric
-// needs — matches the shape repository-service writes to _meta/issues.json.
+// and Issues' metrics need — matches the shape repository-service writes to _meta/issues.json.
+// StatusType is the fixed backend lifecycle enum (initial/in_progress/paused/completed/
+// cancelled), not the per-repo customizable Status slug — see
+// backend/repository-service/internal/scwrapper/client.go's Issue struct for why.
 type Issue struct {
-	CreatedAt string `json:"created_at"`
+	CreatedAt  string `json:"created_at"`
+	UpdatedAt  string `json:"updated_at"`
+	StatusType string `json:"status_type"`
 }
 
 // Milestone is the subset of sourcecraft-wrapper-service's Milestone data Activity's
@@ -125,7 +130,11 @@ func issuesToEvents(issues []Issue) []Event {
 		if err != nil {
 			continue // skip unparseable timestamps rather than fail the whole metric
 		}
-		events = append(events, Event{Timestamp: ts})
+		e := Event{Timestamp: ts, StringFields: map[string]string{"status_type": i.StatusType}}
+		if updatedAt, err := time.Parse(time.RFC3339Nano, i.UpdatedAt); err == nil {
+			e.NumericFields = map[string]float64{"updated_at_unix": float64(updatedAt.Unix())}
+		}
+		events = append(events, e)
 	}
 	return events
 }

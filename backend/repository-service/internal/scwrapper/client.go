@@ -68,14 +68,19 @@ func (c *Client) GetGitURL(ctx context.Context, repoID string) (GitURLs, error) 
 	return GitURLs{HTTPURL: resp.GetHttpUrl(), SSHURL: resp.GetSshUrl()}, nil
 }
 
-// Issue is the subset of the wrapper's Issue message Activity's issue-rate metric needs.
+// Issue is the subset of the wrapper's Issue message Activity's and Issues' metrics need.
+// StatusType is the fixed backend lifecycle enum (initial/in_progress/paused/completed/
+// cancelled — see sourcecraft-wrapper-service's IssueStatus.status_type), not the per-repo
+// customizable Status slug/name — Issues category metrics key off StatusType since a repo's own
+// slug/name for "closed" isn't guaranteed consistent across repos/orgs.
 type Issue struct {
-	ID        string `json:"id"`
-	Slug      string `json:"slug"`
-	Title     string `json:"title"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	ID         string `json:"id"`
+	Slug       string `json:"slug"`
+	Title      string `json:"title"`
+	Status     string `json:"status"`
+	StatusType string `json:"status_type"`
+	CreatedAt  string `json:"created_at"`
+	UpdatedAt  string `json:"updated_at"`
 }
 
 // GetIssues fetches every issue for a repo, following the wrapper's page tokens.
@@ -87,12 +92,13 @@ func (c *Client) GetIssues(ctx context.Context, repoID string) ([]Issue, error) 
 	issues := make([]Issue, 0, len(resp.GetIssues()))
 	for _, i := range resp.GetIssues() {
 		issues = append(issues, Issue{
-			ID:        i.GetId(),
-			Slug:      i.GetSlug(),
-			Title:     i.GetTitle(),
-			Status:    i.GetStatus().GetSlug(),
-			CreatedAt: timestampRFC3339(i.GetCreatedAt()),
-			UpdatedAt: timestampRFC3339(i.GetUpdatedAt()),
+			ID:         i.GetId(),
+			Slug:       i.GetSlug(),
+			Title:      i.GetTitle(),
+			Status:     i.GetStatus().GetSlug(),
+			StatusType: i.GetStatus().GetStatusType(),
+			CreatedAt:  timestampRFC3339(i.GetCreatedAt()),
+			UpdatedAt:  timestampRFC3339(i.GetUpdatedAt()),
 		})
 	}
 	return issues, nil

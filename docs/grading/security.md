@@ -7,6 +7,20 @@
 Real AppSec SourceCraft findings only, per TZ §3.1's explicit warning against faking security
 data. Open critical/high/medium/low defect-group counts, days since the latest scan.
 
+## How it's calculated, in plain words
+
+1. Grade-service asks security-wrapper-service, "what does AppSec know about this repo?",
+   handing over the user's own SourceCraft login token so the wrapper can ask on their behalf.
+2. If the repo has never been scanned, the whole category is "no data" — we never guess or
+   pretend it's a 0.
+3. If it has been scanned, we get back: how many open critical/high/medium/low security findings,
+   and how many days since the last scan.
+4. Each of those five numbers is placed on a line between "healthy" (e.g. 0 open criticals) and
+   "critical" (e.g. 5+ open criticals) — closer to healthy scores near 1, closer to critical
+   scores near 0.
+5. The five scores are combined into one 0-100 category score by weighted average (open critical
+   count matters most).
+
 ## Data source
 
 gRPC call to security-wrapper-service's `GetAppsecResult(git_repo)` — Grade service dials it

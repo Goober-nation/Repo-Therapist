@@ -8,6 +8,23 @@ How alive the project actually is right now: commit cadence, recency, contributo
 issue/milestone cadence, and bus-factor concentration. Purely behavioral signal — never
 popularity (design principle 5 in `00-overview.md`).
 
+## How it's calculated, in plain words
+
+1. Repository-service clones the repo and asks SourceCraft for its issues and milestones, saving
+   each as one entry per event (commit, issue, milestone) with a timestamp, in S3.
+2. Grade-service turns those into eight numbers: how often commits happen, how long since the
+   last one, how many different people are committing, how often issues/milestones show up, how
+   long since the last milestone, how concentrated commits are in one person, and net lines
+   changed per week.
+3. Each number gets placed on a line between a "healthy" value and a "critical" value — close to
+   healthy scores near 1, close to critical scores near 0. (Net lines/week instead uses a
+   "healthy band" — too little *or* too much change is bad, not just too little.)
+4. If a metric's underlying data couldn't be fetched at all, or (for top-contributor share) there
+   were too few commits to compute a meaningful share, that metric is dropped — "no data," not a
+   fabricated 0.
+5. The eight scores are combined into one 0-100 category score by weighted average, stretching
+   remaining weights to fill any dropped metric's gap.
+
 ## Data source
 
 S3 `_meta/commits.json`, `_meta/issues.json`, `_meta/milestones.json` — written by

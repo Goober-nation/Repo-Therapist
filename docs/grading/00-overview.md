@@ -7,13 +7,15 @@ every design choice below: the score must be **reproducible, explainable, fact-g
 distinguish "bad" from "no data"** — judges explicitly test *behavior* on control scenarios, not
 agreement with a reference number.
 
-Per-category detail (what it measures, data source, metrics, no-data rules, limitations, open
-questions) lives one file per category in this directory, all following the same template —
-`activity.md`, `security.md`, `issues.md`, `code-health.md`, `ci-cd.md`, `documentation.md`. This
-file holds only what's cross-cutting, so it isn't duplicated six times.
+Per-category detail (what it measures, **a simple-worded step-by-step walkthrough of how the
+grade is calculated**, data source, metrics, no-data rules, limitations, open questions) lives
+one file per category in this directory, all following the same template — `activity.md`,
+`security.md`, `issues.md`, `code-health.md`, `ci-cd.md`, `documentation.md`. This file holds
+only what's cross-cutting, so it isn't duplicated six times.
 
 **Per `AGENTS.md`: any change to the grading system has to be discussed with the user and
-reflected here before/alongside the code change — not committed as a drive-by.**
+reflected here before/alongside the code change — not committed as a drive-by — and every
+category file must include the plain-language walkthrough section, kept in sync with the code.**
 
 ## Category weights
 
@@ -25,7 +27,7 @@ Kept from the TZ's example weights (§3.2) — they sum cleanly and nothing argu
 | Security | 20% | no | **implemented** |
 | Activity | 15% | yes | **implemented** |
 | Documentation | 15% | yes | blocked (Grade↔LLM Kafka contract) |
-| Issues | 15% | yes | planned |
+| Issues | 15% | yes | **implemented** |
 | CI/CD | 15% | no | planned |
 
 **Public score** = Activity + Documentation + Issues + Code health (65%, renormalized to /100).

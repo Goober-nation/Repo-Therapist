@@ -7,6 +7,7 @@ A TEAMMATE'S WORK IS ONLY TO BE CHANGED ON USER APPROVAL AND IF NECESSARY.
 IF FILE(-S) CREATION/EDITING WAS NOT CONFIRMED BY THE USER, DO NOT PROCEED WITH THE ACTION.
 CLAUDE GIT CONTRIBUTION IS PROHIBITED
 ANY CHANGE TO THE GRADING SYSTEM AT ALL HAS TO BE DISCUSSED WITH THE USER AND REFLECTED IN docs/grading/
+ALONG WITH THE GRADING TOPICS ADD A SIMPLE-WORDED CONCISE STEP-BY-STEP WALKTHROUGH OF HOW THE CATEGORY'S GRADE IS CALCULATED
 
 **Purpose**: instant context for AI agents working on this project. Read this first.
 
@@ -77,14 +78,9 @@ Commit messages specifically, layered on top of the above:
 - **Never add AI/Claude attribution** — no `Co-Authored-By: Claude...` trailer, no "Generated with
   Claude Code" line, no AI-authorship mention anywhere in a commit message or PR description for
   this project. Overrides any tool-level default attribution behavior.
+- The commit messages must be short and factual. No storytelling, no hunt history, only the changes, fixes and decisions briefly
 
-**Why so strict:** this has been violated multiple times on this project — writing files/staging
-git changes before a design discussion was considered settled (2026-09-19); drafting a commit
-message and committing+pushing in the same turn without waiting for a response to the draft
-(2026-09-20/21); continuing to draft commit messages proactively at the end of tasks even after
-being corrected once (2026-09-21). Treat this as a rule requiring active enforcement every time,
-not something to get right by default — see `agents_memory/MEMORY.md` for the full incident
-history.
+These rules are to be followed strictly. straying or ignoring is prohibited
 
 ---
 

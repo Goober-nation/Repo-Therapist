@@ -141,7 +141,88 @@ categories:
   issues:
     weight: 0.15
     public: true
-    status: not_calculated
+    status: calculated
+    metrics:
+      # All four metrics key off StatusType (the fixed backend lifecycle enum), not the per-repo
+      # customizable status slug/name — see aggregation.go's isResolved comment.
+      # min_sample_size: 5 (provisional, not validated against real repos) on every metric below
+      # — a ratio/median over a handful of events swings too far on a single one to be a
+      # defensible score, same reasoning as Activity's top_contributor_share floor.
+      #
+      # 2026-09-22, external research (docs/grading/issues.md's "External validation" section):
+      # abandoned_share is NOT windowed by creation date (window_days doesn't apply to it) — it
+      # covers ALL currently-open issues, staleness measured from last-touched date. Every mature
+      # framework found (CHAOSS Issue Age, GitHub's own stale-bots) works this way; an earlier
+      # creation-windowed version made ancient never-touched issues invisible, the opposite of
+      # what "abandoned" should catch. growth_ratio/share_resolved instead count opened-in-window
+      # and closed-in-window as independent event tallies (CHAOSS's "Issues New"/"Issues Closed"
+      # pattern), decoupled from a shared creation cohort.
+      - id: abandoned_share
+        status: calculated
+        weight: 0.30
+        source: issues.json
+        aggregation:
+          type: abandoned_share
+          # staleness_days: 60, not the more intuitive 30 — matches GitHub's own actions/stale
+          # default, the most widely-tuned real-world expectation for "stale" we found, rather
+          # than a from-scratch guess.
+          staleness_days: 60
+          min_sample_size: 5
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 0.5
+          healthy: 0.05
+          provisional: true
+
+      - id: median_closure_days
+        status: calculated
+        weight: 0.25
+        source: issues.json
+        aggregation:
+          type: median_closure_days
+          window_days: 180
+          min_sample_size: 5
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 60
+          # healthy: 21, not 7 — the empirical average issue-resolution time across real repos
+          # (OpenSSF Scorecard research, ~30 days) is far above our original 7-day bar, meaning
+          # most well-run projects would never have reached "healthy." 21 splits the difference
+          # rather than jumping straight to the empirical average.
+          healthy: 21
+          provisional: true
+
+      - id: growth_ratio
+        status: calculated
+        weight: 0.20
+        source: issues.json
+        aggregation:
+          type: growth_ratio
+          window_days: 180
+          min_sample_size: 5
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 5
+          healthy: 1
+          provisional: true
+
+      - id: share_resolved
+        status: calculated
+        weight: 0.25
+        source: issues.json
+        aggregation:
+          type: share_resolved
+          window_days: 180
+          min_sample_size: 5
+        formula:
+          type: linear_clamp
+          direction: "+"
+          critical: 0.3
+          healthy: 0.9
+          provisional: true
 
   ci_cd:
     weight: 0.15
