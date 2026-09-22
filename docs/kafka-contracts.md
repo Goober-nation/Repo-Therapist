@@ -62,15 +62,16 @@ result independently verified by hand earlier in phase 2.
 These contracts add two independent asynchronous workflows. They do not change the existing
 `repo.grade.requested` or `repo.ready` messages.
 
-1. Grade service requests a Documentation assessment and receives the final normalized score for
-   that category. LLM service owns the Documentation grading method; Grade service owns the
-   cross-category aggregation and final Repo Health Score.
+1. Grade service sends the repository's S3 prefix and receives the final normalized Documentation
+   score, scores for its subcategories, and verified machine-readable facts about deductions. LLM
+   service owns the Documentation grading method; Grade service owns the cross-category aggregation
+   and final Repo Health Score.
 2. Aggregator requests a Russian-language report after all scores and verified problems are final.
    LLM service does not recalculate or change those scores.
 
-Repository contents are never placed in Kafka messages. Documentation requests contain a reference
-to an immutable, completed S3 snapshot. Report requests contain only final scores and verified
-machine-readable deductions; report generation does not read the repository snapshot.
+Repository contents are never placed in Kafka messages. Documentation requests contain the S3
+prefix from `repo.ready`, not repository files. Report requests contain only final scores and
+verified machine-readable deductions; report generation does not re-read repository files.
 
 ## LLM service boundary
 
@@ -78,7 +79,9 @@ Documentation and best practices is the only analysis category assessed by LLM s
 category, normal code performs objective checks and the model performs semantic checks. LLM service
 combines both parts using a versioned grading method and returns the final normalized Documentation
 score, deduction codes, and validated evidence. Grade service consumes that category score without
-recalculating its internal checks.
+recalculating its internal checks. It also receives subcategory scores and facts about every
+deduction. The documentation response contains no written advice; Russian explanations and
+recommendations are generated only after a separate request from Aggregator.
 
 Activity, Security, CI/CD, Issues, and Code Health are assessed algorithmically outside LLM service.
 LLM service does not read their raw inputs, run their analyzers, or calculate their category scores.
@@ -114,14 +117,13 @@ Every LLM event is UTF-8 JSON with `Content-Type: application/json` semantics an
   "event_version": 1,
   "analysis_id": "018f47d1-e33b-7af3-a642-229ac22a9e82",
   "repository_id": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
-  "commit_sha": "47c673f70ddf4c3e5b8768df35d688f43c6f5f52",
   "data_scope": "public",
   "created_at": "2026-09-21T10:15:30Z",
   "payload": {}
 }
 ```
 
-Required fields:
+Envelope fields:
 
 | Field | Meaning |
 |---|---|
@@ -130,14 +132,14 @@ Required fields:
 | `event_version` | Contract version. Version 1 consumers reject other versions explicitly. |
 | `analysis_id` | UUID of one complete repository analysis run. Used as the Kafka key. |
 | `repository_id` | SourceCraft repository UUID. Slugs are display metadata, not identity. |
-| `commit_sha` | Full Git commit SHA for the repository state being assessed. |
+| `commit_sha` | Full Git commit SHA when the producer knows it. Repository/Grade's current `repo.ready` exchange does not provide it, so it is optional for Documentation events. |
 | `data_scope` | `public` for public-only data or `owner` for data available to an authorized owner. |
 | `created_at` | RFC 3339 UTC timestamp. Producers emit the `Z` form. |
 | `payload` | Event-specific object. |
 
 Result and failure events additionally require `request_event_id`, equal to the `event_id` of the
-request being answered. They copy `analysis_id`, `repository_id`, `commit_sha`, and `data_scope`
-unchanged from that request.
+request being answered. They copy `analysis_id`, `repository_id`, `data_scope`, and `commit_sha`
+(when present) unchanged from that request.
 
 Aggregator creates `analysis_id` when the complete analysis run starts and every service propagates
 it unchanged. The producer of each event creates its `event_id`; therefore LLM service creates a new
@@ -153,9 +155,10 @@ usual Kafka 1 MiB record limit.
 
 Topic: `llm.documentation.requests`.
 
-The request is published only after the snapshot is complete and its manifest is readable. S3
-endpoint and credentials are runtime configuration of LLM service and are not included in Kafka.
-In contract v1, `output_language` is required and its only supported value is `ru`.
+The request is published after Grade service consumes `repo.ready` with `status: ready`. It forwards
+that event's `s3_prefix` unchanged. The S3 bucket, endpoint, and credentials are runtime
+configuration of LLM service and are not included in Kafka. Documentation grading does not generate
+prose, so it needs no `output_language` field.
 
 ```json
 {
@@ -164,50 +167,27 @@ In contract v1, `output_language` is required and its only supported value is `r
   "event_version": 1,
   "analysis_id": "018f47d1-e33b-7af3-a642-229ac22a9e82",
   "repository_id": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
-  "commit_sha": "47c673f70ddf4c3e5b8768df35d688f43c6f5f52",
   "data_scope": "public",
   "created_at": "2026-09-21T10:15:30Z",
   "payload": {
-    "snapshot": {
-      "bucket": "repo-content",
-      "prefix": "snapshots/018f47d1-e33b-7af3-a642-229ac22a9e82/",
-      "manifest_key": "snapshots/018f47d1-e33b-7af3-a642-229ac22a9e82/manifest.json"
-    },
-    "output_language": "ru"
+    "s3_prefix": "repos/019b2102-fa21-7ab7-8ce1-116af406fb5e"
   }
 }
 ```
 
-Snapshot requirements:
+S3 input rules:
 
-- `prefix` is unique to this snapshot and ends with `/`;
-- objects under the prefix are immutable after the request is published;
-- `manifest_key` is inside that prefix and is written last;
-- the manifest identifies `repository_id` and `commit_sha`, records its completion time, and lists
-  every content object (the manifest itself is excluded) with its key, byte size, and SHA-256
-  digest;
-- LLM service fails the job if manifest identity differs from the event or a selected object does
-  not match the manifest;
-- absence may be reported as `file_missing` only when the complete manifest was successfully read.
-  An inaccessible or incomplete snapshot produces `NO_DATA` or a failure, never a false absence.
-
-Manifest v1 shape:
-
-```json
-{
-  "manifest_version": 1,
-  "repository_id": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
-  "commit_sha": "47c673f70ddf4c3e5b8768df35d688f43c6f5f52",
-  "completed_at": "2026-09-21T10:15:25Z",
-  "objects": [
-    {
-      "key": "snapshots/018f47d1-e33b-7af3-a642-229ac22a9e82/README.md",
-      "size_bytes": 4821,
-      "sha256": "8ecb8d39de30c96e1cc3a1d76a3c75fca3b579648983b216d9e095173c42f699"
-    }
-  ]
-}
-```
+- `s3_prefix` is exactly the value from `repo.ready`; object keys are read below
+  `s3_prefix + "/"`, so similarly named repository prefixes cannot overlap;
+- the repository content is read from that prefix; `_meta/` exports are not part of the
+  documentation being graded;
+- LLM service builds an in-memory manifest from the complete object listing and records hashes of
+  selected file contents used for the analysis; this manifest is not another S3 object;
+- Repository service currently reuses `repos/<repository_id>` and does not publish a manifest or
+  commit SHA. LLM service must detect a changed object list or changed selected contents while
+  reading and fail the request instead of publishing a mixed-state result;
+- `file_missing` is allowed only after a complete, successful prefix listing. An inaccessible or
+  unstable prefix produces a failed event, never a false absence.
 
 ### `documentation.analysis.completed`
 
@@ -221,7 +201,6 @@ Topic: `llm.documentation.results`.
   "request_event_id": "018f47d2-6d5a-7b72-82fd-1e9834d57a91",
   "analysis_id": "018f47d1-e33b-7af3-a642-229ac22a9e82",
   "repository_id": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
-  "commit_sha": "47c673f70ddf4c3e5b8768df35d688f43c6f5f52",
   "data_scope": "public",
   "created_at": "2026-09-21T10:15:44Z",
   "payload": {
@@ -248,6 +227,16 @@ Topic: `llm.documentation.results`.
       "evaluated_points": 100,
       "percent": 100
     },
+    "subcategories": [
+      {"id": "required_files", "status": "CALCULATED", "score": 100, "applicable_points": 20, "evaluated_points": 20, "earned_points": 20},
+      {"id": "purpose", "status": "CALCULATED", "score": 100, "applicable_points": 15, "evaluated_points": 15, "earned_points": 15},
+      {"id": "local_run", "status": "CALCULATED", "score": 90, "applicable_points": 20, "evaluated_points": 20, "earned_points": 18},
+      {"id": "build", "status": "CALCULATED", "score": 100, "applicable_points": 10, "evaluated_points": 10, "earned_points": 10},
+      {"id": "testing", "status": "CALCULATED", "score": 100, "applicable_points": 10, "evaluated_points": 10, "earned_points": 10},
+      {"id": "usage", "status": "CALCULATED", "score": 100, "applicable_points": 10, "evaluated_points": 10, "earned_points": 10},
+      {"id": "structure", "status": "CALCULATED", "score": 100, "applicable_points": 5, "evaluated_points": 5, "earned_points": 5},
+      {"id": "consistency", "status": "CALCULATED", "score": 100, "applicable_points": 10, "evaluated_points": 10, "earned_points": 10}
+    ],
     "checks": [
       {
         "check_id": "local_run.configuration",
@@ -262,7 +251,7 @@ Topic: `llm.documentation.results`.
             "raw_points_lost": 2,
             "facts": {
               "missing_aspects": [
-                "environment_variables"
+                "required_parameters"
               ]
             },
             "evidence": [
@@ -301,7 +290,7 @@ Topic: `llm.documentation.results`.
         },
         "facts": {
           "missing_aspects": [
-            "environment_variables"
+            "required_parameters"
           ]
         },
         "evidence": [
@@ -336,6 +325,19 @@ maximum points. `check_id` values and their contribution to the category score b
 grading method version. Extending the method does not require a Kafka contract version change.
 Grade service does not interpret individual checks; it consumes `score`. Checks and problems are
 included for auditing and as validated machine input for the final report.
+
+`subcategories` contains exactly the eight method-defined groups shown in the example. Its `score`
+is normalized to 0–100 within that group: `earned_points / evaluated_points * 100`, rounded to two
+decimals. `CALCULATED` means all applicable group points were evaluated; `CALCULATED_PARTIAL` means
+some applicable checks are `NO_DATA`. If every group check is `NOT_APPLICABLE`, the group has
+`status: NOT_APPLICABLE`, `score: null`, and all point fields are zero. If the group applies but none
+of its checks could be evaluated, it has `status: NO_DATA`, `score: null`, and
+`evaluated_points: 0`. `applicable_points` and `evaluated_points` are the sum of method-defined
+check maxima in the corresponding group. Grade service displays these scores but does not average
+them to recompute the category score. The category score uses the method-defined raw point weights.
+
+`problems` contains the verified facts about deficiencies that Grade service can forward to
+Aggregator. It contains no advice text.
 
 Score rules:
 
@@ -376,8 +378,8 @@ For every evaluated check, `raw_points_lost` values sum to
 `max_points - points_awarded`. `raw_points_lost` is an integer on that check's method-defined scale;
 after missing-data normalization it may differ from the deduction's contribution on the final
 category scale. A fully satisfied check has an empty `deductions` array. `NO_DATA` is distinct from
-a zero-point evaluated check: it means the available snapshot/context is insufficient for a
-reliable result. `NOT_APPLICABLE` means the check does not apply to this repository. Internal
+a zero-point evaluated check: it means the available repository content/context is insufficient for
+a reliable result. `NOT_APPLICABLE` means the check does not apply to this repository. Internal
 scales, weights, formulas, and normalization belong to `documentation-grading-v1`, not the Kafka
 schema.
 
@@ -410,9 +412,9 @@ Allowed evidence variants:
 {"type":"document_review","paths":["README.md","docs/overview.md"],"context_sha256":"d5b389a2248c8a7f7054f4b22a70f56fcab12c56108a5f4cc1a9bcb870cc5462"}
 ```
 
-Paths are UTF-8, relative to the snapshot root, use `/`, and cannot contain `..`. Lines are
+Paths are UTF-8, relative to `s3_prefix`, use `/`, and cannot contain `..`. Lines are
 one-based and inclusive. LLM service validates file existence, line ranges, and quotes against the
-snapshot before publishing a completed event. For `document_review`, every listed file must have
+S3 content before publishing a completed event. For `document_review`, every listed file must have
 been included completely in the hashed model context; it supports absence of semantic content in
 existing documents. Invalid model evidence is never forwarded.
 
@@ -433,7 +435,6 @@ Topic: `llm.documentation.results`.
   "request_event_id": "018f47d2-6d5a-7b72-82fd-1e9834d57a91",
   "analysis_id": "018f47d1-e33b-7af3-a642-229ac22a9e82",
   "repository_id": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
-  "commit_sha": "47c673f70ddf4c3e5b8768df35d688f43c6f5f52",
   "data_scope": "public",
   "created_at": "2026-09-21T10:15:44Z",
   "payload": {
@@ -450,9 +451,8 @@ Documentation error codes:
 
 - `INVALID_EVENT`
 - `UNSUPPORTED_EVENT_VERSION`
-- `SNAPSHOT_NOT_FOUND`
-- `SNAPSHOT_IDENTITY_MISMATCH`
-- `SNAPSHOT_INTEGRITY_FAILED`
+- `S3_PREFIX_NOT_FOUND`
+- `S3_CONTENT_CHANGED`
 - `S3_UNAVAILABLE`
 - `CONTEXT_BUILD_FAILED`
 - `LLM_PROVIDER_UNAVAILABLE`
