@@ -151,7 +151,7 @@ categories:
   security:
     weight: 0.20
     public: false
-    status: not_calculated
+    status: calculated
 
   documentation:
     weight: 0.15

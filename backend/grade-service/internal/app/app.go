@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"repo-therapist/grade-service/internal/appsecwrapper"
 	"repo-therapist/grade-service/internal/config"
 	"repo-therapist/grade-service/internal/gitlog"
 	"repo-therapist/grade-service/internal/scoring"
@@ -69,12 +70,46 @@ func Grade(ctx context.Context, repoID string, cfg *config.Config) (map[string]a
 	if !ok {
 		return nil, fmt.Errorf("config has no \"activity\" category")
 	}
-	result := scoring.ComputeCategory("activity", activityCfg, inputs, time.Now())
+	activityResult := scoring.ComputeCategory("activity", activityCfg, inputs, time.Now())
+
+	securityResult := scoring.CategoryResult{ID: "security", NoData: true}
+	if securityCfg, ok := cfg.Categories["security"]; ok && securityCfg.Status == config.StatusCalculated {
+		securityResult = gradeSecurity(ctx, repoID)
+	}
 
 	return map[string]any{
 		"sourcecraft_uuid": repoID,
-		"category":         result,
+		"categories": map[string]scoring.CategoryResult{
+			"activity": activityResult,
+			"security": securityResult,
+		},
 	}, nil
+}
+
+// gradeSecurity calls security-wrapper-service for repoID's AppSec data and scores it. Any
+// failure to reach the wrapper is logged and treated as no-data, same as a missing S3 export —
+// one category's failure shouldn't fail the whole grading run.
+func gradeSecurity(ctx context.Context, repoID string) scoring.CategoryResult {
+	pat := os.Getenv("SOURCECRAFT_PAT")
+	if pat == "" {
+		log.Printf("SOURCECRAFT_PAT not set: Security category will be no-data for %s", repoID)
+		return scoring.CategoryResult{ID: "security", NoData: true}
+	}
+
+	client, err := appsecwrapper.Dial(EnvOrDefault("SECURITY_WRAPPER_ADDR", "localhost:8085"), pat)
+	if err != nil {
+		log.Printf("dialing security-wrapper-service for %s: %v (Security category will be no-data)", repoID, err)
+		return scoring.CategoryResult{ID: "security", NoData: true}
+	}
+	defer client.Close()
+
+	result, err := client.GetAppsecResult(ctx, repoID)
+	if err != nil {
+		log.Printf("GetAppsecResult failed for %s: %v (Security category will be no-data)", repoID, err)
+		return scoring.CategoryResult{ID: "security", NoData: true}
+	}
+
+	return scoring.ComputeSecurity(result, time.Now())
 }
 
 func PrintResult(out map[string]any) {
