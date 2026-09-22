@@ -1,5 +1,5 @@
 # Repo Health Score grading policy — machine-readable config.
-# See docs/grading-policy.md for the full rationale behind every choice here.
+# See docs/grading/ for the full rationale behind every choice here (one file per category, docs/grading/00-overview.md for cross-cutting design).
 #
 # Per-metric/category `status`: "calculated" | "not_calculated" — a config-time toggle, distinct
 # from a metric having no data for a particular repo at runtime. Both are treated identically at

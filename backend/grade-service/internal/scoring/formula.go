@@ -3,7 +3,7 @@ package scoring
 import "repo-therapist/grade-service/internal/config"
 
 // applyFormula maps an aggregated raw value to a score in [0,1]. This is the one place every
-// metric's "value -> score" logic lives, regardless of category — see docs/grading-policy.md
+// metric's "value -> score" logic lives, regardless of category — see docs/grading/00-overview.md
 // principle 1 for why a single formula family (vs. the original draft's mix of log/linear) matters.
 func applyFormula(cfg config.FormulaConfig, x float64) float64 {
 	switch cfg.Type {

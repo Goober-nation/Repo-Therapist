@@ -108,7 +108,7 @@ func uniqueCount(cfg config.AggregationConfig, events []Event, now time.Time) ag
 
 // maxShare: the top field-value's share of all events in the window. Below min_sample_size,
 // the metric is statistically meaningless (e.g. 1 contributor = 100% by construction for any
-// solo/new repo) — deliberately no-data, not a real measurement, per docs/grading-policy.md's
+// solo/new repo) — deliberately no-data, not a real measurement, per docs/grading/activity.md's
 // Activity table note.
 func maxShare(cfg config.AggregationConfig, events []Event, now time.Time) aggResult {
 	windowed := windowFilter(events, now, cfg.WindowDays)

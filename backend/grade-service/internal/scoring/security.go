@@ -12,8 +12,8 @@ import (
 // weights/thresholds are hardcoded here instead of config/grading.yaml for the same reason; only
 // the category's own weight/status (config/grading.yaml's `security:` block) is config-driven.
 //
-// docs/grading-policy.md's Security section: open critical/high/medium/low counts plus days since
-// last scan, and HasScan=false must report "Нет данных" (NoData:true), never a fabricated 0.
+// See docs/grading/security.md: open critical/high/medium/low counts plus days since last scan,
+// and HasScan=false must report "Нет данных" (NoData:true), never a fabricated 0.
 const (
 	securityWeightCritical = 0.35
 	securityWeightHigh     = 0.25
