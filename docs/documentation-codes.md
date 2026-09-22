@@ -40,6 +40,11 @@ included completely in the context identified by `context_sha256`. It is the req
 claims such as “the purpose is not documented”; `file_missing` cannot prove absence of a section in
 an existing document.
 
+If the complete repository listing contains no selected user documentation, a code whose facts
+require `reviewed_paths` may instead set `reviewed_paths: []` and use `file_missing` for `README.md`.
+This exception does not apply when any user documentation was included completely in the model
+context; then `document_review` is required. A nonexistent file is never marked as reviewed.
+
 ## File checks
 
 | Code | Allowed check | Required facts | Evidence | Minimum severity |
@@ -115,6 +120,8 @@ Test types are `unit`, `integration`, `end_to_end`, `contract`, `smoke`, `perfor
 
 Interface and example kinds are controlled enums covering HTTP APIs, libraries, CLIs, user
 interfaces, infrastructure, templates, documentation, and `other`.
+Their values are `http_api`, `library`, `cli`, `user_interface`, `infrastructure`, `template`,
+`documentation`, and `other`.
 
 ## Structure and navigation
 
@@ -137,6 +144,13 @@ interfaces, infrastructure, templates, documentation, and `other`.
 
 External HTTP links are not checked in v1; network availability must not affect a repository score.
 
+Other v1 fact enums are closed: `reference_kind` is `file`, `directory`, `script`,
+`configuration`, or `other`; `link_kind` is `file`, `directory`, or `anchor`;
+`mismatch_kind` is `missing`, `wrong_target`, `wrong_parameter`, `wrong_value`, or `other`;
+`configuration_kind` is `environment_variable`, `config_file`, `flag`, or `other`;
+`claim_kind` is `component`, `capability`, or `technology`; `detected_result_kind` is
+`text`, `json`, `file`, `http_response`, `user_interface`, or `other`.
+
 ## Group problem codes
 
 Service code may replace several related deduction codes with one problem code while preserving all
@@ -153,4 +167,3 @@ source deduction IDs and their evidence:
 Group codes never create additional point loss. Their `category_points_lost` is the normalized sum
 of source deductions. `DOC_DOCUMENTATION_OUTDATED` uses `mismatch_count` and `affected_areas`;
 other group codes use `affected_checks` and the union of registered `missing_aspects`.
-
