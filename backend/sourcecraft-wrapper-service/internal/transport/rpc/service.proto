@@ -2,7 +2,8 @@ syntax = "proto3";
 
 package code_health;
 
-option go_package = "code_health/backend/sourcecraft-wrapper-service/internal/transport/gen;pb";
+option go_package = "sourcecraft-wrapper-service/internal/transport/gen;pb";
+
 
 import "google/protobuf/timestamp.proto";
 
@@ -24,8 +25,10 @@ service CodeHealth {
 
   rpc ListAllPublicRepoIDs(ListAllPublicRepoIDsRequest)
       returns (ListAllPublicRepoIDsResponse);
-}
 
+  rpc GetMyRepos(GetMyReposRequest)
+      returns (GetMyReposResponse);
+}
 
 message GetRepoIDBySlugsRequest {
   string repo_slug = 1;
@@ -49,6 +52,32 @@ message ListAllPublicRepoIDsRequest {}
 
 message ListAllPublicRepoIDsResponse {
   repeated string repo_ids = 1;
+}
+
+message GetMyReposRequest {}
+
+message GetMyReposResponse {
+  repeated Repository repositories = 1;
+  string next_page_token = 2;
+}
+
+message Repository {
+  string id = 1;
+  string name = 2;
+  Organization organization = 3;
+  string slug = 4;
+  string description = 5;
+  Logo logo = 6;
+  string web_url = 7;
+}
+
+message Organization {
+  string id = 1;
+  string slug = 2;
+}
+
+message Logo {
+  string url = 1;
 }
 
 message GetCiCDRunsRequest {
@@ -142,7 +171,6 @@ message RunUser {
   string slug = 2;
 }
 
-
 message GetIssuesRequest {
   string repo_id = 1;
 }
@@ -208,12 +236,6 @@ message RepositoryRef {
   string slug = 2;
   Organization organization = 3;
 }
-
-message Organization {
-  string id = 1;
-  string slug = 2;
-}
-
 
 message GetMilestonesRequest {
   string repo_id = 1;

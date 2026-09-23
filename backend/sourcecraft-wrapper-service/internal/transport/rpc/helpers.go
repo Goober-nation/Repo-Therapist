@@ -21,7 +21,28 @@ func mapRuns(runs []domain.Run) []*pb.Run {
 
 	return result
 }
+func mapRepositories(repositories []domain.Repository) []*pb.Repository {
+	result := make([]*pb.Repository, 0, len(repositories))
 
+	for _, repo := range repositories {
+		result = append(result, &pb.Repository{
+			Id:   repo.ID,
+			Name: repo.Name,
+			Organization: &pb.Organization{
+				Id:   repo.Organization.ID,
+				Slug: repo.Organization.Slug,
+			},
+			Slug:        repo.Slug,
+			Description: repo.Description,
+			Logo: &pb.Logo{
+				Url: repo.Logo.URL,
+			},
+			WebUrl: repo.WebURL,
+		})
+	}
+
+	return result
+}
 func mapRun(run domain.Run) *pb.Run {
 	return &pb.Run{
 		Id:            run.ID,
