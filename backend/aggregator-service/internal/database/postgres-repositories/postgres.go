@@ -1,7 +1,9 @@
 package postgres_repositories
 
 import (
+	"aggregator-service/internal/domain"
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -38,7 +40,7 @@ func NewLLMRepository(db *pgxpool.Pool) *LLMRepository {
 	}
 }
 
-func (r *RepoRepository) CreateRepository(ctx context.Context, repo Repo) (uuid.UUID, error) {
+func (r *RepoRepository) CreateRepository(ctx context.Context, repo domain.Repo) (uuid.UUID, error) {
 	repo.SourcecraftUUID = uuid.New()
 
 	_, err := r.db.Exec(
@@ -61,13 +63,13 @@ func (r *RepoRepository) CreateRepository(ctx context.Context, repo Repo) (uuid.
 	)
 
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, mapRepositoryError(err)
 	}
 
 	return repo.SourcecraftUUID, nil
 }
 
-func (r *RepoRepository) UpdateRepository(ctx context.Context, repo Repo) (uuid.UUID, error) {
+func (r *RepoRepository) UpdateRepository(ctx context.Context, repo domain.Repo) (uuid.UUID, error) {
 	tag, err := r.db.Exec(
 		ctx,
 		`
@@ -87,11 +89,11 @@ func (r *RepoRepository) UpdateRepository(ctx context.Context, repo Repo) (uuid.
 	)
 
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, mapRepositoryError(err)
 	}
 
 	if tag.RowsAffected() == 0 {
-		return uuid.Nil, pgx.ErrNoRows
+		return uuid.Nil, mapRepositoryError(pgx.ErrNoRows)
 	}
 
 	return repo.SourcecraftUUID, nil
@@ -108,18 +110,18 @@ func (r *RepoRepository) DeleteRepository(ctx context.Context, repoID uuid.UUID)
 	)
 
 	if err != nil {
-		return err
+		return mapRepositoryError(err)
 	}
 
 	if tag.RowsAffected() == 0 {
-		return pgx.ErrNoRows
+		return mapRepositoryError(pgx.ErrNoRows)
 	}
 
 	return nil
 }
 
-func (r *RepoRepository) GetRepositoryByID(ctx context.Context, repoID uuid.UUID) (Repo, error) {
-	var repo Repo
+func (r *RepoRepository) GetRepositoryByID(ctx context.Context, repoID uuid.UUID) (domain.Repo, error) {
+	var repo domain.Repo
 
 	err := r.db.QueryRow(
 		ctx,
@@ -143,14 +145,14 @@ func (r *RepoRepository) GetRepositoryByID(ctx context.Context, repoID uuid.UUID
 	)
 
 	if err != nil {
-		return Repo{}, err
+		return domain.Repo{}, mapRepositoryError(err)
 	}
 
 	return repo, nil
 }
 
-func (r *RepoRepository) GetRepositoryBySlugs(ctx context.Context, orgSlug string, repoSlug string) (Repo, error) {
-	var repo Repo
+func (r *RepoRepository) GetRepositoryBySlugs(ctx context.Context, orgSlug string, repoSlug string) (domain.Repo, error) {
+	var repo domain.Repo
 
 	err := r.db.QueryRow(
 		ctx,
@@ -176,13 +178,16 @@ func (r *RepoRepository) GetRepositoryBySlugs(ctx context.Context, orgSlug strin
 	)
 
 	if err != nil {
-		return Repo{}, err
+		return domain.Repo{}, mapRepositoryError(err)
 	}
 
 	return repo, nil
 }
 
-func (r *GradesRepository) CreateGrade(ctx context.Context, grade RepoGrade) error {
+func (r *GradesRepository) UpsertGrade(
+	ctx context.Context,
+	grade domain.RepoGrade,
+) error {
 	_, err := r.db.Exec(
 		ctx,
 		`
@@ -198,9 +203,18 @@ func (r *GradesRepository) CreateGrade(ctx context.Context, grade RepoGrade) err
 			graded_at
 		)
 		VALUES (
-			$1, $2, $3, $4, $5,
-			$6, $7, $8, $9
+			$1, $2, $3, $4, $5, $6, $7, $8, $9
 		)
+		ON CONFLICT (sourcecraft_uuid)
+		DO UPDATE SET
+			public_score = EXCLUDED.public_score,
+			public_category_scores = EXCLUDED.public_category_scores,
+			public_recommendations = EXCLUDED.public_recommendations,
+			private_score = EXCLUDED.private_score,
+			private_category_scores = EXCLUDED.private_category_scores,
+			private_recommendations = EXCLUDED.private_recommendations,
+			missing_data = EXCLUDED.missing_data,
+			graded_at = EXCLUDED.graded_at
 		`,
 		grade.SourcecraftUUID,
 		grade.PublicScore,
@@ -212,43 +226,8 @@ func (r *GradesRepository) CreateGrade(ctx context.Context, grade RepoGrade) err
 		grade.MissingData,
 		grade.GradedAt,
 	)
-
-	return err
-}
-
-func (r *GradesRepository) UpdateGrade(ctx context.Context, grade RepoGrade) error {
-	tag, err := r.db.Exec(
-		ctx,
-		`
-		UPDATE repo_grades
-		SET
-			public_score = $2,
-			public_category_scores = $3,
-			public_recommendations = $4,
-			private_score = $5,
-			private_category_scores = $6,
-			private_recommendations = $7,
-			missing_data = $8,
-			graded_at = $9
-		WHERE sourcecraft_uuid = $1
-		`,
-		grade.SourcecraftUUID,
-		grade.PublicScore,
-		grade.PublicCategoryScores,
-		grade.PublicRecommendations,
-		grade.PrivateScore,
-		grade.PrivateCategoryScores,
-		grade.PrivateRecommendations,
-		grade.MissingData,
-		grade.GradedAt,
-	)
-
 	if err != nil {
-		return err
-	}
-
-	if tag.RowsAffected() == 0 {
-		return pgx.ErrNoRows
+		return mapGradeError(err)
 	}
 
 	return nil
@@ -265,18 +244,18 @@ func (r *GradesRepository) DeleteGrade(ctx context.Context, repoID uuid.UUID) er
 	)
 
 	if err != nil {
-		return err
+		return mapGradeError(err)
 	}
 
 	if tag.RowsAffected() == 0 {
-		return pgx.ErrNoRows
+		return mapGradeError(pgx.ErrNoRows)
 	}
 
 	return nil
 }
 
-func (r *GradesRepository) GetGradeByRepoID(ctx context.Context, repoID uuid.UUID) (RepoGrade, error) {
-	var grade RepoGrade
+func (r *GradesRepository) GetGradeByRepoID(ctx context.Context, repoID uuid.UUID) (domain.RepoGrade, error) {
+	var grade domain.RepoGrade
 
 	err := r.db.QueryRow(
 		ctx,
@@ -308,56 +287,36 @@ func (r *GradesRepository) GetGradeByRepoID(ctx context.Context, repoID uuid.UUI
 	)
 
 	if err != nil {
-		return RepoGrade{}, err
+		return domain.RepoGrade{}, mapGradeError(err)
 	}
 
 	return grade, nil
 }
 
-func (r *LLMRepository) CreatePublicResponse(ctx context.Context, response RepoLLMResponsePublic) error {
+func (r *LLMRepository) UpsertPublicResponse(ctx context.Context, response domain.LLMRecommendationsReceivedEvent) error {
 	_, err := r.db.Exec(
 		ctx,
 		`
-		INSERT INTO repo_llm_responses_public (
-			sourcecraft_uuid,
-			raw_response,
-			model_used,
-			evaluated_at
-		)
-		VALUES ($1, $2, $3, $4)
-		`,
+        INSERT INTO repo_llm_responses_public (
+            sourcecraft_uuid,
+            raw_response,
+            model_used,
+            evaluated_at
+        )
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (sourcecraft_uuid)
+        DO UPDATE SET
+            raw_response = EXCLUDED.raw_response,
+            model_used = EXCLUDED.model_used,
+            evaluated_at = EXCLUDED.evaluated_at
+        `,
 		response.SourcecraftUUID,
 		response.RawResponse,
 		response.ModelUsed,
 		response.EvaluatedAt,
 	)
-
-	return err
-}
-
-func (r *LLMRepository) UpdatePublicResponse(ctx context.Context, response RepoLLMResponsePublic) error {
-	tag, err := r.db.Exec(
-		ctx,
-		`
-		UPDATE repo_llm_responses_public
-		SET
-			raw_response = $2,
-			model_used = $3,
-			evaluated_at = $4
-		WHERE sourcecraft_uuid = $1
-		`,
-		response.SourcecraftUUID,
-		response.RawResponse,
-		response.ModelUsed,
-		response.EvaluatedAt,
-	)
-
 	if err != nil {
-		return err
-	}
-
-	if tag.RowsAffected() == 0 {
-		return pgx.ErrNoRows
+		return mapLLMResponseError(err)
 	}
 
 	return nil
@@ -374,18 +333,18 @@ func (r *LLMRepository) DeletePublicResponse(ctx context.Context, repoID uuid.UU
 	)
 
 	if err != nil {
-		return err
+		return mapLLMResponseError(err)
 	}
 
 	if tag.RowsAffected() == 0 {
-		return pgx.ErrNoRows
+		return mapLLMResponseError(pgx.ErrNoRows)
 	}
 
 	return nil
 }
 
-func (r *LLMRepository) GetPublicResponseByRepoID(ctx context.Context, repoID uuid.UUID) (RepoLLMResponsePublic, error) {
-	var response RepoLLMResponsePublic
+func (r *LLMRepository) GetPublicResponseByRepoID(ctx context.Context, repoID uuid.UUID) (domain.RepoLLMResponsePublic, error) {
+	var response domain.RepoLLMResponsePublic
 
 	err := r.db.QueryRow(
 		ctx,
@@ -407,56 +366,39 @@ func (r *LLMRepository) GetPublicResponseByRepoID(ctx context.Context, repoID uu
 	)
 
 	if err != nil {
-		return RepoLLMResponsePublic{}, err
+		return domain.RepoLLMResponsePublic{}, mapLLMResponseError(err)
 	}
 
 	return response, nil
 }
 
-func (r *LLMRepository) CreatePrivateResponse(ctx context.Context, response RepoLLMResponsePrivate) error {
+func (r *LLMRepository) UpsertPrivateResponse(
+	ctx context.Context,
+	response domain.LLMRecommendationsReceivedEvent,
+) error {
 	_, err := r.db.Exec(
 		ctx,
 		`
-		INSERT INTO repo_llm_responses_private (
-			sourcecraft_uuid,
-			raw_response,
-			model_used,
-			evaluated_at
-		)
-		VALUES ($1, $2, $3, $4)
-		`,
+        INSERT INTO repo_llm_responses_private (
+            sourcecraft_uuid,
+            raw_response,
+            model_used,
+            evaluated_at
+        )
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (sourcecraft_uuid)
+        DO UPDATE SET
+            raw_response = EXCLUDED.raw_response,
+            model_used = EXCLUDED.model_used,
+            evaluated_at = EXCLUDED.evaluated_at
+        `,
 		response.SourcecraftUUID,
 		response.RawResponse,
 		response.ModelUsed,
 		response.EvaluatedAt,
 	)
-
-	return err
-}
-
-func (r *LLMRepository) UpdatePrivateResponse(ctx context.Context, response RepoLLMResponsePrivate) error {
-	tag, err := r.db.Exec(
-		ctx,
-		`
-		UPDATE repo_llm_responses_private
-		SET
-			raw_response = $2,
-			model_used = $3,
-			evaluated_at = $4
-		WHERE sourcecraft_uuid = $1
-		`,
-		response.SourcecraftUUID,
-		response.RawResponse,
-		response.ModelUsed,
-		response.EvaluatedAt,
-	)
-
 	if err != nil {
-		return err
-	}
-
-	if tag.RowsAffected() == 0 {
-		return pgx.ErrNoRows
+		return mapLLMResponseError(err)
 	}
 
 	return nil
@@ -473,18 +415,18 @@ func (r *LLMRepository) DeletePrivateResponse(ctx context.Context, repoID uuid.U
 	)
 
 	if err != nil {
-		return err
+		return mapLLMResponseError(err)
 	}
 
 	if tag.RowsAffected() == 0 {
-		return pgx.ErrNoRows
+		return mapLLMResponseError(pgx.ErrNoRows)
 	}
 
 	return nil
 }
 
-func (r *LLMRepository) GetPrivateResponseByRepoID(ctx context.Context, repoID uuid.UUID) (RepoLLMResponsePrivate, error) {
-	var response RepoLLMResponsePrivate
+func (r *LLMRepository) GetPrivateResponseByRepoID(ctx context.Context, repoID uuid.UUID) (domain.RepoLLMResponsePrivate, error) {
+	var response domain.RepoLLMResponsePrivate
 
 	err := r.db.QueryRow(
 		ctx,
@@ -506,8 +448,72 @@ func (r *LLMRepository) GetPrivateResponseByRepoID(ctx context.Context, repoID u
 	)
 
 	if err != nil {
-		return RepoLLMResponsePrivate{}, err
+		return domain.RepoLLMResponsePrivate{}, mapLLMResponseError(err)
 	}
 
 	return response, nil
+}
+
+func (r *RepoRepository) GetRepositoryLock(ctx context.Context, repoID uuid.UUID) (domain.RepoLock, error) {
+	var lock domain.RepoLock
+
+	err := r.db.QueryRow(
+		ctx,
+		`
+		SELECT
+			sourcecraft_uuid,
+			status,
+			status_updated_at
+		FROM repo_lock
+		WHERE sourcecraft_uuid = $1
+		`,
+		repoID,
+	).Scan(
+		&lock.SourcecraftUUID,
+		&lock.Status,
+		&lock.StatusUpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.RepoLock{}, mapRepositoryError(pgx.ErrNoRows)
+		}
+
+		return domain.RepoLock{}, mapRepositoryError(err)
+
+	}
+
+	return lock, nil
+}
+func (r *RepoRepository) AcquireRepositoryLock(ctx context.Context, id uuid.UUID) (bool, error) {
+	tag, err := r.db.Exec(
+		ctx,
+		`
+		UPDATE repo_lock
+		SET status = 'busy',
+		    status_updated_at = now()
+		WHERE sourcecraft_uuid = $1
+		  AND status = 'free'
+		`,
+		id,
+	)
+	if err != nil {
+		return false, mapRepositoryError(err)
+	}
+
+	return tag.RowsAffected() == 1, nil
+}
+
+func (r *RepoRepository) ReleaseRepositoryLock(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.Exec(
+		ctx,
+		`
+		UPDATE repo_lock
+		SET status = 'free',
+		    status_updated_at = now()
+		WHERE sourcecraft_uuid = $1
+		`,
+		id,
+	)
+
+	return mapRepositoryError(err)
 }

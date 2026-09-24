@@ -25,4 +25,9 @@ var (
 	ErrGradingFailed = errors.New("repository grading failed")
 
 	ErrNoAccess = errors.New("no access rights")
+
+	GradingPending           = errors.New("grading pending")
+	ErrExternalAPI           = errors.New("external api error")
+	ErrRecommendationsFailed = errors.New("recommendations failed")
+	ErrNoGrade               = errors.New("no grading found")
 )

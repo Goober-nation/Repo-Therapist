@@ -1,0 +1,274 @@
+package grpc
+
+import (
+	"aggregator-service/internal/domain"
+	"aggregator-service/internal/transport/rpc/gen"
+	"context"
+	"encoding/json"
+	"errors"
+	"time"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+type AggregatorService interface {
+	GetMyRepos(
+		ctx context.Context,
+	) (domain.MyRepositoriesResponse, error)
+
+	GetGrading(
+		ctx context.Context,
+		orgSlug string,
+		repoSlug string,
+	) (*domain.RepoGrade, error)
+
+	RequestLLMRecommendations(
+		ctx context.Context,
+		orgSlug string,
+		repoSlug string,
+	) (domain.RepoLLMResponse, error)
+}
+
+type Server struct {
+	pb.UnimplementedAggregatorServer
+
+	service AggregatorService
+}
+
+func NewServer(service AggregatorService) *Server {
+	return &Server{
+		service: service,
+	}
+}
+
+func (s *Server) GetMyRepos(
+	ctx context.Context,
+	req *pb.GetMyReposRequest,
+) (*pb.GetMyReposResponse, error) {
+	response, err := s.service.GetMyRepos(ctx)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	repositories := make([]*pb.Repository, 0, len(response.Repositories))
+
+	for _, repo := range response.Repositories {
+		pbRepo, err := repoToProto(repo)
+		if err != nil {
+			return nil, err
+		}
+
+		repositories = append(repositories, pbRepo)
+	}
+
+	return &pb.GetMyReposResponse{
+		Repositories:  repositories,
+		NextPageToken: response.NextPageToken,
+	}, nil
+}
+
+func (s *Server) GetGrading(
+	ctx context.Context,
+	req *pb.GetGradingRequest,
+) (*pb.GetGradingResponse, error) {
+	if req.GetOrgSlug() == "" || req.GetRepoSlug() == "" {
+		return nil, status.Error(
+			codes.InvalidArgument,
+			"org_slug and repo_slug are required",
+		)
+	}
+
+	grade, err := s.service.GetGrading(
+		ctx,
+		req.GetOrgSlug(),
+		req.GetRepoSlug(),
+	)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return &pb.GetGradingResponse{
+		Grade: gradeToProto(*grade),
+	}, nil
+}
+
+func (s *Server) RequestLLMRecommendations(
+	ctx context.Context,
+	req *pb.RequestLLMRecommendationsRequest,
+) (*pb.RequestLLMRecommendationsResponse, error) {
+	if req.GetOrgSlug() == "" || req.GetRepoSlug() == "" {
+		return nil, status.Error(
+			codes.InvalidArgument,
+			"org_slug and repo_slug are required",
+		)
+	}
+
+	response, err := s.service.RequestLLMRecommendations(
+		ctx,
+		req.GetOrgSlug(),
+		req.GetRepoSlug(),
+	)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	result := &pb.RequestLLMRecommendationsResponse{
+		RawResponse: response.RawResponse,
+		ModelUsed:   response.ModelUsed,
+	}
+
+	if response.EvaluatedAt != nil {
+		result.EvaluatedAt = timestamppb.New(*response.EvaluatedAt)
+	}
+
+	return result, nil
+}
+
+func repoToProto(repo domain.Repo) (*pb.Repository, error) {
+	var reactions []domain.ReactionCount
+
+	if len(repo.RatingReactions) > 0 {
+		if err := json.Unmarshal(repo.RatingReactions, &reactions); err != nil {
+			return nil, status.Errorf(
+				codes.Internal,
+				"invalid rating_reactions for repository %s: %v",
+				repo.SourcecraftUUID,
+				err,
+			)
+		}
+	}
+
+	result := &pb.Repository{
+		Id:   repo.SourcecraftUUID.String(),
+		Name: repo.Name,
+		Organization: &pb.Organization{
+			Slug: repo.OrgSlug,
+		},
+		Slug:        repo.RepoSlug,
+		Description: repo.Description,
+		WebUrl:      repo.WebURL,
+		Visibility:  repo.Visibility,
+		Rating:      &pb.Rating{},
+	}
+
+	if repo.LastActivityAt != nil {
+		result.LastActivityAt = repo.LastActivityAt.Format(time.RFC3339Nano)
+	}
+
+	if repo.RatingValue != nil {
+		result.Rating.Value = *repo.RatingValue
+	}
+
+	if repo.RatingPercentile != nil {
+		result.Rating.Percentile = *repo.RatingPercentile
+	}
+
+	for _, reaction := range reactions {
+		result.Rating.ReactionCounts = append(
+			result.Rating.ReactionCounts,
+			&pb.ReactionCount{
+				Type:  reaction.Type,
+				Count: reaction.Count,
+			},
+		)
+	}
+
+	return result, nil
+}
+
+func gradeToProto(grade domain.RepoGrade) *pb.RepoGrade {
+	result := &pb.RepoGrade{
+		SourcecraftUuid:        grade.SourcecraftUUID.String(),
+		PublicCategoryScores:   grade.PublicCategoryScores,
+		PublicRecommendations:  grade.PublicRecommendations,
+		PrivateCategoryScores:  grade.PrivateCategoryScores,
+		PrivateRecommendations: grade.PrivateRecommendations,
+		MissingData:            grade.MissingData,
+	}
+
+	if grade.PublicScore != nil {
+		value := int32(*grade.PublicScore)
+		result.PublicScore = &value
+	}
+
+	if grade.PrivateScore != nil {
+		value := int32(*grade.PrivateScore)
+		result.PrivateScore = &value
+	}
+
+	if grade.GradedAt != nil {
+		result.GradedAt = timestamppb.New(*grade.GradedAt)
+	}
+
+	return result
+}
+
+func mapError(err error) error {
+	switch {
+	case err == nil:
+		return nil
+
+	case errors.Is(err, domain.ErrNoAccess):
+		return status.Error(
+			codes.PermissionDenied,
+			"no access rights",
+		)
+
+	case errors.Is(err, domain.ErrRepositoryNotFound):
+		return status.Error(
+			codes.NotFound,
+			"repository not found",
+		)
+
+	case errors.Is(err, domain.ErrGradeNotFound),
+		errors.Is(err, domain.ErrNoGrade):
+		return status.Error(
+			codes.NotFound,
+			"grade not found",
+		)
+
+	case errors.Is(err, domain.GradingPending):
+		return status.Error(
+			codes.FailedPrecondition,
+			"grading is pending",
+		)
+
+	case errors.Is(err, domain.ErrRepoLocked):
+		return status.Error(
+			codes.Aborted,
+			"repository is locked",
+		)
+
+	case errors.Is(err, domain.ErrLLMUnavailable):
+		return status.Error(
+			codes.Unavailable,
+			"llm service unavailable",
+		)
+
+	case errors.Is(err, domain.ErrSourceCraftUnavailable):
+		return status.Error(
+			codes.Unavailable,
+			"sourcecraft service unavailable",
+		)
+
+	case errors.Is(err, domain.ErrGradingFailed):
+		return status.Error(
+			codes.Internal,
+			"grading failed",
+		)
+
+	case errors.Is(err, domain.ErrRecommendationsFailed):
+		return status.Error(
+			codes.Internal,
+			"recommendations failed",
+		)
+
+	default:
+		return status.Error(
+			codes.Internal,
+			"internal server error",
+		)
+	}
+}
