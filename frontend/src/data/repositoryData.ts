@@ -29,12 +29,7 @@ function gradingFromSummary(repository: RepositorySummary): GradingResponse {
     status: repository.gradeStatus ?? "FINISHED",
     repo_slug: repository.repoSlug ?? repository.id,
     health_score: repository.healthScore,
-    category_scores: Object.fromEntries(
-      Object.entries(repository.categoryScores).map(([metricId, metric]) => [
-        metricId,
-        metric.score,
-      ]),
-    ),
+    category_scores: repository.categoryScores,
     missing_data: repository.missingData ?? [],
     graded_at: repository.gradedAt,
   }
@@ -136,7 +131,7 @@ export const mockRepositoryDataSource = new MockRepositoryDataSource()
 
 export function createRepositoryDataSource(): RepositoryDataSource {
   if (import.meta.env.VITE_DATA_SOURCE === "http") {
-   return new HttpRepositoryDataSource(DEMO_REPOSITORIES)
+    return new HttpRepositoryDataSource(DEMO_REPOSITORIES)
   }
   return mockRepositoryDataSource
 }

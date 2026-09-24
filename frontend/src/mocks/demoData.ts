@@ -1,23 +1,43 @@
 import type {
   AttentionItem,
-  MetricId,
   Recommendation,
   RepositorySummary,
   SecurityFinding,
-} from "../types";
+} from "../types"
 
-export const DEFAULT_REPOSITORY_ID = "awesome-project";
+export const DEFAULT_REPOSITORY_ID = "awesome-project"
 
-export const METRIC_LABELS: Record<MetricId, string> = {
-  activity: "Активность",
-  codeHealth: "Состояние кода",
-  security: "Безопасность",
-  ciCd: "CI/CD",
-  documentation: "Документация",
-  issues: "Issues",
-};
+const demoMetricPresentation: Record<string, {
+  name: string
+  description: string
+}> = {
+  activity: {
+    name: "Активность",
+    description: "Активность проекта по истории изменений.",
+  },
+  codeHealth: {
+    name: "Состояние кода",
+    description: "Признаки сопровождаемости и качества кодовой базы.",
+  },
+  security: {
+    name: "Безопасность",
+    description: "Результаты анализа безопасности и зависимостей.",
+  },
+  ciCd: {
+    name: "CI/CD",
+    description: "Наличие и стабильность CI/CD-процессов.",
+  },
+  documentation: {
+    name: "Документация",
+    description: "README, лицензия и инструкции для участников.",
+  },
+  issues: {
+    name: "Issues",
+    description: "Состояние задач и работа с обращениями.",
+  },
+}
 
-export const DEMO_REPOSITORIES: RepositorySummary[] = [
+const demoRepositories: RepositorySummary[] = [
   {
     id: "sourcecraft-sdk",
     name: "sourcecraft/sdk",
@@ -162,7 +182,19 @@ export const DEMO_REPOSITORIES: RepositorySummary[] = [
       issues: { score: 39, trend: -7 },
     },
   },
-];
+]
+
+export const DEMO_REPOSITORIES: RepositorySummary[] = demoRepositories.map(
+  (repository) => ({
+    ...repository,
+    categoryScores: Object.fromEntries(
+      Object.entries(repository.categoryScores).map(([name, result]) => [
+        name,
+        { ...result, ...demoMetricPresentation[name] },
+      ]),
+    ),
+  }),
+)
 
 export const DEMO_ATTENTION_ITEMS: AttentionItem[] = [
   {
@@ -178,7 +210,8 @@ export const DEMO_ATTENTION_ITEMS: AttentionItem[] = [
     severity: "warning",
     category: "Документация",
     title: "README не обновлялся шесть месяцев",
-    description: "Актуальная инструкция поможет быстрее начать работу с проектом.",
+    description:
+      "Актуальная инструкция поможет быстрее начать работу с проектом.",
     impact: 2,
   },
   {
@@ -189,14 +222,15 @@ export const DEMO_ATTENTION_ITEMS: AttentionItem[] = [
     description: "Среднее время ожидания ответа на задачу — 4,2 дня.",
     impact: 3,
   },
-];
+]
 
 export const DEMO_RECOMMENDATIONS: Recommendation[] = [
   {
     id: "update-dependencies",
     priority: "high",
     title: "Обновить уязвимые зависимости",
-    description: "Обновите пакеты до версий, в которых исправлены критические уязвимости.",
+    description:
+      "Обновите пакеты до версий, в которых исправлены критические уязвимости.",
     currentScore: 82,
     projectedScore: 89,
   },
@@ -204,7 +238,8 @@ export const DEMO_RECOMMENDATIONS: Recommendation[] = [
     id: "add-contributing",
     priority: "medium",
     title: "Добавить CONTRIBUTING.md",
-    description: "Опишите процесс разработки, тестирования и отправки изменений.",
+    description:
+      "Опишите процесс разработки, тестирования и отправки изменений.",
     currentScore: 82,
     projectedScore: 85,
   },
@@ -212,18 +247,19 @@ export const DEMO_RECOMMENDATIONS: Recommendation[] = [
     id: "improve-issue-response",
     priority: "medium",
     title: "Сократить время ответа на issues",
-    description: "Назначьте ответственных и настройте уведомления о новых задачах.",
+    description:
+      "Назначьте ответственных и настройте уведомления о новых задачах.",
     currentScore: 82,
     projectedScore: 86,
   },
-];
+]
 
 export const DEMO_SECURITY_BREAKDOWN = [
   { label: "Уязвимости зависимостей", score: 45 },
   { label: "Поиск секретов", score: 100 },
   { label: "Актуальность зависимостей", score: 72 },
   { label: "Настройки безопасности", score: 68 },
-];
+]
 
 export const DEMO_SECURITY_FINDINGS: SecurityFinding[] = [
   {
@@ -250,7 +286,7 @@ export const DEMO_SECURITY_FINDINGS: SecurityFinding[] = [
     installedVersion: "0.21",
     fixAvailable: true,
   },
-];
+]
 
 export const DEMO_SCORE_HISTORY = [
   { month: "Апр", score: 71 },
@@ -259,19 +295,19 @@ export const DEMO_SCORE_HISTORY = [
   { month: "Июл", score: 75 },
   { month: "Авг", score: 78 },
   { month: "Сен", score: 82 },
-];
+]
 
 export function getHealthLabel(score: number): string {
-  if (score >= 90) return "Отличное состояние";
-  if (score >= 75) return "Здоровый";
-  if (score >= 60) return "Требует внимания";
-  return "Под риском";
+  if (score >= 90) return "Отличное состояние"
+  if (score >= 75) return "Здоровый"
+  if (score >= 60) return "Требует внимания"
+  return "Под риском"
 }
 
 export function getLastActivityLabel(daysAgo: number): string {
-  if (daysAgo === 0) return "Сегодня";
-  if (daysAgo === 1) return "Вчера";
-  if (daysAgo < 7) return `${daysAgo} дн. назад`;
-  if (daysAgo < 30) return `${Math.floor(daysAgo / 7)} нед. назад`;
-  return `${Math.floor(daysAgo / 30)} мес. назад`;
+  if (daysAgo === 0) return "Сегодня"
+  if (daysAgo === 1) return "Вчера"
+  if (daysAgo < 7) return `${daysAgo} дн. назад`
+  if (daysAgo < 30) return `${Math.floor(daysAgo / 7)} нед. назад`
+  return `${Math.floor(daysAgo / 30)} мес. назад`
 }

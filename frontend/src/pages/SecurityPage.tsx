@@ -15,6 +15,7 @@ import {
   getHealthLabel,
 } from "../mocks/demoData"
 import type { RepositorySummary } from "../types"
+import { getCategoryScore } from "../metrics"
 
 function securityTone(score: number): "good" | "warning" | "critical" {
   if (score >= 85) return "good"
@@ -29,8 +30,13 @@ export default function SecurityPage({
   repository: RepositorySummary
   onBack: () => void
 }) {
-  const hasSecuritySample = repository.id === DEFAULT_REPOSITORY_ID
-  const securityScore = repository.categoryScores.security.score
+  const securityScore = getCategoryScore(
+    repository.categoryScores,
+    "security",
+    "appsec",
+  )
+  const hasSecuritySample =
+    repository.id === DEFAULT_REPOSITORY_ID && securityScore !== null
 
   return (
     <div className="page-stack">
@@ -49,16 +55,24 @@ export default function SecurityPage({
         <Card className="security-score-card">
           <Label>Оценка безопасности</Label>
           <div className="health-score">
-            {securityScore}
-            <span>/100</span>
+            {securityScore ?? "—"}
+            {securityScore !== null && <span>/100</span>}
           </div>
-          <Badge tone={securityTone(securityScore)}>
-            {getHealthLabel(securityScore)}
+          <Badge
+            tone={
+              securityScore === null ? "neutral" : securityTone(securityScore)
+            }
+          >
+            {securityScore === null
+              ? "Нет данных"
+              : getHealthLabel(securityScore)}
           </Badge>
-          <ScoreBar
-            score={securityScore}
-            label={`Безопасность: ${securityScore} из 100`}
-          />
+          {securityScore !== null && (
+            <ScoreBar
+              score={securityScore}
+              label={`Безопасность: ${securityScore} из 100`}
+            />
+          )}
           <p className="muted-copy">
             Безопасность — одна из категорий Repo Health Score.
           </p>
