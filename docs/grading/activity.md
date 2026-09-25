@@ -38,8 +38,8 @@ note for why that matters).
 | Commits/week | + | 0.5 | 5 | 0.20 | commits.json | `rate_per_week` |
 | Days since last activity | − | 40 | 3 | 0.20 | commits.json | `days_since_last_event` |
 | Unique contributors | + | 1 | 5 | 0.15 | commits.json | `unique_count(author_email)` |
-| Issue rate/week | + | 0.2 | 2 | 0.15 | issues.json | `rate_per_week` |
-| Milestones/year | + | 1 | 6 | 0.05 | milestones.json | `rate_per_year` |
+| Issue rate/week | + | 0.02 | 0.15 | 0.15 | issues.json | `rate_per_week` |
+| Milestones/year | + | 0 | 3 | 0.05 | milestones.json | `rate_per_year` |
 | Days since last milestone | − | 180 | 30 | 0.10 | milestones.json | `days_since_last_event` |
 | Top-contributor share | − | 1.0 | 0.5 | 0.10 | commits.json | `max_share(author_email)` |
 
@@ -88,3 +88,12 @@ validated against real repos.
   pulling enough independent signal to justify fixing over dropping — `commits_per_week` and
   `days_since_last_activity` (0.20 weight each) already correctly punish zero/low activity, so the
   category lost no real coverage by removing it.
+- **`issue_rate_per_week`/`milestones_per_year` recalibrated, 2026-09-25.** Real data across 20
+  diverse repos (`agents_memory/topics/threshold-calibration-data.md`) — including large orgs like
+  gravity-ui/datalens/postgres forks — found median and p75 exactly 0 for both metrics, max 0.117
+  and 4 respectively. The old thresholds (`critical: 0.2/1`, `healthy: 2/6`) meant essentially no
+  real repo ever cleared critical, zero discrimination. Not evidence 20 real repos are badly run —
+  reads as SourceCraft's issue/milestone features being lightly adopted platform-wide. New:
+  `issue_rate_per_week` critical `0.02`/healthy `0.15`; `milestones_per_year` critical `0`/healthy
+  `3` — both still `provisional: true`, now at least anchored to the real observed range instead
+  of an arbitrary guess nothing could reach.

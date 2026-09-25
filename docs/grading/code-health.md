@@ -41,7 +41,7 @@ All thresholds `provisional: true` — first-guess values, not calibrated agains
 | Metric | Direction | Critical | Healthy | Weight | `min_sample_size` population |
 |---|---|---|---|---|---|
 | Median marker age (days) | − | 293 | 183 | 0.25 | **uncapped** marker count — see below |
-| Density per kLOC (markers / 1000 LOC) | − | 20 | 1 | 0.30 | none — see below |
+| Density per kLOC (markers / 1000 LOC) | − | 3 | 0.3 | 0.30 | none — see below |
 | Share of markers stale (≥293d, uncapped) | − | 0.5 | 0.05 | 0.25 | **uncapped** marker count — see below |
 | Worst-file concentration (max-file markers ÷ total markers) | − | 0.6 | 0.15 | 0.20 | all markers (age-independent) |
 
@@ -152,3 +152,10 @@ full analysis.
   293d as `share_stale_markers`' per-marker cutoff — taken from the real pooled age
   distribution's p90/p25 (192 markers, 6 repos), not a guess. Re-verified against all 12 repos:
   real partial credit and a 58.3-100 spread, no clustering, no backwards incentive.
+
+- **`density_per_kloc` recalibrated, 2026-09-25.** A follow-up 20-repo run (5 to 17,651 files —
+  see `agents_memory/topics/threshold-calibration-data.md`) found the max observed density across
+  32 repos tested total (both batches) was 2.01/kLOC — the old `critical: 20/healthy: 1` meant
+  virtually every real repo scored ~1.0 here regardless of actual density, no discrimination.
+  New: `critical: 3` / `healthy: 0.3`, anchored to the real observed range instead of an arbitrary
+  guess nothing could approach. Still `provisional: true`.

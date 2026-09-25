@@ -68,8 +68,12 @@ categories:
         formula:
           type: linear_clamp
           direction: "+"
-          critical: 0.2
-          healthy: 2
+          # Recalibrated 2026-09-25 against real data (20 repos, incl. large orgs like
+          # gravity-ui/datalens/postgres forks): median and p75 were both exactly 0, max 0.117 —
+          # the old critical:0.2/healthy:2 meant nobody ever cleared critical at all, zero
+          # discrimination. See agents_memory/topics/threshold-calibration-data.md.
+          critical: 0.02
+          healthy: 0.15
           provisional: true
 
       - id: milestones_per_year
@@ -82,8 +86,12 @@ categories:
         formula:
           type: linear_clamp
           direction: "+"
-          critical: 1
-          healthy: 6
+          # Recalibrated 2026-09-25: same finding as issue_rate_per_week — median 0, p75 0, max 4
+          # across 20 real repos (milestones are lightly used platform-wide, not something most
+          # real repos, including large orgs, are "failing" at). See
+          # agents_memory/topics/threshold-calibration-data.md.
+          critical: 0
+          healthy: 3
           provisional: true
 
       - id: days_since_last_milestone
@@ -168,8 +176,12 @@ categories:
         formula:
           type: linear_clamp
           direction: "-"
-          critical: 20
-          healthy: 1
+          # Recalibrated 2026-09-25: max observed across 32 real repos tested (two batches, 5 to
+          # 17,651 files) was 2.01/kLOC — the old critical:20/healthy:1 meant almost every real
+          # repo scored ~1.0 here regardless of actual density, no discrimination. See
+          # agents_memory/topics/threshold-calibration-data.md.
+          critical: 3
+          healthy: 0.3
           provisional: true
 
       - id: share_stale_markers
