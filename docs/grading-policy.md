@@ -103,9 +103,11 @@ table said per-week) — picking per-week, matching the table.
 ## Documentation (15%, method defined; implementation pending)
 
 LLM service owns the category's versioned 0–100 method. Ordinary code performs deterministic file
-checks and verifies repository facts; the model awards integer points for semantic documentation
+checks; model output is validated for format only. The model awards integer points for semantic documentation
 quality. LLM service combines both parts and returns a final category score that Grade service does
-not recalculate.
+not recalculate. The current Kafka completed payload (v2) contains only `grade`, eight section
+`subcategories`, and a flat `facts` list. Internal checks and numeric per-fact penalties are
+not sent; recommendations are generated later on Aggregator request.
 
 The method assigns 20 points to deterministic README, LICENSE, CONTRIBUTING, and CODEOWNERS checks,
 and 80 points to purpose, local-run, build, testing, usage, navigation, and consistency checks.

@@ -8,8 +8,8 @@ Scope: the message shapes published/consumed on the Kafka links in the architect
 - Grade service <-> Repository service — **defined below**. This exchange is entirely within one
   person's scope (Repository + Grade service), so it didn't need to wait on wider team sign-off —
   see `backlog/phase-3-kafka-integration.md` for the implementation notes.
-- Grade service <-> LLM service — **defined below (v1)** for semantic documentation analysis.
-- Aggregator <-> LLM service — **defined below (v1)** for final report generation.
+- Grade service <-> LLM service — **defined below (request v1, completed v2)** for documentation analysis.
+- Aggregator <-> LLM service — **defined below (request/completed v2)** for final report generation.
 
 ## `repo.grade.requested`
 
@@ -52,28 +52,28 @@ result independently verified by hand earlier in phase 2.
 
 ---
 
-# LLM service contracts (v1)
+# LLM service contracts (versioned)
 
 These contracts add two independent asynchronous workflows. They do not change the existing
 `repo.grade.requested` or `repo.ready` messages.
 
 1. Grade service sends the repository's S3 prefix and receives the final normalized Documentation
-   score, scores for its subcategories, and verified machine-readable facts about deductions. LLM
+   score, scores for its eight sections, and machine-readable facts about deficiencies. LLM
    service owns the Documentation grading method; Grade service owns the cross-category aggregation
    and final Repo Health Score.
-2. Aggregator requests a Russian-language report after all scores and verified problems are final.
+2. Aggregator requests a Russian-language report after all scores and analyzer facts are final.
    LLM service does not recalculate or change those scores.
 
 Repository contents are never placed in Kafka messages. Documentation requests contain the S3
 prefix from `repo.ready`, not repository files. Report requests contain only final scores and
-verified machine-readable deductions; report generation does not re-read repository files.
+machine-readable deficiencies; report generation does not re-read repository files.
 
 ## LLM service boundary
 
 Documentation and best practices is the only analysis category assessed by LLM service. For this
 category, normal code performs objective checks and the model performs semantic checks. LLM service
 combines both parts using a versioned grading method and returns the final normalized Documentation
-score, deduction codes, and validated evidence. Grade service consumes that category score without
+score, eight section grades, and a flat fact list. Grade service consumes that category score without
 recalculating its internal checks. It also receives subcategory scores and facts about every
 deduction. The documentation response contains no written advice; Russian explanations and
 recommendations are generated only after a separate request from Aggregator.
@@ -124,13 +124,18 @@ Envelope fields:
 |---|---|
 | `event_id` | UUID identifying this Kafka event. A retry of the same logical event keeps this ID. |
 | `event_type` | One of the six event types defined below. |
-| `event_version` | Contract version. Version 1 consumers reject other versions explicitly. |
+| `event_version` | Contract version for this event type; unsupported versions are rejected explicitly. |
 | `analysis_id` | UUID of one complete repository analysis run. Used as the Kafka key. |
 | `repository_id` | SourceCraft repository UUID. Slugs are display metadata, not identity. |
 | `commit_sha` | Full Git commit SHA when the producer knows it. Repository/Grade's current `repo.ready` exchange does not provide it, so it is optional for Documentation events. |
 | `data_scope` | `public` for public-only data or `owner` for data available to an authorized owner. |
 | `created_at` | RFC 3339 UTC timestamp. Producers emit the `Z` form. |
 | `payload` | Event-specific object. |
+
+Current versions: Documentation request/failure = 1; Documentation completed = 2;
+report request/completed = 2; report failure = 1 (unchanged error envelope). The Python
+request parser also accepts legacy report request v1 during migration. Report v1 keeps its
+legacy problem-impact rules; new producers use v2 for compact Documentation facts.
 
 Result and failure events additionally require `request_event_id`, equal to the `event_id` of the
 request being answered. They copy `analysis_id`, `repository_id`, `data_scope`, and `commit_sha`
@@ -186,103 +191,62 @@ S3 input rules:
 
 ### `documentation.analysis.completed`
 
-Topic: `llm.documentation.results`.
+Topic: `llm.documentation.results`. Event version: **2**.
+
+The payload contains exactly three fields: the overall Documentation grade, eight section grades,
+and a flat list of facts describing deficiencies. Correlation IDs remain in the event envelope.
 
 ```json
 {
   "event_id": "018f47d8-e274-7aa8-ac4f-e85ee5f01818",
   "event_type": "documentation.analysis.completed",
-  "event_version": 1,
+  "event_version": 2,
   "request_event_id": "018f47d2-6d5a-7b72-82fd-1e9834d57a91",
   "analysis_id": "018f47d1-e33b-7af3-a642-229ac22a9e82",
   "repository_id": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
   "data_scope": "public",
   "created_at": "2026-09-21T10:15:44Z",
   "payload": {
-    "category": "documentation",
-    "grading_method_version": "documentation-grading-v1",
-    "prompt_version": "documentation-prompt-v1",
-    "context": {
-      "sha256": "d5b389a2248c8a7f7054f4b22a70f56fcab12c56108a5f4cc1a9bcb870cc5462",
-      "selected_file_count": 7,
-      "total_file_count": 83,
-      "truncated": false
-    },
-    "model": {
-      "provider": "yandex-cloud",
-      "name": "model-name-set-by-deployment"
-    },
-    "score": {
-      "status": "CALCULATED",
-      "value": 98,
-      "scale": 100
-    },
-    "coverage": {
-      "applicable_points": 100,
-      "evaluated_points": 100,
-      "percent": 100
-    },
+    "grade": 98,
     "subcategories": [
-      {"id": "required_files", "status": "CALCULATED", "score": 100, "applicable_points": 20, "evaluated_points": 20, "earned_points": 20},
-      {"id": "purpose", "status": "CALCULATED", "score": 100, "applicable_points": 15, "evaluated_points": 15, "earned_points": 15},
-      {"id": "local_run", "status": "CALCULATED", "score": 90, "applicable_points": 20, "evaluated_points": 20, "earned_points": 18},
-      {"id": "build", "status": "CALCULATED", "score": 100, "applicable_points": 10, "evaluated_points": 10, "earned_points": 10},
-      {"id": "testing", "status": "CALCULATED", "score": 100, "applicable_points": 10, "evaluated_points": 10, "earned_points": 10},
-      {"id": "usage", "status": "CALCULATED", "score": 100, "applicable_points": 10, "evaluated_points": 10, "earned_points": 10},
-      {"id": "structure", "status": "CALCULATED", "score": 100, "applicable_points": 5, "evaluated_points": 5, "earned_points": 5},
-      {"id": "consistency", "status": "CALCULATED", "score": 100, "applicable_points": 10, "evaluated_points": 10, "earned_points": 10}
-    ],
-    "checks": [
       {
-        "check_id": "local_run.configuration",
-        "check_type": "SEMANTIC",
-        "outcome": "EVALUATED",
-        "points_awarded": 2,
-        "max_points": 4,
-        "deductions": [
-          {
-            "deduction_id": "local_run.configuration:environment",
-            "code": "DOC_LOCAL_RUN_CONFIGURATION_INCOMPLETE",
-            "raw_points_lost": 2,
-            "facts": {
-              "missing_aspects": [
-                "required_parameters"
-              ]
-            },
-            "evidence": [
-              {
-                "type": "file_content",
-                "path": "README.md",
-                "start_line": 30,
-                "end_line": 38,
-                "quote": "POSTGRES_USER=..."
-              },
-              {
-                "type": "file_missing",
-                "path": ".env.example"
-              }
-            ]
-          }
-        ]
+        "id": "required_files",
+        "grade": 100
       },
       {
-        "check_id": "license.exists",
-        "check_type": "DETERMINISTIC",
-        "outcome": "EVALUATED",
-        "points_awarded": 5,
-        "max_points": 5,
-        "deductions": []
+        "id": "purpose",
+        "grade": 100
+      },
+      {
+        "id": "local_run",
+        "grade": 90
+      },
+      {
+        "id": "build",
+        "grade": 100
+      },
+      {
+        "id": "testing",
+        "grade": 100
+      },
+      {
+        "id": "usage",
+        "grade": 100
+      },
+      {
+        "id": "structure",
+        "grade": 100
+      },
+      {
+        "id": "consistency",
+        "grade": 100
       }
     ],
-    "problems": [
+    "facts": [
       {
-        "id": "DOC-LOCAL-RUN-CONFIGURATION",
-        "category": "documentation",
+        "id": "DOC-0001",
+        "subcategory": "local_run",
         "code": "DOC_LOCAL_RUN_CONFIGURATION_INCOMPLETE",
-        "severity": "LOW",
-        "score_impact": {
-          "category_points_lost": 2
-        },
         "facts": {
           "missing_aspects": [
             "required_parameters"
@@ -300,123 +264,45 @@ Topic: `llm.documentation.results`.
             "type": "file_missing",
             "path": ".env.example"
           }
-        ],
-        "source_checks": [
-          "local_run.configuration"
-        ],
-        "source_deductions": [
-          "local_run.configuration:environment"
         ]
       }
-    ],
-    "warnings": []
+    ]
   }
 }
 ```
 
-The example abbreviates `checks`; a production event contains every check defined by
-`grading_method_version`. The omitted checks in this example are fully evaluated and receive their
-maximum points. `check_id` values and their contribution to the category score belong to the named
-grading method version. Extending the method does not require a Kafka contract version change.
-Grade service does not interpret individual checks; it consumes `score`. Checks and problems are
-included for auditing and as validated machine input for the final report.
+Payload rules:
 
-`subcategories` contains exactly the eight method-defined groups shown in the example. Its `score`
-is normalized to 0–100 within that group: `earned_points / evaluated_points * 100`, rounded to two
-decimals. `CALCULATED` means all applicable group points were evaluated; `CALCULATED_PARTIAL` means
-some applicable checks are `NO_DATA`. If every group check is `NOT_APPLICABLE`, the group has
-`status: NOT_APPLICABLE`, `score: null`, and all point fields are zero. If the group applies but none
-of its checks could be evaluated, it has `status: NO_DATA`, `score: null`, and
-`evaluated_points: 0`. `applicable_points` and `evaluated_points` are the sum of method-defined
-check maxima in the corresponding group. Grade service displays these scores but does not average
-them to recompute the category score. The category score uses the method-defined raw point weights.
+- `grade`: number from 0 to 100, rounded to two decimals. Grade service uses this value directly.
+- `subcategories`: exactly eight objects with only `id` and `grade`. IDs are `required_files`,
+  `purpose`, `local_run`, `build`, `testing`, `usage`, `structure`, `consistency`.
+- Each section grade is normalized to 0–100 within that section. `null` means every check in
+  the section is not applicable; it is not zero and must not reduce the overall grade.
+- Overall grade uses the existing check weights and evaluated maxima, not the arithmetic mean
+  of the eight section grades. Scoring guidance remains in `documentation-grading.md`.
+- `facts`: an array of objects containing `id`, `subcategory`, `code`, `facts`, and `evidence`.
+  `facts` within an item is an object of structured deficiency details; `evidence` is an array
+  of objects and can be empty. `code` labels the kind of deficiency. There is no advice text.
+- Fact IDs are unique within a result (for example `DOC-0001`). They are assigned in internal
+  check/deduction order and preserved when the same logical event is retried or forwarded.
+  They are not cross-analysis identities. Facts retain their section association.
+- Both objective-file and model-produced facts are included, even minor ones. All supplied
+  model findings are retained without testing their arithmetic against the section score.
+- Validation is format-only. Model facts, quotes, line numbers and semantic claims are not
+  certified by the service; evidence and numeric deduction consistency do not block delivery.
+- The payload does **not** contain `checks`, `components`, `deductions`, `problems`, `severity`,
+  numeric score impacts, coverage, prompt/model metadata, context hashes or validation flags
+  at its top level. Evidence objects may retain their original context hash or file excerpt.
+- Recommendations and human-readable explanations are produced only in the later report flow.
 
-`problems` contains the verified facts about deficiencies that Grade service can forward to
-Aggregator. It contains no advice text.
+The 25 internal checks and component scores remain implementation details. Removing them from
+Kafka does not change the scoring weights. Grade service forwards this complete compact payload
+to Aggregator, which supplies it as `payload.documentation` in report request v2. Neither service
+needs to synthesize severity, numerical per-fact penalties or verified problem records.
 
-Score rules:
-
-- `category` is always `documentation`;
-- `scale` is always `100` in contract v1;
-- `status` is `CALCULATED` when every applicable check was evaluated and `CALCULATED_PARTIAL` when
-  one or more applicable checks are `NO_DATA`;
-- both statuses carry a numeric `value` from 0 to 100;
-- LLM service calculates `value` from deterministic and semantic checks using the exact method
-  identified by `grading_method_version`;
-- the model does not freely invent the final category score: normal service code validates model
-  output and applies the versioned method.
-
-Normalization rules:
-
-```text
-applicable_max = sum(max_points where outcome != NOT_APPLICABLE)
-evaluated_max  = sum(max_points where outcome == EVALUATED)
-earned         = sum(points_awarded where outcome == EVALUATED)
-coverage       = evaluated_max / applicable_max * 100
-score          = earned / evaluated_max * 100
-```
-
-Missing data never counts as zero. If no applicable check can be evaluated, LLM service publishes a
-failed event instead of fabricating a completed result. Exact weights and applicability rules are
-defined by `documentation-grading-v1` in `docs/documentation-grading.md`.
-
-Check rules:
-
-| Field | Values / meaning |
-|---|---|
-| `check_type` | `DETERMINISTIC`, `SEMANTIC`, or `HYBRID` |
-| `outcome` | `EVALUATED`, `NO_DATA`, or `NOT_APPLICABLE` |
-| `points_awarded` | Integer from 0 through the method-defined `max_points` for `EVALUATED`; otherwise `null` |
-| `deductions` | Machine-readable deduction codes, typed facts, and validated evidence; never user-facing prose |
-
-For every evaluated check, `raw_points_lost` values sum to
-`max_points - points_awarded`. `raw_points_lost` is an integer on that check's method-defined scale;
-after missing-data normalization it may differ from the deduction's contribution on the final
-category scale. A fully satisfied check has an empty `deductions` array. `NO_DATA` is distinct from
-a zero-point evaluated check: it means the available repository content/context is insufficient for
-a reliable result. `NOT_APPLICABLE` means the check does not apply to this repository. Internal
-scales, weights, formulas, and normalization belong to `documentation-grading-v1`, not the Kafka
-schema.
-
-The documentation grading workflow emits no user-facing reason, title, or recommendation. Those
-are generated later, and only once, by the report workflow. Deduction `code`, typed `facts`, and
-validated evidence carry the machine-readable reason between the two workflows. The deduction
-code selects the allowed facts schema; arbitrary model-generated fact fields are rejected. Every
-deduction has a `deduction_id` that is stable and unique within the result. Documentation codes and
-their facts/evidence schemas are defined in `docs/documentation-codes.md`.
-
-Problem rules:
-
-- normal service code groups deductions by a shared root cause; the model does not perform this
-  grouping;
-- every deduction appears in exactly one problem's `source_deductions`;
-- `source_checks` lists all contributing checks;
-- `score_impact.category_points_lost` is the grouped raw loss normalized by `evaluated_points`;
-- problem impacts sum exactly to `100 - score.value`, with the final problem absorbing any rounding
-  remainder;
-- severity is computed after grouping: up to 10 lost points is `LOW`, more than 10 through 25 is
-  `MEDIUM`, more than 25 through 50 is `HIGH`, and more than 50 is `CRITICAL`;
-- a code-specific minimum severity may raise, but never lower, impact severity.
-
-Allowed evidence variants:
-
-```jsonl
-{"type":"file_content","path":"README.md","start_line":10,"end_line":12,"quote":"..."}
-{"type":"file_exists","path":"Dockerfile"}
-{"type":"file_missing","path":".env.example"}
-{"type":"document_review","paths":["README.md","docs/overview.md"],"context_sha256":"d5b389a2248c8a7f7054f4b22a70f56fcab12c56108a5f4cc1a9bcb870cc5462"}
-```
-
-Paths are UTF-8, relative to `s3_prefix`, use `/`, and cannot contain `..`. Lines are
-one-based and inclusive. LLM service validates file existence, line ranges, and quotes against the
-S3 content before publishing a completed event. For `document_review`, every listed file must have
-been included completely in the hashed model context; it supports absence of semantic content in
-existing documents. Invalid model evidence is never forwarded.
-
-`warnings` reports non-fatal context limitations such as intentionally truncated documentation.
-When truncation prevents a reliable decision, the affected check is `NO_DATA`, coverage decreases,
-and the result becomes `CALCULATED_PARTIAL`. Missing-data warnings do not create deductions and do
-not reduce the normalized score.
+Version 2 replaces the former extended v1 completed payload. Consumers must explicitly migrate;
+there is no silent interpretation of v1 `score/checks/problems` as v2 `grade/subcategories/facts`.
+Documentation requests and documentation failure events retain version 1.
 
 ### `documentation.analysis.failed`
 
@@ -463,15 +349,16 @@ Documentation error codes:
 Topic: `llm.report.requests`.
 
 Aggregator publishes this event only after Grade service and all analyzers have produced final
-results. Problems are already verified before they reach LLM service. The request contains no S3
+results. Documentation facts are forwarded unchanged in `payload.documentation`; they are
+format-checked model claims, not verified problems. `problems` holds other categories only. The request contains no S3
 snapshot because report generation must use final facts, not re-read repository source code.
-In contract v1, `output_language` is required and its only supported value is `ru`.
+In report request v2, `output_language` is required and its only supported value is `ru`.
 
 ```json
 {
   "event_id": "018f47e0-66ad-76fa-8c50-d162b7264a47",
   "event_type": "report.generation.requested",
-  "event_version": 1,
+  "event_version": 2,
   "analysis_id": "018f47d1-e33b-7af3-a642-229ac22a9e82",
   "repository_id": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
   "commit_sha": "47c673f70ddf4c3e5b8768df35d688f43c6f5f52",
@@ -480,41 +367,45 @@ In contract v1, `output_language` is required and its only supported value is `r
   "payload": {
     "output_language": "ru",
     "scores": {
-      "overall": {"status": "CALCULATED", "score": 91},
+      "overall": {
+        "status": "CALCULATED",
+        "score": 91
+      },
       "categories": [
-        {"category": "security", "status": "NO_DATA", "score": null},
-        {"category": "activity", "status": "CALCULATED", "score": 91},
-        {"category": "documentation", "status": "CALCULATED", "score": 68, "coverage_percent": 100},
-        {"category": "ci_cd", "status": "NO_DATA", "score": null},
-        {"category": "issues", "status": "CALCULATED", "score": 100},
-        {"category": "code_health", "status": "CALCULATED", "score": 100}
+        {
+          "category": "security",
+          "status": "NO_DATA",
+          "score": null
+        },
+        {
+          "category": "activity",
+          "status": "CALCULATED",
+          "score": 91
+        },
+        {
+          "category": "documentation",
+          "status": "CALCULATED",
+          "score": 98,
+          "coverage_percent": 100
+        },
+        {
+          "category": "ci_cd",
+          "status": "NO_DATA",
+          "score": null
+        },
+        {
+          "category": "issues",
+          "status": "CALCULATED",
+          "score": 100
+        },
+        {
+          "category": "code_health",
+          "status": "CALCULATED",
+          "score": 100
+        }
       ]
     },
     "problems": [
-      {
-        "id": "DOC-LOCAL-RUN",
-        "category": "documentation",
-        "code": "DOC_LOCAL_RUN_INCOMPLETE",
-        "severity": "HIGH",
-        "score_impact": {
-          "category_points_lost": 32
-        },
-        "facts": {
-          "missing_aspects": [
-            "environment_variables",
-            "expected_result"
-          ]
-        },
-        "evidence": [
-          {
-            "type": "file_content",
-            "summary": "В README указана команда запуска",
-            "path": "README.md",
-            "start_line": 42,
-            "end_line": 42
-          }
-        ]
-      },
       {
         "id": "ACT-RECENCY",
         "category": "activity",
@@ -537,7 +428,69 @@ In contract v1, `output_language` is required and its only supported value is `r
           }
         ]
       }
-    ]
+    ],
+    "documentation": {
+      "grade": 98,
+      "subcategories": [
+        {
+          "id": "required_files",
+          "grade": 100
+        },
+        {
+          "id": "purpose",
+          "grade": 100
+        },
+        {
+          "id": "local_run",
+          "grade": 90
+        },
+        {
+          "id": "build",
+          "grade": 100
+        },
+        {
+          "id": "testing",
+          "grade": 100
+        },
+        {
+          "id": "usage",
+          "grade": 100
+        },
+        {
+          "id": "structure",
+          "grade": 100
+        },
+        {
+          "id": "consistency",
+          "grade": 100
+        }
+      ],
+      "facts": [
+        {
+          "id": "DOC-0001",
+          "subcategory": "local_run",
+          "code": "DOC_LOCAL_RUN_CONFIGURATION_INCOMPLETE",
+          "facts": {
+            "missing_aspects": [
+              "required_parameters"
+            ]
+          },
+          "evidence": [
+            {
+              "type": "file_content",
+              "path": "README.md",
+              "start_line": 30,
+              "end_line": 38,
+              "quote": "POSTGRES_USER=..."
+            },
+            {
+              "type": "file_missing",
+              "path": ".env.example"
+            }
+          ]
+        }
+      ]
+    }
   }
 }
 ```
@@ -555,10 +508,16 @@ Score rules:
 - `data_scope` decides which problems Aggregator may include. LLM service does not combine public
   and owner-only inputs.
 
-Problem and deduction rules:
+`documentation` is required: the exact three-field completed payload when Documentation is
+scored, or `null` if the category failed/is unavailable. Preserve its grade, section grades and
+all fact IDs/content. The category score supplied in `scores.categories` comes from its `grade`.
+Documentation facts need no severity, score impact, or mandatory verified evidence.
+
+Problem and deduction rules for the other five categories:
 
 - `id` is unique within the analysis and stable for the supplied result;
-- `category` is one of `security`, `activity`, `documentation`, `ci_cd`, `issues`, `code_health`;
+- `category` is one of `security`, `activity`, `ci_cd`, `issues`, `code_health`; Documentation
+  entries belong only in `documentation.facts`;
 - `severity` is `CRITICAL`, `HIGH`, `MEDIUM`, or `LOW`; minor deductions are `LOW`, not omitted;
 - `score_impact.category_points_lost` is a positive number on that category's 0-100 scale;
 - for every `CALCULATED` or `CALCULATED_PARTIAL` category below 100, at least one scoring problem
@@ -583,7 +542,7 @@ Topic: `llm.report.results`.
 {
   "event_id": "018f47e5-414e-77ad-80f2-061f91e79f89",
   "event_type": "report.generation.completed",
-  "event_version": 1,
+  "event_version": 2,
   "request_event_id": "018f47e0-66ad-76fa-8c50-d162b7264a47",
   "analysis_id": "018f47d1-e33b-7af3-a642-229ac22a9e82",
   "repository_id": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
@@ -601,7 +560,7 @@ Topic: `llm.report.results`.
       "text": "Репозиторий получил 91 балл из 100. Основные улучшения связаны с документацией.",
       "sources": [
         {"source_type": "overall_score", "source_id": "overall"},
-        {"source_type": "problem", "source_id": "DOC-LOCAL-RUN"}
+        {"source_type": "documentation_fact", "source_id": "DOC-0001"}
       ]
     },
     "category_assessments": [
@@ -615,10 +574,10 @@ Topic: `llm.report.results`.
       },
       {
         "category": "documentation",
-        "text": "Документация оценена в 68 баллов из 100 из-за неполной инструкции локального запуска.",
+        "text": "Документация оценена в 98 баллов из 100 из-за неполной инструкции локального запуска.",
         "sources": [
           {"source_type": "category_score", "source_id": "documentation"},
-          {"source_type": "problem", "source_id": "DOC-LOCAL-RUN"}
+          {"source_type": "documentation_fact", "source_id": "DOC-0001"}
         ]
       },
       {
@@ -640,7 +599,7 @@ Topic: `llm.report.results`.
       {
         "text": "В документации не указаны обязательные переменные окружения.",
         "sources": [
-          {"source_type": "problem", "source_id": "DOC-LOCAL-RUN"}
+          {"source_type": "documentation_fact", "source_id": "DOC-0001"}
         ]
       },
       {
@@ -674,7 +633,7 @@ Topic: `llm.report.results`.
         "action": "Перечислить обязательные переменные и добавить файл-пример.",
         "expected_effect": "Локальный запуск станет воспроизводимым для новых участников.",
         "sources": [
-          {"source_type": "problem", "source_id": "DOC-LOCAL-RUN"}
+          {"source_type": "documentation_fact", "source_id": "DOC-0001"}
         ]
       }
     ]
@@ -685,12 +644,13 @@ Topic: `llm.report.results`.
 Every generated statement has at least one source. A source is one of:
 
 - `{"source_type":"problem","source_id":"<existing problem id>"}`;
+- `{"source_type":"documentation_fact","source_id":"<documentation.facts item id>"}`;
 - `{"source_type":"category_score","source_id":"<existing category id>"}`;
 - `{"source_type":"overall_score","source_id":"overall"}`.
 
 LLM service validates every reference against the request. Unknown IDs make the model response
-invalid. Every input problem ID must appear in at least one item of the output `problems` array, so
-even a minor deduction remains visible. Recommendation sources must include at least one problem.
+invalid. Every input problem ID and Documentation fact ID must appear in at least one item of the output `problems` array, so
+even a minor deduction remains visible. Recommendation sources must include at least one problem or Documentation fact.
 Exact projected overall score changes are not generated because only Grade service can calculate
 cross-category and final score changes. LLM service owns only the Documentation category
 calculation.

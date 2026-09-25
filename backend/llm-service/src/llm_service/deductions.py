@@ -125,7 +125,7 @@ def validate_deduction(check_id: str, deduction: dict, reviewed_paths: set[str],
         elif name in _LIST_FIELDS:
             if not isinstance(value, list) or (not value and name not in {
                 "reviewed_paths", "detected_test_commands"
-            }):
+            } and name not in trusted_facts):
                 raise ValueError(f"invalid list fact: {name}")
             if name in _TRUSTED_FIELDS and name not in {"detected_test_types", "detected_identifiers"}:
                 if any(not isinstance(item, dict) or set(item) != {"kind", "identifier", "path"}

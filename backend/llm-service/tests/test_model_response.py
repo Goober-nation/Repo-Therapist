@@ -36,6 +36,56 @@ class ModelResponseTests(unittest.TestCase):
         self.assertEqual(result["score"]["value"], 100)
         self.assertEqual(result["context"]["sha256"], HASH)
 
+    def test_recomputes_check_total_from_integer_components(self):
+        checks = full_checks()
+        summary = next(item for item in checks if item["check_id"] == "purpose.summary")
+        summary["points_awarded"] = 8
+        result = evaluate(checks)
+        scored = next(item for item in result["checks"]
+                      if item["check_id"] == "purpose.summary")
+        self.assertEqual(scored["points_awarded"], sum(summary["components"].values()))
+
+    def test_rejects_non_integer_component_values_before_summing(self):
+        checks = full_checks()
+        summary = next(item for item in checks if item["check_id"] == "purpose.summary")
+        summary["components"]["project_identity"] = True
+        with self.assertRaisesRegex(InvalidModelResponse, "integer components"):
+            evaluate(checks)
+
+    def test_derives_exact_quote_line_numbers_instead_of_trusting_model(self):
+        checks = full_checks()
+        summary = next(item for item in checks if item["check_id"] == "purpose.summary")
+        summary["components"]["problem_statement"] -= 1
+        summary["points_awarded"] -= 1
+        summary["deductions"] = [{
+            "deduction_id": "purpose.summary:unclear-problem",
+            "code": "DOC_PURPOSE_UNCLEAR", "raw_points_lost": 1,
+            "facts": {"unclear_aspects": ["problem_statement"]},
+            "evidence": [{"type": "file_content", "path": "README.md",
+                          "start_line": 900, "end_line": 901,
+                          "quote": "A small documented project."}],
+        }]
+        result = evaluate(checks)
+        scored = next(item for item in result["checks"]
+                      if item["check_id"] == "purpose.summary")
+        self.assertEqual(scored["deductions"][0]["evidence"][0]["start_line"], 3)
+        self.assertEqual(scored["deductions"][0]["evidence"][0]["end_line"], 3)
+
+    def test_rejects_file_evidence_quote_not_in_snapshot(self):
+        checks = full_checks()
+        summary = next(item for item in checks if item["check_id"] == "purpose.summary")
+        summary["components"]["problem_statement"] -= 1
+        summary["points_awarded"] -= 1
+        summary["deductions"] = [{
+            "deduction_id": "purpose.summary:unclear-problem",
+            "code": "DOC_PURPOSE_UNCLEAR", "raw_points_lost": 1,
+            "facts": {"unclear_aspects": ["problem_statement"]},
+            "evidence": [{"type": "file_content", "path": "README.md",
+                          "start_line": 3, "end_line": 3, "quote": "invented quote"}],
+        }]
+        with self.assertRaisesRegex(InvalidModelResponse, "not an exact excerpt"):
+            evaluate(checks)
+
     def test_rejects_prose_extra_fields_and_duplicate_json_keys(self):
         response = json.dumps({"checks": full_checks(), "advice": "Just trust me"}).encode()
         with self.assertRaisesRegex(InvalidModelResponse, "only checks"):
@@ -102,6 +152,42 @@ class ModelResponseTests(unittest.TestCase):
         self.assertEqual(result["score"]["value"], 72)
         with self.assertRaises(InvalidModelResponse):
             evaluate(checks)
+
+    def test_injects_empty_required_detector_list_when_inventory_has_no_match(self):
+        checks = full_checks()
+        usage = next(item for item in checks if item["check_id"] == "usage.primary_example")
+        usage["components"]["usage_context"] = 0
+        usage["points_awarded"] -= 1
+        usage["deductions"] = [{
+            "deduction_id": "usage.primary_example:no-example",
+            "code": "DOC_USAGE_EXAMPLE_MISSING", "raw_points_lost": 1,
+            "facts": {"reviewed_paths": ["README.md"]},
+            "evidence": [{"type": "document_review", "paths": ["README.md"],
+                          "context_sha256": HASH}],
+        }]
+        result = evaluate(checks)
+        usage_result = next(item for item in result["checks"]
+                            if item["check_id"] == "usage.primary_example")
+        self.assertEqual(usage_result["deductions"][0]["facts"]["detected_interfaces"], [])
+
+    def test_injects_zero_required_detector_count_when_inventory_has_no_match(self):
+        checks = full_checks()
+        structure = next(item for item in checks if item["check_id"] == "structure.overview")
+        structure["components"]["component_roles"] = 0
+        structure["points_awarded"] -= 1
+        structure["deductions"] = [{
+            "deduction_id": "structure.overview:missing-roles",
+            "code": "DOC_STRUCTURE_OVERVIEW_INCOMPLETE", "raw_points_lost": 1,
+            "facts": {"missing_aspects": ["component_roles"],
+                      "documented_component_count": 0},
+            "evidence": [{"type": "document_review", "paths": ["README.md"],
+                          "context_sha256": HASH}],
+        }]
+        result = evaluate(checks, allowed_not_applicable=frozenset())
+        structure_result = next(item for item in result["checks"]
+                                if item["check_id"] == "structure.overview")
+        self.assertEqual(
+            structure_result["deductions"][0]["facts"]["detected_component_count"], 0)
 
     def test_rejects_unknown_enum_and_wrong_evidence_variant(self):
         checks = full_checks()

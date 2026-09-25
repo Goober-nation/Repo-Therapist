@@ -51,7 +51,7 @@ class PipelineTests(unittest.TestCase):
         self.assertNotIn("hello", context.text)
 
         checks[0]["deductions"][0]["evidence"][0]["quote"] = "invented claim"
-        with self.assertRaisesRegex(InvalidModelResponse, "not verified"):
+        with self.assertRaisesRegex(InvalidModelResponse, "exact excerpt"):
             validate_model_response(json.dumps({"checks": checks}).encode(), snapshot, context)
 
 

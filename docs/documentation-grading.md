@@ -1,5 +1,12 @@
 # Documentation grading method (`documentation-grading-v1`)
 
+> Current active output: `documentation.analysis.completed` v2 contains only `grade`,
+> eight `subcategories`, and a flat `facts` list. Internal checks/components and
+> numeric deduction impacts are not transmitted. The active model path checks format
+> only; strict evidence/impact rules below describe the legacy validator and scoring
+> guidance, not acceptance requirements for the current Yandex response. See
+> [Kafka contract](kafka-contracts.md) and [active model output](llm-model-output.md).
+
 This document defines the reproducible 0–100 method owned by LLM service for the
 `documentation` category. Kafka transport is defined in `docs/kafka-contracts.md`.
 

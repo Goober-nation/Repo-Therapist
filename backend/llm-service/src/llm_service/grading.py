@@ -363,7 +363,11 @@ def grade_documentation(files: Mapping[str, str], semantic_checks: Mapping[str, 
             validate_deduction(check_id, deduction, reviewed_paths, all_paths,
                                trusted_facts_by_deduction.get(deduction_id))
         if outcome == "EVALUATED" and lost != spec.maximum - awarded:
-            raise ValueError(f"deductions do not explain score: {check_id}")
+            raise ValueError(
+                f"deductions do not explain score: {check_id} "
+                f"(max={spec.maximum}, awarded={awarded}, deductions={lost}, "
+                f"expected_deductions={spec.maximum - awarded})"
+            )
         checks.append(check)
 
     applicable = sum(c["max_points"] for c in checks if c["outcome"] != "NOT_APPLICABLE")
