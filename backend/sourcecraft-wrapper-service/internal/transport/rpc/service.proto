@@ -8,6 +8,9 @@ option go_package = "sourcecraft-wrapper-service/internal/transport/gen;pb";
 import "google/protobuf/timestamp.proto";
 
 service CodeHealth {
+  rpc GetRepositoryBySlugs(GetRepositoryBySlugsRequest)
+      returns (GetRepositoryBySlugsResponse);
+
   rpc GetRepoIDBySlugs(GetRepoIDBySlugsRequest)
       returns (GetRepoIDBySlugsResponse);
 
@@ -23,8 +26,8 @@ service CodeHealth {
   rpc GetMilestones(GetMilestonesRequest)
       returns (GetMilestonesResponse);
 
-  rpc ListAllPublicRepoIDs(ListAllPublicRepoIDsRequest)
-      returns (ListAllPublicRepoIDsResponse);
+  rpc ListAllPublicRepos(ListAllPublicReposRequest)
+      returns (ListAllPublicReposResponse);
 
   rpc GetMyRepos(GetMyReposRequest)
       returns (GetMyReposResponse);
@@ -48,10 +51,10 @@ message GetGitURLResponse {
   string ssh_url = 2;
 }
 
-message ListAllPublicRepoIDsRequest {}
+message ListAllPublicReposRequest {}
 
-message ListAllPublicRepoIDsResponse {
-  repeated string repo_ids = 1;
+message ListAllPublicReposResponse {
+  repeated Repository repos = 1;
 }
 
 message GetMyReposRequest {}
@@ -69,6 +72,9 @@ message Repository {
   string description = 5;
   Logo logo = 6;
   string web_url = 7;
+  string visibility = 8;
+  string last_activity_at = 9;
+  Rating rating = 10;
 }
 
 message Organization {
@@ -263,4 +269,31 @@ message Milestone {
 message MilestoneUser {
   string id = 1;
   string slug = 2;
+}
+
+message GetRepositoryBySlugsRequest {
+  string org_slug = 1;
+  string repo_slug = 2;
+}
+message Rating {
+  double value = 1;
+  double percentile = 2;
+  repeated ReactionCount reaction_counts = 3;
+}
+
+message ReactionCount {
+  string type = 1;
+  string count = 2;
+}
+message GetRepositoryBySlugsResponse {
+  string id = 1;
+  string name = 2;
+  Organization organization = 3;
+  string slug = 4;
+  string description = 5;
+  Logo logo = 6;
+  string web_url = 7;
+  string visibility = 8;
+  string last_activity_at = 9;
+  Rating rating = 10;
 }

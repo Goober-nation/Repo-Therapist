@@ -1,7 +1,12 @@
 package domain
 
+import "time"
+
 type RepositoryID struct {
-	RepoId string `json:"id"`
+	RepoId       string `json:"id"`
+	OrgSlug      string
+	RepoSlug     string
+	LastActivity *time.Time
 }
 
 type RepositoriesID struct {
@@ -21,8 +26,21 @@ type Repository struct {
 	Description  string       `json:"description"`
 	Logo         Logo         `json:"logo"`
 	WebURL       string       `json:"web_url"`
+	Visibility   string       `json:"visibility"`
+	LastActivity *time.Time   `json:"last_updated"`
+	Rating       Rating       `json:"rating"`
 }
 
+type Rating struct {
+	Value          float64         `json:"value"`
+	Percentile     float64         `json:"percentile"`
+	ReactionCounts []ReactionCount `json:"reaction_counts"`
+}
+
+type ReactionCount struct {
+	Type  string `json:"type"`
+	Count string `json:"count"`
+}
 type Logo struct {
 	URL string `json:"url"`
 }

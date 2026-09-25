@@ -21,23 +21,52 @@ func mapRuns(runs []domain.Run) []*pb.Run {
 
 	return result
 }
-func mapRepositories(repositories []domain.Repository) []*pb.Repository {
-	result := make([]*pb.Repository, 0, len(repositories))
+func mapRepositories(repos []domain.Repository) []*pb.Repository {
+	result := make([]*pb.Repository, 0, len(repos))
 
-	for _, repo := range repositories {
+	for _, repo := range repos {
+		var lastActivityAt string
+		if repo.LastActivity != nil {
+			lastActivityAt = repo.LastActivity.Format(time.RFC3339Nano)
+		}
+
+		reactionCounts := make([]*pb.ReactionCount, 0, len(repo.Rating.ReactionCounts))
+
+		for _, reaction := range repo.Rating.ReactionCounts {
+			reactionCounts = append(
+				reactionCounts,
+				&pb.ReactionCount{
+					Type:  reaction.Type,
+					Count: reaction.Count,
+				},
+			)
+		}
+
 		result = append(result, &pb.Repository{
 			Id:   repo.ID,
 			Name: repo.Name,
+
 			Organization: &pb.Organization{
 				Id:   repo.Organization.ID,
 				Slug: repo.Organization.Slug,
 			},
+
 			Slug:        repo.Slug,
 			Description: repo.Description,
+
 			Logo: &pb.Logo{
 				Url: repo.Logo.URL,
 			},
-			WebUrl: repo.WebURL,
+
+			WebUrl:         repo.WebURL,
+			Visibility:     repo.Visibility,
+			LastActivityAt: lastActivityAt,
+
+			Rating: &pb.Rating{
+				Value:          repo.Rating.Value,
+				Percentile:     repo.Rating.Percentile,
+				ReactionCounts: reactionCounts,
+			},
 		})
 	}
 
