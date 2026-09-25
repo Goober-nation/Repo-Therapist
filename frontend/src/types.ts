@@ -1,11 +1,13 @@
 export type PageId = "overview" | "ranking" | "security"
 
-export type MetricId = "activity" | "codeHealth" | "security" | "ciCd" | "documentation" | "issues"
-
 export interface MetricResult {
-  score: number
+  score: number | null
   trend: number | null
+  name?: string
+  description?: string
 }
+
+export type CategoryScores = Record<string, MetricResult>
 
 export interface RepositorySummary {
   id: string
@@ -24,7 +26,7 @@ export interface RepositorySummary {
   trend: number
   likes: number
   lastActivityDaysAgo: number
-  categoryScores: Record<MetricId, MetricResult>
+  categoryScores: CategoryScores
   gradeStatus?: "PENDING" | "FINISHED"
   gradedAt?: string
   missingData?: string[]

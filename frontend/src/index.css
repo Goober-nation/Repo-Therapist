@@ -100,7 +100,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .app-workspace { display: flex; flex: 1; min-width: 0; flex-direction: column; }
 .sidebar { display: flex; width: 242px; flex: 0 0 242px; flex-direction: column; padding: 22px 14px 14px; background: var(--surface); border-right: 1px solid var(--border); }
 .brand { display: flex; align-items: center; gap: 10px; width: 100%; margin: 0 0 36px; padding: 3px 8px; border: 0; background: transparent; text-align: left; cursor: pointer; }
-.brand__mark { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; background: #17212f; color: white; font-weight: 700; }
+.brand__mark { display: grid; width: 42px; height: 34px; flex: 0 0 42px; place-items: center; color: #000000; }
+.brand__mark svg { display: block; width: 100%; height: 100%; }
+:root[data-theme="dark"] .brand__mark { color: #ffffff; }
+:root[data-theme="dopamine"] .brand__mark svg { stroke: url(#repo-health-logo-gradient); }
 .brand strong, .brand small, .sidebar__footer strong, .sidebar__footer small { display: block; }
 .brand strong { font-size: 14px; letter-spacing: -.02em; }
 .brand small, .sidebar__footer small { margin-top: 3px; color: var(--muted); font-size: 11px; }
@@ -191,11 +194,12 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .potential-score > strong { font-size: 26px; letter-spacing: -.04em; }
 .potential-score > strong span { padding: 0 5px; color: var(--subtle); font-weight: 400; }
 .metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.metric-card { display: grid; align-content: start; gap: 11px; padding: 17px; }
+.metric-card { display: grid; min-width: 0; align-content: start; gap: 11px; padding: 17px; overflow-wrap: anywhere; }
 .metric-card__topline { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .metric-card__score { font-size: 32px; font-weight: 650; letter-spacing: -.05em; }
 .metric-card__score span { margin-left: 4px; color: var(--subtle); font-size: 12px; font-weight: 500; letter-spacing: 0; }
 .metric-card p { min-height: 33px; margin: -5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.metric-card .metric-card__empty { margin: 0; font-size: 20px; }
 
 .list-card { padding: 0 20px; }
 .attention-item { display: flex; align-items: center; gap: 18px; padding: 16px 0; }

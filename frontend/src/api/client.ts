@@ -39,7 +39,7 @@ export class HttpRepoHealthApi implements RepoHealthApi {
       import.meta.env.VITE_API_BASE_URL ??
       "/api"
     ).replace(/\/$/, "")
-    this.fetcher = options.fetcher ?? fetch
+    this.fetcher = options.fetcher ?? fetch.bind(globalThis)
   }
 
   getGrading(

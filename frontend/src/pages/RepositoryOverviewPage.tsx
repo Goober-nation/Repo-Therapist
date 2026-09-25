@@ -13,62 +13,17 @@ import {
   DEMO_RECOMMENDATIONS,
   DEFAULT_REPOSITORY_ID,
   DEMO_SCORE_HISTORY,
-  METRIC_LABELS,
   getHealthLabel,
   getLastActivityLabel,
 } from "../mocks/demoData"
 import { downloadReport } from "../mocks/downloadReport"
-import type {
-  MetricId,
-  MetricResult,
-  Recommendation,
-  RepositorySummary,
-} from "../types"
-
-const metricDescriptions: Record<MetricId, string> = {
-  activity: "Активность проекта по истории изменений.",
-  codeHealth: "Признаки сопровождаемости и качества кодовой базы.",
-  security: "Результаты анализа безопасности и зависимостей.",
-  ciCd: "Наличие и стабильность CI/CD-процессов.",
-  documentation: "README, лицензия и инструкции для участников.",
-  issues: "Состояние задач и работа с обращениями.",
-}
+import AnalysisResults from "../components/AnalysisResults"
+import type { Recommendation, RepositorySummary } from "../types"
 
 function getTone(score: number): "good" | "warning" | "critical" {
   if (score >= 85) return "good"
   if (score >= 60) return "warning"
   return "critical"
-}
-
-function MetricCard({
-  metricId,
-  result,
-}: {
-  metricId: MetricId
-  result: MetricResult
-}) {
-  return (
-    <Card className="metric-card">
-      <div className="metric-card__topline">
-        <Label>{METRIC_LABELS[metricId]}</Label>
-        {result.trend !== null && (
-          <span className={`trend ${result.trend < 0 ? "trend--down" : ""}`}>
-            {result.trend > 0 ? "+" : ""}
-            {result.trend}
-          </span>
-        )}
-      </div>
-      <div className="metric-card__score">
-        {result.score}
-        <span>/100</span>
-      </div>
-      <p>{metricDescriptions[metricId]}</p>
-      <ScoreBar
-        score={result.score}
-        label={`${METRIC_LABELS[metricId]}: ${result.score} из 100`}
-      />
-    </Card>
-  )
 }
 
 function ScoreHistoryChart() {
@@ -161,9 +116,6 @@ export default function RepositoryOverviewPage({
   onRunAnalysis,
 }: RepositoryOverviewPageProps) {
   const hasDetailedSample = repository.id === DEFAULT_REPOSITORY_ID
-  const categoryMetrics = Object.entries(
-    repository.categoryScores,
-  ) as [MetricId, MetricResult][]
   const attentionItems = hasDetailedSample ? DEMO_ATTENTION_ITEMS : []
   const recommendations =
     loadedRecommendations ?? (hasDetailedSample ? DEMO_RECOMMENDATIONS : [])
@@ -263,11 +215,10 @@ export default function RepositoryOverviewPage({
           </div>
         </Card>
 
-        <div className="metric-grid">
-          {categoryMetrics.map(([metricId, result]) => (
-            <MetricCard key={metricId} metricId={metricId} result={result} />
-          ))}
-        </div>
+        <AnalysisResults
+          categories={repository.categoryScores}
+          status={analysisStatus ?? repository.gradeStatus}
+        />
       </div>
 
       <section className="section-block">

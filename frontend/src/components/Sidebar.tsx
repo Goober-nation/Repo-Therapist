@@ -59,7 +59,31 @@ export default function Sidebar({
         onClick={() => onPageChange("overview")}
       >
         <span className="brand__mark" aria-hidden="true">
-          R
+          <svg
+            viewBox="0 0 64 44"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            focusable="false"
+          >
+            <defs>
+              <linearGradient
+                id="repo-health-logo-gradient"
+                gradientUnits="userSpaceOnUse"
+                x1="5"
+                y1="6"
+                x2="59"
+                y2="38"
+              >
+                <stop stopColor="#e73583" />
+                <stop offset=".5" stopColor="#8b3fe8" />
+                <stop offset="1" stopColor="#ed791c" />
+              </linearGradient>
+            </defs>
+            <path d="m21 6-16 16 16 16M43 6l16 16-16 16" strokeWidth="6" />
+            <path d="M19 22h8l5-12 7 24 5-12h5" strokeWidth="4.8" />
+          </svg>
         </span>
         <span>
           <strong>Repo Health</strong>
