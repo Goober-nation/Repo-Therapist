@@ -120,6 +120,21 @@ func (s *ServerRPC) ListAllPublicRepoIDs(
 	}, nil
 }
 
+func (s *ServerRPC) GetMyRepos(
+	ctx context.Context,
+	req *pb.GetMyReposRequest,
+) (*pb.GetMyReposResponse, error) {
+	repos, err := s.service.GetMyRepos(ctx)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return &pb.GetMyReposResponse{
+		Repositories:  mapRepositories(repos.Repositories),
+		NextPageToken: repos.NextPageToken,
+	}, nil
+}
+
 func mapError(err error) error {
 	log.Println(err)
 	switch {

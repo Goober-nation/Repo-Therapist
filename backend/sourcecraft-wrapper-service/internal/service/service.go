@@ -23,6 +23,7 @@ type SCService interface {
 	GetIssues(ctx context.Context, repoID string) (domain.Issues, error)
 	GetMilestones(ctx context.Context, repoID string) (domain.Milestones, error)
 	ListAllPublicReposId(ctx context.Context) ([]string, error)
+	GetMyRepos(ctx context.Context) (domain.MyRepositoriesResponse, error)
 }
 
 type SCWrapper struct {
@@ -298,4 +299,44 @@ func tokenFromContext(ctx context.Context) (string, error) {
 	}
 
 	return token, nil
+}
+
+func (scw *SCWrapper) GetMyRepos(ctx context.Context) (domain.MyRepositoriesResponse, error) {
+	token, err := tokenFromContext(ctx)
+	if err != nil {
+		return domain.MyRepositoriesResponse{}, fmt.Errorf("%w:%w", domain.ErrUnauthenticated, err)
+	}
+
+	basePath := "/me/repos"
+
+	var all domain.MyRepositoriesResponse
+	pageToken := ""
+
+	for page := 0; page < maxPages; page++ {
+		var rr domain.MyRepositoriesResponse
+
+		next, err := scw.getPage(
+			ctx,
+			token,
+			basePath,
+			pageToken,
+			&rr,
+			func() string {
+				return rr.NextPageToken
+			},
+		)
+		if err != nil {
+			return domain.MyRepositoriesResponse{}, err
+		}
+
+		all.Repositories = append(all.Repositories, rr.Repositories...)
+
+		if next == "" {
+			break
+		}
+
+		pageToken = next
+	}
+
+	return all, nil
 }
