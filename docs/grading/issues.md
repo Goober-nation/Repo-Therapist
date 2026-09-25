@@ -1,12 +1,14 @@
 # Issues (15%, public)
 
-**Status: implemented.** Last updated 2026-09-22.
+**Status: implemented.** Last updated 2026-09-25.
 
 ## What it measures
 
 How well the project triages and closes work items: abandonment across the whole open-issue
 backlog (not just recent issues), closure throughput, resolution rate. Time-to-first-response is
-explicitly out of scope — no data source for it (see Known limitations).
+a decided non-goal, not a pending gap — see Known limitations. Median closure time is the
+closure-related signal this category tracks instead; it doesn't stand in for first-response,
+it's a separate question the metric set was scoped to answer from the start.
 
 ## How it's calculated, in plain words
 
@@ -64,9 +66,11 @@ values, not calibrated against a repo population.
 - **Median closure time is a proxy** (`updated_at - created_at`), not a real close-event
   timestamp — the wrapper exposes no first-comment/close-event timeline separate from
   `updated_at`.
-- **Time to first response has no data source at all** — `updated_at` conflates first response,
-  later discussion, relabeling, and closure into one timestamp, so it's not used as a proxy.
-  Revisit only if sourcecraft-wrapper-service ever exposes an issue comment/event timeline.
+- **Time to first response is out of scope, decided 2026-09-25** — `updated_at` conflates first
+  response, later discussion, relabeling, and closure into one timestamp, so it can't be used as
+  a proxy, and no other data source exists. Not planned; would need
+  sourcecraft-wrapper-service to expose a real issue comment/event timeline before this is
+  revisited at all.
 - `paused` (`status_type`) counts as unresolved/open everywhere here, same as
   `initial`/`in_progress`.
 - Issues carry their own visibility flag independent of the repo's — a public repo can contain

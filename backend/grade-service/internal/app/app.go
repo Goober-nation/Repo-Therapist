@@ -82,12 +82,32 @@ func Grade(ctx context.Context, repoID string, cfg *config.Config) (map[string]a
 		securityResult = gradeSecurity(ctx, repoID)
 	}
 
+	codeHealthInputs := scoring.CodeHealthInputs{}
+	if data, err := s3Client.GetObject(ctx, prefix+"/_meta/todo-markers.json"); err != nil {
+		log.Printf("todo-markers.json unavailable for %s: %v (Code health category will be no-data)", repoID, err)
+	} else {
+		var export struct {
+			Markers  []scoring.Marker `json:"markers"`
+			TotalLOC int              `json:"total_loc"`
+		}
+		if err := json.Unmarshal(data, &export); err != nil {
+			return nil, fmt.Errorf("decoding todo-markers.json: %w", err)
+		}
+		codeHealthInputs = scoring.CodeHealthInputs{Markers: export.Markers, TotalLOC: export.TotalLOC, Available: true}
+	}
+
+	codeHealthResult := scoring.CategoryResult{ID: "code_health", NoData: true}
+	if codeHealthCfg, ok := cfg.Categories["code_health"]; ok && codeHealthCfg.Status == config.StatusCalculated {
+		codeHealthResult = scoring.ComputeCodeHealth(codeHealthCfg, codeHealthInputs)
+	}
+
 	return map[string]any{
 		"sourcecraft_uuid": repoID,
 		"categories": map[string]scoring.CategoryResult{
-			"activity": activityResult,
-			"issues":   issuesResult,
-			"security": securityResult,
+			"activity":    activityResult,
+			"issues":      issuesResult,
+			"security":    securityResult,
+			"code_health": codeHealthResult,
 		},
 	}, nil
 }

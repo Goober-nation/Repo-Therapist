@@ -12,17 +12,15 @@ popularity (design principle 5 in `00-overview.md`).
 
 1. Repository-service clones the repo and asks SourceCraft for its issues and milestones, saving
    each as one entry per event (commit, issue, milestone) with a timestamp, in S3.
-2. Grade-service turns those into eight numbers: how often commits happen, how long since the
+2. Grade-service turns those into seven numbers: how often commits happen, how long since the
    last one, how many different people are committing, how often issues/milestones show up, how
-   long since the last milestone, how concentrated commits are in one person, and net lines
-   changed per week.
+   long since the last milestone, and how concentrated commits are in one person.
 3. Each number gets placed on a line between a "healthy" value and a "critical" value — close to
-   healthy scores near 1, close to critical scores near 0. (Net lines/week instead uses a
-   "healthy band" — too little *or* too much change is bad, not just too little.)
+   healthy scores near 1, close to critical scores near 0.
 4. If a metric's underlying data couldn't be fetched at all, or (for top-contributor share) there
    were too few commits to compute a meaningful share, that metric is dropped — "no data," not a
    fabricated 0.
-5. The eight scores are combined into one 0-100 category score by weighted average, stretching
+5. The seven scores are combined into one 0-100 category score by weighted average, stretching
    remaining weights to fill any dropped metric's gap.
 
 ## Data source
@@ -44,7 +42,6 @@ note for why that matters).
 | Milestones/year | + | 1 | 6 | 0.05 | milestones.json | `rate_per_year` |
 | Days since last milestone | − | 180 | 30 | 0.10 | milestones.json | `days_since_last_event` |
 | Top-contributor share | − | 1.0 | 0.5 | 0.10 | commits.json | `max_share(author_email)` |
-| Net lines/week (band) | healthy [-2,10], critical [-30,50] | — | — | 0.05 | commits.json | `rate_per_week(net_lines)` |
 
 *= marked `provisional: true` in `config/grading.yaml` — first-guess placeholders, not yet
 validated against real repos.
@@ -66,17 +63,6 @@ validated against real repos.
   real population of repos yet.
 - "MR rate/week" in the original source draft had a prose/table contradiction (per-month vs.
   per-week) — resolved to per-week, matching the table.
-- Releases (`_meta/releases.json`) were fetched but never found populated on any real repo tested
-  — releases appear to be a largely-unused SourceCraft feature distinct from git tags; not
-  currently wired into any metric.
-- `net_lines_per_week`'s healthy band ([-2, 10]) scores a repo with **zero commits in the
-  window** identically to one with healthy, balanced activity (0 net lines both clamp to score
-  1). Caught reviewing `yapb/yapb`'s real result: a fully dormant repo got this one metric's
-  maximum score purely from having nothing happen. In practice this doesn't distort the overall
-  score — `commits_per_week`/`days_since_last_activity` (0.20 weight each, vs. this metric's
-  0.05) already correctly punish zero activity hard — but it's a real inconsistency: "nothing
-  happened" and "healthy amount of change" aren't the same fact and shouldn't score the same.
-  Not fixed yet, flagged here rather than silently left in place.
 - SourceCraft's API returns Go's zero-value time (`"0001-01-01T00:00:00Z"`) for a milestone with
   no deadline set, rather than omitting the field or returning null. `milestonesToEvents` treats
   this sentinel (or an empty string) as unset and falls back to `created_at`
@@ -87,5 +73,18 @@ validated against real repos.
 
 - Threshold validation against real repos — tracked in `backlog/phase-2-grade-service.md`.
 - No automated unit tests yet for `internal/scoring` — same gap for every category.
-- Whether `net_lines_per_week` should require a minimum commit count in-window (like
-  `top_contributor_share`'s floor) before scoring at all, to close the gap above.
+
+## Design history (compressed)
+
+- **Releases dropped, 2026-09-25.** `_meta/releases.json` was fetched but never found populated
+  on any real repo tested — releases appear to be a largely-unused SourceCraft feature distinct
+  from git tags, and it was never wired into any metric. repository-service no longer fetches it.
+- **`net_lines_per_week` dropped, 2026-09-25.** Net lines changed per week conflated too many
+  unrelated real events (a steady contributor pace, a single big refactor, a vendored-dependency
+  bump, a revert) under one number, and its healthy band had no activity floor — a repo with
+  **zero commits in the window** scored identically to one with healthy, balanced activity (both
+  clamp to score 1 inside `[-2, 10]`). Caught reviewing `yapb/yapb`'s real result: a fully dormant
+  repo got this metric's maximum score purely from having nothing happen. At 0.05 weight it wasn't
+  pulling enough independent signal to justify fixing over dropping — `commits_per_week` and
+  `days_since_last_activity` (0.20 weight each) already correctly punish zero/low activity, so the
+  category lost no real coverage by removing it.

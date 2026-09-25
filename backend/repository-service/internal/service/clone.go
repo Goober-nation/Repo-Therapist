@@ -18,6 +18,7 @@ import (
 	"repo-therapist/repository-service/internal/gitlog"
 	"repo-therapist/repository-service/internal/scwrapper"
 	"repo-therapist/repository-service/internal/storage"
+	"repo-therapist/repository-service/internal/todomarkers"
 )
 
 // Result carries everything the Kafka listen-mode needs to build a repo.ready message — the
@@ -29,6 +30,7 @@ type Result struct {
 	CommitCount     int
 	IssueCount      int
 	MilestoneCount  int
+	TodoMarkerCount int
 }
 
 // CloneAndUpload is the shared entry point for both the one-shot CLI path and the Kafka listen
@@ -113,6 +115,19 @@ func CloneAndUpload(ctx context.Context, org, repo string) (*Result, error) {
 		return nil, fmt.Errorf("uploading commit history: %w", err)
 	}
 
+	log.Printf("scanning for TODO/FIXME markers in %s", tmpDir)
+	todoExport, err := todomarkers.Scan(ctx, tmpDir, historyDays)
+	if err != nil {
+		return nil, fmt.Errorf("scanning todo markers: %w", err)
+	}
+	todoJSON, err := json.Marshal(todoExport)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling todo markers: %w", err)
+	}
+	if err := s3Client.PutObject(ctx, keyPrefix+"/_meta/todo-markers.json", todoJSON, "application/json"); err != nil {
+		return nil, fmt.Errorf("uploading todo markers: %w", err)
+	}
+
 	log.Printf("fetching issues for %s/%s", org, repo)
 	issues, err := scClient.GetIssues(ctx, repoID)
 	if err != nil {
@@ -146,6 +161,7 @@ func CloneAndUpload(ctx context.Context, org, repo string) (*Result, error) {
 		CommitCount:     len(commits),
 		IssueCount:      len(issues),
 		MilestoneCount:  len(milestones),
+		TodoMarkerCount: len(todoExport.Markers),
 	}, nil
 }
 

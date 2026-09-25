@@ -23,7 +23,7 @@ Kept from the TZ's example weights (§3.2) — they sum cleanly and nothing argu
 
 | Category | Weight | Public? | Status |
 |---|---|---|---|
-| Code health / tech debt | 20% | yes | planned |
+| Code health / tech debt | 20% | yes | **implemented** |
 | Security | 20% | no | **implemented** |
 | Activity | 15% | yes | **implemented** |
 | Documentation | 15% | yes | blocked (Grade↔LLM Kafka contract) |
@@ -67,6 +67,15 @@ decision, not a technical block (its data is viewer-readable on public repos).
    artificially healthy. Repos below a minimum content threshold (or `is_empty=true`) short-circuit
    to "Недостаточно данных" rather than a score. Not something either source doc called out — a real
    gaming vector caught during design, not after.
+   **Parked as of 2026-09-25**: still aspirational, not implemented as a hard gate anywhere —
+   explicit decision (during Code health's implementation) that every repo should be gradeable
+   regardless of size, since a hard gate blocks grading small-but-real repos entirely. The gaming
+   concern this principle names is real and unaddressed; the intended replacement is a future,
+   separate "repo grade trust/confidence factor" (weights the score's reliability rather than
+   refusing to compute one) — not designed yet, parked in
+   `backlog/phase-2-grade-service.md`. Code health's per-metric floors (`min_sample_size`) are a
+   narrower, already-implemented version of the same underlying concern, scoped to individual
+   metrics rather than the whole repo.
 5. **Popularity is never a scoring input**, anywhere — matches TZ §11 rule 9 ("Repo Health Score
    должен иметь большее значение для рейтинга, чем популярность проекта") directly.
 6. **Metric config is layered — source, aggregation, formula — each independently swappable.**

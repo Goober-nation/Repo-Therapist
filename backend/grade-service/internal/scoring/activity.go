@@ -107,17 +107,9 @@ func eventsForSource(source string, inputs ActivityInputs) ([]Event, bool) {
 func commitsToEvents(commits []gitlog.Commit) []Event {
 	events := make([]Event, 0, len(commits))
 	for _, c := range commits {
-		var netLines float64
-		for _, fc := range c.FilesChanged {
-			if fc.Binary {
-				continue
-			}
-			netLines += float64(fc.Added - fc.Deleted)
-		}
 		events = append(events, Event{
-			Timestamp:     c.AuthoredAt,
-			NumericFields: map[string]float64{"net_lines": netLines},
-			StringFields:  map[string]string{"author_email": c.AuthorEmail},
+			Timestamp:    c.AuthoredAt,
+			StringFields: map[string]string{"author_email": c.AuthorEmail},
 		})
 	}
 	return events

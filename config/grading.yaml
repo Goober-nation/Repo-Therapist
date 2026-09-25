@@ -117,26 +117,94 @@ categories:
           healthy: 0.5
           provisional: true
 
-      - id: net_lines_per_week
-        status: calculated
-        weight: 0.05
-        source: commits.json
-        aggregation:
-          type: rate_per_week
-          field: net_lines
-          window_days: 180
-        formula:
-          type: band
-          healthy_low: -2
-          healthy_high: 10
-          critical_low: -30
-          critical_high: 50
-          provisional: true
-
   code_health:
     weight: 0.20
     public: true
-    status: not_calculated
+    status: calculated
+    metrics:
+      # All four metrics read from todo-markers.json (repository-service's TODO/FIXME scan +
+      # git-blame age, see internal/todomarkers). min_sample_size: 5 on the three
+      # marker-count-dependent metrics (not density) — same reasoning as Activity/Issues' floors,
+      # a statistic over 1-4 markers is too noisy to score defensibly.
+      #
+      # "Oldest marker age" (this file's original draft column) was deliberately NOT
+      # implemented as a raw max — a max is an order statistic that skews older purely from
+      # having more markers sampled, which would penalize large repos vs small ones for no real
+      # quality difference. share_stale_markers (a ratio, same family as Issues'
+      # abandoned_share) replaces it — see docs/grading/code-health.md.
+      #
+      # 2026-09-25: real-repo testing found TODO age does NOT correlate with repo size (Spearman
+      # ~0 across 192 real markers) — so no size-based threshold is needed here. A per-repo
+      # commit-cadence-relative threshold was tried next and also reverted: the age/cadence ratio
+      # varied 64x across real repos tested, and using it would have penalized the fastest-moving,
+      # most actively-maintained repos hardest for the same or better absolute TODO age than
+      # slower ones — backwards from what's defensible. critical/healthy below are flat, but
+      # empirically calibrated: p90/p25 of the pooled real age distribution (242d median, 183d
+      # p25, 278d p75, 293d p90 — n=192 markers from 6 repos, see docs/grading/code-health.md's
+      # Design history), not a from-scratch guess.
+      - id: median_marker_age
+        status: calculated
+        weight: 0.25
+        source: todo-markers.json
+        aggregation:
+          type: median_marker_age
+          min_sample_size: 5
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 293
+          healthy: 183
+          provisional: true
+
+      - id: density_per_kloc
+        status: calculated
+        weight: 0.30
+        source: todo-markers.json
+        aggregation:
+          type: density_per_kloc
+          # No min_sample_size: 0 markers over a real, non-empty LOC count is a real, good (0)
+          # density, not a small-sample problem — see internal/scoring/codehealth.go's
+          # densityPerKLOC comment.
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 20
+          healthy: 1
+          provisional: true
+
+      - id: share_stale_markers
+        status: calculated
+        weight: 0.25
+        source: todo-markers.json
+        aggregation:
+          type: share_stale_markers
+          # staleness_days: 293 — same p90 cutoff as median_marker_age's critical (see that
+          # metric's comment): a marker counts as "stale" once it's already in the worst ~10% of
+          # the real pooled age distribution. Not the same concept as Issues' 60d (a much more
+          # actively triaged artifact) — TODOs realistically sit far longer before that's a fair
+          # call.
+          staleness_days: 293
+          min_sample_size: 5
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 0.5
+          healthy: 0.05
+          provisional: true
+
+      - id: worst_file_concentration
+        status: calculated
+        weight: 0.20
+        source: todo-markers.json
+        aggregation:
+          type: worst_file_concentration
+          min_sample_size: 5
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 0.6
+          healthy: 0.15
+          provisional: true
 
   issues:
     weight: 0.15
