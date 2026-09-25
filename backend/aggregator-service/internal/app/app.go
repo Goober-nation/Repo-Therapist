@@ -5,6 +5,7 @@ import (
 	postgres_repositories "aggregator-service/internal/database/postgres-repositories"
 	"aggregator-service/internal/service"
 	"aggregator-service/internal/transport/kafka"
+	grpctransport "aggregator-service/internal/transport/rpc"
 	pb "aggregator-service/internal/transport/rpc/gen"
 	"context"
 	"log"
@@ -12,9 +13,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
-
-	grpctransport "aggregator-service/internal/transport/rpc"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -25,7 +23,7 @@ import (
 func StartApp() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal(err)
+		log.Printf(".env not found, using environment variables")
 	}
 
 	cfg := config.LoadConfig()
@@ -48,18 +46,9 @@ func StartApp() {
 	}
 
 	log.Println("postgres connected")
-
-	// -------------------------------------------------------------------------
-	// Repositories
-	// -------------------------------------------------------------------------
-
 	reposRepo := postgres_repositories.NewRepoRepository(db)
 	gradesRepo := postgres_repositories.NewGradesRepository(db)
 	llmRepo := postgres_repositories.NewLLMRepository(db)
-
-	// -------------------------------------------------------------------------
-	// Kafka publishers
-	// -------------------------------------------------------------------------
 
 	gradingPublisher := kafka.NewGradingPublisher(
 		cfg.Kafka.Brokers,
@@ -70,10 +59,6 @@ func StartApp() {
 		cfg.Kafka.Brokers,
 		cfg.Kafka.LLMRequestsTopic,
 	)
-
-	// -------------------------------------------------------------------------
-	// SourceCraft wrapper RPC client
-	// -------------------------------------------------------------------------
 
 	wrapperConn, err := grpc.Dial(
 		cfg.SourceCraftWrapper.GRPCAddress,
@@ -86,10 +71,6 @@ func StartApp() {
 
 	wrapperClient := pb.NewCodeHealthClient(wrapperConn)
 
-	// -------------------------------------------------------------------------
-	// Aggregator service
-	// -------------------------------------------------------------------------
-
 	aggregatorService := service.NewAggregatorService(
 		reposRepo,
 		gradesRepo,
@@ -98,10 +79,6 @@ func StartApp() {
 		gradingPublisher,
 		llmPublisher,
 	)
-
-	// -------------------------------------------------------------------------
-	// Kafka consumers
-	// -------------------------------------------------------------------------
 
 	gradeConsumer := kafka.NewGradeConsumer(
 		cfg.Kafka.Brokers,
@@ -143,18 +120,10 @@ func StartApp() {
 
 	log.Printf("grpc server listening on %s", cfg.GRPC.Address)
 
-	// -------------------------------------------------------------------------
-	// Public grading ticker
-	// -------------------------------------------------------------------------
-
 	aggregatorService.StartPublicGrading(
 		ctx,
 		cfg.Grading.RegradeInterval,
 	)
-
-	// -------------------------------------------------------------------------
-	// Start gRPC
-	// -------------------------------------------------------------------------
 
 	serverErr := make(chan error, 1)
 
@@ -164,10 +133,6 @@ func StartApp() {
 		}
 	}()
 
-	// -------------------------------------------------------------------------
-	// Wait for shutdown
-	// -------------------------------------------------------------------------
-
 	select {
 	case <-ctx.Done():
 		log.Println("shutdown signal received")
@@ -175,17 +140,7 @@ func StartApp() {
 	case err := <-serverErr:
 		log.Printf("grpc server error: %v", err)
 	}
-
-	// -------------------------------------------------------------------------
-	// Graceful shutdown
-	// -------------------------------------------------------------------------
-
-	shutdownCtx, cancel := context.WithTimeout(
-		context.Background(),
-		10*time.Second,
-	)
-	defer cancel()
-
+	
 	stop()
 
 	grpcServer.GracefulStop()
@@ -207,13 +162,5 @@ func StartApp() {
 	if err := llmPublisher.Close(); err != nil {
 		log.Printf("close llm publisher: %v", err)
 	}
-
-	wrapperConn.Close()
-
-	select {
-	case <-shutdownCtx.Done():
-		log.Println("shutdown timeout")
-	default:
-		log.Println("aggregator service stopped")
-	}
+	log.Println("aggregator service stopped")
 }

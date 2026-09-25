@@ -4,7 +4,6 @@ import (
 	"aggregator-service/internal/domain"
 	pb "aggregator-service/internal/transport/rpc/gen"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -121,8 +120,6 @@ func (as *AggregatorService) RequestLLMRecommendations(
 		SourcecraftUUID: repoID,
 		OrgSlug:         response.GetOrganization().GetSlug(),
 		RepoSlug:        response.GetSlug(),
-		Name:            response.GetName(),
-		Description:     response.GetDescription(),
 		Visibility:      response.GetVisibility(),
 		LastActivityAt:  lastActivityAt,
 	}
@@ -154,8 +151,6 @@ func (as *AggregatorService) RequestLLMRecommendations(
 		// Synchronize all fields that come from SourceCraft.
 		repo.OrgSlug = sourceRepo.OrgSlug
 		repo.RepoSlug = sourceRepo.RepoSlug
-		repo.Name = sourceRepo.Name
-		repo.Description = sourceRepo.Description
 		repo.Visibility = sourceRepo.Visibility
 		repo.LastActivityAt = sourceRepo.LastActivityAt
 
@@ -318,11 +313,8 @@ func (as *AggregatorService) GetGrading(
 		SourcecraftUUID: repoID,
 		OrgSlug:         response.GetOrganization().GetSlug(),
 		RepoSlug:        response.GetSlug(),
-		Name:            response.GetName(),
-		Description:     response.GetDescription(),
 		Visibility:      response.GetVisibility(),
-		LastActivityAt:  lastActivityAt,
-	}
+		LastActivityAt:  lastActivityAt}
 
 	// Get repository from our database.
 	repo, err := as.ReposRepo.GetRepositoryByID(ctx, repoID)
@@ -351,8 +343,6 @@ func (as *AggregatorService) GetGrading(
 		// Synchronize all fields that come from SourceCraft.
 		repo.OrgSlug = sourceRepo.OrgSlug
 		repo.RepoSlug = sourceRepo.RepoSlug
-		repo.Name = sourceRepo.Name
-		repo.Description = sourceRepo.Description
 		repo.Visibility = sourceRepo.Visibility
 		repo.LastActivityAt = sourceRepo.LastActivityAt
 
@@ -486,34 +476,12 @@ func (as *AggregatorService) GetMyRepos(
 			)
 		}
 
-		ratingReactions, err := json.Marshal(reactionCounts)
-		if err != nil {
-			return domain.MyRepositoriesResponse{}, fmt.Errorf(
-				"%w: marshal rating reactions: %v",
-				domain.ErrGradingFailed,
-				err,
-			)
-		}
-
-		ratingValue := repo.GetRating().GetValue()
-		ratingPercentile := repo.GetRating().GetPercentile()
-
 		repositories = append(repositories, domain.Repo{
 			SourcecraftUUID: repoID,
-
-			OrgSlug:     repo.GetOrganization().GetSlug(),
-			RepoSlug:    repo.GetSlug(),
-			Name:        repo.GetName(),
-			Description: repo.GetDescription(),
-
-			WebURL:     repo.GetWebUrl(),
-			Visibility: repo.GetVisibility(),
-
-			LastActivityAt: lastActivityAt,
-
-			RatingValue:      &ratingValue,
-			RatingPercentile: &ratingPercentile,
-			RatingReactions:  ratingReactions,
+			OrgSlug:         repo.GetOrganization().GetSlug(),
+			RepoSlug:        repo.GetSlug(),
+			Visibility:      repo.GetVisibility(),
+			LastActivityAt:  lastActivityAt,
 		})
 	}
 
@@ -522,8 +490,6 @@ func (as *AggregatorService) GetMyRepos(
 		NextPageToken: response.GetNextPageToken(),
 	}, nil
 }
-
-//  кафка консумер, и сделать рпс сервер
 
 func (as *AggregatorService) StartPublicGrading(ctx context.Context, interval time.Duration) {
 	as.ticker = time.NewTicker(interval)
@@ -613,8 +579,6 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 			SourcecraftUUID: repoID,
 			OrgSlug:         pbRepo.GetOrganization().GetSlug(),
 			RepoSlug:        pbRepo.GetSlug(),
-			Name:            pbRepo.GetName(),
-			Description:     pbRepo.GetDescription(),
 			Visibility:      pbRepo.GetVisibility(),
 			LastActivityAt:  lastActivityAt,
 		}
@@ -648,8 +612,6 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 			// Synchronize fields that come from SourceCraft.
 			repo.OrgSlug = sourceRepo.OrgSlug
 			repo.RepoSlug = sourceRepo.RepoSlug
-			repo.Name = sourceRepo.Name
-			repo.Description = sourceRepo.Description
 			repo.Visibility = sourceRepo.Visibility
 			repo.LastActivityAt = sourceRepo.LastActivityAt
 

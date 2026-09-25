@@ -40,10 +40,19 @@ func NewLLMRepository(db *pgxpool.Pool) *LLMRepository {
 	}
 }
 
-func (r *RepoRepository) CreateRepository(ctx context.Context, repo domain.Repo) (uuid.UUID, error) {
-	repo.SourcecraftUUID = uuid.New()
+func (r *RepoRepository) CreateRepository(
+	ctx context.Context,
+	repo domain.Repo,
+) (uuid.UUID, error) {
+	id := uuid.New()
 
-	_, err := r.db.Exec(
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	_, err = tx.Exec(
 		ctx,
 		`
 		INSERT INTO repos (
@@ -55,18 +64,36 @@ func (r *RepoRepository) CreateRepository(ctx context.Context, repo domain.Repo)
 		)
 		VALUES ($1, $2, $3, $4, $5)
 		`,
-		repo.SourcecraftUUID,
+		id,
 		repo.OrgSlug,
 		repo.RepoSlug,
 		repo.Visibility,
 		repo.LastActivityAt,
 	)
-
 	if err != nil {
 		return uuid.Nil, mapRepositoryError(err)
 	}
 
-	return repo.SourcecraftUUID, nil
+	_, err = tx.Exec(
+		ctx,
+		`
+		INSERT INTO repo_lock (
+			sourcecraft_uuid,
+			status
+		)
+		VALUES ($1, 'free')
+		`,
+		id,
+	)
+	if err != nil {
+		return uuid.Nil, mapRepositoryError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return uuid.Nil, err
+	}
+
+	return id, nil
 }
 
 func (r *RepoRepository) UpdateRepository(ctx context.Context, repo domain.Repo) (uuid.UUID, error) {

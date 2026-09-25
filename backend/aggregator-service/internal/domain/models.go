@@ -13,23 +13,7 @@ type Repo struct {
 	OrgSlug  string `db:"org_slug" json:"org_slug"`
 	RepoSlug string `db:"repo_slug" json:"repo_slug"`
 
-	Name        string `db:"name" json:"name"`
-	Description string `db:"description" json:"description"`
-
-	WebURL        string `db:"web_url" json:"web_url"`
-	DefaultBranch string `db:"default_branch" json:"default_branch"`
-
-	Visibility string `db:"visibility" json:"visibility"`
-
-	PrimaryLanguage string `db:"primary_language" json:"primary_language"`
-
-	RatingValue      *float64 `db:"rating_value" json:"rating_value"`
-	RatingPercentile *float64 `db:"rating_percentile" json:"rating_percentile"`
-	RatingReactions  []byte   `db:"rating_reactions" json:"rating_reactions"`
-
-	Counters []byte `db:"counters" json:"counters"`
-
-	LastCommitAt   *time.Time `db:"last_commit_at" json:"last_commit_at"`
+	Visibility     string     `db:"visibility" json:"visibility"`
 	LastActivityAt *time.Time `db:"last_activity_at" json:"last_activity_at"`
 }
 

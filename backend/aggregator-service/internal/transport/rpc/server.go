@@ -4,7 +4,6 @@ import (
 	"aggregator-service/internal/domain"
 	"aggregator-service/internal/transport/rpc/gen"
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
 
@@ -129,41 +128,38 @@ func (s *Server) RequestLLMRecommendations(
 func repoToProto(repo domain.Repo) (*pb.Repository, error) {
 	var reactions []domain.ReactionCount
 
-	if len(repo.RatingReactions) > 0 {
-		if err := json.Unmarshal(repo.RatingReactions, &reactions); err != nil {
-			return nil, status.Errorf(
-				codes.Internal,
-				"invalid rating_reactions for repository %s: %v",
-				repo.SourcecraftUUID,
-				err,
-			)
-		}
-	}
+	//if len(repo.RatingReactions) > 0 {
+	//	if err := json.Unmarshal(repo.RatingReactions, &reactions); err != nil {
+	//		return nil, status.Errorf(
+	//			codes.Internal,
+	//			"invalid rating_reactions for repository %s: %v",
+	//			repo.SourcecraftUUID,
+	//			err,
+	//		)
+	//	}
+	//}
 
 	result := &pb.Repository{
-		Id:   repo.SourcecraftUUID.String(),
-		Name: repo.Name,
+		Id: repo.SourcecraftUUID.String(),
 		Organization: &pb.Organization{
 			Slug: repo.OrgSlug,
 		},
-		Slug:        repo.RepoSlug,
-		Description: repo.Description,
-		WebUrl:      repo.WebURL,
-		Visibility:  repo.Visibility,
-		Rating:      &pb.Rating{},
+		Slug:       repo.RepoSlug,
+		Visibility: repo.Visibility,
+		Rating:     &pb.Rating{},
 	}
 
 	if repo.LastActivityAt != nil {
 		result.LastActivityAt = repo.LastActivityAt.Format(time.RFC3339Nano)
 	}
 
-	if repo.RatingValue != nil {
-		result.Rating.Value = *repo.RatingValue
-	}
-
-	if repo.RatingPercentile != nil {
-		result.Rating.Percentile = *repo.RatingPercentile
-	}
+	//if repo.RatingValue != nil {
+	//	result.Rating.Value = *repo.RatingValue
+	//}
+	//
+	//if repo.RatingPercentile != nil {
+	//	result.Rating.Percentile = *repo.RatingPercentile
+	//}
 
 	for _, reaction := range reactions {
 		result.Rating.ReactionCounts = append(
