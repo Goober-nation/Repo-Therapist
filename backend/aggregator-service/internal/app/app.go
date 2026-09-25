@@ -6,7 +6,8 @@ import (
 	"aggregator-service/internal/service"
 	"aggregator-service/internal/transport/kafka"
 	grpctransport "aggregator-service/internal/transport/rpc"
-	pb "aggregator-service/internal/transport/rpc/gen"
+	"aggregator-service/internal/transport/rpc/gen/client"
+	pb "aggregator-service/internal/transport/rpc/gen/server"
 	"context"
 	"log"
 	"net"
@@ -69,7 +70,7 @@ func StartApp() {
 	}
 	defer wrapperConn.Close()
 
-	wrapperClient := pb.NewCodeHealthClient(wrapperConn)
+	wrapperClient := client.NewCodeHealthClient(wrapperConn)
 
 	aggregatorService := service.NewAggregatorService(
 		reposRepo,
@@ -140,7 +141,7 @@ func StartApp() {
 	case err := <-serverErr:
 		log.Printf("grpc server error: %v", err)
 	}
-	
+
 	stop()
 
 	grpcServer.GracefulStop()

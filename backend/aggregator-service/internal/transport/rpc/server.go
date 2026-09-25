@@ -2,7 +2,8 @@ package grpc
 
 import (
 	"aggregator-service/internal/domain"
-	"aggregator-service/internal/transport/rpc/gen"
+	"aggregator-service/internal/transport/rpc/gen/client"
+	"aggregator-service/internal/transport/rpc/gen/server"
 	"context"
 	"errors"
 	"time"
@@ -31,7 +32,7 @@ type AggregatorService interface {
 }
 
 type Server struct {
-	pb.UnimplementedAggregatorServer
+	server.UnimplementedAggregatorServer
 
 	service AggregatorService
 }
@@ -44,14 +45,14 @@ func NewServer(service AggregatorService) *Server {
 
 func (s *Server) GetMyRepos(
 	ctx context.Context,
-	req *pb.GetMyReposRequest,
-) (*pb.GetMyReposResponse, error) {
+	req *client.GetMyReposRequest,
+) (*client.GetMyReposResponse, error) {
 	response, err := s.service.GetMyRepos(ctx)
 	if err != nil {
 		return nil, mapError(err)
 	}
 
-	repositories := make([]*pb.Repository, 0, len(response.Repositories))
+	repositories := make([]*client.Repository, 0, len(response.Repositories))
 
 	for _, repo := range response.Repositories {
 		pbRepo, err := repoToProto(repo)
@@ -62,7 +63,7 @@ func (s *Server) GetMyRepos(
 		repositories = append(repositories, pbRepo)
 	}
 
-	return &pb.GetMyReposResponse{
+	return &client.GetMyReposResponse{
 		Repositories:  repositories,
 		NextPageToken: response.NextPageToken,
 	}, nil
@@ -70,8 +71,8 @@ func (s *Server) GetMyRepos(
 
 func (s *Server) GetGrading(
 	ctx context.Context,
-	req *pb.GetGradingRequest,
-) (*pb.GetGradingResponse, error) {
+	req *server.GetGradingRequest,
+) (*server.GetGradingResponse, error) {
 	if req.GetOrgSlug() == "" || req.GetRepoSlug() == "" {
 		return nil, status.Error(
 			codes.InvalidArgument,
@@ -88,15 +89,15 @@ func (s *Server) GetGrading(
 		return nil, mapError(err)
 	}
 
-	return &pb.GetGradingResponse{
+	return &server.GetGradingResponse{
 		Grade: gradeToProto(*grade),
 	}, nil
 }
 
 func (s *Server) RequestLLMRecommendations(
 	ctx context.Context,
-	req *pb.RequestLLMRecommendationsRequest,
-) (*pb.RequestLLMRecommendationsResponse, error) {
+	req *server.RequestLLMRecommendationsRequest,
+) (*server.RequestLLMRecommendationsResponse, error) {
 	if req.GetOrgSlug() == "" || req.GetRepoSlug() == "" {
 		return nil, status.Error(
 			codes.InvalidArgument,
@@ -113,7 +114,7 @@ func (s *Server) RequestLLMRecommendations(
 		return nil, mapError(err)
 	}
 
-	result := &pb.RequestLLMRecommendationsResponse{
+	result := &server.RequestLLMRecommendationsResponse{
 		RawResponse: response.RawResponse,
 		ModelUsed:   response.ModelUsed,
 	}
@@ -125,7 +126,7 @@ func (s *Server) RequestLLMRecommendations(
 	return result, nil
 }
 
-func repoToProto(repo domain.Repo) (*pb.Repository, error) {
+func repoToProto(repo domain.Repo) (*client.Repository, error) {
 	var reactions []domain.ReactionCount
 
 	//if len(repo.RatingReactions) > 0 {
@@ -139,14 +140,14 @@ func repoToProto(repo domain.Repo) (*pb.Repository, error) {
 	//	}
 	//}
 
-	result := &pb.Repository{
+	result := &client.Repository{
 		Id: repo.SourcecraftUUID.String(),
-		Organization: &pb.Organization{
+		Organization: &client.Organization{
 			Slug: repo.OrgSlug,
 		},
 		Slug:       repo.RepoSlug,
 		Visibility: repo.Visibility,
-		Rating:     &pb.Rating{},
+		Rating:     &client.Rating{},
 	}
 
 	if repo.LastActivityAt != nil {
@@ -164,7 +165,7 @@ func repoToProto(repo domain.Repo) (*pb.Repository, error) {
 	for _, reaction := range reactions {
 		result.Rating.ReactionCounts = append(
 			result.Rating.ReactionCounts,
-			&pb.ReactionCount{
+			&client.ReactionCount{
 				Type:  reaction.Type,
 				Count: reaction.Count,
 			},
@@ -174,8 +175,8 @@ func repoToProto(repo domain.Repo) (*pb.Repository, error) {
 	return result, nil
 }
 
-func gradeToProto(grade domain.RepoGrade) *pb.RepoGrade {
-	result := &pb.RepoGrade{
+func gradeToProto(grade domain.RepoGrade) *server.RepoGrade {
+	result := &server.RepoGrade{
 		SourcecraftUuid:        grade.SourcecraftUUID.String(),
 		PublicCategoryScores:   grade.PublicCategoryScores,
 		PublicRecommendations:  grade.PublicRecommendations,

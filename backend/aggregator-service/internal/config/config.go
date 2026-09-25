@@ -48,11 +48,9 @@ func (dbc DatabaseConfig) DSN() string {
 type KafkaConfig struct {
 	Brokers []string
 
-	// Requests from aggregator.
 	GradingRequestsTopic string
 	LLMRequestsTopic     string
 
-	// Results consumed by aggregator.
 	GradingResultsTopic     string
 	LLMRecommendationsTopic string
 

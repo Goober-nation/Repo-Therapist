@@ -4,10 +4,11 @@
 // - protoc             v7.36.2
 // source: internal/transport/rpc/client.proto
 
-package pb
+package client
 
 import (
 	context "context"
+
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"

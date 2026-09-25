@@ -4,7 +4,7 @@
 // 	protoc        v7.36.2
 // source: internal/transport/rpc/server.proto
 
-package pb
+package server
 
 import (
 	reflect "reflect"

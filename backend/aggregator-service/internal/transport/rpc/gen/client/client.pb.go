@@ -4,14 +4,15 @@
 // 	protoc        v7.36.2
 // source: internal/transport/rpc/client.proto
 
-package pb
+package client
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -76,15 +77,15 @@ func (x *GetRepositoryBySlugsRequest) GetOrgSlug() string {
 type GetRepositoryBySlugsResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Organization   *Organization          `protobuf:"bytes,3,opt,name=organization,proto3" json:"organization,omitempty"`
-	Slug           string                 `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
-	Description    string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
-	Logo           *Logo                  `protobuf:"bytes,6,opt,name=logo,proto3" json:"logo,omitempty"`
-	WebUrl         string                 `protobuf:"bytes,7,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
+	Name           string        `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Organization   *Organization `protobuf:"bytes,3,opt,name=organization,proto3" json:"organization,omitempty"`
+	Slug           string        `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
+	Description    string        `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	Logo           *Logo         `protobuf:"bytes,6,opt,name=logo,proto3" json:"logo,omitempty"`
+	WebUrl         string        `protobuf:"bytes,7,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
 	Visibility     string                 `protobuf:"bytes,8,opt,name=visibility,proto3" json:"visibility,omitempty"`
-	LastActivityAt string                 `protobuf:"bytes,9,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
-	Rating         *Rating                `protobuf:"bytes,10,opt,name=rating,proto3" json:"rating,omitempty"`
+	LastActivityAt string        `protobuf:"bytes,9,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
+	Rating         *Rating       `protobuf:"bytes,10,opt,name=rating,proto3" json:"rating,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -360,15 +361,15 @@ func (x *GetMyReposResponse) GetNextPageToken() string {
 type Repository struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Organization   *Organization          `protobuf:"bytes,3,opt,name=organization,proto3" json:"organization,omitempty"`
-	Slug           string                 `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
-	Description    string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
-	Logo           *Logo                  `protobuf:"bytes,6,opt,name=logo,proto3" json:"logo,omitempty"`
-	WebUrl         string                 `protobuf:"bytes,7,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
+	Name           string        `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Organization   *Organization `protobuf:"bytes,3,opt,name=organization,proto3" json:"organization,omitempty"`
+	Slug           string        `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
+	Description    string        `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	Logo           *Logo         `protobuf:"bytes,6,opt,name=logo,proto3" json:"logo,omitempty"`
+	WebUrl         string        `protobuf:"bytes,7,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
 	Visibility     string                 `protobuf:"bytes,8,opt,name=visibility,proto3" json:"visibility,omitempty"`
-	LastActivityAt string                 `protobuf:"bytes,9,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
-	Rating         *Rating                `protobuf:"bytes,10,opt,name=rating,proto3" json:"rating,omitempty"`
+	LastActivityAt string        `protobuf:"bytes,9,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
+	Rating         *Rating       `protobuf:"bytes,10,opt,name=rating,proto3" json:"rating,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -572,8 +573,8 @@ func (x *Logo) GetUrl() string {
 type Rating struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Value          float64                `protobuf:"fixed64,1,opt,name=value,proto3" json:"value,omitempty"`
-	Percentile     float64                `protobuf:"fixed64,2,opt,name=percentile,proto3" json:"percentile,omitempty"`
-	ReactionCounts []*ReactionCount       `protobuf:"bytes,3,rep,name=reaction_counts,json=reactionCounts,proto3" json:"reaction_counts,omitempty"`
+	Percentile     float64          `protobuf:"fixed64,2,opt,name=percentile,proto3" json:"percentile,omitempty"`
+	ReactionCounts []*ReactionCount `protobuf:"bytes,3,rep,name=reaction_counts,json=reactionCounts,proto3" json:"reaction_counts,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }

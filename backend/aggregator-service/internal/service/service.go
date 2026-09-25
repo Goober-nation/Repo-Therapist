@@ -2,7 +2,7 @@ package service
 
 import (
 	"aggregator-service/internal/domain"
-	pb "aggregator-service/internal/transport/rpc/gen"
+	"aggregator-service/internal/transport/rpc/gen/client"
 	"context"
 	"errors"
 	"fmt"
@@ -19,13 +19,13 @@ type AggregatorService struct {
 	GradesRepo       domain.GradesRepository
 	LLMRepo          domain.LLMRepository
 	ticker           *time.Ticker
-	clientRPC        pb.CodeHealthClient
+	clientRPC        client.CodeHealthClient
 	gradingPublisher domain.GradingPublisher
 	llmPublisher     domain.LLMRecommendationsPublisher
 }
 
 func NewAggregatorService(reposRepo domain.RepoRepository, gradesRepo domain.GradesRepository, llmRepo domain.LLMRepository,
-	clientRPC pb.CodeHealthClient, gradingPublisher domain.GradingPublisher, llmPublisher domain.LLMRecommendationsPublisher) *AggregatorService {
+	clientRPC client.CodeHealthClient, gradingPublisher domain.GradingPublisher, llmPublisher domain.LLMRecommendationsPublisher) *AggregatorService {
 	return &AggregatorService{
 		ReposRepo:        reposRepo,
 		GradesRepo:       gradesRepo,
@@ -74,7 +74,7 @@ func (as *AggregatorService) RequestLLMRecommendations(
 ) (domain.RepoLLMResponse, error) {
 	response, err := as.clientRPC.GetRepositoryBySlugs(
 		ctx,
-		&pb.GetRepositoryBySlugsRequest{
+		&client.GetRepositoryBySlugsRequest{
 			OrgSlug:  orgSlug,
 			RepoSlug: repoSlug,
 		},
@@ -115,7 +115,6 @@ func (as *AggregatorService) RequestLLMRecommendations(
 		lastActivityAt = &parsed
 	}
 
-	// SourceCraft/wrapper is the source of truth.
 	sourceRepo := domain.Repo{
 		SourcecraftUUID: repoID,
 		OrgSlug:         response.GetOrganization().GetSlug(),
@@ -124,7 +123,6 @@ func (as *AggregatorService) RequestLLMRecommendations(
 		LastActivityAt:  lastActivityAt,
 	}
 
-	// Get repository from our database.
 	repo, err := as.ReposRepo.GetRepositoryByID(ctx, repoID)
 	if err != nil {
 		if !errors.Is(err, domain.ErrRepositoryNotFound) {
@@ -135,8 +133,6 @@ func (as *AggregatorService) RequestLLMRecommendations(
 			)
 		}
 
-		// Repository doesn't exist yet.
-		// Create it using the latest data from SourceCraft.
 		repo = sourceRepo
 
 		if _, err := as.ReposRepo.CreateRepository(ctx, repo); err != nil {
@@ -147,8 +143,7 @@ func (as *AggregatorService) RequestLLMRecommendations(
 			)
 		}
 	} else {
-		// Repository exists.
-		// Synchronize all fields that come from SourceCraft.
+
 		repo.OrgSlug = sourceRepo.OrgSlug
 		repo.RepoSlug = sourceRepo.RepoSlug
 		repo.Visibility = sourceRepo.Visibility
@@ -266,7 +261,7 @@ func (as *AggregatorService) GetGrading(
 ) (*domain.RepoGrade, error) {
 	response, err := as.clientRPC.GetRepositoryBySlugs(
 		ctx,
-		&pb.GetRepositoryBySlugsRequest{
+		&client.GetRepositoryBySlugsRequest{
 			OrgSlug:  orgSlug,
 			RepoSlug: repoSlug,
 		},
@@ -308,7 +303,6 @@ func (as *AggregatorService) GetGrading(
 		lastActivityAt = &parsed
 	}
 
-	// SourceCraft/wrapper is the source of truth.
 	sourceRepo := domain.Repo{
 		SourcecraftUUID: repoID,
 		OrgSlug:         response.GetOrganization().GetSlug(),
@@ -316,7 +310,6 @@ func (as *AggregatorService) GetGrading(
 		Visibility:      response.GetVisibility(),
 		LastActivityAt:  lastActivityAt}
 
-	// Get repository from our database.
 	repo, err := as.ReposRepo.GetRepositoryByID(ctx, repoID)
 	if err != nil {
 		if !errors.Is(err, domain.ErrRepositoryNotFound) {
@@ -327,8 +320,6 @@ func (as *AggregatorService) GetGrading(
 			)
 		}
 
-		// Repository doesn't exist yet.
-		// Create it using the latest data from SourceCraft.
 		repo = sourceRepo
 
 		if _, err := as.ReposRepo.CreateRepository(ctx, repo); err != nil {
@@ -339,8 +330,7 @@ func (as *AggregatorService) GetGrading(
 			)
 		}
 	} else {
-		// Repository exists.
-		// Synchronize all fields that come from SourceCraft.
+
 		repo.OrgSlug = sourceRepo.OrgSlug
 		repo.RepoSlug = sourceRepo.RepoSlug
 		repo.Visibility = sourceRepo.Visibility
@@ -423,7 +413,7 @@ func (as *AggregatorService) GetMyRepos(
 ) (domain.MyRepositoriesResponse, error) {
 	response, err := as.clientRPC.GetMyRepos(
 		ctx,
-		&pb.GetMyReposRequest{},
+		&client.GetMyReposRequest{},
 	)
 	if err != nil {
 		return domain.MyRepositoriesResponse{}, fmt.Errorf(
@@ -537,7 +527,7 @@ func (as *AggregatorService) SaveGradingResult(ctx context.Context, grade domain
 func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 	response, err := as.clientRPC.ListAllPublicRepos(
 		ctx,
-		&pb.ListAllPublicReposRequest{},
+		&client.ListAllPublicReposRequest{},
 	)
 	if err != nil {
 		return fmt.Errorf(
@@ -574,7 +564,6 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 			lastActivityAt = &parsed
 		}
 
-		// SourceCraft/wrapper is the source of truth.
 		sourceRepo := domain.Repo{
 			SourcecraftUUID: repoID,
 			OrgSlug:         pbRepo.GetOrganization().GetSlug(),
@@ -583,7 +572,6 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 			LastActivityAt:  lastActivityAt,
 		}
 
-		// Get repository from our database.
 		repo, err := as.ReposRepo.GetRepositoryByID(ctx, repoID)
 		if err != nil {
 			if !errors.Is(err, domain.ErrRepositoryNotFound) {
@@ -595,8 +583,6 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 				)
 			}
 
-			// Repository doesn't exist yet.
-			// Create it using the latest data from SourceCraft.
 			repo = sourceRepo
 
 			if _, err := as.ReposRepo.CreateRepository(ctx, repo); err != nil {
@@ -608,8 +594,7 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 				)
 			}
 		} else {
-			// Repository exists.
-			// Synchronize fields that come from SourceCraft.
+
 			repo.OrgSlug = sourceRepo.OrgSlug
 			repo.RepoSlug = sourceRepo.RepoSlug
 			repo.Visibility = sourceRepo.Visibility
@@ -635,12 +620,10 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 			)
 		}
 
-		// Grade exists and is still up to date.
 		if err == nil && !needsGrading(repo, grade) {
 			continue
 		}
 
-		// Try to acquire the lock.
 		acquired, err := as.ReposRepo.AcquireRepositoryLock(ctx, repoID)
 		if err != nil {
 			return fmt.Errorf(
@@ -651,7 +634,6 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 			)
 		}
 
-		// Another grading is already in progress.
 		if !acquired {
 			continue
 		}
@@ -663,7 +645,7 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 		}
 
 		if err := as.gradingPublisher.Publish(ctx, event); err != nil {
-			// Do not leave repository locked if publishing failed.
+
 			_ = as.ReposRepo.ReleaseRepositoryLock(ctx, repoID)
 
 			return fmt.Errorf(
