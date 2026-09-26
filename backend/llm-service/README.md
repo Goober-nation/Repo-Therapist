@@ -128,4 +128,25 @@ supersedes earlier wording that required all section grades to be estimated.
 The Kafka object shape is unchanged; consumers must display null as unavailable,
 not as zero. Deterministic required-file checks retain their existing rules.
 
-The current flat Kafka contract is verified by unit tests; the full real-service path remains unverified.
+The current flat Kafka contract passed an integration check with a real local Kafka
+broker, an HTTP S3 emulator and an HTTP Responses API stub (2026-09-26). The actual
+HTTP request contained the model URI and JSON Schema; the result matched the flat
+Kafka contract, and the offset was committed after publication. Temporary test
+topics were removed. Real MinIO + Yandex end-to-end operation remains unverified.
+
+Audit fixes: ignore S3 directory markers; discover named root documentation such
+as INSTALL/BUILD/TESTING; enforce the context budget after JSON escaping and
+recompute coverage if excerpts are dropped; suppress facts from inapplicable
+checks; include the schema in the serialized request byte guard; bound S3 network
+timeouts/retries and report truncated model HTTP responses as provider errors.
+
+The model produces internal `checks`, not Kafka events. The local validator checks
+structure/types, scoring code normalizes evaluated checks, and `grade_wire.py`
+converts the summary to the agreed flat Kafka result. Model factual accuracy is
+not mechanically verified. Schema mode uses `strict: false`; malformed output is
+rejected locally with at most one format-correction retry. The provider schema
+fields follow the [Responses API reference](https://aistudio.yandex.ru/en/docs/ai-studio/api/Responses/createResponse).
+
+Excluded checks (NOT_APPLICABLE or algorithmically not_reviewed) are normalized
+to null scores and empty deductions before validating their unused values.
+Evaluated checks retain score type/range validation.

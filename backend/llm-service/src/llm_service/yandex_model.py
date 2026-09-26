@@ -6,6 +6,7 @@ import json
 import os
 import ssl
 from dataclasses import dataclass, field
+from http.client import HTTPException
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -23,7 +24,7 @@ API_URL = "https://ai.api.cloud.yandex.net/v1/responses"
 MODEL_INPUT_BYTE_LIMITS = {"aliceai-llm": 220_000, "aliceai-llm-flash": 96_000}
 
 # The Python validator remains authoritative. This schema gives the model a precise
-# response envelope and prevents prose/wrong top-level keys before that validation.
+# response envelope; strict=False means local validation is still required.
 GRADING_RESPONSE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -177,7 +178,10 @@ def build_grading_prompt(context: ModelContext,
         "{type: document_review, paths: array of strings, context_sha256: string}. "
         "Use exact excerpts when citing files and the supplied context hash for document_review. "
         "Do not claim to execute commands. Empty deductions and evidence arrays are permitted. "
-        "The service checks JSON structure and field types, not factual or arithmetic consistency."
+        "For NOT_APPLICABLE, deductions must be empty. "
+        "Each deduction must describe a shortcoming that actually reduced this check score. "
+        "Keep component scores and deducted points consistent with points_awarded. "
+        "Never include recommendations or facts about unassessed repository categories."
     )
     rubric = {
         "checks": check_specs,
@@ -221,6 +225,8 @@ class YandexModel:
         elif json_output:
             payload["text"] = {"format": {"type": "json_object"}}
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        if len(body) > input_limit:
+            raise ModelInputTooLarge("serialized model request including schema exceeds safety limit")
         request = Request(API_URL, data=body, method="POST", headers={
             "Authorization": f"Api-Key {self.config.api_key}",
             "Content-Type": "application/json",
@@ -243,6 +249,8 @@ class YandexModel:
             raise ModelProviderError("Yandex AI Studio request failed") from None
         except TimeoutError:
             raise ModelProviderError("Yandex AI Studio request timed out") from None
+        except (OSError, HTTPException):
+            raise ModelProviderError("Yandex AI Studio transport failed while reading the response") from None
         if len(raw) > 1_000_000:
             raise ModelProviderError("Yandex AI Studio response is too large")
         try:

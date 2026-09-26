@@ -45,7 +45,9 @@ class S3Store:
             client = boto3.client(
                 "s3", endpoint_url=f"{'https' if config.use_ssl else 'http'}://{config.endpoint}",
                 aws_access_key_id=config.access_key, aws_secret_access_key=config.secret_key,
-                region_name="us-east-1", config=Config(s3={"addressing_style": "path"}),
+                region_name="us-east-1", config=Config(s3={"addressing_style": "path"},
+                                                     connect_timeout=5, read_timeout=15,
+                                                     retries={"mode": "standard", "total_max_attempts": 2}),
             )
         self.client = client
 
