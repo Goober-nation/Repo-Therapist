@@ -18,8 +18,8 @@ type RepoRepository interface {
 }
 
 type GradesRepository interface {
-	UpsertGrade(ctx context.Context, grade RepoGrade) error
-
+	UpsertPublicGrade(ctx context.Context, grade RepoGrade) error
+	UpsertPrivateGrade(ctx context.Context, grade RepoGrade) error
 	DeleteGrade(ctx context.Context, repoID uuid.UUID) error
 	GetGradeByRepoID(ctx context.Context, repoID uuid.UUID) (RepoGrade, error)
 }

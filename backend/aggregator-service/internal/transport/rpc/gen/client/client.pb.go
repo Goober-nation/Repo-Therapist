@@ -86,6 +86,7 @@ type GetRepositoryBySlugsResponse struct {
 	Visibility     string                 `protobuf:"bytes,8,opt,name=visibility,proto3" json:"visibility,omitempty"`
 	LastActivityAt string        `protobuf:"bytes,9,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
 	Rating         *Rating       `protobuf:"bytes,10,opt,name=rating,proto3" json:"rating,omitempty"`
+	Language       *Language     `protobuf:"bytes,11,opt,name=language,proto3" json:"language,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -186,6 +187,13 @@ func (x *GetRepositoryBySlugsResponse) GetLastActivityAt() string {
 func (x *GetRepositoryBySlugsResponse) GetRating() *Rating {
 	if x != nil {
 		return x.Rating
+	}
+	return nil
+}
+
+func (x *GetRepositoryBySlugsResponse) GetLanguage() *Language {
+	if x != nil {
+		return x.Language
 	}
 	return nil
 }
@@ -370,6 +378,7 @@ type Repository struct {
 	Visibility     string                 `protobuf:"bytes,8,opt,name=visibility,proto3" json:"visibility,omitempty"`
 	LastActivityAt string        `protobuf:"bytes,9,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
 	Rating         *Rating       `protobuf:"bytes,10,opt,name=rating,proto3" json:"rating,omitempty"`
+	Language       *Language     `protobuf:"bytes,11,opt,name=language,proto3" json:"language,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -474,6 +483,65 @@ func (x *Repository) GetRating() *Rating {
 	return nil
 }
 
+func (x *Repository) GetLanguage() *Language {
+	if x != nil {
+		return x.Language
+	}
+	return nil
+}
+
+type Language struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Color         string                 `protobuf:"bytes,2,opt,name=color,proto3" json:"color,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Language) Reset() {
+	*x = Language{}
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Language) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Language) ProtoMessage() {}
+
+func (x *Language) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Language.ProtoReflect.Descriptor instead.
+func (*Language) Descriptor() ([]byte, []int) {
+	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *Language) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Language) GetColor() string {
+	if x != nil {
+		return x.Color
+	}
+	return ""
+}
+
 type Organization struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -484,7 +552,7 @@ type Organization struct {
 
 func (x *Organization) Reset() {
 	*x = Organization{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[7]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -496,7 +564,7 @@ func (x *Organization) String() string {
 func (*Organization) ProtoMessage() {}
 
 func (x *Organization) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[7]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -509,7 +577,7 @@ func (x *Organization) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Organization.ProtoReflect.Descriptor instead.
 func (*Organization) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{7}
+	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Organization) GetId() string {
@@ -535,7 +603,7 @@ type Logo struct {
 
 func (x *Logo) Reset() {
 	*x = Logo{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[8]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -547,7 +615,7 @@ func (x *Logo) String() string {
 func (*Logo) ProtoMessage() {}
 
 func (x *Logo) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[8]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -560,7 +628,7 @@ func (x *Logo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Logo.ProtoReflect.Descriptor instead.
 func (*Logo) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{8}
+	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Logo) GetUrl() string {
@@ -581,7 +649,7 @@ type Rating struct {
 
 func (x *Rating) Reset() {
 	*x = Rating{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[9]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -593,7 +661,7 @@ func (x *Rating) String() string {
 func (*Rating) ProtoMessage() {}
 
 func (x *Rating) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[9]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -606,7 +674,7 @@ func (x *Rating) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Rating.ProtoReflect.Descriptor instead.
 func (*Rating) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{9}
+	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Rating) GetValue() float64 {
@@ -640,7 +708,7 @@ type ReactionCount struct {
 
 func (x *ReactionCount) Reset() {
 	*x = ReactionCount{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[10]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -652,7 +720,7 @@ func (x *ReactionCount) String() string {
 func (*ReactionCount) ProtoMessage() {}
 
 func (x *ReactionCount) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[10]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -665,7 +733,7 @@ func (x *ReactionCount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReactionCount.ProtoReflect.Descriptor instead.
 func (*ReactionCount) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{10}
+	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ReactionCount) GetType() string {
@@ -689,7 +757,7 @@ const file_internal_transport_rpc_client_proto_rawDesc = "" +
 	"#internal/transport/rpc/client.proto\x12\vcode_health\"U\n" +
 	"\x1bGetRepositoryBySlugsRequest\x12\x1b\n" +
 	"\trepo_slug\x18\x01 \x01(\tR\brepoSlug\x12\x19\n" +
-	"\borg_slug\x18\x02 \x01(\tR\aorgSlug\"\xee\x02\n" +
+	"\borg_slug\x18\x02 \x01(\tR\aorgSlug\"\xa1\x03\n" +
 	"\x1cGetRepositoryBySlugsResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12=\n" +
@@ -703,14 +771,15 @@ const file_internal_transport_rpc_client_proto_rawDesc = "" +
 	"visibility\x12(\n" +
 	"\x10last_activity_at\x18\t \x01(\tR\x0elastActivityAt\x12+\n" +
 	"\x06rating\x18\n" +
-	" \x01(\v2\x13.code_health.RatingR\x06rating\"\x1b\n" +
+	" \x01(\v2\x13.code_health.RatingR\x06rating\x121\n" +
+	"\blanguage\x18\v \x01(\v2\x15.code_health.LanguageR\blanguage\"\x1b\n" +
 	"\x19ListAllPublicReposRequest\"K\n" +
 	"\x1aListAllPublicReposResponse\x12-\n" +
 	"\x05repos\x18\x01 \x03(\v2\x17.code_health.RepositoryR\x05repos\"\x13\n" +
 	"\x11GetMyReposRequest\"y\n" +
 	"\x12GetMyReposResponse\x12;\n" +
 	"\frepositories\x18\x01 \x03(\v2\x17.code_health.RepositoryR\frepositories\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xdc\x02\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x8f\x03\n" +
 	"\n" +
 	"Repository\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -725,7 +794,11 @@ const file_internal_transport_rpc_client_proto_rawDesc = "" +
 	"visibility\x12(\n" +
 	"\x10last_activity_at\x18\t \x01(\tR\x0elastActivityAt\x12+\n" +
 	"\x06rating\x18\n" +
-	" \x01(\v2\x13.code_health.RatingR\x06rating\"2\n" +
+	" \x01(\v2\x13.code_health.RatingR\x06rating\x121\n" +
+	"\blanguage\x18\v \x01(\v2\x15.code_health.LanguageR\blanguage\"4\n" +
+	"\bLanguage\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05color\x18\x02 \x01(\tR\x05color\"2\n" +
 	"\fOrganization\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04slug\x18\x02 \x01(\tR\x04slug\"\x18\n" +
@@ -759,7 +832,7 @@ func file_internal_transport_rpc_client_proto_rawDescGZIP() []byte {
 	return file_internal_transport_rpc_client_proto_rawDescData
 }
 
-var file_internal_transport_rpc_client_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_internal_transport_rpc_client_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_internal_transport_rpc_client_proto_goTypes = []any{
 	(*GetRepositoryBySlugsRequest)(nil),  // 0: code_health.GetRepositoryBySlugsRequest
 	(*GetRepositoryBySlugsResponse)(nil), // 1: code_health.GetRepositoryBySlugsResponse
@@ -768,32 +841,35 @@ var file_internal_transport_rpc_client_proto_goTypes = []any{
 	(*GetMyReposRequest)(nil),            // 4: code_health.GetMyReposRequest
 	(*GetMyReposResponse)(nil),           // 5: code_health.GetMyReposResponse
 	(*Repository)(nil),                   // 6: code_health.Repository
-	(*Organization)(nil),                 // 7: code_health.Organization
-	(*Logo)(nil),                         // 8: code_health.Logo
-	(*Rating)(nil),                       // 9: code_health.Rating
-	(*ReactionCount)(nil),                // 10: code_health.ReactionCount
+	(*Language)(nil),                     // 7: code_health.Language
+	(*Organization)(nil),                 // 8: code_health.Organization
+	(*Logo)(nil),                         // 9: code_health.Logo
+	(*Rating)(nil),                       // 10: code_health.Rating
+	(*ReactionCount)(nil),                // 11: code_health.ReactionCount
 }
 var file_internal_transport_rpc_client_proto_depIdxs = []int32{
-	7,  // 0: code_health.GetRepositoryBySlugsResponse.organization:type_name -> code_health.Organization
-	8,  // 1: code_health.GetRepositoryBySlugsResponse.logo:type_name -> code_health.Logo
-	9,  // 2: code_health.GetRepositoryBySlugsResponse.rating:type_name -> code_health.Rating
-	6,  // 3: code_health.ListAllPublicReposResponse.repos:type_name -> code_health.Repository
-	6,  // 4: code_health.GetMyReposResponse.repositories:type_name -> code_health.Repository
-	7,  // 5: code_health.Repository.organization:type_name -> code_health.Organization
-	8,  // 6: code_health.Repository.logo:type_name -> code_health.Logo
-	9,  // 7: code_health.Repository.rating:type_name -> code_health.Rating
-	10, // 8: code_health.Rating.reaction_counts:type_name -> code_health.ReactionCount
-	0,  // 9: code_health.CodeHealth.GetRepositoryBySlugs:input_type -> code_health.GetRepositoryBySlugsRequest
-	2,  // 10: code_health.CodeHealth.ListAllPublicRepos:input_type -> code_health.ListAllPublicReposRequest
-	4,  // 11: code_health.CodeHealth.GetMyRepos:input_type -> code_health.GetMyReposRequest
-	1,  // 12: code_health.CodeHealth.GetRepositoryBySlugs:output_type -> code_health.GetRepositoryBySlugsResponse
-	3,  // 13: code_health.CodeHealth.ListAllPublicRepos:output_type -> code_health.ListAllPublicReposResponse
-	5,  // 14: code_health.CodeHealth.GetMyRepos:output_type -> code_health.GetMyReposResponse
-	12, // [12:15] is the sub-list for method output_type
-	9,  // [9:12] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	8,  // 0: code_health.GetRepositoryBySlugsResponse.organization:type_name -> code_health.Organization
+	9,  // 1: code_health.GetRepositoryBySlugsResponse.logo:type_name -> code_health.Logo
+	10, // 2: code_health.GetRepositoryBySlugsResponse.rating:type_name -> code_health.Rating
+	7,  // 3: code_health.GetRepositoryBySlugsResponse.language:type_name -> code_health.Language
+	6,  // 4: code_health.ListAllPublicReposResponse.repos:type_name -> code_health.Repository
+	6,  // 5: code_health.GetMyReposResponse.repositories:type_name -> code_health.Repository
+	8,  // 6: code_health.Repository.organization:type_name -> code_health.Organization
+	9,  // 7: code_health.Repository.logo:type_name -> code_health.Logo
+	10, // 8: code_health.Repository.rating:type_name -> code_health.Rating
+	7,  // 9: code_health.Repository.language:type_name -> code_health.Language
+	11, // 10: code_health.Rating.reaction_counts:type_name -> code_health.ReactionCount
+	0,  // 11: code_health.CodeHealth.GetRepositoryBySlugs:input_type -> code_health.GetRepositoryBySlugsRequest
+	2,  // 12: code_health.CodeHealth.ListAllPublicRepos:input_type -> code_health.ListAllPublicReposRequest
+	4,  // 13: code_health.CodeHealth.GetMyRepos:input_type -> code_health.GetMyReposRequest
+	1,  // 14: code_health.CodeHealth.GetRepositoryBySlugs:output_type -> code_health.GetRepositoryBySlugsResponse
+	3,  // 15: code_health.CodeHealth.ListAllPublicRepos:output_type -> code_health.ListAllPublicReposResponse
+	5,  // 16: code_health.CodeHealth.GetMyRepos:output_type -> code_health.GetMyReposResponse
+	14, // [14:17] is the sub-list for method output_type
+	11, // [11:14] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_internal_transport_rpc_client_proto_init() }
@@ -807,7 +883,7 @@ func file_internal_transport_rpc_client_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_transport_rpc_client_proto_rawDesc), len(file_internal_transport_rpc_client_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -12,11 +12,19 @@ type Repo struct {
 
 	OrgSlug  string `db:"org_slug" json:"org_slug"`
 	RepoSlug string `db:"repo_slug" json:"repo_slug"`
+	WebURL   string `json:"web_url"`
 
 	Visibility     string     `db:"visibility" json:"visibility"`
 	LastActivityAt *time.Time `db:"last_activity_at" json:"last_activity_at"`
+
+	RatingValue float64         `json:"rating"`
+	Language    PrimaryLanguage `json:"language"`
 }
 
+type PrimaryLanguage struct {
+	Name  string `json:"name"`
+	Color string `json:"color"`
+}
 type RepoLock struct {
 	SourcecraftUUID uuid.UUID `db:"sourcecraft_uuid"`
 

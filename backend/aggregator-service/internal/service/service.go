@@ -308,7 +308,14 @@ func (as *AggregatorService) GetGrading(
 		OrgSlug:         response.GetOrganization().GetSlug(),
 		RepoSlug:        response.GetSlug(),
 		Visibility:      response.GetVisibility(),
-		LastActivityAt:  lastActivityAt}
+		LastActivityAt:  lastActivityAt,
+		Language: domain.PrimaryLanguage{
+			Name:  response.GetLanguage().Name,
+			Color: response.GetLanguage().Color,
+		},
+		RatingValue: response.GetRating().Value,
+		WebURL:      response.GetWebUrl(),
+	}
 
 	repo, err := as.ReposRepo.GetRepositoryByID(ctx, repoID)
 	if err != nil {
@@ -335,6 +342,9 @@ func (as *AggregatorService) GetGrading(
 		repo.RepoSlug = sourceRepo.RepoSlug
 		repo.Visibility = sourceRepo.Visibility
 		repo.LastActivityAt = sourceRepo.LastActivityAt
+		repo.Language = sourceRepo.Language
+		repo.RatingValue = sourceRepo.RatingValue
+		repo.WebURL = sourceRepo.WebURL
 
 		if _, err := as.ReposRepo.UpdateRepository(ctx, repo); err != nil {
 			return nil, fmt.Errorf(
@@ -472,6 +482,12 @@ func (as *AggregatorService) GetMyRepos(
 			RepoSlug:        repo.GetSlug(),
 			Visibility:      repo.GetVisibility(),
 			LastActivityAt:  lastActivityAt,
+			Language: domain.PrimaryLanguage{
+				Name:  repo.Language.Name,
+				Color: repo.Language.Color,
+			},
+			WebURL:      repo.GetWebUrl(),
+			RatingValue: repo.GetRating().Value,
 		})
 	}
 
@@ -501,13 +517,24 @@ func (as *AggregatorService) StartPublicGrading(ctx context.Context, interval ti
 	}()
 }
 
-func (as *AggregatorService) SaveGradingResult(ctx context.Context, grade domain.RepoGrade) error {
-	if err := as.GradesRepo.UpsertGrade(ctx, grade); err != nil {
-		return fmt.Errorf(
-			"%w: save grade: %v",
-			domain.ErrGradingFailed,
-			err,
-		)
+func (as *AggregatorService) SaveGradingResult(ctx context.Context, grade domain.RepoGrade, visibility string) error {
+	switch visibility {
+	case "public":
+		if err := as.GradesRepo.UpsertPublicGrade(ctx, grade); err != nil {
+			return fmt.Errorf(
+				"%w: save public grade: %v",
+				domain.ErrGradingFailed,
+				err,
+			)
+		}
+	case "private":
+		if err := as.GradesRepo.UpsertPrivateGrade(ctx, grade); err != nil {
+			return fmt.Errorf(
+				"%w: save private grade: %v",
+				domain.ErrGradingFailed,
+				err,
+			)
+		}
 	}
 
 	if err := as.ReposRepo.ReleaseRepositoryLock(
@@ -570,6 +597,12 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 			RepoSlug:        pbRepo.GetSlug(),
 			Visibility:      pbRepo.GetVisibility(),
 			LastActivityAt:  lastActivityAt,
+			RatingValue:     pbRepo.Rating.Value,
+			Language: domain.PrimaryLanguage{
+				Name:  pbRepo.GetLanguage().Name,
+				Color: pbRepo.GetLanguage().Color,
+			},
+			WebURL: pbRepo.GetWebUrl(),
 		}
 
 		repo, err := as.ReposRepo.GetRepositoryByID(ctx, repoID)
@@ -599,6 +632,9 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 			repo.RepoSlug = sourceRepo.RepoSlug
 			repo.Visibility = sourceRepo.Visibility
 			repo.LastActivityAt = sourceRepo.LastActivityAt
+			repo.Language = sourceRepo.Language
+			repo.RatingValue = sourceRepo.RatingValue
+			repo.WebURL = sourceRepo.WebURL
 
 			if _, err := as.ReposRepo.UpdateRepository(ctx, repo); err != nil {
 				return fmt.Errorf(

@@ -46,13 +46,13 @@ func NewServer(service AggregatorService) *Server {
 func (s *Server) GetMyRepos(
 	ctx context.Context,
 	req *client.GetMyReposRequest,
-) (*client.GetMyReposResponse, error) {
+) (*server.GetMyReposResponse, error) {
 	response, err := s.service.GetMyRepos(ctx)
 	if err != nil {
 		return nil, mapError(err)
 	}
 
-	repositories := make([]*client.Repository, 0, len(response.Repositories))
+	repositories := make([]*server.Repository, 0, len(response.Repositories))
 
 	for _, repo := range response.Repositories {
 		pbRepo, err := repoToProto(repo)
@@ -63,7 +63,7 @@ func (s *Server) GetMyRepos(
 		repositories = append(repositories, pbRepo)
 	}
 
-	return &client.GetMyReposResponse{
+	return &server.GetMyReposResponse{
 		Repositories:  repositories,
 		NextPageToken: response.NextPageToken,
 	}, nil
@@ -126,8 +126,8 @@ func (s *Server) RequestLLMRecommendations(
 	return result, nil
 }
 
-func repoToProto(repo domain.Repo) (*client.Repository, error) {
-	var reactions []domain.ReactionCount
+func repoToProto(repo domain.Repo) (*server.Repository, error) {
+	//var reactions []domain.ReactionCount
 
 	//if len(repo.RatingReactions) > 0 {
 	//	if err := json.Unmarshal(repo.RatingReactions, &reactions); err != nil {
@@ -140,14 +140,14 @@ func repoToProto(repo domain.Repo) (*client.Repository, error) {
 	//	}
 	//}
 
-	result := &client.Repository{
+	result := &server.Repository{
 		Id: repo.SourcecraftUUID.String(),
-		Organization: &client.Organization{
+		Organization: &server.Organization{
 			Slug: repo.OrgSlug,
 		},
 		Slug:       repo.RepoSlug,
 		Visibility: repo.Visibility,
-		Rating:     &client.Rating{},
+		Rating:     repo.RatingValue,
 	}
 
 	if repo.LastActivityAt != nil {
@@ -162,15 +162,15 @@ func repoToProto(repo domain.Repo) (*client.Repository, error) {
 	//	result.Rating.Percentile = *repo.RatingPercentile
 	//}
 
-	for _, reaction := range reactions {
-		result.Rating.ReactionCounts = append(
-			result.Rating.ReactionCounts,
-			&client.ReactionCount{
-				Type:  reaction.Type,
-				Count: reaction.Count,
-			},
-		)
-	}
+	//for _, reaction := range reactions {
+	//	result.Rating.ReactionCounts = append(
+	//		result.Rating.ReactionCounts,
+	//		&client.ReactionCount{
+	//			Type:  reaction.Type,
+	//			Count: reaction.Count,
+	//		},
+	//	)
+	//}
 
 	return result, nil
 }

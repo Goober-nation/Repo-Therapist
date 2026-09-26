@@ -394,6 +394,7 @@ type Repository struct {
 	Visibility     string                 `protobuf:"bytes,8,opt,name=visibility,proto3" json:"visibility,omitempty"`
 	LastActivityAt string                 `protobuf:"bytes,9,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
 	Rating         *Rating                `protobuf:"bytes,10,opt,name=rating,proto3" json:"rating,omitempty"`
+	Language       *Language              `protobuf:"bytes,11,opt,name=language,proto3" json:"language,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -498,6 +499,65 @@ func (x *Repository) GetRating() *Rating {
 	return nil
 }
 
+func (x *Repository) GetLanguage() *Language {
+	if x != nil {
+		return x.Language
+	}
+	return nil
+}
+
+type Language struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Color         string                 `protobuf:"bytes,2,opt,name=color,proto3" json:"color,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Language) Reset() {
+	*x = Language{}
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Language) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Language) ProtoMessage() {}
+
+func (x *Language) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Language.ProtoReflect.Descriptor instead.
+func (*Language) Descriptor() ([]byte, []int) {
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *Language) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Language) GetColor() string {
+	if x != nil {
+		return x.Color
+	}
+	return ""
+}
+
 type Organization struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -508,7 +568,7 @@ type Organization struct {
 
 func (x *Organization) Reset() {
 	*x = Organization{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[9]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -520,7 +580,7 @@ func (x *Organization) String() string {
 func (*Organization) ProtoMessage() {}
 
 func (x *Organization) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[9]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -533,7 +593,7 @@ func (x *Organization) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Organization.ProtoReflect.Descriptor instead.
 func (*Organization) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{9}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Organization) GetId() string {
@@ -559,7 +619,7 @@ type Logo struct {
 
 func (x *Logo) Reset() {
 	*x = Logo{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[10]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -571,7 +631,7 @@ func (x *Logo) String() string {
 func (*Logo) ProtoMessage() {}
 
 func (x *Logo) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[10]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -584,7 +644,7 @@ func (x *Logo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Logo.ProtoReflect.Descriptor instead.
 func (*Logo) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{10}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Logo) GetUrl() string {
@@ -603,7 +663,7 @@ type GetCiCDRunsRequest struct {
 
 func (x *GetCiCDRunsRequest) Reset() {
 	*x = GetCiCDRunsRequest{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[11]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -615,7 +675,7 @@ func (x *GetCiCDRunsRequest) String() string {
 func (*GetCiCDRunsRequest) ProtoMessage() {}
 
 func (x *GetCiCDRunsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[11]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -628,7 +688,7 @@ func (x *GetCiCDRunsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCiCDRunsRequest.ProtoReflect.Descriptor instead.
 func (*GetCiCDRunsRequest) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{11}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetCiCDRunsRequest) GetRepoId() string {
@@ -648,7 +708,7 @@ type GetCiCDRunsResponse struct {
 
 func (x *GetCiCDRunsResponse) Reset() {
 	*x = GetCiCDRunsResponse{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[12]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -660,7 +720,7 @@ func (x *GetCiCDRunsResponse) String() string {
 func (*GetCiCDRunsResponse) ProtoMessage() {}
 
 func (x *GetCiCDRunsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[12]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -673,7 +733,7 @@ func (x *GetCiCDRunsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCiCDRunsResponse.ProtoReflect.Descriptor instead.
 func (*GetCiCDRunsResponse) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{12}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetCiCDRunsResponse) GetRuns() []*Run {
@@ -707,7 +767,7 @@ type Run struct {
 
 func (x *Run) Reset() {
 	*x = Run{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[13]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -719,7 +779,7 @@ func (x *Run) String() string {
 func (*Run) ProtoMessage() {}
 
 func (x *Run) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[13]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -732,7 +792,7 @@ func (x *Run) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Run.ProtoReflect.Descriptor instead.
 func (*Run) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{13}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *Run) GetId() string {
@@ -814,7 +874,7 @@ type Workflow struct {
 
 func (x *Workflow) Reset() {
 	*x = Workflow{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[14]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -826,7 +886,7 @@ func (x *Workflow) String() string {
 func (*Workflow) ProtoMessage() {}
 
 func (x *Workflow) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[14]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -839,7 +899,7 @@ func (x *Workflow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Workflow.ProtoReflect.Descriptor instead.
 func (*Workflow) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{14}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Workflow) GetId() string {
@@ -914,7 +974,7 @@ type Task struct {
 
 func (x *Task) Reset() {
 	*x = Task{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[15]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -926,7 +986,7 @@ func (x *Task) String() string {
 func (*Task) ProtoMessage() {}
 
 func (x *Task) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[15]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -939,7 +999,7 @@ func (x *Task) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Task.ProtoReflect.Descriptor instead.
 func (*Task) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{15}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *Task) GetId() string {
@@ -1012,7 +1072,7 @@ type Cube struct {
 
 func (x *Cube) Reset() {
 	*x = Cube{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[16]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1024,7 +1084,7 @@ func (x *Cube) String() string {
 func (*Cube) ProtoMessage() {}
 
 func (x *Cube) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[16]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1037,7 +1097,7 @@ func (x *Cube) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Cube.ProtoReflect.Descriptor instead.
 func (*Cube) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{16}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *Cube) GetId() string {
@@ -1092,7 +1152,7 @@ type Progress struct {
 
 func (x *Progress) Reset() {
 	*x = Progress{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[17]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1104,7 +1164,7 @@ func (x *Progress) String() string {
 func (*Progress) ProtoMessage() {}
 
 func (x *Progress) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[17]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1117,7 +1177,7 @@ func (x *Progress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Progress.ProtoReflect.Descriptor instead.
 func (*Progress) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{17}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Progress) GetPercent() float64 {
@@ -1147,7 +1207,7 @@ type Artifact struct {
 
 func (x *Artifact) Reset() {
 	*x = Artifact{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[18]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1159,7 +1219,7 @@ func (x *Artifact) String() string {
 func (*Artifact) ProtoMessage() {}
 
 func (x *Artifact) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[18]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1172,7 +1232,7 @@ func (x *Artifact) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Artifact.ProtoReflect.Descriptor instead.
 func (*Artifact) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{18}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *Artifact) GetId() string {
@@ -1219,7 +1279,7 @@ type Relations struct {
 
 func (x *Relations) Reset() {
 	*x = Relations{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[19]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1231,7 +1291,7 @@ func (x *Relations) String() string {
 func (*Relations) ProtoMessage() {}
 
 func (x *Relations) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[19]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1244,7 +1304,7 @@ func (x *Relations) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Relations.ProtoReflect.Descriptor instead.
 func (*Relations) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{19}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *Relations) GetNeeds() []*Relation {
@@ -1264,7 +1324,7 @@ type Relation struct {
 
 func (x *Relation) Reset() {
 	*x = Relation{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[20]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1276,7 +1336,7 @@ func (x *Relation) String() string {
 func (*Relation) ProtoMessage() {}
 
 func (x *Relation) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[20]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1289,7 +1349,7 @@ func (x *Relation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Relation.ProtoReflect.Descriptor instead.
 func (*Relation) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{20}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *Relation) GetId() string {
@@ -1318,7 +1378,7 @@ type Dates struct {
 
 func (x *Dates) Reset() {
 	*x = Dates{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[21]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1330,7 +1390,7 @@ func (x *Dates) String() string {
 func (*Dates) ProtoMessage() {}
 
 func (x *Dates) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[21]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1343,7 +1403,7 @@ func (x *Dates) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Dates.ProtoReflect.Descriptor instead.
 func (*Dates) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{21}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *Dates) GetCreatedAt() *timestamppb.Timestamp {
@@ -1384,7 +1444,7 @@ type Pull struct {
 
 func (x *Pull) Reset() {
 	*x = Pull{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[22]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1396,7 +1456,7 @@ func (x *Pull) String() string {
 func (*Pull) ProtoMessage() {}
 
 func (x *Pull) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[22]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1409,7 +1469,7 @@ func (x *Pull) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Pull.ProtoReflect.Descriptor instead.
 func (*Pull) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{22}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *Pull) GetId() string {
@@ -1436,7 +1496,7 @@ type RunUser struct {
 
 func (x *RunUser) Reset() {
 	*x = RunUser{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[23]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1448,7 +1508,7 @@ func (x *RunUser) String() string {
 func (*RunUser) ProtoMessage() {}
 
 func (x *RunUser) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[23]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1461,7 +1521,7 @@ func (x *RunUser) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunUser.ProtoReflect.Descriptor instead.
 func (*RunUser) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{23}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *RunUser) GetId() string {
@@ -1487,7 +1547,7 @@ type GetIssuesRequest struct {
 
 func (x *GetIssuesRequest) Reset() {
 	*x = GetIssuesRequest{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[24]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1499,7 +1559,7 @@ func (x *GetIssuesRequest) String() string {
 func (*GetIssuesRequest) ProtoMessage() {}
 
 func (x *GetIssuesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[24]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1512,7 +1572,7 @@ func (x *GetIssuesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIssuesRequest.ProtoReflect.Descriptor instead.
 func (*GetIssuesRequest) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{24}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *GetIssuesRequest) GetRepoId() string {
@@ -1532,7 +1592,7 @@ type GetIssuesResponse struct {
 
 func (x *GetIssuesResponse) Reset() {
 	*x = GetIssuesResponse{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[25]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1544,7 +1604,7 @@ func (x *GetIssuesResponse) String() string {
 func (*GetIssuesResponse) ProtoMessage() {}
 
 func (x *GetIssuesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[25]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1557,7 +1617,7 @@ func (x *GetIssuesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIssuesResponse.ProtoReflect.Descriptor instead.
 func (*GetIssuesResponse) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{25}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *GetIssuesResponse) GetIssues() []*Issue {
@@ -1601,7 +1661,7 @@ type Issue struct {
 
 func (x *Issue) Reset() {
 	*x = Issue{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[26]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1613,7 +1673,7 @@ func (x *Issue) String() string {
 func (*Issue) ProtoMessage() {}
 
 func (x *Issue) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[26]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1626,7 +1686,7 @@ func (x *Issue) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Issue.ProtoReflect.Descriptor instead.
 func (*Issue) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{26}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *Issue) GetId() string {
@@ -1774,7 +1834,7 @@ type IssueStatus struct {
 
 func (x *IssueStatus) Reset() {
 	*x = IssueStatus{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[27]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1786,7 +1846,7 @@ func (x *IssueStatus) String() string {
 func (*IssueStatus) ProtoMessage() {}
 
 func (x *IssueStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[27]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1799,7 +1859,7 @@ func (x *IssueStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueStatus.ProtoReflect.Descriptor instead.
 func (*IssueStatus) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{27}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *IssueStatus) GetId() string {
@@ -1840,7 +1900,7 @@ type IssueUser struct {
 
 func (x *IssueUser) Reset() {
 	*x = IssueUser{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[28]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1852,7 +1912,7 @@ func (x *IssueUser) String() string {
 func (*IssueUser) ProtoMessage() {}
 
 func (x *IssueUser) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[28]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1865,7 +1925,7 @@ func (x *IssueUser) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueUser.ProtoReflect.Descriptor instead.
 func (*IssueUser) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{28}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *IssueUser) GetId() string {
@@ -1894,7 +1954,7 @@ type Label struct {
 
 func (x *Label) Reset() {
 	*x = Label{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[29]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1906,7 +1966,7 @@ func (x *Label) String() string {
 func (*Label) ProtoMessage() {}
 
 func (x *Label) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[29]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1919,7 +1979,7 @@ func (x *Label) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Label.ProtoReflect.Descriptor instead.
 func (*Label) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{29}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *Label) GetId() string {
@@ -1960,7 +2020,7 @@ type LinkedPR struct {
 
 func (x *LinkedPR) Reset() {
 	*x = LinkedPR{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[30]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1972,7 +2032,7 @@ func (x *LinkedPR) String() string {
 func (*LinkedPR) ProtoMessage() {}
 
 func (x *LinkedPR) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[30]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1985,7 +2045,7 @@ func (x *LinkedPR) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LinkedPR.ProtoReflect.Descriptor instead.
 func (*LinkedPR) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{30}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *LinkedPR) GetId() string {
@@ -2012,7 +2072,7 @@ type IssueMilestone struct {
 
 func (x *IssueMilestone) Reset() {
 	*x = IssueMilestone{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[31]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2024,7 +2084,7 @@ func (x *IssueMilestone) String() string {
 func (*IssueMilestone) ProtoMessage() {}
 
 func (x *IssueMilestone) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[31]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2037,7 +2097,7 @@ func (x *IssueMilestone) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueMilestone.ProtoReflect.Descriptor instead.
 func (*IssueMilestone) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{31}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *IssueMilestone) GetId() string {
@@ -2065,7 +2125,7 @@ type RepositoryRef struct {
 
 func (x *RepositoryRef) Reset() {
 	*x = RepositoryRef{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[32]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2077,7 +2137,7 @@ func (x *RepositoryRef) String() string {
 func (*RepositoryRef) ProtoMessage() {}
 
 func (x *RepositoryRef) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[32]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2090,7 +2150,7 @@ func (x *RepositoryRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RepositoryRef.ProtoReflect.Descriptor instead.
 func (*RepositoryRef) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{32}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *RepositoryRef) GetId() string {
@@ -2123,7 +2183,7 @@ type GetMilestonesRequest struct {
 
 func (x *GetMilestonesRequest) Reset() {
 	*x = GetMilestonesRequest{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[33]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2135,7 +2195,7 @@ func (x *GetMilestonesRequest) String() string {
 func (*GetMilestonesRequest) ProtoMessage() {}
 
 func (x *GetMilestonesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[33]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2148,7 +2208,7 @@ func (x *GetMilestonesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMilestonesRequest.ProtoReflect.Descriptor instead.
 func (*GetMilestonesRequest) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{33}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *GetMilestonesRequest) GetRepoId() string {
@@ -2168,7 +2228,7 @@ type GetMilestonesResponse struct {
 
 func (x *GetMilestonesResponse) Reset() {
 	*x = GetMilestonesResponse{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[34]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2180,7 +2240,7 @@ func (x *GetMilestonesResponse) String() string {
 func (*GetMilestonesResponse) ProtoMessage() {}
 
 func (x *GetMilestonesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[34]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2193,7 +2253,7 @@ func (x *GetMilestonesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMilestonesResponse.ProtoReflect.Descriptor instead.
 func (*GetMilestonesResponse) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{34}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *GetMilestonesResponse) GetItems() []*Milestone {
@@ -2229,7 +2289,7 @@ type Milestone struct {
 
 func (x *Milestone) Reset() {
 	*x = Milestone{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[35]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2241,7 +2301,7 @@ func (x *Milestone) String() string {
 func (*Milestone) ProtoMessage() {}
 
 func (x *Milestone) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[35]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2254,7 +2314,7 @@ func (x *Milestone) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Milestone.ProtoReflect.Descriptor instead.
 func (*Milestone) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{35}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *Milestone) GetId() string {
@@ -2344,7 +2404,7 @@ type MilestoneUser struct {
 
 func (x *MilestoneUser) Reset() {
 	*x = MilestoneUser{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[36]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2356,7 +2416,7 @@ func (x *MilestoneUser) String() string {
 func (*MilestoneUser) ProtoMessage() {}
 
 func (x *MilestoneUser) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[36]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2369,7 +2429,7 @@ func (x *MilestoneUser) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MilestoneUser.ProtoReflect.Descriptor instead.
 func (*MilestoneUser) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{36}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *MilestoneUser) GetId() string {
@@ -2396,7 +2456,7 @@ type GetRepositoryBySlugsRequest struct {
 
 func (x *GetRepositoryBySlugsRequest) Reset() {
 	*x = GetRepositoryBySlugsRequest{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[37]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2408,7 +2468,7 @@ func (x *GetRepositoryBySlugsRequest) String() string {
 func (*GetRepositoryBySlugsRequest) ProtoMessage() {}
 
 func (x *GetRepositoryBySlugsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[37]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2421,7 +2481,7 @@ func (x *GetRepositoryBySlugsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRepositoryBySlugsRequest.ProtoReflect.Descriptor instead.
 func (*GetRepositoryBySlugsRequest) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{37}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *GetRepositoryBySlugsRequest) GetOrgSlug() string {
@@ -2449,7 +2509,7 @@ type Rating struct {
 
 func (x *Rating) Reset() {
 	*x = Rating{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[38]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2461,7 +2521,7 @@ func (x *Rating) String() string {
 func (*Rating) ProtoMessage() {}
 
 func (x *Rating) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[38]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2474,7 +2534,7 @@ func (x *Rating) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Rating.ProtoReflect.Descriptor instead.
 func (*Rating) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{38}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *Rating) GetValue() float64 {
@@ -2508,7 +2568,7 @@ type ReactionCount struct {
 
 func (x *ReactionCount) Reset() {
 	*x = ReactionCount{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[39]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2520,7 +2580,7 @@ func (x *ReactionCount) String() string {
 func (*ReactionCount) ProtoMessage() {}
 
 func (x *ReactionCount) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[39]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2533,7 +2593,7 @@ func (x *ReactionCount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReactionCount.ProtoReflect.Descriptor instead.
 func (*ReactionCount) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{39}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *ReactionCount) GetType() string {
@@ -2562,13 +2622,14 @@ type GetRepositoryBySlugsResponse struct {
 	Visibility     string                 `protobuf:"bytes,8,opt,name=visibility,proto3" json:"visibility,omitempty"`
 	LastActivityAt string                 `protobuf:"bytes,9,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
 	Rating         *Rating                `protobuf:"bytes,10,opt,name=rating,proto3" json:"rating,omitempty"`
+	Language       *Language              `protobuf:"bytes,11,opt,name=language,proto3" json:"language,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetRepositoryBySlugsResponse) Reset() {
 	*x = GetRepositoryBySlugsResponse{}
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[40]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2580,7 +2641,7 @@ func (x *GetRepositoryBySlugsResponse) String() string {
 func (*GetRepositoryBySlugsResponse) ProtoMessage() {}
 
 func (x *GetRepositoryBySlugsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_service_proto_msgTypes[40]
+	mi := &file_internal_transport_rpc_service_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2593,7 +2654,7 @@ func (x *GetRepositoryBySlugsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRepositoryBySlugsResponse.ProtoReflect.Descriptor instead.
 func (*GetRepositoryBySlugsResponse) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{40}
+	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *GetRepositoryBySlugsResponse) GetId() string {
@@ -2666,6 +2727,13 @@ func (x *GetRepositoryBySlugsResponse) GetRating() *Rating {
 	return nil
 }
 
+func (x *GetRepositoryBySlugsResponse) GetLanguage() *Language {
+	if x != nil {
+		return x.Language
+	}
+	return nil
+}
+
 var File_internal_transport_rpc_service_proto protoreflect.FileDescriptor
 
 const file_internal_transport_rpc_service_proto_rawDesc = "" +
@@ -2687,7 +2755,7 @@ const file_internal_transport_rpc_service_proto_rawDesc = "" +
 	"\x11GetMyReposRequest\"y\n" +
 	"\x12GetMyReposResponse\x12;\n" +
 	"\frepositories\x18\x01 \x03(\v2\x17.code_health.RepositoryR\frepositories\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xdc\x02\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x8f\x03\n" +
 	"\n" +
 	"Repository\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -2702,7 +2770,11 @@ const file_internal_transport_rpc_service_proto_rawDesc = "" +
 	"visibility\x12(\n" +
 	"\x10last_activity_at\x18\t \x01(\tR\x0elastActivityAt\x12+\n" +
 	"\x06rating\x18\n" +
-	" \x01(\v2\x13.code_health.RatingR\x06rating\"2\n" +
+	" \x01(\v2\x13.code_health.RatingR\x06rating\x121\n" +
+	"\blanguage\x18\v \x01(\v2\x15.code_health.LanguageR\blanguage\"4\n" +
+	"\bLanguage\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05color\x18\x02 \x01(\tR\x05color\"2\n" +
 	"\fOrganization\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04slug\x18\x02 \x01(\tR\x04slug\"\x18\n" +
@@ -2874,7 +2946,7 @@ const file_internal_transport_rpc_service_proto_rawDesc = "" +
 	"\x0freaction_counts\x18\x03 \x03(\v2\x1a.code_health.ReactionCountR\x0ereactionCounts\"9\n" +
 	"\rReactionCount\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x14\n" +
-	"\x05count\x18\x02 \x01(\tR\x05count\"\xee\x02\n" +
+	"\x05count\x18\x02 \x01(\tR\x05count\"\xa1\x03\n" +
 	"\x1cGetRepositoryBySlugsResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12=\n" +
@@ -2888,7 +2960,8 @@ const file_internal_transport_rpc_service_proto_rawDesc = "" +
 	"visibility\x12(\n" +
 	"\x10last_activity_at\x18\t \x01(\tR\x0elastActivityAt\x12+\n" +
 	"\x06rating\x18\n" +
-	" \x01(\v2\x13.code_health.RatingR\x06rating2\xd2\x05\n" +
+	" \x01(\v2\x13.code_health.RatingR\x06rating\x121\n" +
+	"\blanguage\x18\v \x01(\v2\x15.code_health.LanguageR\blanguage2\xd2\x05\n" +
 	"\n" +
 	"CodeHealth\x12k\n" +
 	"\x14GetRepositoryBySlugs\x12(.code_health.GetRepositoryBySlugsRequest\x1a).code_health.GetRepositoryBySlugsResponse\x12_\n" +
@@ -2913,7 +2986,7 @@ func file_internal_transport_rpc_service_proto_rawDescGZIP() []byte {
 	return file_internal_transport_rpc_service_proto_rawDescData
 }
 
-var file_internal_transport_rpc_service_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
+var file_internal_transport_rpc_service_proto_msgTypes = make([]protoimpl.MessageInfo, 42)
 var file_internal_transport_rpc_service_proto_goTypes = []any{
 	(*GetRepoIDBySlugsRequest)(nil),      // 0: code_health.GetRepoIDBySlugsRequest
 	(*GetRepoIDBySlugsResponse)(nil),     // 1: code_health.GetRepoIDBySlugsResponse
@@ -2924,115 +2997,118 @@ var file_internal_transport_rpc_service_proto_goTypes = []any{
 	(*GetMyReposRequest)(nil),            // 6: code_health.GetMyReposRequest
 	(*GetMyReposResponse)(nil),           // 7: code_health.GetMyReposResponse
 	(*Repository)(nil),                   // 8: code_health.Repository
-	(*Organization)(nil),                 // 9: code_health.Organization
-	(*Logo)(nil),                         // 10: code_health.Logo
-	(*GetCiCDRunsRequest)(nil),           // 11: code_health.GetCiCDRunsRequest
-	(*GetCiCDRunsResponse)(nil),          // 12: code_health.GetCiCDRunsResponse
-	(*Run)(nil),                          // 13: code_health.Run
-	(*Workflow)(nil),                     // 14: code_health.Workflow
-	(*Task)(nil),                         // 15: code_health.Task
-	(*Cube)(nil),                         // 16: code_health.Cube
-	(*Progress)(nil),                     // 17: code_health.Progress
-	(*Artifact)(nil),                     // 18: code_health.Artifact
-	(*Relations)(nil),                    // 19: code_health.Relations
-	(*Relation)(nil),                     // 20: code_health.Relation
-	(*Dates)(nil),                        // 21: code_health.Dates
-	(*Pull)(nil),                         // 22: code_health.Pull
-	(*RunUser)(nil),                      // 23: code_health.RunUser
-	(*GetIssuesRequest)(nil),             // 24: code_health.GetIssuesRequest
-	(*GetIssuesResponse)(nil),            // 25: code_health.GetIssuesResponse
-	(*Issue)(nil),                        // 26: code_health.Issue
-	(*IssueStatus)(nil),                  // 27: code_health.IssueStatus
-	(*IssueUser)(nil),                    // 28: code_health.IssueUser
-	(*Label)(nil),                        // 29: code_health.Label
-	(*LinkedPR)(nil),                     // 30: code_health.LinkedPR
-	(*IssueMilestone)(nil),               // 31: code_health.IssueMilestone
-	(*RepositoryRef)(nil),                // 32: code_health.RepositoryRef
-	(*GetMilestonesRequest)(nil),         // 33: code_health.GetMilestonesRequest
-	(*GetMilestonesResponse)(nil),        // 34: code_health.GetMilestonesResponse
-	(*Milestone)(nil),                    // 35: code_health.Milestone
-	(*MilestoneUser)(nil),                // 36: code_health.MilestoneUser
-	(*GetRepositoryBySlugsRequest)(nil),  // 37: code_health.GetRepositoryBySlugsRequest
-	(*Rating)(nil),                       // 38: code_health.Rating
-	(*ReactionCount)(nil),                // 39: code_health.ReactionCount
-	(*GetRepositoryBySlugsResponse)(nil), // 40: code_health.GetRepositoryBySlugsResponse
-	(*timestamppb.Timestamp)(nil),        // 41: google.protobuf.Timestamp
+	(*Language)(nil),                     // 9: code_health.Language
+	(*Organization)(nil),                 // 10: code_health.Organization
+	(*Logo)(nil),                         // 11: code_health.Logo
+	(*GetCiCDRunsRequest)(nil),           // 12: code_health.GetCiCDRunsRequest
+	(*GetCiCDRunsResponse)(nil),          // 13: code_health.GetCiCDRunsResponse
+	(*Run)(nil),                          // 14: code_health.Run
+	(*Workflow)(nil),                     // 15: code_health.Workflow
+	(*Task)(nil),                         // 16: code_health.Task
+	(*Cube)(nil),                         // 17: code_health.Cube
+	(*Progress)(nil),                     // 18: code_health.Progress
+	(*Artifact)(nil),                     // 19: code_health.Artifact
+	(*Relations)(nil),                    // 20: code_health.Relations
+	(*Relation)(nil),                     // 21: code_health.Relation
+	(*Dates)(nil),                        // 22: code_health.Dates
+	(*Pull)(nil),                         // 23: code_health.Pull
+	(*RunUser)(nil),                      // 24: code_health.RunUser
+	(*GetIssuesRequest)(nil),             // 25: code_health.GetIssuesRequest
+	(*GetIssuesResponse)(nil),            // 26: code_health.GetIssuesResponse
+	(*Issue)(nil),                        // 27: code_health.Issue
+	(*IssueStatus)(nil),                  // 28: code_health.IssueStatus
+	(*IssueUser)(nil),                    // 29: code_health.IssueUser
+	(*Label)(nil),                        // 30: code_health.Label
+	(*LinkedPR)(nil),                     // 31: code_health.LinkedPR
+	(*IssueMilestone)(nil),               // 32: code_health.IssueMilestone
+	(*RepositoryRef)(nil),                // 33: code_health.RepositoryRef
+	(*GetMilestonesRequest)(nil),         // 34: code_health.GetMilestonesRequest
+	(*GetMilestonesResponse)(nil),        // 35: code_health.GetMilestonesResponse
+	(*Milestone)(nil),                    // 36: code_health.Milestone
+	(*MilestoneUser)(nil),                // 37: code_health.MilestoneUser
+	(*GetRepositoryBySlugsRequest)(nil),  // 38: code_health.GetRepositoryBySlugsRequest
+	(*Rating)(nil),                       // 39: code_health.Rating
+	(*ReactionCount)(nil),                // 40: code_health.ReactionCount
+	(*GetRepositoryBySlugsResponse)(nil), // 41: code_health.GetRepositoryBySlugsResponse
+	(*timestamppb.Timestamp)(nil),        // 42: google.protobuf.Timestamp
 }
 var file_internal_transport_rpc_service_proto_depIdxs = []int32{
 	8,  // 0: code_health.ListAllPublicReposResponse.repos:type_name -> code_health.Repository
 	8,  // 1: code_health.GetMyReposResponse.repositories:type_name -> code_health.Repository
-	9,  // 2: code_health.Repository.organization:type_name -> code_health.Organization
-	10, // 3: code_health.Repository.logo:type_name -> code_health.Logo
-	38, // 4: code_health.Repository.rating:type_name -> code_health.Rating
-	13, // 5: code_health.GetCiCDRunsResponse.runs:type_name -> code_health.Run
-	21, // 6: code_health.Run.dates:type_name -> code_health.Dates
-	14, // 7: code_health.Run.workflows:type_name -> code_health.Workflow
-	22, // 8: code_health.Run.pull:type_name -> code_health.Pull
-	23, // 9: code_health.Run.user:type_name -> code_health.RunUser
-	21, // 10: code_health.Workflow.dates:type_name -> code_health.Dates
-	15, // 11: code_health.Workflow.tasks:type_name -> code_health.Task
-	17, // 12: code_health.Workflow.progress:type_name -> code_health.Progress
-	21, // 13: code_health.Task.dates:type_name -> code_health.Dates
-	16, // 14: code_health.Task.cubes:type_name -> code_health.Cube
-	17, // 15: code_health.Task.progress:type_name -> code_health.Progress
-	19, // 16: code_health.Task.relations:type_name -> code_health.Relations
-	21, // 17: code_health.Cube.dates:type_name -> code_health.Dates
-	18, // 18: code_health.Cube.artifacts:type_name -> code_health.Artifact
-	19, // 19: code_health.Cube.relations:type_name -> code_health.Relations
-	16, // 20: code_health.Progress.current_cube:type_name -> code_health.Cube
-	21, // 21: code_health.Artifact.dates:type_name -> code_health.Dates
-	20, // 22: code_health.Relations.needs:type_name -> code_health.Relation
-	41, // 23: code_health.Dates.created_at:type_name -> google.protobuf.Timestamp
-	41, // 24: code_health.Dates.started_at:type_name -> google.protobuf.Timestamp
-	41, // 25: code_health.Dates.finished_at:type_name -> google.protobuf.Timestamp
-	41, // 26: code_health.Dates.updated_at:type_name -> google.protobuf.Timestamp
-	26, // 27: code_health.GetIssuesResponse.issues:type_name -> code_health.Issue
-	27, // 28: code_health.Issue.status:type_name -> code_health.IssueStatus
-	28, // 29: code_health.Issue.author:type_name -> code_health.IssueUser
-	28, // 30: code_health.Issue.updated_by:type_name -> code_health.IssueUser
-	41, // 31: code_health.Issue.created_at:type_name -> google.protobuf.Timestamp
-	41, // 32: code_health.Issue.updated_at:type_name -> google.protobuf.Timestamp
-	28, // 33: code_health.Issue.assignee:type_name -> code_health.IssueUser
-	29, // 34: code_health.Issue.labels:type_name -> code_health.Label
-	30, // 35: code_health.Issue.linked_prs:type_name -> code_health.LinkedPR
-	31, // 36: code_health.Issue.milestone:type_name -> code_health.IssueMilestone
-	41, // 37: code_health.Issue.deadline:type_name -> google.protobuf.Timestamp
-	41, // 38: code_health.Issue.started_at:type_name -> google.protobuf.Timestamp
-	41, // 39: code_health.Issue.completed_at:type_name -> google.protobuf.Timestamp
-	32, // 40: code_health.Issue.repository:type_name -> code_health.RepositoryRef
-	9,  // 41: code_health.RepositoryRef.organization:type_name -> code_health.Organization
-	35, // 42: code_health.GetMilestonesResponse.items:type_name -> code_health.Milestone
-	41, // 43: code_health.Milestone.start_date:type_name -> google.protobuf.Timestamp
-	41, // 44: code_health.Milestone.deadline:type_name -> google.protobuf.Timestamp
-	36, // 45: code_health.Milestone.author:type_name -> code_health.MilestoneUser
-	36, // 46: code_health.Milestone.updated_by:type_name -> code_health.MilestoneUser
-	41, // 47: code_health.Milestone.created_at:type_name -> google.protobuf.Timestamp
-	41, // 48: code_health.Milestone.updated_at:type_name -> google.protobuf.Timestamp
-	39, // 49: code_health.Rating.reaction_counts:type_name -> code_health.ReactionCount
-	9,  // 50: code_health.GetRepositoryBySlugsResponse.organization:type_name -> code_health.Organization
-	10, // 51: code_health.GetRepositoryBySlugsResponse.logo:type_name -> code_health.Logo
-	38, // 52: code_health.GetRepositoryBySlugsResponse.rating:type_name -> code_health.Rating
-	37, // 53: code_health.CodeHealth.GetRepositoryBySlugs:input_type -> code_health.GetRepositoryBySlugsRequest
-	0,  // 54: code_health.CodeHealth.GetRepoIDBySlugs:input_type -> code_health.GetRepoIDBySlugsRequest
-	2,  // 55: code_health.CodeHealth.GetGitURL:input_type -> code_health.GetGitURLRequest
-	11, // 56: code_health.CodeHealth.GetCiCDRuns:input_type -> code_health.GetCiCDRunsRequest
-	24, // 57: code_health.CodeHealth.GetIssues:input_type -> code_health.GetIssuesRequest
-	33, // 58: code_health.CodeHealth.GetMilestones:input_type -> code_health.GetMilestonesRequest
-	4,  // 59: code_health.CodeHealth.ListAllPublicRepos:input_type -> code_health.ListAllPublicReposRequest
-	6,  // 60: code_health.CodeHealth.GetMyRepos:input_type -> code_health.GetMyReposRequest
-	40, // 61: code_health.CodeHealth.GetRepositoryBySlugs:output_type -> code_health.GetRepositoryBySlugsResponse
-	1,  // 62: code_health.CodeHealth.GetRepoIDBySlugs:output_type -> code_health.GetRepoIDBySlugsResponse
-	3,  // 63: code_health.CodeHealth.GetGitURL:output_type -> code_health.GetGitURLResponse
-	12, // 64: code_health.CodeHealth.GetCiCDRuns:output_type -> code_health.GetCiCDRunsResponse
-	25, // 65: code_health.CodeHealth.GetIssues:output_type -> code_health.GetIssuesResponse
-	34, // 66: code_health.CodeHealth.GetMilestones:output_type -> code_health.GetMilestonesResponse
-	5,  // 67: code_health.CodeHealth.ListAllPublicRepos:output_type -> code_health.ListAllPublicReposResponse
-	7,  // 68: code_health.CodeHealth.GetMyRepos:output_type -> code_health.GetMyReposResponse
-	61, // [61:69] is the sub-list for method output_type
-	53, // [53:61] is the sub-list for method input_type
-	53, // [53:53] is the sub-list for extension type_name
-	53, // [53:53] is the sub-list for extension extendee
-	0,  // [0:53] is the sub-list for field type_name
+	10, // 2: code_health.Repository.organization:type_name -> code_health.Organization
+	11, // 3: code_health.Repository.logo:type_name -> code_health.Logo
+	39, // 4: code_health.Repository.rating:type_name -> code_health.Rating
+	9,  // 5: code_health.Repository.language:type_name -> code_health.Language
+	14, // 6: code_health.GetCiCDRunsResponse.runs:type_name -> code_health.Run
+	22, // 7: code_health.Run.dates:type_name -> code_health.Dates
+	15, // 8: code_health.Run.workflows:type_name -> code_health.Workflow
+	23, // 9: code_health.Run.pull:type_name -> code_health.Pull
+	24, // 10: code_health.Run.user:type_name -> code_health.RunUser
+	22, // 11: code_health.Workflow.dates:type_name -> code_health.Dates
+	16, // 12: code_health.Workflow.tasks:type_name -> code_health.Task
+	18, // 13: code_health.Workflow.progress:type_name -> code_health.Progress
+	22, // 14: code_health.Task.dates:type_name -> code_health.Dates
+	17, // 15: code_health.Task.cubes:type_name -> code_health.Cube
+	18, // 16: code_health.Task.progress:type_name -> code_health.Progress
+	20, // 17: code_health.Task.relations:type_name -> code_health.Relations
+	22, // 18: code_health.Cube.dates:type_name -> code_health.Dates
+	19, // 19: code_health.Cube.artifacts:type_name -> code_health.Artifact
+	20, // 20: code_health.Cube.relations:type_name -> code_health.Relations
+	17, // 21: code_health.Progress.current_cube:type_name -> code_health.Cube
+	22, // 22: code_health.Artifact.dates:type_name -> code_health.Dates
+	21, // 23: code_health.Relations.needs:type_name -> code_health.Relation
+	42, // 24: code_health.Dates.created_at:type_name -> google.protobuf.Timestamp
+	42, // 25: code_health.Dates.started_at:type_name -> google.protobuf.Timestamp
+	42, // 26: code_health.Dates.finished_at:type_name -> google.protobuf.Timestamp
+	42, // 27: code_health.Dates.updated_at:type_name -> google.protobuf.Timestamp
+	27, // 28: code_health.GetIssuesResponse.issues:type_name -> code_health.Issue
+	28, // 29: code_health.Issue.status:type_name -> code_health.IssueStatus
+	29, // 30: code_health.Issue.author:type_name -> code_health.IssueUser
+	29, // 31: code_health.Issue.updated_by:type_name -> code_health.IssueUser
+	42, // 32: code_health.Issue.created_at:type_name -> google.protobuf.Timestamp
+	42, // 33: code_health.Issue.updated_at:type_name -> google.protobuf.Timestamp
+	29, // 34: code_health.Issue.assignee:type_name -> code_health.IssueUser
+	30, // 35: code_health.Issue.labels:type_name -> code_health.Label
+	31, // 36: code_health.Issue.linked_prs:type_name -> code_health.LinkedPR
+	32, // 37: code_health.Issue.milestone:type_name -> code_health.IssueMilestone
+	42, // 38: code_health.Issue.deadline:type_name -> google.protobuf.Timestamp
+	42, // 39: code_health.Issue.started_at:type_name -> google.protobuf.Timestamp
+	42, // 40: code_health.Issue.completed_at:type_name -> google.protobuf.Timestamp
+	33, // 41: code_health.Issue.repository:type_name -> code_health.RepositoryRef
+	10, // 42: code_health.RepositoryRef.organization:type_name -> code_health.Organization
+	36, // 43: code_health.GetMilestonesResponse.items:type_name -> code_health.Milestone
+	42, // 44: code_health.Milestone.start_date:type_name -> google.protobuf.Timestamp
+	42, // 45: code_health.Milestone.deadline:type_name -> google.protobuf.Timestamp
+	37, // 46: code_health.Milestone.author:type_name -> code_health.MilestoneUser
+	37, // 47: code_health.Milestone.updated_by:type_name -> code_health.MilestoneUser
+	42, // 48: code_health.Milestone.created_at:type_name -> google.protobuf.Timestamp
+	42, // 49: code_health.Milestone.updated_at:type_name -> google.protobuf.Timestamp
+	40, // 50: code_health.Rating.reaction_counts:type_name -> code_health.ReactionCount
+	10, // 51: code_health.GetRepositoryBySlugsResponse.organization:type_name -> code_health.Organization
+	11, // 52: code_health.GetRepositoryBySlugsResponse.logo:type_name -> code_health.Logo
+	39, // 53: code_health.GetRepositoryBySlugsResponse.rating:type_name -> code_health.Rating
+	9,  // 54: code_health.GetRepositoryBySlugsResponse.language:type_name -> code_health.Language
+	38, // 55: code_health.CodeHealth.GetRepositoryBySlugs:input_type -> code_health.GetRepositoryBySlugsRequest
+	0,  // 56: code_health.CodeHealth.GetRepoIDBySlugs:input_type -> code_health.GetRepoIDBySlugsRequest
+	2,  // 57: code_health.CodeHealth.GetGitURL:input_type -> code_health.GetGitURLRequest
+	12, // 58: code_health.CodeHealth.GetCiCDRuns:input_type -> code_health.GetCiCDRunsRequest
+	25, // 59: code_health.CodeHealth.GetIssues:input_type -> code_health.GetIssuesRequest
+	34, // 60: code_health.CodeHealth.GetMilestones:input_type -> code_health.GetMilestonesRequest
+	4,  // 61: code_health.CodeHealth.ListAllPublicRepos:input_type -> code_health.ListAllPublicReposRequest
+	6,  // 62: code_health.CodeHealth.GetMyRepos:input_type -> code_health.GetMyReposRequest
+	41, // 63: code_health.CodeHealth.GetRepositoryBySlugs:output_type -> code_health.GetRepositoryBySlugsResponse
+	1,  // 64: code_health.CodeHealth.GetRepoIDBySlugs:output_type -> code_health.GetRepoIDBySlugsResponse
+	3,  // 65: code_health.CodeHealth.GetGitURL:output_type -> code_health.GetGitURLResponse
+	13, // 66: code_health.CodeHealth.GetCiCDRuns:output_type -> code_health.GetCiCDRunsResponse
+	26, // 67: code_health.CodeHealth.GetIssues:output_type -> code_health.GetIssuesResponse
+	35, // 68: code_health.CodeHealth.GetMilestones:output_type -> code_health.GetMilestonesResponse
+	5,  // 69: code_health.CodeHealth.ListAllPublicRepos:output_type -> code_health.ListAllPublicReposResponse
+	7,  // 70: code_health.CodeHealth.GetMyRepos:output_type -> code_health.GetMyReposResponse
+	63, // [63:71] is the sub-list for method output_type
+	55, // [55:63] is the sub-list for method input_type
+	55, // [55:55] is the sub-list for extension type_name
+	55, // [55:55] is the sub-list for extension extendee
+	0,  // [0:55] is the sub-list for field type_name
 }
 
 func init() { file_internal_transport_rpc_service_proto_init() }
@@ -3046,7 +3122,7 @@ func file_internal_transport_rpc_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_transport_rpc_service_proto_rawDesc), len(file_internal_transport_rpc_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   41,
+			NumMessages:   42,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
