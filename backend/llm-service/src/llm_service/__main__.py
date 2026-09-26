@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from .context import build_model_context, select_context_paths
+from .discovery import readme_links
 from .model_response import InvalidModelResponse
 from .snapshot import Snapshot
 from .yandex_model import ModelProviderError, YandexModel, YandexModelConfig
@@ -31,14 +32,18 @@ def local_snapshot(directory: Path) -> Snapshot:
         paths.add(name)
     files, hashes = {}, {}
     total = 0
-    for name in sorted(select_context_paths(frozenset(paths))):
+    pending = sorted(select_context_paths(frozenset(paths)))
+    initial_count = len(pending)
+    for index, name in enumerate(pending):
         with (root / name).open("rb") as handle:
-            data = handle.read(512_001)
+            data = handle.read(2_000_001)
         total += len(data)
-        if total > 512_000:
-            raise ValueError("Selected files exceed the 512000-byte local context limit")
+        if len(data) > 2_000_000 or total > 8_000_000:
+            raise ValueError("Selected candidate files exceed the local scan limit")
         files[name] = data.decode("utf-8")
         hashes[name] = hashlib.sha256(data).hexdigest()
+        if index + 1 == initial_count:
+            pending.extend(p for p in readme_links(files, paths) if p not in files)
     return Snapshot(frozenset(paths), files, hashes)
 
 
@@ -46,14 +51,26 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Оценка документации локального Git-репозитория")
     parser.add_argument("--repo", type=Path, default=Path.cwd())
     parser.add_argument("--dry-run", action="store_true", help="Подготовить контекст без вызова модели")
+    parser.add_argument("--listen", action="store_true", help="Обрабатывать запросы документации из Kafka")
     args = parser.parse_args(argv)
     try:
+        if args.listen:
+            if args.dry_run:
+                parser.error("--dry-run cannot be used with --listen")
+            from .kafka_worker import main as run_kafka_worker
+            run_kafka_worker()
+            return 0
         snapshot = local_snapshot(args.repo)
         context = build_model_context(snapshot)
         if args.dry_run:
             print(json.dumps({"selected_files": sorted(snapshot.files),
                               "total_file_count": len(snapshot.all_paths),
-                              "context_bytes": len(context.text.encode("utf-8"))},
+                              "context_bytes": len(context.text.encode("utf-8")),
+                              "review_mode": "sampled-documentation-v2",
+                              "coverage": json.loads(context.text)["coverage"],
+                              "sampled_sections": [{k: item[k] for k in
+                                  ("path", "heading", "topic", "start_line", "end_line", "excerpt_truncated", "check_ids")}
+                                  for item in json.loads(context.text)["documents"]]},
                              ensure_ascii=False, indent=2))
             return 0
         model = YandexModel(YandexModelConfig.from_env())

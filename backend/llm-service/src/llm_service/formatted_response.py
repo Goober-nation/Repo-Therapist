@@ -126,6 +126,14 @@ def parse_formatted_response(raw: bytes, snapshot: Snapshot, context: ModelConte
     if set(by_id) != set(COMPONENTS):
         raise InvalidModelResponse("missing model checks: expected all 21 IDs")
 
+    coverage = json.loads(context.text).get("coverage", {})
+    if coverage:
+        for name, check in by_id.items():
+            if coverage.get(name) == "not_reviewed":
+                check["outcome"] = "NOT_REVIEWED"
+                check["points_awarded"] = None
+                check["components"] = None
+                check["deductions"] = []
     by_id.update(deterministic_checks(snapshot.files, set(snapshot.all_paths)))
     checks = [by_id[name] for name in CHECKS]
     subcategories = []
@@ -134,7 +142,7 @@ def parse_formatted_response(raw: bytes, snapshot: Snapshot, context: ModelConte
                    and c["outcome"] == "EVALUATED"]
         maximum = sum(c["max_points"] for c in members)
         earned = sum(c["points_awarded"] for c in members)
-        subcategories.append({"id": group, "status": "CALCULATED" if maximum else "NOT_APPLICABLE",
+        subcategories.append({"id": group, "status": "CALCULATED" if maximum else "NOT_REVIEWED",
                               "score": _percent(earned, maximum)})
     evaluated = [c for c in checks if c["outcome"] == "EVALUATED"]
     score = _percent(sum(c["points_awarded"] for c in evaluated),

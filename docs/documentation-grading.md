@@ -1,5 +1,12 @@
 # Documentation grading method (`documentation-grading-v1`)
 
+> Active method (2026-09-26): budget-limited sampled documentation review.
+> The service selects up to eight relevant excerpts (30 lines and 3000 UTF-8 bytes
+> per excerpt). Existing weights and eight section grades apply as estimates
+> from the selected material. Findings must not claim that omitted text was
+> inspected or absent; sampling alone is not a deficiency.
+
+
 > Current active output: `documentation.analysis.completed` v2 contains only `grade`,
 > eight `subcategories`, and a flat `facts` list. Internal checks/components and
 > numeric deduction impacts are not transmitted. The active model path checks format
@@ -301,3 +308,18 @@ Expected control cases:
 | Applicable points total 100, evaluated points total 65, earned points total 52 | `CALCULATED_PARTIAL`, coverage 65%, score 80 |
 | Expected README or local-run instructions are absent | Evaluated zero and a scoring deduction, never `NO_DATA` |
 | Snapshot identity or integrity cannot be verified | Failed workflow; no fabricated completed result |
+
+
+Sampling refinement (2026-09-26): the selector prioritizes individual rubric checks,
+reserves README introduction, and follows up to eight existing repository-local
+README document links (one hop; inline and reference links). External links are
+never fetched. Excerpts have a shared 24000-byte content budget; the entire JSON
+context is capped at 32000 bytes. Candidate scanning remains bounded separately.
+Each model check is marked `sampled` or `not_reviewed` in the internal context.
+An unreviewed check contributes neither earned nor maximum points and cannot
+produce deficiency facts. The total is 100 * earned / evaluated maximum. A section
+with no evaluated checks has `grade: null`; this now means either not applicable
+or not reviewed. No estimated score is substituted for omitted material. This
+supersedes earlier wording that required all section grades to be estimated.
+The Kafka object shape is unchanged; consumers must display null as unavailable,
+not as zero. Deterministic required-file checks retain their existing rules.

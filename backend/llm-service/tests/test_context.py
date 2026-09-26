@@ -36,7 +36,7 @@ class ContextTests(unittest.TestCase):
         self.assertNotIn("TOKEN=secret", context.text)
         self.assertNotIn("not sent to model", context.text)
         self.assertIn("src/app.py", sent["repository_paths"])
-        self.assertFalse(context.truncated)
+        self.assertTrue(context.truncated)
 
     def test_context_limit_fails_without_partial_document_review(self):
         snapshot, _ = prepare_documentation_context(FakeStore(), "repos/id")
