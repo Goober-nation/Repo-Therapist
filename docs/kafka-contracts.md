@@ -5,6 +5,11 @@ Scope: the message shapes published/consumed on the Kafka links in the architect
 - Aggregator <-> Grade service — **still TBD**, a team decision (needs whoever owns the
   Aggregator), not filled in here.
 - Grade service <-> Security wrapper — **still TBD**, same reasoning.
+- Grade service <-> LLM service — **still TBD**, same reasoning. Needed for the Documentation
+  category (2026-09-22 decision: Documentation is judged by the LLM service, not a deterministic
+  heuristic — Grade service ships it repo doc content, e.g. README/CONTRIBUTING/etc., and gets a
+  score back). See `backlog/phase-2-grade-service.md`'s Documentation section for what Grade
+  service's side needs once this contract exists.
 - Grade service <-> Repository service — **defined below**. This exchange is entirely within one
   person's scope (Repository + Grade service), so it didn't need to wait on wider team sign-off —
   see `backlog/phase-3-kafka-integration.md` for the implementation notes.
@@ -13,16 +18,32 @@ Scope: the message shapes published/consumed on the Kafka links in the architect
 
 ## `repo.grade.requested`
 
-Producer: currently only a manual trigger (`grade-service --request-org=X --request-repo=Y`);
-eventually the Aggregator. Consumer: Repository service.
+Producer: Grade service, relaying each `grading.requests` message from the Aggregator (or from
+the manual `grading-request` command). Consumer: Repository service.
 
 ```json
 {
   "org_slug": "examples",
   "repo_slug": "vulnerable-repo",
-  "requested_at": "2026-09-19T23:49:12+03:00"
+  "requested_at": "2026-09-19T23:49:12+03:00",
+  "token": "<optional user SourceCraft PAT>"
 }
 ```
+
+The Aggregator's own topics, as Grade service reads/writes them:
+
+- `grading.requests`: `{org_slug, repo_slug, visibility, requested_at, token?}`. A token means
+  private grading; no token means public. A non-public `visibility` without a token is dropped.
+- `grading.results`: `{sourcecraft_uuid, visibility, public_score, public_category_scores,
+  public_recommendations, private_score, private_category_scores, private_recommendations,
+  missing_data, graded_at}`. Only the side named by `visibility` is filled, the other side is
+  `null`; recommendations hold at most 3, picked at random.
+
+`token` is copied from `grading.requests`. When present, Repository service uses it for the
+wrapper calls and the git clone; when absent, it falls back to its own `SOURCECRAFT_PAT`. The
+token is never logged and is deliberately **not** echoed on `repo.ready` — Grade service keeps it
+in memory (keyed by `org/repo`, dropped on `repo.ready` or after 30 minutes) for its own
+Security wrapper call.
 
 ## `repo.ready`
 

@@ -1,0 +1,42 @@
+{
+  "created": "2026-09-26",
+  "purpose": "CI/CD grading fixtures on real SourceCraft. Public repos under an org the test PAT owns (/cicd/runs needs owner access). Created by scripts/mock-repos/create-all.sh; checked by the live test in backend/grade-service/internal/scoring/cicd_live_test.go. Runs are only ~1-6 seconds long, so median duration always scores 1 here.",
+  "org": "timoxa102928",
+  "repos": [
+    {
+      "repo": "ci-mock-green",
+      "sourcecraft_uuid": "01a0dd5b-fb68-7f2c-8196-064ec0700605",
+      "scenario": "CI always passes",
+      "runs_oldest_first": "S S S S S S S",
+      "expected": {"no_data": false, "score": 100}
+    },
+    {
+      "repo": "ci-mock-red",
+      "sourcecraft_uuid": "01a0dd5d-d28a-7c46-b8bd-188b04f4d292",
+      "scenario": "CI always fails",
+      "runs_oldest_first": "F F F F F F F F",
+      "expected": {"no_data": false, "score": 20}
+    },
+    {
+      "repo": "ci-mock-flaky",
+      "sourcecraft_uuid": "01a0dd5d-d258-7af2-9b1b-b2346d6d29b6",
+      "scenario": "Flaky and degrading: older half 75% pass, newer half 25%",
+      "runs_oldest_first": "S S S F S F F F",
+      "expected": {"no_data": false, "score": 8}
+    },
+    {
+      "repo": "ci-mock-dormant",
+      "sourcecraft_uuid": "01a0dd5d-d29b-75bf-9ee6-1fe59b6b1e59",
+      "scenario": ".sourcecraft/ci.yaml present, triggers only on a branch that never exists",
+      "runs_oldest_first": "",
+      "expected": {"no_data": true}
+    },
+    {
+      "repo": "ci-mock-none",
+      "sourcecraft_uuid": "01a0dd5d-d258-765b-928b-a163588c10e3",
+      "scenario": "No CI config, no runs: hard gate",
+      "runs_oldest_first": "",
+      "expected": {"no_data": false, "score": 0}
+    }
+  ]
+}

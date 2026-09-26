@@ -8,12 +8,21 @@
 
 export type GradeStatus = "PENDING" | "FINISHED"
 
-export type CategoryScoresPayload = Record<string, number> | Array<Record<string, number>>
+export interface CategoryScorePayload {
+  score?: number | null
+  name?: string
+  description?: string
+  trend?: number | null
+}
+
+export type CategoryScoreValue = number | null | CategoryScorePayload
+export type CategoryScoresPayload = Record<string, CategoryScoreValue> | Array<Record<string, CategoryScoreValue>>
 
 export interface GradingResponse {
   repo_slug?: string
   health_score?: number
-  category_scores?: CategoryScoresPayload
+  category_scores?: CategoryScoresPayload | null
+  criteria?: CategoryScoresPayload | null
   category_data?: Record<string, unknown>
   missing_data?: Record<string, unknown> | string[]
   graded_at?: string
@@ -31,7 +40,7 @@ export interface RecommendationItemResponse {
 
 export interface RecommendationsResponse {
   status: GradeStatus
- reccomendations?: RecommendationItemResponse[]
+  reccomendations?: RecommendationItemResponse[]
   recommendations?: RecommendationItemResponse[]
 }
 
@@ -50,7 +59,10 @@ export interface SourceCraftRepository {
   visibility: "public" | "internal" | "private"
   web_url?: string
   last_updated?: string
-  language?: { name?: string; color?: string }
+  language?: {
+    name?: string
+    color?: string
+  }
   counters?: {
     forks?: string
     pull_requests?: string
@@ -61,7 +73,10 @@ export interface SourceCraftRepository {
   rating?: {
     value?: number
     percentile?: number
-    reaction_counts?: Array<{ type?: string; count?: string }>
+    reaction_counts?: Array<{
+      type?: string
+      count?: string
+    }>
   }
 }
 

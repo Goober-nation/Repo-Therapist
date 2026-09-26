@@ -1,0 +1,38 @@
+# Recommendation catalog — one entry per metric ID, appended to a repo's recommendation list
+# whenever that metric scores below perfect (see internal/scoring/recommendations.go). First
+# draft only, written from each metric's own doc description in docs/grading/ — needs review
+# before treating as real user-facing copy, not yet calibrated against real repo feedback.
+
+# --- Activity (docs/grading/activity.md) ---
+commits_per_week: "Commit activity is low relative to a healthy pace for this repo. Consider whether ownership or contribution barriers are slowing regular changes."
+days_since_last_activity: "This repo hasn't been committed to recently. If it's still active, a recent commit (even a small one) would reflect that."
+unique_contributors: "Few distinct contributors are making commits. Relying on a small group increases risk if any of them become unavailable."
+issue_rate_per_week: "Few issues are being opened relative to a healthy pace. Low issue activity can mean low visibility into real problems, not necessarily a healthy backlog."
+milestones_per_year: "Milestones are created infrequently. Regular milestones help communicate project direction and progress to users and contributors."
+days_since_last_milestone: "It's been a while since the last milestone was closed. A recent milestone helps show the project is progressing toward concrete goals."
+top_contributor_share: "Commits are concentrated in one contributor. This is a bus-factor risk — consider spreading ownership across more people."
+
+# --- Issues (docs/grading/issues.md) ---
+abandoned_share: "A large share of open issues haven't been touched in a long time. Triaging or closing stale issues improves backlog health and contributor trust."
+median_closure_days: "Issues are taking a long time to close on average. Faster triage and resolution improves contributor experience."
+growth_ratio: "Issues are being opened faster than they're being closed. Left unchecked, this grows an unmanageable backlog."
+share_resolved: "A low share of the issue backlog is getting resolved. Consider dedicating time to closing out older issues."
+
+# --- Code health (docs/grading/code-health.md) ---
+median_marker_age: "TODO/FIXME markers in this codebase tend to sit for a long time before being addressed. Consider periodically reviewing and resolving old markers."
+density_per_kloc: "This codebase has a high density of TODO/FIXME markers relative to its size. Consider paying down some of this tracked technical debt."
+share_stale_markers: "A large share of TODO/FIXME markers are old relative to what's typical. These may be worth revisiting — an old marker can mean forgotten, not just low-priority."
+worst_file_concentration: "TODO/FIXME markers are heavily concentrated in a single file. That file may be a good candidate for a focused cleanup or refactor."
+
+# --- Security (docs/grading/security.md; metric IDs hardcoded in internal/scoring/security.go) ---
+open_critical: "There are open critical-severity findings. These represent the most urgent security risk and should be prioritized."
+open_high: "There are open high-severity findings. These should be addressed soon after any critical findings."
+open_medium: "There are open medium-severity findings worth scheduling time to address."
+open_low: "There are open low-severity findings. Not urgent, but worth tracking so they don't accumulate."
+days_since_last_scan: "It's been a while since the last security scan. Running a fresh scan ensures the findings reflect the current state of the code."
+
+# --- CI/CD (docs/grading/ci-cd.md) ---
+has_ci: "No CI pipeline was found. Adding a .sourcecraft/ci.yaml that builds and tests every change catches regressions before they reach the main branch."
+ci_success_rate: "A large share of CI runs are failing. Fixing or quarantining the failing checks keeps CI a trustworthy signal instead of noise."
+ci_stability_trend: "CI has been failing more often recently than before. Look at what changed in the recent failing runs before the failures become normal."
+ci_median_duration_min: "CI runs take a long time. Caching dependencies or splitting slow jobs shortens the feedback loop for contributors."

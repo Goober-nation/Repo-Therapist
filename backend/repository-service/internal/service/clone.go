@@ -15,9 +15,11 @@ import (
 	"strings"
 	"time"
 
+	"repo-therapist/repository-service/internal/cidata"
 	"repo-therapist/repository-service/internal/gitlog"
 	"repo-therapist/repository-service/internal/scwrapper"
 	"repo-therapist/repository-service/internal/storage"
+	"repo-therapist/repository-service/internal/todomarkers"
 )
 
 // Result carries everything the Kafka listen-mode needs to build a repo.ready message — the
@@ -29,14 +31,16 @@ type Result struct {
 	CommitCount     int
 	IssueCount      int
 	MilestoneCount  int
+	TodoMarkerCount int
 }
 
 // CloneAndUpload is the shared entry point for both the one-shot CLI path and the Kafka listen
-// loop (via transport.handleRequest).
-func CloneAndUpload(ctx context.Context, org, repo string) (*Result, error) {
-	pat := os.Getenv("SOURCECRAFT_PAT")
-	if pat == "" {
-		return nil, fmt.Errorf("SOURCECRAFT_PAT environment variable is required")
+// loop (via transport.handleRequest). token is the caller's SourceCraft PAT; empty falls back to
+// the service's own SOURCECRAFT_PAT.
+func CloneAndUpload(ctx context.Context, org, repo, token string) (*Result, error) {
+	pat, err := resolvePAT(token)
+	if err != nil {
+		return nil, err
 	}
 
 	scClient, err := scwrapper.Dial(envOrDefault("SC_WRAPPER_ADDR", "localhost:8083"), pat)
@@ -113,6 +117,37 @@ func CloneAndUpload(ctx context.Context, org, repo string) (*Result, error) {
 		return nil, fmt.Errorf("uploading commit history: %w", err)
 	}
 
+	log.Printf("scanning for TODO/FIXME markers in %s", tmpDir)
+	todoExport, err := todomarkers.Scan(ctx, tmpDir, historyDays)
+	if err != nil {
+		return nil, fmt.Errorf("scanning todo markers: %w", err)
+	}
+	todoJSON, err := json.Marshal(todoExport)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling todo markers: %w", err)
+	}
+	if err := s3Client.PutObject(ctx, keyPrefix+"/_meta/todo-markers.json", todoJSON, "application/json"); err != nil {
+		return nil, fmt.Errorf("uploading todo markers: %w", err)
+	}
+
+	// CI/CD export: a runs fetch failure (typically 403 — /cicd/runs needs owner access) is not
+	// fatal, it's recorded as runs_available=false and CI/CD grades as no-data.
+	ciExport := cidata.Export{ConfigFiles: cidata.DetectConfigs(tmpDir), Runs: []scwrapper.CIRun{}}
+	log.Printf("fetching CI runs for %s/%s", org, repo)
+	if runs, err := scClient.GetCICDRuns(ctx, repoID); err != nil {
+		log.Printf("CI runs unavailable for %s/%s: %v (CI/CD will be no-data)", org, repo, err)
+	} else {
+		ciExport.RunsAvailable = true
+		ciExport.Runs = cidata.SelectRuns(runs, time.Now(), cidata.WindowDays, cidata.MaxRuns)
+	}
+	ciJSON, err := json.Marshal(ciExport)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling CI runs: %w", err)
+	}
+	if err := s3Client.PutObject(ctx, keyPrefix+"/_meta/ci-runs.json", ciJSON, "application/json"); err != nil {
+		return nil, fmt.Errorf("uploading CI runs: %w", err)
+	}
+
 	log.Printf("fetching issues for %s/%s", org, repo)
 	issues, err := scClient.GetIssues(ctx, repoID)
 	if err != nil {
@@ -146,7 +181,18 @@ func CloneAndUpload(ctx context.Context, org, repo string) (*Result, error) {
 		CommitCount:     len(commits),
 		IssueCount:      len(issues),
 		MilestoneCount:  len(milestones),
+		TodoMarkerCount: len(todoExport.Markers),
 	}, nil
+}
+
+func resolvePAT(token string) (string, error) {
+	if token != "" {
+		return token, nil
+	}
+	if pat := os.Getenv("SOURCECRAFT_PAT"); pat != "" {
+		return pat, nil
+	}
+	return "", fmt.Errorf("no request token and SOURCECRAFT_PAT environment variable is not set")
 }
 
 // authenticatedCloneURL injects the PAT into an HTTPS clone URL as basic-auth credentials.

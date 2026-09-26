@@ -1,5 +1,5 @@
 // Package config defines and loads the Repo Health Score grading policy schema
-// (docs/grading-policy.md, config/grading.yaml). Every metric is layered: a `source` (which S3
+// (docs/grading/00-overview.md, config/grading.yaml). Every metric is layered: a `source` (which S3
 // _meta/*.json file), an `aggregation` (raw timestamped events -> one number), and a `formula`
 // (that number -> a 0-1 score) — each independently swappable, which is what lets a future
 // formula or aggregation type (e.g. time-decay) be added without touching existing metric
@@ -45,6 +45,9 @@ type AggregationConfig struct {
 	WindowDays    int    `yaml:"window_days"`
 	Field         string `yaml:"field"`
 	MinSampleSize int    `yaml:"min_sample_size"`
+	// StalenessDays is abandoned_share's "untouched for N days" threshold — distinct from
+	// WindowDays (which issues to consider at all).
+	StalenessDays int `yaml:"staleness_days"`
 }
 
 type FormulaConfig struct {

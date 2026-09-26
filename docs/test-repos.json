@@ -1,0 +1,171 @@
+{
+  "discovered": "2026-09-26",
+  "criteria": "full crawl of 28237 public repos; >=10 issues; updated within 180 days; >=5 resolved issues created within 180 days; >=5 open issues; >=1 milestone; all graded through the full pipeline",
+  "repos": [
+    {
+      "org": "itmo-do",
+      "repo": "antifraud",
+      "sourcecraft_uuid": "019e82c2-2ef4-7bf7-b41e-82ccee32cec4",
+      "language": "Python",
+      "issues_at_discovery": 108,
+      "resolved_issues_created_within_180d": 82,
+      "open_issues_at_discovery": 26,
+      "milestones_at_discovery": 3,
+      "public_score_2026_09_26": 76,
+      "no_data_metrics_2026_09_26": [
+        "code_health.median_marker_age",
+        "code_health.share_stale_markers",
+        "code_health.worst_file_concentration"
+      ]
+    },
+    {
+      "org": "imbok",
+      "repo": "uims-portal",
+      "sourcecraft_uuid": "01a00b46-598e-746d-a234-d5bd3b3f0550",
+      "language": "SQLPL",
+      "issues_at_discovery": 61,
+      "resolved_issues_created_within_180d": 5,
+      "open_issues_at_discovery": 56,
+      "milestones_at_discovery": 15,
+      "public_score_2026_09_26": 79,
+      "no_data_metrics_2026_09_26": []
+    },
+    {
+      "org": "a-obraz60022006",
+      "repo": "mirea-trade",
+      "sourcecraft_uuid": "01a09c4f-54b1-71d9-af7b-3eba0c74f4e1",
+      "language": null,
+      "issues_at_discovery": 19,
+      "resolved_issues_created_within_180d": 8,
+      "open_issues_at_discovery": 11,
+      "milestones_at_discovery": 8,
+      "public_score_2026_09_26": 77,
+      "no_data_metrics_2026_09_26": [
+        "activity.top_contributor_share",
+        "code_health.median_marker_age",
+        "code_health.share_stale_markers",
+        "code_health.worst_file_concentration"
+      ]
+    },
+    {
+      "org": "pelmenya",
+      "repo": "pixel-tanks",
+      "sourcecraft_uuid": "01a01ab8-2d02-7416-afbc-16d055c94341",
+      "language": "TypeScript",
+      "issues_at_discovery": 384,
+      "resolved_issues_created_within_180d": 328,
+      "open_issues_at_discovery": 56,
+      "milestones_at_discovery": 82,
+      "public_score_2026_09_26": 86,
+      "no_data_metrics_2026_09_26": [
+        "code_health.median_marker_age",
+        "code_health.share_stale_markers",
+        "code_health.worst_file_concentration"
+      ]
+    },
+    {
+      "org": "bamsbamsentertaiment",
+      "repo": "mobiledev",
+      "sourcecraft_uuid": "019c9fcb-3fd7-731a-b19b-b6863b96a3cd",
+      "language": "Dart",
+      "issues_at_discovery": 30,
+      "resolved_issues_created_within_180d": 19,
+      "open_issues_at_discovery": 11,
+      "milestones_at_discovery": 3,
+      "public_score_2026_09_26": 74,
+      "no_data_metrics_2026_09_26": [
+        "code_health.median_marker_age",
+        "code_health.share_stale_markers",
+        "code_health.worst_file_concentration"
+      ]
+    },
+    {
+      "org": "lidermajor",
+      "repo": "ai-agents-studio",
+      "sourcecraft_uuid": "019e41b7-e083-7b29-af3c-a3e5e8a63491",
+      "language": "Python",
+      "issues_at_discovery": 44,
+      "resolved_issues_created_within_180d": 39,
+      "open_issues_at_discovery": 5,
+      "milestones_at_discovery": 2,
+      "public_score_2026_09_26": 56,
+      "no_data_metrics_2026_09_26": []
+    },
+    {
+      "org": "lexxi-0",
+      "repo": "template",
+      "sourcecraft_uuid": "019eb709-f6b7-748d-bcdd-b58bfc113f44",
+      "language": "Python",
+      "issues_at_discovery": 18,
+      "resolved_issues_created_within_180d": 9,
+      "open_issues_at_discovery": 9,
+      "milestones_at_discovery": 1,
+      "public_score_2026_09_26": 80,
+      "no_data_metrics_2026_09_26": [
+        "code_health.median_marker_age",
+        "code_health.share_stale_markers",
+        "code_health.worst_file_concentration"
+      ]
+    },
+    {
+      "org": "angry-met",
+      "repo": "angry-met-platform",
+      "sourcecraft_uuid": "019f2df4-096d-718a-b46d-208258e06f44",
+      "language": "Java",
+      "issues_at_discovery": 13,
+      "resolved_issues_created_within_180d": 5,
+      "open_issues_at_discovery": 8,
+      "milestones_at_discovery": 4,
+      "public_score_2026_09_26": 63,
+      "no_data_metrics_2026_09_26": [
+        "code_health.median_marker_age",
+        "code_health.share_stale_markers",
+        "code_health.worst_file_concentration"
+      ]
+    },
+    {
+      "org": "team23",
+      "repo": "mobile-ios",
+      "sourcecraft_uuid": "019fdc49-f9eb-77e0-bf1f-daa13f30d45c",
+      "language": "Swift",
+      "issues_at_discovery": 23,
+      "resolved_issues_created_within_180d": 11,
+      "open_issues_at_discovery": 12,
+      "milestones_at_discovery": 1,
+      "public_score_2026_09_26": 83,
+      "no_data_metrics_2026_09_26": [
+        "code_health.median_marker_age",
+        "code_health.share_stale_markers",
+        "code_health.worst_file_concentration"
+      ]
+    },
+    {
+      "org": "pelmenya",
+      "repo": "ralph",
+      "sourcecraft_uuid": "01a0196d-a013-7c22-ad8b-a9f31bcc9cb2",
+      "language": "TypeScript",
+      "issues_at_discovery": 69,
+      "resolved_issues_created_within_180d": 23,
+      "open_issues_at_discovery": 46,
+      "milestones_at_discovery": 5,
+      "public_score_2026_09_26": 77,
+      "no_data_metrics_2026_09_26": [
+        "code_health.median_marker_age",
+        "code_health.share_stale_markers",
+        "code_health.worst_file_concentration"
+      ]
+    },
+    {
+      "org": "pelmenya",
+      "repo": "repo-vitals",
+      "sourcecraft_uuid": "01a0adf2-0c4e-7c41-ac60-398949eda712",
+      "language": "TypeScript",
+      "issues_at_discovery": 317,
+      "resolved_issues_created_within_180d": 258,
+      "open_issues_at_discovery": 59,
+      "milestones_at_discovery": 56,
+      "public_score_2026_09_26": 92,
+      "no_data_metrics_2026_09_26": []
+    }
+  ]
+}

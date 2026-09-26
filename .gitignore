@@ -27,6 +27,8 @@
 !go.work
 !go.work.sum
 
+# protobuf (source contract for generated *.pb.go — the allowlist missed this type)
+!*.proto
 # python LLM service
 !*.py
 
@@ -62,6 +64,9 @@
 
 # project markdown (AGENTS.md, etc.)
 !*.md
+
+# shell scripts (scripts/mock-repos etc.)
+!*.sh
 
 # --- re-ignore: personal/local files that would otherwise match the allowlist above ---
 backlog/

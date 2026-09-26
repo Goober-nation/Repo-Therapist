@@ -12,6 +12,7 @@ corepack pnpm dev
 Проверки:
 
 ```bash
+corepack pnpm test
 corepack pnpm exec tsc --noEmit
 corepack pnpm run build
 ```

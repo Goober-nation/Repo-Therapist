@@ -68,14 +68,19 @@ func (c *Client) GetGitURL(ctx context.Context, repoID string) (GitURLs, error) 
 	return GitURLs{HTTPURL: resp.GetHttpUrl(), SSHURL: resp.GetSshUrl()}, nil
 }
 
-// Issue is the subset of the wrapper's Issue message Activity's issue-rate metric needs.
+// Issue is the subset of the wrapper's Issue message Activity's and Issues' metrics need.
+// StatusType is the fixed backend lifecycle enum (initial/in_progress/paused/completed/
+// cancelled — see sourcecraft-wrapper-service's IssueStatus.status_type), not the per-repo
+// customizable Status slug/name — Issues category metrics key off StatusType since a repo's own
+// slug/name for "closed" isn't guaranteed consistent across repos/orgs.
 type Issue struct {
-	ID        string `json:"id"`
-	Slug      string `json:"slug"`
-	Title     string `json:"title"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	ID         string `json:"id"`
+	Slug       string `json:"slug"`
+	Title      string `json:"title"`
+	Status     string `json:"status"`
+	StatusType string `json:"status_type"`
+	CreatedAt  string `json:"created_at"`
+	UpdatedAt  string `json:"updated_at"`
 }
 
 // GetIssues fetches every issue for a repo, following the wrapper's page tokens.
@@ -87,12 +92,13 @@ func (c *Client) GetIssues(ctx context.Context, repoID string) ([]Issue, error) 
 	issues := make([]Issue, 0, len(resp.GetIssues()))
 	for _, i := range resp.GetIssues() {
 		issues = append(issues, Issue{
-			ID:        i.GetId(),
-			Slug:      i.GetSlug(),
-			Title:     i.GetTitle(),
-			Status:    i.GetStatus().GetSlug(),
-			CreatedAt: timestampRFC3339(i.GetCreatedAt()),
-			UpdatedAt: timestampRFC3339(i.GetUpdatedAt()),
+			ID:         i.GetId(),
+			Slug:       i.GetSlug(),
+			Title:      i.GetTitle(),
+			Status:     i.GetStatus().GetSlug(),
+			StatusType: i.GetStatus().GetStatusType(),
+			CreatedAt:  timestampRFC3339(i.GetCreatedAt()),
+			UpdatedAt:  timestampRFC3339(i.GetUpdatedAt()),
 		})
 	}
 	return issues, nil
@@ -127,6 +133,52 @@ func (c *Client) GetMilestones(ctx context.Context, repoID string) ([]Milestone,
 		})
 	}
 	return milestones, nil
+}
+
+// CIRun is the subset of the wrapper's Run message CI/CD's metrics need (docs/grading/ci-cd.md).
+// Status is SourceCraft's Run.Status enum (created/prepared/processing/success/failed/canceled/
+// timeout/skipped/awaiting_approval/rejected).
+type CIRun struct {
+	Slug       string `json:"slug"`
+	Status     string `json:"status"`
+	EventType  string `json:"event_type"`
+	CreatedAt  string `json:"created_at"`
+	StartedAt  string `json:"started_at"`
+	FinishedAt string `json:"finished_at"`
+}
+
+// GetCICDRuns fetches the first page of a repo's CI runs, newest first. The underlying
+// /cicd/runs endpoint only answers for a token with owner-level access — any error here
+// (including that 403, which the wrapper currently surfaces as a generic Internal) means "runs
+// unavailable", not "no runs".
+func (c *Client) GetCICDRuns(ctx context.Context, repoID string) ([]CIRun, error) {
+	resp, err := c.rpc.GetCiCDRuns(c.authed(ctx), &gen.GetCiCDRunsRequest{RepoId: repoID})
+	if err != nil {
+		return nil, err
+	}
+	runs := make([]CIRun, 0, len(resp.GetRuns()))
+	for _, r := range resp.GetRuns() {
+		d := r.GetDates()
+		runs = append(runs, CIRun{
+			Slug:       r.GetSlug(),
+			Status:     r.GetStatus(),
+			EventType:  r.GetEventType(),
+			CreatedAt:  runTimestamp(d.GetCreatedAt()),
+			StartedAt:  runTimestamp(d.GetStartedAt()),
+			FinishedAt: runTimestamp(d.GetFinishedAt()),
+		})
+	}
+	return runs, nil
+}
+
+// runTimestamp is timestampRFC3339 plus one CI-specific rule: SourceCraft reports a queued run's
+// (status "prepared") started_at/finished_at as 1970-01-01T00:00:00Z rather than omitting them
+// (seen live, 2026-09-26) — treated as absent so it can never be mistaken for a real time.
+func runTimestamp(ts *timestamppb.Timestamp) string {
+	if ts == nil || ts.AsTime().Unix() <= 0 {
+		return ""
+	}
+	return timestampRFC3339(ts)
 }
 
 func timestampRFC3339(ts *timestamppb.Timestamp) string {

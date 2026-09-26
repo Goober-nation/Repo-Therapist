@@ -3,7 +3,7 @@ package scoring
 import "repo-therapist/grade-service/internal/config"
 
 // applyFormula maps an aggregated raw value to a score in [0,1]. This is the one place every
-// metric's "value -> score" logic lives, regardless of category — see docs/grading-policy.md
+// metric's "value -> score" logic lives, regardless of category — see docs/grading/00-overview.md
 // principle 1 for why a single formula family (vs. the original draft's mix of log/linear) matters.
 func applyFormula(cfg config.FormulaConfig, x float64) float64 {
 	switch cfg.Type {
@@ -12,10 +12,9 @@ func applyFormula(cfg config.FormulaConfig, x float64) float64 {
 	case "band":
 		return band(x, cfg.HealthyLow, cfg.HealthyHigh, cfg.CriticalLow, cfg.CriticalHigh)
 	case "gate":
-		// Pass-through: x is expected to already be 0 or 1. combine.go does not yet implement
-		// gate's "zero the whole category on failure" side effect (no calculated metric uses
-		// this formula type yet — CI/CD's has_ci gate, when built, will need it). Tracked in
-		// backlog/phase-2-grade-service.md, not silently forgotten.
+		// Pass-through: x is expected to already be 0 or 1. The "zero the whole category on
+		// failure" side effect is applied by the category that uses a gate — currently only
+		// CI/CD's has_ci, in cicd.go's ComputeCICD — not by combineWeighted.
 		return clamp01(x)
 	default:
 		return 0

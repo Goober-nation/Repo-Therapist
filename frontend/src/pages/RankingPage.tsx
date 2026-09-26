@@ -2,11 +2,15 @@ import { useMemo, useState } from "react"
 import { Badge, Button, Card, PageHeading } from "../components/Shell"
 import { getHealthLabel, getLastActivityLabel } from "../mocks/demoData"
 import type { RepositorySummary } from "../types"
+import { getCategoryScore } from "../metrics"
 
 type RankingView = "overall" | "growing" | "security" | "issues"
 type SortOption = "health-desc" | "health-asc" | "likes-desc" | "activity-recent"
 
-const rankingViews: { id: RankingView; label: string }[] = [
+const rankingViews: {
+  id: RankingView
+  label: string
+}[] = [
   { id: "overall", label: "Общий рейтинг" },
   { id: "growing", label: "Быстрый рост" },
   { id: "security", label: "Безопасность" },
@@ -41,12 +45,15 @@ function sortRepositories(
           right.trend - left.trend
       : view === "security"
         ? (left: RepositorySummary, right: RepositorySummary) =>
-            right.categoryScores.security.score -
-            left.categoryScores.security.score
+            (getCategoryScore(right.categoryScores, "security", "appsec") ??
+              -1) -
+            (getCategoryScore(left.categoryScores, "security", "appsec") ?? -1)
         : view === "issues"
           ? (left: RepositorySummary, right: RepositorySummary) =>
-              right.categoryScores.issues.score -
-              left.categoryScores.issues.score
+              (getCategoryScore(right.categoryScores, "issues", "community") ??
+                -1) -
+              (getCategoryScore(left.categoryScores, "issues", "community") ??
+                -1)
           : sortComparators[sort]
 
   return repositories.sort(
@@ -92,8 +99,12 @@ export default function RankingPage({
         matchesSearch &&
         matchesLanguage &&
         repository.healthScore >= minimumHealth &&
-        repository.categoryScores.activity.score >= minimumActivity &&
-        repository.categoryScores.security.score >= minimumSecurity
+        (minimumActivity === 0 ||
+          (getCategoryScore(repository.categoryScores, "activity") ?? -1) >=
+            minimumActivity) &&
+        (minimumSecurity === 0 ||
+          (getCategoryScore(repository.categoryScores, "security", "appsec") ??
+            -1) >= minimumSecurity)
       )
     })
 
@@ -287,7 +298,13 @@ export default function RankingPage({
                 <span>
                   {getLastActivityLabel(repository.lastActivityDaysAgo)}
                 </span>
-                <span>{repository.categoryScores.security.score}</span>
+                <span>
+                  {getCategoryScore(
+                    repository.categoryScores,
+                    "security",
+                    "appsec",
+                  ) ?? "—"}
+                </span>
                 <span>
                   <Badge tone={getStatusTone(repository.healthScore)}>
                     {getHealthLabel(repository.healthScore)}

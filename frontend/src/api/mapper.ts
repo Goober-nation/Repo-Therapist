@@ -1,63 +1,56 @@
-import type { MetricId, MetricResult, RepositorySummary } from "../types"
+import type { CategoryScores, MetricResult, RepositorySummary } from "../types"
 import type {
-  CategoryScoresPayload,
   GradingResponse,
   RecommendationItemResponse,
   RecommendationsResponse,
   SourceCraftRepository,
 } from "./contracts"
 
-const metricAliases: Record<string, MetricId> = {
-  activity: "activity",
-  code: "codeHealth",
-  code_health: "codeHealth",
-  codehealth: "codeHealth",
-  security: "security",
-  appsec: "security",
-  ci: "ciCd",
-  cicd: "ciCd",
-  ci_cd: "ciCd",
-  documentation: "documentation",
-  docs: "documentation",
-  issues: "issues",
-  community: "issues",
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-const defaultMetricIds: MetricId[] = [
-  "activity",
-  "codeHealth",
-  "security",
-  "ciCd",
-  "documentation",
-  "issues",
-]
+function optionalText(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined
+}
 
-function emptyMetricResults(): Record<MetricId, MetricResult> {
+export function normalizeCategoryScores(payload?: unknown): CategoryScores {
+  const groups = Array.isArray(payload) ? payload : [payload]
+  const entries = groups.flatMap((group) =>
+    isRecord(group) ? Object.entries(group) : [],
+  )
+
   return Object.fromEntries(
-    defaultMetricIds.map((metricId) => [metricId, { score: 0, trend: null }]),
-  ) as Record<MetricId, MetricResult>
+    entries.map(([name, value]) => {
+      const details = isRecord(value) ? value : undefined
+      const rawScore = details ? details.score : value
+      const score =
+        typeof rawScore === "number" &&
+        Number.isFinite(rawScore) &&
+        rawScore >= 0 &&
+        rawScore <= 100
+          ? Math.round(rawScore)
+          : null
+      const result: MetricResult = {
+        score,
+        trend:
+          typeof details?.trend === "number" && Number.isFinite(details.trend)
+            ? details.trend
+            : null,
+      }
+      const displayName = optionalText(details?.name)
+      const description = optionalText(details?.description)
+      if (displayName) result.name = displayName
+      if (description) result.description = description
+      return [name, result]
+    }),
+  )
 }
 
-export function normalizeCategoryScores(
-  payload?: CategoryScoresPayload,
-): Record<MetricId, MetricResult> {
-  const result = emptyMetricResults()
-  if (!payload) return result
-
-  const entries = Array.isArray(payload)
-    ? payload.flatMap((item) => Object.entries(item))
-    : Object.entries(payload)
-  for (const [rawName, rawScore] of entries) {
-    const metricId =
-      metricAliases[rawName.trim().toLocaleLowerCase().replace(/\s+/g, "_")]
-    if (!metricId || typeof rawScore !== "number" || !Number.isFinite(rawScore))
-      continue
-    result[metricId] = {
-      score: Math.max(0, Math.min(100, Math.round(rawScore))),
-      trend: null,
-    }
-  }
-  return result
+function categoryPayload(grading?: GradingResponse) {
+  return grading?.category_scores !== undefined
+    ? grading.category_scores
+    : grading?.criteria
 }
 
 function parseCount(value?: string): number {
@@ -79,7 +72,7 @@ export function repositoryFromSourceCraft(
   repository: SourceCraftRepository,
   grading?: GradingResponse,
 ): RepositorySummary {
-  const categoryScores = normalizeCategoryScores(grading?.category_scores)
+  const categoryScores = normalizeCategoryScores(categoryPayload(grading))
   const healthScore =
     typeof grading?.health_score === "number"
       ? Math.round(grading.health_score)
@@ -142,9 +135,10 @@ export function mergeGradingIntoRepository(
   return {
     ...repository,
     healthScore,
-    categoryScores: grading.category_scores
-      ? normalizeCategoryScores(grading.category_scores)
-      : repository.categoryScores,
+    categoryScores:
+      categoryPayload(grading) !== undefined || grading.status === "FINISHED"
+        ? normalizeCategoryScores(categoryPayload(grading))
+        : repository.categoryScores,
     gradeStatus: grading.status,
     gradedAt: grading.graded_at ?? repository.gradedAt,
     missingData: grading.missing_data

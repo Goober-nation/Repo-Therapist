@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package security_wrapper;
+
+option go_package = "repo-therapist/security-wrapper-service/internal/transport/gen;pb";
+
+import "google/protobuf/timestamp.proto";
+
+service SecurityWrapper {
+  // GetAppsecResult fetches AppSec scan/defect data for one repo. The caller's SourceCraft PAT
+  // is read from the "authorization" gRPC metadata key, never from the request body.
+  rpc GetAppsecResult(GetAppsecResultRequest) returns (GetAppsecResultResponse);
+}
+
+message GetAppsecResultRequest {
+  // Repo's SourceCraft UUID (or internal numeric-string ID) — the AppSec API's gitRepo param.
+  string git_repo = 1;
+}
+
+message GetAppsecResultResponse {
+  // False when the repo has never been scanned — every other field is unset in that case.
+  bool has_scan = 1;
+
+  ScanSummary scan = 2;
+  SeverityCounts open_counts = 3;
+  repeated DefectGroupSummary defect_groups = 4;
+}
+
+message ScanSummary {
+  string uuid = 1;
+  string status = 2;
+  string scan_type = 3;
+  string commit_hash = 4;
+  google.protobuf.Timestamp time_started = 5;
+  google.protobuf.Timestamp time_finished = 6;
+  int64 total_defect_groups = 7;
+  int64 found_defect_groups = 8;
+  int64 open_defect_groups = 9;
+}
+
+message SeverityCounts {
+  int64 critical = 1;
+  int64 high = 2;
+  int64 medium = 3;
+  int64 low = 4;
+}
+
+message DefectGroupSummary {
+  string rule_id = 1;
+  string rule_name = 2;
+  string severity = 3;
+  string file = 4;
+  int32 start_line = 5;
+  int32 end_line = 6;
+  string message = 7;
+}

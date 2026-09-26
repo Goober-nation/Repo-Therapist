@@ -1,5 +1,5 @@
 # Repo Health Score grading policy — machine-readable config.
-# See docs/grading-policy.md for the full rationale behind every choice here.
+# See docs/grading/ for the full rationale behind every choice here (one file per category, docs/grading/00-overview.md for cross-cutting design).
 #
 # Per-metric/category `status`: "calculated" | "not_calculated" — a config-time toggle, distinct
 # from a metric having no data for a particular repo at runtime. Both are treated identically at
@@ -18,7 +18,7 @@ categories:
     metrics:
       - id: commits_per_week
         status: calculated
-        weight: 0.20
+        weight: 0.25
         source: commits.json
         aggregation:
           type: rate_per_week
@@ -68,8 +68,12 @@ categories:
         formula:
           type: linear_clamp
           direction: "+"
-          critical: 0.2
-          healthy: 2
+          # Recalibrated 2026-09-25 against real data (20 repos, incl. large orgs like
+          # gravity-ui/datalens/postgres forks): median and p75 were both exactly 0, max 0.117 —
+          # the old critical:0.2/healthy:2 meant nobody ever cleared critical at all, zero
+          # discrimination. See agents_memory/topics/threshold-calibration-data.md.
+          critical: 0.02
+          healthy: 0.15
           provisional: true
 
       - id: milestones_per_year
@@ -82,8 +86,12 @@ categories:
         formula:
           type: linear_clamp
           direction: "+"
-          critical: 1
-          healthy: 6
+          # Recalibrated 2026-09-25: same finding as issue_rate_per_week — median 0, p75 0, max 4
+          # across 20 real repos (milestones are lightly used platform-wide, not something most
+          # real repos, including large orgs, are "failing" at). See
+          # agents_memory/topics/threshold-calibration-data.md.
+          critical: 0
+          healthy: 3
           provisional: true
 
       - id: days_since_last_milestone
@@ -117,41 +125,251 @@ categories:
           healthy: 0.5
           provisional: true
 
-      - id: net_lines_per_week
-        status: calculated
-        weight: 0.05
-        source: commits.json
-        aggregation:
-          type: rate_per_week
-          field: net_lines
-          window_days: 180
-        formula:
-          type: band
-          healthy_low: -2
-          healthy_high: 10
-          critical_low: -30
-          critical_high: 50
-          provisional: true
-
   code_health:
     weight: 0.20
     public: true
-    status: not_calculated
+    status: calculated
+    metrics:
+      # All four metrics read from todo-markers.json (repository-service's TODO/FIXME scan +
+      # git-blame age, see internal/todomarkers). min_sample_size: 5 on the three
+      # marker-count-dependent metrics (not density) — same reasoning as Activity/Issues' floors,
+      # a statistic over 1-4 markers is too noisy to score defensibly.
+      #
+      # "Oldest marker age" (this file's original draft column) was deliberately NOT
+      # implemented as a raw max — a max is an order statistic that skews older purely from
+      # having more markers sampled, which would penalize large repos vs small ones for no real
+      # quality difference. share_stale_markers (a ratio, same family as Issues'
+      # abandoned_share) replaces it — see docs/grading/code-health.md.
+      #
+      # 2026-09-25: real-repo testing found TODO age does NOT correlate with repo size (Spearman
+      # ~0 across 192 real markers) — so no size-based threshold is needed here. A per-repo
+      # commit-cadence-relative threshold was tried next and also reverted: the age/cadence ratio
+      # varied 64x across real repos tested, and using it would have penalized the fastest-moving,
+      # most actively-maintained repos hardest for the same or better absolute TODO age than
+      # slower ones — backwards from what's defensible. critical/healthy below are flat, but
+      # empirically calibrated: p90/p25 of the pooled real age distribution (242d median, 183d
+      # p25, 278d p75, 293d p90 — n=192 markers from 6 repos, see docs/grading/code-health.md's
+      # Design history), not a from-scratch guess.
+      - id: median_marker_age
+        status: calculated
+        weight: 0.25
+        source: todo-markers.json
+        aggregation:
+          type: median_marker_age
+          min_sample_size: 5
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 293
+          healthy: 183
+          provisional: true
+
+      - id: density_per_kloc
+        status: calculated
+        weight: 0.30
+        source: todo-markers.json
+        aggregation:
+          type: density_per_kloc
+          # No min_sample_size: 0 markers over a real, non-empty LOC count is a real, good (0)
+          # density, not a small-sample problem — see internal/scoring/codehealth.go's
+          # densityPerKLOC comment.
+        formula:
+          type: linear_clamp
+          direction: "-"
+          # Recalibrated 2026-09-25: max observed across 32 real repos tested (two batches, 5 to
+          # 17,651 files) was 2.01/kLOC — the old critical:20/healthy:1 meant almost every real
+          # repo scored ~1.0 here regardless of actual density, no discrimination. See
+          # agents_memory/topics/threshold-calibration-data.md.
+          critical: 3
+          healthy: 0.3
+          provisional: true
+
+      - id: share_stale_markers
+        status: calculated
+        weight: 0.25
+        source: todo-markers.json
+        aggregation:
+          type: share_stale_markers
+          # staleness_days: 293 — same p90 cutoff as median_marker_age's critical (see that
+          # metric's comment): a marker counts as "stale" once it's already in the worst ~10% of
+          # the real pooled age distribution. Not the same concept as Issues' 60d (a much more
+          # actively triaged artifact) — TODOs realistically sit far longer before that's a fair
+          # call.
+          staleness_days: 293
+          min_sample_size: 5
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 0.5
+          healthy: 0.05
+          provisional: true
+
+      - id: worst_file_concentration
+        status: calculated
+        weight: 0.20
+        source: todo-markers.json
+        aggregation:
+          type: worst_file_concentration
+          min_sample_size: 5
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 0.6
+          healthy: 0.15
+          provisional: true
 
   issues:
     weight: 0.15
     public: true
-    status: not_calculated
+    status: calculated
+    metrics:
+      # All four metrics key off StatusType (the fixed backend lifecycle enum), not the per-repo
+      # customizable status slug/name — see aggregation.go's isResolved comment.
+      # min_sample_size: 5 (provisional, not validated against real repos) on every metric below
+      # — a ratio/median over a handful of events swings too far on a single one to be a
+      # defensible score, same reasoning as Activity's top_contributor_share floor.
+      #
+      # 2026-09-22, external research (docs/grading/issues.md's "External validation" section):
+      # abandoned_share is NOT windowed by creation date (window_days doesn't apply to it) — it
+      # covers ALL currently-open issues, staleness measured from last-touched date. Every mature
+      # framework found (CHAOSS Issue Age, GitHub's own stale-bots) works this way; an earlier
+      # creation-windowed version made ancient never-touched issues invisible, the opposite of
+      # what "abandoned" should catch. growth_ratio/share_resolved instead count opened-in-window
+      # and closed-in-window as independent event tallies (CHAOSS's "Issues New"/"Issues Closed"
+      # pattern), decoupled from a shared creation cohort.
+      - id: abandoned_share
+        status: calculated
+        weight: 0.30
+        source: issues.json
+        aggregation:
+          type: abandoned_share
+          # staleness_days: 60, not the more intuitive 30 — matches GitHub's own actions/stale
+          # default, the most widely-tuned real-world expectation for "stale" we found, rather
+          # than a from-scratch guess.
+          staleness_days: 60
+          min_sample_size: 5
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 0.5
+          healthy: 0.05
+          provisional: true
+
+      - id: median_closure_days
+        status: calculated
+        weight: 0.25
+        source: issues.json
+        aggregation:
+          type: median_closure_days
+          window_days: 180
+          min_sample_size: 5
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 60
+          # healthy: 21, not 7 — the empirical average issue-resolution time across real repos
+          # (OpenSSF Scorecard research, ~30 days) is far above our original 7-day bar, meaning
+          # most well-run projects would never have reached "healthy." 21 splits the difference
+          # rather than jumping straight to the empirical average.
+          healthy: 21
+          provisional: true
+
+      - id: growth_ratio
+        status: calculated
+        weight: 0.20
+        source: issues.json
+        aggregation:
+          type: growth_ratio
+          window_days: 180
+          min_sample_size: 5
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 5
+          healthy: 1
+          provisional: true
+
+      - id: share_resolved
+        status: calculated
+        weight: 0.25
+        source: issues.json
+        aggregation:
+          type: share_resolved
+          window_days: 180
+          min_sample_size: 5
+        formula:
+          type: linear_clamp
+          direction: "+"
+          critical: 0.3
+          healthy: 0.9
+          provisional: true
 
   ci_cd:
     weight: 0.15
     public: false
-    status: not_calculated
+    status: calculated
+    # Source: _meta/ci-runs.json (repository-service): CI config files found in the clone + the
+    # newest <=25 runs from the last 180 days via /cicd/runs, which only answers for an owner
+    # token — unreadable runs make the whole category no-data. See docs/grading/ci-cd.md.
+    metrics:
+      # Hard gate: no .sourcecraft/ci.yaml AND zero runs -> whole category = 0. Weight 0: it never
+      # contributes to the weighted average, it only zeroes the category when it fails.
+      - id: has_ci
+        status: calculated
+        weight: 0
+        source: ci-runs.json
+        aggregation:
+          type: ci_has_ci
+        formula:
+          type: gate
+
+      - id: ci_success_rate
+        status: calculated
+        weight: 0.5
+        source: ci-runs.json
+        aggregation:
+          type: ci_success_rate
+          min_sample_size: 3
+        formula:
+          type: linear_clamp
+          direction: "+"
+          critical: 0.5
+          healthy: 0.9
+          provisional: true
+
+      # Newer half's pass share minus older half's, in [-1, 1]. 0 (stable) or better is healthy.
+      - id: ci_stability_trend
+        status: calculated
+        weight: 0.3
+        source: ci-runs.json
+        aggregation:
+          type: ci_stability_trend
+          min_sample_size: 6
+        formula:
+          type: linear_clamp
+          direction: "+"
+          critical: -0.3
+          healthy: 0
+          provisional: true
+
+      - id: ci_median_duration_min
+        status: calculated
+        weight: 0.2
+        source: ci-runs.json
+        aggregation:
+          type: ci_median_duration_min
+          min_sample_size: 3
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 30
+          healthy: 5
+          provisional: true
 
   security:
     weight: 0.20
     public: false
-    status: not_calculated
+    status: calculated
 
   documentation:
     weight: 0.15

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
+	url2 "net/url"
 	"sourcecraft-wrapper-service/internal/domain"
 	"strings"
 
@@ -17,12 +17,13 @@ import (
 const maxPages = 50
 
 type SCService interface {
-	GetRepoIdBySlugs(ctx context.Context, repoSlug string, orgSlug string) (string, error)
+	GetRepositoryBySlugs(ctx context.Context, repoSlug string, orgSlug string) (domain.Repository, error)
 	GetGitUrl(ctx context.Context, repoID string) (domain.CloneURL, error)
 	GetCiCdRuns(ctx context.Context, repoID string) (domain.Runs, error)
 	GetIssues(ctx context.Context, repoID string) (domain.Issues, error)
 	GetMilestones(ctx context.Context, repoID string) (domain.Milestones, error)
-	ListAllPublicReposId(ctx context.Context) ([]string, error)
+	ListAllPublicRepos(ctx context.Context) ([]domain.Repository, error)
+	GetMyRepos(ctx context.Context) (domain.MyRepositoriesResponse, error)
 }
 
 type SCWrapper struct {
@@ -37,40 +38,76 @@ func NewSCWrapperService(client http.Client, apiURL string) *SCWrapper {
 	}
 }
 
-func (scw *SCWrapper) GetRepoIdBySlugs(ctx context.Context, repoSlug, orgSlug string) (string, error) {
+func (scw *SCWrapper) GetRepositoryBySlugs(ctx context.Context, repoSlug string, orgSlug string) (domain.Repository, error) {
 	token, err := tokenFromContext(ctx)
 	if err != nil {
-		return "", fmt.Errorf("%w:%w", domain.ErrUnauthenticated, err)
-	}
-	url := fmt.Sprintf("%s/repos/%s/%s", scw.apiURL, orgSlug, repoSlug)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return "", fmt.Errorf("%w: %w", domain.ErrInternalError, err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := scw.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("%w: %w", domain.ErrExternalAPI, err)
-	}
-
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusNotFound {
-			return "", domain.ErrRepositoryNotFound
-		} else if resp.StatusCode == http.StatusForbidden {
-			return "", domain.ErrNoAccess
-		}
-		return "", fmt.Errorf(
-			"%w: external API returned status %s",
-			domain.ErrExternalAPI,
-			resp.Status,
+		return domain.Repository{}, fmt.Errorf(
+			"%w: %w",
+			domain.ErrUnauthenticated,
+			err,
 		)
 	}
-	var rr domain.RepositoryID
-	if err := json.NewDecoder(resp.Body).Decode(&rr); err != nil {
-		return "", fmt.Errorf("%w: %w", domain.ErrInternalError, err)
+
+	url := fmt.Sprintf(
+		"%s/repos/%s/%s",
+		scw.apiURL,
+		orgSlug,
+		repoSlug,
+	)
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		url,
+		nil,
+	)
+	if err != nil {
+		return domain.Repository{}, fmt.Errorf(
+			"%w: %w",
+			domain.ErrInternalError,
+			err,
+		)
 	}
-	return rr.RepoId, nil
+
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := scw.client.Do(req)
+	if err != nil {
+		return domain.Repository{}, fmt.Errorf(
+			"%w: %w",
+			domain.ErrExternalAPI,
+			err,
+		)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		switch resp.StatusCode {
+		case http.StatusNotFound:
+			return domain.Repository{}, domain.ErrRepositoryNotFound
+
+		case http.StatusForbidden:
+			return domain.Repository{}, domain.ErrNoAccess
+
+		default:
+			return domain.Repository{}, fmt.Errorf(
+				"%w: external API returned status %s",
+				domain.ErrExternalAPI,
+				resp.Status,
+			)
+		}
+	}
+
+	var repo domain.Repository
+	if err := json.NewDecoder(resp.Body).Decode(&repo); err != nil {
+		return domain.Repository{}, fmt.Errorf(
+			"%w: %w",
+			domain.ErrInternalError,
+			err,
+		)
+	}
+
+	return repo, nil
 }
 
 func (scw *SCWrapper) GetGitUrl(ctx context.Context, repoID string) (domain.CloneURL, error) {
@@ -204,7 +241,7 @@ func (scw *SCWrapper) GetMilestones(ctx context.Context, repoID string) (domain.
 // ("" if this was the last page).
 func (scw *SCWrapper) getPage(ctx context.Context, token, path, pageToken string, out any, nextToken func() string) (string, error) {
 	u := scw.apiURL + path
-	params := url.Values{"page_size": {"100"}}
+	params := url2.Values{"page_size": {"100"}}
 	if pageToken != "" {
 		params.Set("page_token", pageToken)
 	}
@@ -234,43 +271,89 @@ func (scw *SCWrapper) getPage(ctx context.Context, token, path, pageToken string
 	return nextToken(), nil
 }
 
-func (scw *SCWrapper) ListAllPublicReposId(ctx context.Context) ([]string, error) {
+func (scw *SCWrapper) ListAllPublicRepos(
+	ctx context.Context,
+) ([]domain.Repository, error) {
 	token, err := tokenFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("%w:%w", domain.ErrUnauthenticated, err)
-	}
-	url := fmt.Sprintf("%s/repos", scw.apiURL)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", domain.ErrInternalError, err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := scw.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", domain.ErrExternalAPI, err)
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf(
-			"%w: external API returned status %s",
-			domain.ErrExternalAPI,
-			resp.Status,
+			"%w: %w",
+			domain.ErrUnauthenticated,
+			err,
 		)
 	}
-	var ids domain.RepositoriesID
 
-	if err := json.NewDecoder(resp.Body).Decode(&ids); err != nil {
-		return nil, fmt.Errorf("%w: %w", domain.ErrInternalError, err)
-	}
-	repoIDs := make([]string, 0, len(ids.Repositories))
+	var repositories []domain.Repository
+	pageToken := ""
 
-	for _, repo := range ids.Repositories {
-		repoIDs = append(repoIDs, repo.RepoId)
+	for page := 0; page < maxPages; page++ {
+		url := fmt.Sprintf("%s/repos", scw.apiURL)
+
+		if pageToken != "" {
+			url += "?page_token=" + url2.QueryEscape(pageToken)
+		}
+
+		req, err := http.NewRequestWithContext(
+			ctx,
+			http.MethodGet,
+			url,
+			nil,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"%w: %w",
+				domain.ErrInternalError,
+				err,
+			)
+		}
+
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp, err := scw.client.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"%w: %w",
+				domain.ErrExternalAPI,
+				err,
+			)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+
+			return nil, fmt.Errorf(
+				"%w: external API returned status %s",
+				domain.ErrExternalAPI,
+				resp.Status,
+			)
+		}
+
+		var result struct {
+			Repositories  []domain.Repository `json:"repositories"`
+			NextPageToken string              `json:"next_page_token"`
+		}
+
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		resp.Body.Close()
+
+		if err != nil {
+			return nil, fmt.Errorf(
+				"%w: %w",
+				domain.ErrInternalError,
+				err,
+			)
+		}
+
+		repositories = append(repositories, result.Repositories...)
+
+		if result.NextPageToken == "" {
+			break
+		}
+
+		pageToken = result.NextPageToken
 	}
-	return repoIDs, nil
+
+	return repositories, nil
 }
 
 func tokenFromContext(ctx context.Context) (string, error) {
@@ -298,4 +381,44 @@ func tokenFromContext(ctx context.Context) (string, error) {
 	}
 
 	return token, nil
+}
+
+func (scw *SCWrapper) GetMyRepos(ctx context.Context) (domain.MyRepositoriesResponse, error) {
+	token, err := tokenFromContext(ctx)
+	if err != nil {
+		return domain.MyRepositoriesResponse{}, fmt.Errorf("%w:%w", domain.ErrUnauthenticated, err)
+	}
+
+	basePath := "/me/repos"
+
+	var all domain.MyRepositoriesResponse
+	pageToken := ""
+
+	for page := 0; page < maxPages; page++ {
+		var rr domain.MyRepositoriesResponse
+
+		next, err := scw.getPage(
+			ctx,
+			token,
+			basePath,
+			pageToken,
+			&rr,
+			func() string {
+				return rr.NextPageToken
+			},
+		)
+		if err != nil {
+			return domain.MyRepositoriesResponse{}, err
+		}
+
+		all.Repositories = append(all.Repositories, rr.Repositories...)
+
+		if next == "" {
+			break
+		}
+
+		pageToken = next
+	}
+
+	return all, nil
 }

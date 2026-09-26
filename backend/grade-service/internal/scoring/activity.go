@@ -8,9 +8,14 @@ import (
 )
 
 // Issue is the subset of sourcecraft-wrapper-service's Issue data Activity's issue-rate metric
-// needs — matches the shape repository-service writes to _meta/issues.json.
+// and Issues' metrics need — matches the shape repository-service writes to _meta/issues.json.
+// StatusType is the fixed backend lifecycle enum (initial/in_progress/paused/completed/
+// cancelled), not the per-repo customizable Status slug — see
+// backend/repository-service/internal/scwrapper/client.go's Issue struct for why.
 type Issue struct {
-	CreatedAt string `json:"created_at"`
+	CreatedAt  string `json:"created_at"`
+	UpdatedAt  string `json:"updated_at"`
+	StatusType string `json:"status_type"`
 }
 
 // Milestone is the subset of sourcecraft-wrapper-service's Milestone data Activity's
@@ -102,17 +107,9 @@ func eventsForSource(source string, inputs ActivityInputs) ([]Event, bool) {
 func commitsToEvents(commits []gitlog.Commit) []Event {
 	events := make([]Event, 0, len(commits))
 	for _, c := range commits {
-		var netLines float64
-		for _, fc := range c.FilesChanged {
-			if fc.Binary {
-				continue
-			}
-			netLines += float64(fc.Added - fc.Deleted)
-		}
 		events = append(events, Event{
-			Timestamp:     c.AuthoredAt,
-			NumericFields: map[string]float64{"net_lines": netLines},
-			StringFields:  map[string]string{"author_email": c.AuthorEmail},
+			Timestamp:    c.AuthoredAt,
+			StringFields: map[string]string{"author_email": c.AuthorEmail},
 		})
 	}
 	return events
@@ -125,16 +122,34 @@ func issuesToEvents(issues []Issue) []Event {
 		if err != nil {
 			continue // skip unparseable timestamps rather than fail the whole metric
 		}
-		events = append(events, Event{Timestamp: ts})
+		e := Event{Timestamp: ts, StringFields: map[string]string{"status_type": i.StatusType}}
+		if updatedAt, err := time.Parse(time.RFC3339Nano, i.UpdatedAt); err == nil {
+			e.NumericFields = map[string]float64{"updated_at_unix": float64(updatedAt.Unix())}
+		}
+		events = append(events, e)
 	}
 	return events
+}
+
+// isUnsetDeadline reports whether raw is empty or the platform's sentinel for "no deadline set"
+// — SourceCraft's API returns Go's zero-value time ("0001-01-01T00:00:00Z") rather than omitting
+// the field or nulling it, confirmed live (2026-09-22) against yapb/yapb's real milestones, all
+// of which carry this exact value despite having real, distinct created_at/updated_at dates. A
+// naive raw=="" check misses this and lets a "no deadline" milestone parse as a real ~2000-year-
+// old deadline, producing nonsense like days_since_last_milestone > 100000.
+func isUnsetDeadline(raw string) bool {
+	if raw == "" {
+		return true
+	}
+	ts, err := time.Parse(time.RFC3339Nano, raw)
+	return err == nil && ts.Year() <= 1
 }
 
 func milestonesToEvents(milestones []Milestone) []Event {
 	events := make([]Event, 0, len(milestones))
 	for _, m := range milestones {
 		raw := m.Deadline
-		if raw == "" {
+		if isUnsetDeadline(raw) {
 			raw = m.CreatedAt
 		}
 		ts, err := time.Parse(time.RFC3339Nano, raw)
