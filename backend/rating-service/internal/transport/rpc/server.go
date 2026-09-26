@@ -61,7 +61,7 @@ func (s *Server) GetRanking(ctx context.Context, req *pb.GetRankingRequest) (*pb
 
 func sortFromProto(sortBy pb.SortBy) (domain.SortBy, error) {
 	switch sortBy {
-	case pb.SortBy_SORT_BY_UNSPECIFIED, pb.SortBy_SORT_BY_SCORE:
+	case pb.SortBy_SORT_BY_SCORE:
 		return domain.SortByScore, nil
 	case pb.SortBy_SORT_BY_LAST_ACTIVITY:
 		return domain.SortByLastActivity, nil
@@ -79,7 +79,10 @@ func entryToProto(entry domain.RankingEntry) *pb.RankingEntry {
 		Name:            entry.Name,
 		WebUrl:          entry.WebURL,
 		Likes:           entry.Likes,
-		Language:        entry.Language,
+		Language: &pb.Language{
+			Name:  entry.Language.Name,
+			Color: entry.Language.Color,
+		},
 	}
 
 	if entry.PublicScore != nil {

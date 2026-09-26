@@ -35,8 +35,13 @@ type RankingRow struct {
 	WebURL          string
 	PublicScore     *int16
 	Likes           *float64
-	Language        *string
+	Language        Language
 	LastActivityAt  *time.Time
+}
+
+type Language struct {
+	Name  string
+	Color string
 }
 
 type RankingEntry struct {

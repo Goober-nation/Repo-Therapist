@@ -14,9 +14,9 @@ import (
 // input never reaches the SQL string. Every sort is descending with NULLs last and falls back to
 // public_score, so health stays the dominant ranking factor; slugs make the order stable.
 var orderClauses = map[domain.SortBy]string{
-	domain.SortByScore:        "g.public_score DESC NULLS LAST, r.last_activity_at DESC NULLS LAST, r.org_slug, r.repo_slug",
-	domain.SortByLastActivity: "r.last_activity_at DESC NULLS LAST, g.public_score DESC NULLS LAST, r.org_slug, r.repo_slug",
-	domain.SortByLikes:        "r.rating_value DESC NULLS LAST, g.public_score DESC NULLS LAST, r.org_slug, r.repo_slug",
+	domain.SortByScore:        "g.score DESC NULLS LAST, r.last_activity_at DESC NULLS LAST, r.org_slug, r.repo_slug",
+	domain.SortByLastActivity: "r.last_activity_at DESC NULLS LAST, g.score DESC NULLS LAST, r.org_slug, r.repo_slug",
+	domain.SortByLikes:        "r.sourcecraft_rating DESC NULLS LAST, g.score DESC NULLS LAST, r.org_slug, r.repo_slug",
 }
 
 type RankingRepository struct {
@@ -63,7 +63,8 @@ func (r *RankingRepository) ListRanking(ctx context.Context, q domain.RankingQue
 			&row.WebURL,
 			&row.PublicScore,
 			&row.Likes,
-			&row.Language,
+			&row.Language.Name,
+			&row.Language.Color,
 			&row.LastActivityAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan ranking row: %w", err)
@@ -88,7 +89,7 @@ func whereClause(language string) (string, []any) {
 
 	if language != "" {
 		args = append(args, language)
-		fmt.Fprintf(&b, " AND lower(r.primary_language) = lower($%d)", len(args))
+		fmt.Fprintf(&b, " AND lower(r.main_language) = lower($%d)", len(args))
 	}
 
 	return b.String(), args
@@ -113,14 +114,15 @@ func buildListQuery(q domain.RankingQuery) (string, []any, error) {
 	query := fmt.Sprintf(`
 		SELECT
 			r.sourcecraft_uuid::text,
-			r.name,
-			r.web_url,
-			g.public_score,
-			r.rating_value,
-			r.primary_language,
+			r.repo_slug,
+			COALESCE(r.web_url, ''),
+			g.score,
+			r.sourcecraft_rating,
+			COALESCE(r.main_language, ''),
+			COALESCE(r.language_color, ''),
 			r.last_activity_at
 		FROM repos r
-		LEFT JOIN repo_grades g ON g.sourcecraft_uuid = r.sourcecraft_uuid
+		LEFT JOIN repo_grades_public g ON g.sourcecraft_uuid = r.sourcecraft_uuid
 		%s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d

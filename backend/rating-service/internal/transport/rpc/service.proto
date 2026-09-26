@@ -13,11 +13,10 @@ service Rating {
 }
 
 enum SortBy {
-  // Treated as SORT_BY_SCORE.
-  SORT_BY_UNSPECIFIED = 0;
-  SORT_BY_SCORE = 1;
-  SORT_BY_LAST_ACTIVITY = 2;
-  SORT_BY_LIKES = 3;
+  // Zero value, so an omitted sort_by also means score.
+  SORT_BY_SCORE = 0;
+  SORT_BY_LAST_ACTIVITY = 1;
+  SORT_BY_LIKES = 2;
 }
 
 message GetRankingRequest {
@@ -36,16 +35,23 @@ message RankingEntry {
   // Position within the current filtered and sorted list: (page-1)*page_size + index + 1.
   int32 place = 1;
   string sourcecraft_uuid = 2;
+  // Currently repo_slug — repos has no display name column yet.
   string name = 3;
+  // Empty when unknown.
   string web_url = 4;
   // Unset when the repo has not been graded yet ("нет данных").
   optional int32 public_score = 5;
   // SourceCraft rating value (likes). Unset when unknown.
   optional double likes = 6;
-  // Unset when unknown.
-  optional string language = 7;
+  // Always set; name and color are empty strings when unknown.
+  Language language = 7;
   // Unset when unknown.
   google.protobuf.Timestamp last_activity_at = 8;
+}
+
+message Language {
+  string name = 1;
+  string color = 2;
 }
 
 message GetRankingResponse {

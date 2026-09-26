@@ -25,26 +25,23 @@ const (
 type SortBy int32
 
 const (
-	// Treated as SORT_BY_SCORE.
-	SortBy_SORT_BY_UNSPECIFIED   SortBy = 0
-	SortBy_SORT_BY_SCORE         SortBy = 1
-	SortBy_SORT_BY_LAST_ACTIVITY SortBy = 2
-	SortBy_SORT_BY_LIKES         SortBy = 3
+	// Zero value, so an omitted sort_by also means score.
+	SortBy_SORT_BY_SCORE         SortBy = 0
+	SortBy_SORT_BY_LAST_ACTIVITY SortBy = 1
+	SortBy_SORT_BY_LIKES         SortBy = 2
 )
 
 // Enum value maps for SortBy.
 var (
 	SortBy_name = map[int32]string{
-		0: "SORT_BY_UNSPECIFIED",
-		1: "SORT_BY_SCORE",
-		2: "SORT_BY_LAST_ACTIVITY",
-		3: "SORT_BY_LIKES",
+		0: "SORT_BY_SCORE",
+		1: "SORT_BY_LAST_ACTIVITY",
+		2: "SORT_BY_LIKES",
 	}
 	SortBy_value = map[string]int32{
-		"SORT_BY_UNSPECIFIED":   0,
-		"SORT_BY_SCORE":         1,
-		"SORT_BY_LAST_ACTIVITY": 2,
-		"SORT_BY_LIKES":         3,
+		"SORT_BY_SCORE":         0,
+		"SORT_BY_LAST_ACTIVITY": 1,
+		"SORT_BY_LIKES":         2,
 	}
 )
 
@@ -145,7 +142,7 @@ func (x *GetRankingRequest) GetSortBy() SortBy {
 	if x != nil {
 		return x.SortBy
 	}
-	return SortBy_SORT_BY_UNSPECIFIED
+	return SortBy_SORT_BY_SCORE
 }
 
 type RankingEntry struct {
@@ -153,14 +150,16 @@ type RankingEntry struct {
 	// Position within the current filtered and sorted list: (page-1)*page_size + index + 1.
 	Place           int32  `protobuf:"varint,1,opt,name=place,proto3" json:"place,omitempty"`
 	SourcecraftUuid string `protobuf:"bytes,2,opt,name=sourcecraft_uuid,json=sourcecraftUuid,proto3" json:"sourcecraft_uuid,omitempty"`
-	Name            string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	WebUrl          string `protobuf:"bytes,4,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
+	// Currently repo_slug — repos has no display name column yet.
+	Name string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	// Empty when unknown.
+	WebUrl string `protobuf:"bytes,4,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
 	// Unset when the repo has not been graded yet ("нет данных").
 	PublicScore *int32 `protobuf:"varint,5,opt,name=public_score,json=publicScore,proto3,oneof" json:"public_score,omitempty"`
 	// SourceCraft rating value (likes). Unset when unknown.
 	Likes *float64 `protobuf:"fixed64,6,opt,name=likes,proto3,oneof" json:"likes,omitempty"`
-	// Unset when unknown.
-	Language *string `protobuf:"bytes,7,opt,name=language,proto3,oneof" json:"language,omitempty"`
+	// Always set; name and color are empty strings when unknown.
+	Language *Language `protobuf:"bytes,7,opt,name=language,proto3" json:"language,omitempty"`
 	// Unset when unknown.
 	LastActivityAt *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
 	unknownFields  protoimpl.UnknownFields
@@ -239,11 +238,11 @@ func (x *RankingEntry) GetLikes() float64 {
 	return 0
 }
 
-func (x *RankingEntry) GetLanguage() string {
-	if x != nil && x.Language != nil {
-		return *x.Language
+func (x *RankingEntry) GetLanguage() *Language {
+	if x != nil {
+		return x.Language
 	}
-	return ""
+	return nil
 }
 
 func (x *RankingEntry) GetLastActivityAt() *timestamppb.Timestamp {
@@ -251,6 +250,58 @@ func (x *RankingEntry) GetLastActivityAt() *timestamppb.Timestamp {
 		return x.LastActivityAt
 	}
 	return nil
+}
+
+type Language struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Color         string                 `protobuf:"bytes,2,opt,name=color,proto3" json:"color,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Language) Reset() {
+	*x = Language{}
+	mi := &file_service_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Language) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Language) ProtoMessage() {}
+
+func (x *Language) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Language.ProtoReflect.Descriptor instead.
+func (*Language) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *Language) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Language) GetColor() string {
+	if x != nil {
+		return x.Color
+	}
+	return ""
 }
 
 type GetRankingResponse struct {
@@ -267,7 +318,7 @@ type GetRankingResponse struct {
 
 func (x *GetRankingResponse) Reset() {
 	*x = GetRankingResponse{}
-	mi := &file_service_proto_msgTypes[2]
+	mi := &file_service_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -279,7 +330,7 @@ func (x *GetRankingResponse) String() string {
 func (*GetRankingResponse) ProtoMessage() {}
 
 func (x *GetRankingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[2]
+	mi := &file_service_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -292,7 +343,7 @@ func (x *GetRankingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRankingResponse.ProtoReflect.Descriptor instead.
 func (*GetRankingResponse) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{2}
+	return file_service_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetRankingResponse) GetEntries() []*RankingEntry {
@@ -339,23 +390,24 @@ const file_service_proto_rawDesc = "" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x17\n" +
 	"\aweb_url\x18\x04 \x01(\tR\x06webUrl\x12&\n" +
 	"\fpublic_score\x18\x05 \x01(\x05H\x00R\vpublicScore\x88\x01\x01\x12\x19\n" +
-	"\x05likes\x18\x06 \x01(\x01H\x01R\x05likes\x88\x01\x01\x12\x1f\n" +
-	"\blanguage\x18\a \x01(\tH\x02R\blanguage\x88\x01\x01\x12D\n" +
+	"\x05likes\x18\x06 \x01(\x01H\x01R\x05likes\x88\x01\x01\x12,\n" +
+	"\blanguage\x18\a \x01(\v2\x10.rating.LanguageR\blanguage\x12D\n" +
 	"\x10last_activity_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x0elastActivityAtB\x0f\n" +
 	"\r_public_scoreB\b\n" +
-	"\x06_likesB\v\n" +
-	"\t_language\"\x96\x01\n" +
+	"\x06_likes\"4\n" +
+	"\bLanguage\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05color\x18\x02 \x01(\tR\x05color\"\x96\x01\n" +
 	"\x12GetRankingResponse\x12.\n" +
 	"\aentries\x18\x01 \x03(\v2\x14.rating.RankingEntryR\aentries\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
 	"totalCount\x12\x12\n" +
 	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
-	"\tpage_size\x18\x04 \x01(\x05R\bpageSize*b\n" +
-	"\x06SortBy\x12\x17\n" +
-	"\x13SORT_BY_UNSPECIFIED\x10\x00\x12\x11\n" +
-	"\rSORT_BY_SCORE\x10\x01\x12\x19\n" +
-	"\x15SORT_BY_LAST_ACTIVITY\x10\x02\x12\x11\n" +
-	"\rSORT_BY_LIKES\x10\x032M\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize*I\n" +
+	"\x06SortBy\x12\x11\n" +
+	"\rSORT_BY_SCORE\x10\x00\x12\x19\n" +
+	"\x15SORT_BY_LAST_ACTIVITY\x10\x01\x12\x11\n" +
+	"\rSORT_BY_LIKES\x10\x022M\n" +
 	"\x06Rating\x12C\n" +
 	"\n" +
 	"GetRanking\x12\x19.rating.GetRankingRequest\x1a\x1a.rating.GetRankingResponseB*Z(rating-service/internal/transport/gen;pbb\x06proto3"
@@ -373,25 +425,27 @@ func file_service_proto_rawDescGZIP() []byte {
 }
 
 var file_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_service_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_service_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_service_proto_goTypes = []any{
 	(SortBy)(0),                   // 0: rating.SortBy
 	(*GetRankingRequest)(nil),     // 1: rating.GetRankingRequest
 	(*RankingEntry)(nil),          // 2: rating.RankingEntry
-	(*GetRankingResponse)(nil),    // 3: rating.GetRankingResponse
-	(*timestamppb.Timestamp)(nil), // 4: google.protobuf.Timestamp
+	(*Language)(nil),              // 3: rating.Language
+	(*GetRankingResponse)(nil),    // 4: rating.GetRankingResponse
+	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
 }
 var file_service_proto_depIdxs = []int32{
 	0, // 0: rating.GetRankingRequest.sort_by:type_name -> rating.SortBy
-	4, // 1: rating.RankingEntry.last_activity_at:type_name -> google.protobuf.Timestamp
-	2, // 2: rating.GetRankingResponse.entries:type_name -> rating.RankingEntry
-	1, // 3: rating.Rating.GetRanking:input_type -> rating.GetRankingRequest
-	3, // 4: rating.Rating.GetRanking:output_type -> rating.GetRankingResponse
-	4, // [4:5] is the sub-list for method output_type
-	3, // [3:4] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	3, // 1: rating.RankingEntry.language:type_name -> rating.Language
+	5, // 2: rating.RankingEntry.last_activity_at:type_name -> google.protobuf.Timestamp
+	2, // 3: rating.GetRankingResponse.entries:type_name -> rating.RankingEntry
+	1, // 4: rating.Rating.GetRanking:input_type -> rating.GetRankingRequest
+	4, // 5: rating.Rating.GetRanking:output_type -> rating.GetRankingResponse
+	5, // [5:6] is the sub-list for method output_type
+	4, // [4:5] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_service_proto_init() }
@@ -406,7 +460,7 @@ func file_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_proto_rawDesc), len(file_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
