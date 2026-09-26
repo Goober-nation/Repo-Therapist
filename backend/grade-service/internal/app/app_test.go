@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"repo-therapist/grade-service/internal/config"
+	"repo-therapist/grade-service/internal/contracts"
 	"repo-therapist/grade-service/internal/scoring"
 )
 
@@ -24,7 +25,7 @@ func TestBuildGradingResult_RoundsNotTruncates(t *testing.T) {
 		"activity": {Weight: 1.0},
 	}}
 
-	result, err := BuildGradingResult(out, cfg, map[string]string{}, time.Now())
+	result, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPublic, time.Now(), noShuffle)
 	if err != nil {
 		t.Fatalf("BuildGradingResult: %v", err)
 	}
@@ -56,7 +57,7 @@ func TestBuildGradingResult_AbsentCategoriesStayAbsent(t *testing.T) {
 		"code_health": {Weight: 0.20}, "security": {Weight: 0.20}, "ci_cd": {Weight: 0.15},
 	}}
 
-	result, err := BuildGradingResult(out, cfg, map[string]string{}, time.Now())
+	result, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPrivate, time.Now(), noShuffle)
 	if err != nil {
 		t.Fatalf("BuildGradingResult: %v", err)
 	}
@@ -85,5 +86,68 @@ func TestBuildGradingResult_AbsentCategoriesStayAbsent(t *testing.T) {
 		if !missingSet[id] {
 			t.Errorf("MissingData should list %q, got %v", id, result.MissingData)
 		}
+	}
+}
+
+func noShuffle(int, func(i, j int)) {}
+
+func TestBuildGradingResult_FillsOnlyItsVisibility(t *testing.T) {
+	out := &GradeOutput{
+		RepoID: "test-repo",
+		Categories: map[string]scoring.CategoryResult{
+			"activity": {ID: "activity", Score: 80},
+		},
+	}
+	cfg := &config.Config{Categories: map[string]config.CategoryConfig{"activity": {Weight: 1.0}}}
+
+	pub, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPublic, time.Now(), noShuffle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pub.Visibility != contracts.VisibilityPublic || pub.PublicScore == nil || pub.PrivateScore != nil ||
+		pub.PrivateCategoryScores != nil || pub.PrivateRecommendations != nil {
+		t.Errorf("public result should fill only the public side: %+v", pub)
+	}
+	for _, id := range pub.MissingData {
+		if id == "security" || id == "ci_cd" {
+			t.Errorf("public missing_data must not list private-only category %q: %v", id, pub.MissingData)
+		}
+	}
+
+	priv, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPrivate, time.Now(), noShuffle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if priv.Visibility != contracts.VisibilityPrivate || priv.PrivateScore == nil || priv.PublicScore != nil ||
+		priv.PublicCategoryScores != nil || priv.PublicRecommendations != nil {
+		t.Errorf("private result should fill only the private side: %+v", priv)
+	}
+}
+
+func TestBuildGradingResult_CapsRecommendationsAcrossCategories(t *testing.T) {
+	low := func(id string) scoring.MetricResult { return scoring.MetricResult{ID: id, Score: 0.2} }
+	out := &GradeOutput{
+		RepoID: "test-repo",
+		Categories: map[string]scoring.CategoryResult{
+			"activity":    {ID: "activity", Score: 20, Metrics: []scoring.MetricResult{low("a1"), low("a2")}},
+			"issues":      {ID: "issues", Score: 20, Metrics: []scoring.MetricResult{low("i1"), low("i2")}},
+			"code_health": {ID: "code_health", Score: 20, Metrics: []scoring.MetricResult{low("c1")}},
+		},
+	}
+	cfg := &config.Config{Categories: map[string]config.CategoryConfig{
+		"activity": {Weight: 0.3}, "issues": {Weight: 0.3}, "code_health": {Weight: 0.4},
+	}}
+	catalog := map[string]string{"a1": "A1", "a2": "A2", "i1": "I1", "i2": "I2", "c1": "C1"}
+
+	result, err := BuildGradingResult(out, cfg, catalog, contracts.VisibilityPublic, time.Now(), noShuffle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var recs []contracts.Recommendation
+	if err := json.Unmarshal(result.PublicRecommendations, &recs); err != nil {
+		t.Fatal(err)
+	}
+	if len(recs) != 3 {
+		t.Fatalf("got %d recommendations from a pool of 5, want 3", len(recs))
 	}
 }

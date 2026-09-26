@@ -83,3 +83,27 @@ func TestBuildRecommendations_SkipsHealthyNoDataAndUncataloged(t *testing.T) {
 		t.Errorf("recommendation = %+v, want {activity bad_metric \"fix the bad thing\"}", recs[0])
 	}
 }
+
+func TestPickRandom(t *testing.T) {
+	recs := []Recommendation{{MetricID: "a"}, {MetricID: "b"}, {MetricID: "c"}, {MetricID: "d"}, {MetricID: "e"}}
+	reverse := func(n int, swap func(i, j int)) {
+		for i := 0; i < n/2; i++ {
+			swap(i, n-1-i)
+		}
+	}
+
+	got := PickRandom(recs, 3, reverse)
+	if len(got) != 3 || got[0].MetricID != "e" || got[1].MetricID != "d" || got[2].MetricID != "c" {
+		t.Errorf("PickRandom(5 recs, 3) = %+v, want first 3 after shuffle (e, d, c)", got)
+	}
+	if recs[0].MetricID != "a" {
+		t.Error("PickRandom must not reorder the input slice")
+	}
+
+	if got := PickRandom(recs[:2], 3, reverse); len(got) != 2 {
+		t.Errorf("fewer than n recs should return all of them, got %d", len(got))
+	}
+	if got := PickRandom(nil, 3, reverse); len(got) != 0 {
+		t.Errorf("no recs should return none, got %d", len(got))
+	}
+}

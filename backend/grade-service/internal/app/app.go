@@ -36,9 +36,20 @@ type GradeOutput struct {
 	Categories map[string]scoring.CategoryResult `json:"categories"`
 }
 
+// CategoryIDs returns the categories graded for a visibility: the private view is a superset
+// that adds the private-only Security and CI/CD categories.
+func CategoryIDs(visibility string) []string {
+	if visibility == contracts.VisibilityPrivate {
+		return privateCategoryIDs
+	}
+	return publicCategoryIDs
+}
+
 // Grade does the actual work: pull this repo's S3 exports, compute every category's score.
-// token is the user's SourceCraft PAT for private grading; empty uses the service PAT.
-func Grade(ctx context.Context, repoID string, cfg *config.Config, token string) (*GradeOutput, error) {
+// token is the user's SourceCraft PAT for private grading; empty uses the service PAT. Public
+// grading skips the private-only categories entirely (no AppSec call, no CI/CD read).
+func Grade(ctx context.Context, repoID string, cfg *config.Config, token, visibility string) (*GradeOutput, error) {
+	private := visibility == contracts.VisibilityPrivate
 	s3Client, err := storage.NewClient(ctx, storage.Config{
 		Endpoint:  EnvOrDefault("S3_ENDPOINT", "localhost:9000"),
 		AccessKey: EnvOrDefault("S3_ACCESS_KEY", "repotherapist"),
@@ -97,7 +108,7 @@ func Grade(ctx context.Context, repoID string, cfg *config.Config, token string)
 	}
 
 	securityResult := scoring.CategoryResult{ID: "security", NoData: true}
-	if securityCfg, ok := cfg.Categories["security"]; ok && securityCfg.Status == config.StatusCalculated {
+	if securityCfg, ok := cfg.Categories["security"]; private && ok && securityCfg.Status == config.StatusCalculated {
 		securityResult = gradeSecurity(ctx, repoID, token)
 	}
 
@@ -120,6 +131,15 @@ func Grade(ctx context.Context, repoID string, cfg *config.Config, token string)
 		codeHealthResult = scoring.ComputeCodeHealth(codeHealthCfg, codeHealthInputs)
 	}
 
+	categories := map[string]scoring.CategoryResult{
+		"activity":    activityResult,
+		"issues":      issuesResult,
+		"code_health": codeHealthResult,
+	}
+	if !private {
+		return &GradeOutput{RepoID: repoID, Categories: categories}, nil
+	}
+
 	ciInputs := scoring.CICDInputs{}
 	if data, err := s3Client.GetObject(ctx, prefix+"/_meta/ci-runs.json"); err != nil {
 		log.Printf("ci-runs.json unavailable for %s: %v (CI/CD category will be no-data)", repoID, err)
@@ -135,24 +155,22 @@ func Grade(ctx context.Context, repoID string, cfg *config.Config, token string)
 		ciResult = scoring.ComputeCICD(ciCfg, ciInputs)
 	}
 
-	return &GradeOutput{
-		RepoID: repoID,
-		Categories: map[string]scoring.CategoryResult{
-			"activity":    activityResult,
-			"issues":      issuesResult,
-			"security":    securityResult,
-			"code_health": codeHealthResult,
-			"ci_cd":       ciResult,
-		},
-	}, nil
+	categories["security"] = securityResult
+	categories["ci_cd"] = ciResult
+	return &GradeOutput{RepoID: repoID, Categories: categories}, nil
 }
 
-// BuildGradingResult turns a GradeOutput into the Aggregator-facing contracts.GradingResultEvent —
-// the public/private score split, the recommendation lists, and missing_data. catalog is the
-// recommendation text lookup (config.LoadRecommendations); an empty catalog just means every
-// metric that would otherwise get a recommendation is silently skipped (see
-// scoring.BuildRecommendations), not an error.
-func BuildGradingResult(out *GradeOutput, cfg *config.Config, catalog map[string]string, now time.Time) (contracts.GradingResultEvent, error) {
+// maxRecommendations is how many recommendations a result carries, picked at random from the pool
+// of every graded category's recommendations.
+const maxRecommendations = 3
+
+// BuildGradingResult turns a GradeOutput into the Aggregator-facing contracts.GradingResultEvent
+// for one visibility: that side's score, category scores, up to maxRecommendations random
+// recommendations and missing_data; the other side stays null. catalog is the recommendation
+// text lookup (config.LoadRecommendations); an empty catalog just means every metric that would
+// otherwise get a recommendation is silently skipped (see scoring.BuildRecommendations), not an
+// error. shuffle is rand.Shuffle in production.
+func BuildGradingResult(out *GradeOutput, cfg *config.Config, catalog map[string]string, visibility string, now time.Time, shuffle func(n int, swap func(i, j int))) (contracts.GradingResultEvent, error) {
 	weights := make(map[string]float64, len(cfg.Categories))
 	for id, cat := range cfg.Categories {
 		weights[id] = cat.Weight
@@ -160,53 +178,46 @@ func BuildGradingResult(out *GradeOutput, cfg *config.Config, catalog map[string
 
 	// KNOWN LIMITATION (2026-09-25): category_scores' JSON shape is not uniform. A category Grade
 	// attempted and failed (e.g. Security with no PAT/connection) gets an explicit
-	// {"no_data": true} entry; a not_calculated category (Documentation, CI/CD today) never gets
+	// {"no_data": true} entry; a not_calculated category (Documentation today) never gets
 	// an entry in out.Categories at all, so it's simply absent from the JSON — no placeholder.
 	// Deliberately not "fixed" by injecting placeholders for every category: an extra
 	// {no_data: true} object per absent category was tried and rejected — more objects with the
 	// same shape as a real category is a bigger risk to a consumer that isn't defensive about it
 	// than a key just being missing. MissingData below is the authoritative "what's not computed"
 	// signal regardless of what category_scores does or doesn't contain.
-	publicScore, publicNoData := scoring.CombineCategories(out.Categories, publicCategoryIDs, weights)
-	privateScore, privateNoData := scoring.CombineCategories(out.Categories, privateCategoryIDs, weights)
+	ids := CategoryIDs(visibility)
+	score, noData := scoring.CombineCategories(out.Categories, ids, weights)
 
-	publicCategoryJSON, err := json.Marshal(scoring.SubsetCategories(out.Categories, publicCategoryIDs))
+	categoryJSON, err := json.Marshal(scoring.SubsetCategories(out.Categories, ids))
 	if err != nil {
-		return contracts.GradingResultEvent{}, fmt.Errorf("marshaling public category scores: %w", err)
-	}
-	privateCategoryJSON, err := json.Marshal(scoring.SubsetCategories(out.Categories, privateCategoryIDs))
-	if err != nil {
-		return contracts.GradingResultEvent{}, fmt.Errorf("marshaling private category scores: %w", err)
+		return contracts.GradingResultEvent{}, fmt.Errorf("marshaling category scores: %w", err)
 	}
 
-	publicRecs, err := json.Marshal(toContractRecommendations(scoring.BuildRecommendations(out.Categories, publicCategoryIDs, catalog)))
+	pool := scoring.BuildRecommendations(out.Categories, ids, catalog)
+	recsJSON, err := json.Marshal(toContractRecommendations(scoring.PickRandom(pool, maxRecommendations, shuffle)))
 	if err != nil {
-		return contracts.GradingResultEvent{}, fmt.Errorf("marshaling public recommendations: %w", err)
-	}
-	privateRecs, err := json.Marshal(toContractRecommendations(scoring.BuildRecommendations(out.Categories, privateCategoryIDs, catalog)))
-	if err != nil {
-		return contracts.GradingResultEvent{}, fmt.Errorf("marshaling private recommendations: %w", err)
+		return contracts.GradingResultEvent{}, fmt.Errorf("marshaling recommendations: %w", err)
 	}
 
-	result := contracts.GradingResultEvent{
-		SourcecraftUUID:        out.RepoID,
-		PublicCategoryScores:   publicCategoryJSON,
-		PublicRecommendations:  publicRecs,
-		PrivateCategoryScores:  privateCategoryJSON,
-		PrivateRecommendations: privateRecs,
-		MissingData:            scoring.MissingCategories(out.Categories, privateCategoryIDs),
-		GradedAt:               now,
-	}
 	// math.Round, not a bare int16(x) truncation — a bare cast rounds every score down (never up),
 	// silently biasing every headline score by up to a full point (found reviewing a real pipeline
 	// run, 2026-09-25).
-	if !publicNoData {
-		v := int16(math.Round(publicScore))
-		result.PublicScore = &v
+	var scorePtr *int16
+	if !noData {
+		v := int16(math.Round(score))
+		scorePtr = &v
 	}
-	if !privateNoData {
-		v := int16(math.Round(privateScore))
-		result.PrivateScore = &v
+
+	result := contracts.GradingResultEvent{
+		SourcecraftUUID: out.RepoID,
+		Visibility:      visibility,
+		MissingData:     scoring.MissingCategories(out.Categories, ids),
+		GradedAt:        now,
+	}
+	if visibility == contracts.VisibilityPrivate {
+		result.PrivateScore, result.PrivateCategoryScores, result.PrivateRecommendations = scorePtr, categoryJSON, recsJSON
+	} else {
+		result.PublicScore, result.PublicCategoryScores, result.PublicRecommendations = scorePtr, categoryJSON, recsJSON
 	}
 	return result, nil
 }

@@ -18,6 +18,7 @@ import (
 
 	"repo-therapist/grade-service/internal/app"
 	"repo-therapist/grade-service/internal/config"
+	"repo-therapist/grade-service/internal/contracts"
 	"repo-therapist/grade-service/internal/transport"
 )
 
@@ -50,7 +51,8 @@ func runOnce(repoID, configPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	out, err := app.Grade(ctx, repoID, cfg, "")
+	// One-shot debugging prints every category, so it grades the full private view.
+	out, err := app.Grade(ctx, repoID, cfg, "", contracts.VisibilityPrivate)
 	if err != nil {
 		return err
 	}
