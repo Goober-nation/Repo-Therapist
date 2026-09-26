@@ -31,7 +31,7 @@ func (f *fakeRepo) ListRanking(ctx context.Context, q domain.RankingQuery) ([]do
 func TestGetRankingDefaults(t *testing.T) {
 	repo := &fakeRepo{total: 1, rows: []domain.RankingRow{{SourcecraftUUID: "a"}}}
 
-	page, err := NewRatingService(repo).GetRanking(context.Background(), domain.RankingRequest{})
+	page, err := NewRatingService(repo).GetRanking(context.Background(), domain.RankingRequest{SortBy: domain.SortByScore})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestGetRankingPlacesAndOffset(t *testing.T) {
 func TestGetRankingPastLastPageSkipsList(t *testing.T) {
 	repo := &fakeRepo{total: 20}
 
-	page, err := NewRatingService(repo).GetRanking(context.Background(), domain.RankingRequest{Page: 3, PageSize: 10})
+	page, err := NewRatingService(repo).GetRanking(context.Background(), domain.RankingRequest{Page: 3, PageSize: 10, SortBy: domain.SortByScore})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -107,6 +107,7 @@ func TestGetRankingValidation(t *testing.T) {
 		{"negative page size", domain.RankingRequest{PageSize: -1}},
 		{"page size over max", domain.RankingRequest{PageSize: MaxPageSize + 1}},
 		{"unknown sort", domain.RankingRequest{SortBy: "stars"}},
+		{"empty sort", domain.RankingRequest{}},
 	}
 
 	for _, tc := range cases {
@@ -127,7 +128,7 @@ func TestGetRankingValidation(t *testing.T) {
 func TestGetRankingMaxPageSizeAllowed(t *testing.T) {
 	repo := &fakeRepo{}
 
-	page, err := NewRatingService(repo).GetRanking(context.Background(), domain.RankingRequest{PageSize: MaxPageSize})
+	page, err := NewRatingService(repo).GetRanking(context.Background(), domain.RankingRequest{PageSize: MaxPageSize, SortBy: domain.SortByScore})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -139,11 +140,11 @@ func TestGetRankingMaxPageSizeAllowed(t *testing.T) {
 func TestGetRankingRepositoryErrors(t *testing.T) {
 	boom := errors.New("boom")
 
-	if _, err := NewRatingService(&fakeRepo{countErr: boom}).GetRanking(context.Background(), domain.RankingRequest{}); !errors.Is(err, boom) {
+	if _, err := NewRatingService(&fakeRepo{countErr: boom}).GetRanking(context.Background(), domain.RankingRequest{SortBy: domain.SortByScore}); !errors.Is(err, boom) {
 		t.Errorf("count error = %v, want %v", err, boom)
 	}
 
-	if _, err := NewRatingService(&fakeRepo{total: 5, listErr: boom}).GetRanking(context.Background(), domain.RankingRequest{}); !errors.Is(err, boom) {
+	if _, err := NewRatingService(&fakeRepo{total: 5, listErr: boom}).GetRanking(context.Background(), domain.RankingRequest{SortBy: domain.SortByScore}); !errors.Is(err, boom) {
 		t.Errorf("list error = %v, want %v", err, boom)
 	}
 }

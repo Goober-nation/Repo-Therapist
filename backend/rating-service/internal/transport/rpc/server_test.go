@@ -30,7 +30,6 @@ func TestGetRankingRequestMapping(t *testing.T) {
 		sortBy pb.SortBy
 		want   domain.SortBy
 	}{
-		{pb.SortBy_SORT_BY_UNSPECIFIED, domain.SortByScore},
 		{pb.SortBy_SORT_BY_SCORE, domain.SortByScore},
 		{pb.SortBy_SORT_BY_LAST_ACTIVITY, domain.SortByLastActivity},
 		{pb.SortBy_SORT_BY_LIKES, domain.SortByLikes},
@@ -73,7 +72,6 @@ func TestGetRankingUnknownSortEnum(t *testing.T) {
 func TestGetRankingResponseMapping(t *testing.T) {
 	score := int16(87)
 	likes := 12.5
-	language := "Go"
 	activity := time.Date(2026, 9, 20, 12, 0, 0, 0, time.UTC)
 
 	svc := &fakeService{page: domain.RankingPage{
@@ -89,7 +87,7 @@ func TestGetRankingResponseMapping(t *testing.T) {
 					WebURL:          "https://sourcecraft.dev/org/repo",
 					PublicScore:     &score,
 					Likes:           &likes,
-					Language:        &language,
+					Language:        domain.Language{Name: "Go", Color: "#00ADD8"},
 					LastActivityAt:  &activity,
 				},
 			},
@@ -122,8 +120,8 @@ func TestGetRankingResponseMapping(t *testing.T) {
 	if full.Likes == nil || full.GetLikes() != 12.5 {
 		t.Errorf("likes = %v, want 12.5", full.Likes)
 	}
-	if full.Language == nil || full.GetLanguage() != "Go" {
-		t.Errorf("language = %v, want Go", full.Language)
+	if full.GetLanguage().GetName() != "Go" || full.GetLanguage().GetColor() != "#00ADD8" {
+		t.Errorf("language = %v, want Go/#00ADD8", full.GetLanguage())
 	}
 	if !full.GetLastActivityAt().AsTime().Equal(activity) {
 		t.Errorf("last_activity_at = %v, want %v", full.GetLastActivityAt().AsTime(), activity)
@@ -131,8 +129,12 @@ func TestGetRankingResponseMapping(t *testing.T) {
 
 	// NULL columns must come back unset, not as zero values — 0 score and "no score" differ.
 	empty := resp.GetEntries()[1]
-	if empty.PublicScore != nil || empty.Likes != nil || empty.Language != nil || empty.LastActivityAt != nil {
+	if empty.PublicScore != nil || empty.Likes != nil || empty.LastActivityAt != nil {
 		t.Errorf("expected unset optional fields, got %+v", empty)
+	}
+	// Language is always set, with empty strings when unknown.
+	if empty.Language == nil || empty.GetLanguage().GetName() != "" || empty.GetLanguage().GetColor() != "" {
+		t.Errorf("language = %v, want set with empty name/color", empty.Language)
 	}
 }
 

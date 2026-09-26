@@ -81,18 +81,15 @@ func buildQuery(req domain.RankingRequest) (domain.RankingQuery, int, error) {
 		pageSize = DefaultPageSize
 	}
 
-	sortBy := req.SortBy
-	switch sortBy {
-	case "":
-		sortBy = domain.SortByScore
+	switch req.SortBy {
 	case domain.SortByScore, domain.SortByLastActivity, domain.SortByLikes:
 	default:
-		return domain.RankingQuery{}, 0, fmt.Errorf("%w: unknown sort %q", domain.ErrInvalidArgument, sortBy)
+		return domain.RankingQuery{}, 0, fmt.Errorf("%w: unknown sort %q", domain.ErrInvalidArgument, req.SortBy)
 	}
 
 	return domain.RankingQuery{
 		Language: strings.TrimSpace(req.Language),
-		SortBy:   sortBy,
+		SortBy:   req.SortBy,
 		Limit:    pageSize,
 		Offset:   (page - 1) * pageSize,
 	}, page, nil

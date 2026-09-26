@@ -11,7 +11,7 @@ import (
 
 func TestBuildCountQuery(t *testing.T) {
 	query, args := buildCountQuery("")
-	if !strings.Contains(query, "WHERE r.visibility = 'public'") || strings.Contains(query, "primary_language") {
+	if !strings.Contains(query, "WHERE r.visibility = 'public'") || strings.Contains(query, "main_language") {
 		t.Errorf("unfiltered count query = %q", query)
 	}
 	if len(args) != 0 {
@@ -19,7 +19,7 @@ func TestBuildCountQuery(t *testing.T) {
 	}
 
 	query, args = buildCountQuery("Go")
-	if !strings.Contains(query, "AND lower(r.primary_language) = lower($1)") {
+	if !strings.Contains(query, "AND lower(r.main_language) = lower($1)") {
 		t.Errorf("filtered count query = %q", query)
 	}
 	if !reflect.DeepEqual(args, []any{"Go"}) {
@@ -32,9 +32,9 @@ func TestBuildListQueryOrder(t *testing.T) {
 		sortBy domain.SortBy
 		order  string
 	}{
-		{domain.SortByScore, "ORDER BY g.public_score DESC NULLS LAST, r.last_activity_at DESC NULLS LAST, r.org_slug, r.repo_slug"},
-		{domain.SortByLastActivity, "ORDER BY r.last_activity_at DESC NULLS LAST, g.public_score DESC NULLS LAST, r.org_slug, r.repo_slug"},
-		{domain.SortByLikes, "ORDER BY r.rating_value DESC NULLS LAST, g.public_score DESC NULLS LAST, r.org_slug, r.repo_slug"},
+		{domain.SortByScore, "ORDER BY g.score DESC NULLS LAST, r.last_activity_at DESC NULLS LAST, r.org_slug, r.repo_slug"},
+		{domain.SortByLastActivity, "ORDER BY r.last_activity_at DESC NULLS LAST, g.score DESC NULLS LAST, r.org_slug, r.repo_slug"},
+		{domain.SortByLikes, "ORDER BY r.sourcecraft_rating DESC NULLS LAST, g.score DESC NULLS LAST, r.org_slug, r.repo_slug"},
 	}
 
 	for _, tc := range cases {
@@ -55,7 +55,7 @@ func TestBuildListQueryPlaceholders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(query, "LIMIT $1 OFFSET $2") || strings.Contains(query, "primary_language) =") {
+	if !strings.Contains(query, "LIMIT $1 OFFSET $2") || strings.Contains(query, "main_language) =") {
 		t.Errorf("unfiltered list query:\n%s", query)
 	}
 	if !reflect.DeepEqual(args, []any{20, 40}) {
@@ -66,7 +66,7 @@ func TestBuildListQueryPlaceholders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(query, "lower(r.primary_language) = lower($1)") || !strings.Contains(query, "LIMIT $2 OFFSET $3") {
+	if !strings.Contains(query, "lower(r.main_language) = lower($1)") || !strings.Contains(query, "LIMIT $2 OFFSET $3") {
 		t.Errorf("filtered list query:\n%s", query)
 	}
 	if !reflect.DeepEqual(args, []any{"Go", 20, 40}) {
@@ -80,11 +80,32 @@ func TestBuildListQueryPublicLeftJoin(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	// Ungraded repos must stay in the ranking (NULLs last), so the grades join can't be inner.
-	if !strings.Contains(query, "LEFT JOIN repo_grades g") {
-		t.Errorf("expected LEFT JOIN on repo_grades:\n%s", query)
+	if !strings.Contains(query, "LEFT JOIN repo_grades_public g") {
+		t.Errorf("expected LEFT JOIN on repo_grades_public:\n%s", query)
 	}
 	if !strings.Contains(query, "WHERE r.visibility = 'public'") {
 		t.Errorf("expected public-only filter:\n%s", query)
+	}
+}
+
+func TestBuildListQueryColumns(t *testing.T) {
+	query, _, err := buildListQuery(domain.RankingQuery{SortBy: domain.SortByScore, Limit: 20})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Name is repo_slug until repos gets a display name column; nullable text is coalesced to ""
+	// so the language struct and web_url are always set.
+	for _, column := range []string{
+		"r.repo_slug,",
+		"COALESCE(r.web_url, '')",
+		"g.score,",
+		"r.sourcecraft_rating,",
+		"COALESCE(r.main_language, '')",
+		"COALESCE(r.language_color, '')",
+	} {
+		if !strings.Contains(query, column) {
+			t.Errorf("query missing %q:\n%s", column, query)
+		}
 	}
 }
 
