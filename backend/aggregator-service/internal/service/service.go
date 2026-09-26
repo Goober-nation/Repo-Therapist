@@ -7,10 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -111,10 +113,8 @@ func (as *AggregatorService) RequestLLMRecommendations(
 				err,
 			)
 		}
-
 		lastActivityAt = &parsed
 	}
-
 	sourceRepo := domain.Repo{
 		SourcecraftUUID: repoID,
 		OrgSlug:         response.GetOrganization().GetSlug(),
@@ -122,7 +122,6 @@ func (as *AggregatorService) RequestLLMRecommendations(
 		Visibility:      response.GetVisibility(),
 		LastActivityAt:  lastActivityAt,
 	}
-
 	repo, err := as.ReposRepo.GetRepositoryByID(ctx, repoID)
 	if err != nil {
 		if !errors.Is(err, domain.ErrRepositoryNotFound) {
@@ -132,9 +131,7 @@ func (as *AggregatorService) RequestLLMRecommendations(
 				err,
 			)
 		}
-
 		repo = sourceRepo
-
 		if _, err := as.ReposRepo.CreateRepository(ctx, repo); err != nil {
 			return domain.RepoLLMResponse{}, fmt.Errorf(
 				"%w: create repository: %v",
@@ -143,12 +140,10 @@ func (as *AggregatorService) RequestLLMRecommendations(
 			)
 		}
 	} else {
-
 		repo.OrgSlug = sourceRepo.OrgSlug
 		repo.RepoSlug = sourceRepo.RepoSlug
 		repo.Visibility = sourceRepo.Visibility
 		repo.LastActivityAt = sourceRepo.LastActivityAt
-
 		if _, err := as.ReposRepo.UpdateRepository(ctx, repo); err != nil {
 			return domain.RepoLLMResponse{}, fmt.Errorf(
 				"%w: update repository: %v",
@@ -157,74 +152,102 @@ func (as *AggregatorService) RequestLLMRecommendations(
 			)
 		}
 	}
+	var grade domain.RepoGrade
 
-	grade, err := as.GradesRepo.GetGradeByRepoID(ctx, repoID)
-	if err != nil {
-		return domain.RepoLLMResponse{}, fmt.Errorf(
-			"%w: %w",
-			domain.ErrNoGrade,
-			err,
-		)
-	}
+	if as.hasPrivateAccess(ctx, sourceRepo) {
+		grade, err = as.GradesRepo.GetPrivateGradeByRepoID(ctx, repoID)
+		if err != nil {
+			if errors.Is(err, domain.ErrGradeNotFound) {
+				return domain.RepoLLMResponse{}, domain.ErrNoGrade
+			}
 
-	switch repo.Visibility {
-	case "public":
-		resp, err := as.LLMRepo.GetPublicResponseByRepoID(
-			ctx,
-			repoID,
-		)
-		if err == nil && llmResponseIsCurrent(
-			resp.EvaluatedAt,
-			repo.LastActivityAt,
-		) {
-			return domain.RepoLLMResponse{
-				SourcecraftUUID: resp.SourcecraftUUID,
-				RawResponse:     resp.RawResponse,
-				ModelUsed:       resp.ModelUsed,
-				EvaluatedAt:     resp.EvaluatedAt,
-			}, nil
-		}
-
-		if err != nil && !errors.Is(err, domain.ErrLLMResponseNotFound) {
 			return domain.RepoLLMResponse{}, fmt.Errorf(
-				"%w: get public llm response: %v",
+				"%w: get private grade: %v",
 				domain.ErrLLMUnavailable,
 				err,
 			)
 		}
+	} else {
+		grade, err = as.GradesRepo.GetPublicGradeByRepoID(ctx, repoID)
+		if err != nil {
+			if errors.Is(err, domain.ErrGradeNotFound) {
+				return domain.RepoLLMResponse{}, domain.ErrNoGrade
+			}
 
-	case "private", "internal":
-		resp, err := as.LLMRepo.GetPrivateResponseByRepoID(
-			ctx,
-			repoID,
-		)
-		if err == nil && llmResponseIsCurrent(
-			resp.EvaluatedAt,
-			repo.LastActivityAt,
-		) {
-			return domain.RepoLLMResponse{
-				SourcecraftUUID: resp.SourcecraftUUID,
-				RawResponse:     resp.RawResponse,
-				ModelUsed:       resp.ModelUsed,
-				EvaluatedAt:     resp.EvaluatedAt,
-			}, nil
-		}
-
-		if err != nil && !errors.Is(err, domain.ErrLLMResponseNotFound) {
 			return domain.RepoLLMResponse{}, fmt.Errorf(
-				"%w: get private llm response: %v",
+				"%w: get public grade: %v",
 				domain.ErrLLMUnavailable,
 				err,
 			)
 		}
-
-	default:
-		return domain.RepoLLMResponse{}, fmt.Errorf(
-			"%w: unknown repository visibility %q",
-			domain.ErrRecommendationsFailed,
-			repo.Visibility,
-		)
 	}
+
+	if grade.GradedAt == nil {
+		return domain.RepoLLMResponse{}, domain.ErrNoGrade
+	}
+
+	if repo.LastActivityAt != nil && repo.LastActivityAt.After(*grade.GradedAt) {
+		return domain.RepoLLMResponse{}, domain.ErrGradeOutdated
+	}
+
+	//switch repo.Visibility {
+	//case "public":
+	//	resp, err := as.LLMRepo.GetPublicResponseByRepoID(
+	//		ctx,
+	//		repoID,
+	//	)
+	//	if err == nil && llmResponseIsCurrent(
+	//		resp.EvaluatedAt,
+	//		repo.LastActivityAt,
+	//	) {
+	//		return domain.RepoLLMResponse{
+	//			SourcecraftUUID: resp.SourcecraftUUID,
+	//			RawResponse:     resp.RawResponse,
+	//			ModelUsed:       resp.ModelUsed,
+	//			EvaluatedAt:     resp.EvaluatedAt,
+	//		}, nil
+	//	}
+	//
+	//	if err != nil && !errors.Is(err, domain.ErrLLMResponseNotFound) {
+	//		return domain.RepoLLMResponse{}, fmt.Errorf(
+	//			"%w: get public llm response: %v",
+	//			domain.ErrLLMUnavailable,
+	//			err,
+	//		)
+	//	}
+	//
+	//case "private", "internal":
+	//	resp, err := as.LLMRepo.GetPrivateResponseByRepoID(
+	//		ctx,
+	//		repoID,
+	//	)
+	//	if err == nil && llmResponseIsCurrent(
+	//		resp.EvaluatedAt,
+	//		repo.LastActivityAt,
+	//	) {
+	//		return domain.RepoLLMResponse{
+	//			SourcecraftUUID: resp.SourcecraftUUID,
+	//			RawResponse:     resp.RawResponse,
+	//			ModelUsed:       resp.ModelUsed,
+	//			EvaluatedAt:     resp.EvaluatedAt,
+	//		}, nil
+	//	}
+	//
+	//	if err != nil && !errors.Is(err, domain.ErrLLMResponseNotFound) {
+	//		return domain.RepoLLMResponse{}, fmt.Errorf(
+	//			"%w: get private llm response: %v",
+	//			domain.ErrLLMUnavailable,
+	//			err,
+	//		)
+	//	}
+	//
+	//default:
+	//	return domain.RepoLLMResponse{}, fmt.Errorf(
+	//		"%w: unknown repository visibility %q",
+	//		domain.ErrRecommendationsFailed,
+	//		repo.Visibility,
+	//	)
+	//}
 
 	event := domain.LLMRecommendationsRequestedEvent{
 		SourcecraftUUID: repoID,
@@ -354,22 +377,36 @@ func (as *AggregatorService) GetGrading(
 			)
 		}
 	}
-
-	grade, err := as.GradesRepo.GetGradeByRepoID(ctx, repoID)
-	if err != nil {
-		if !errors.Is(err, domain.ErrGradeNotFound) {
-			return nil, fmt.Errorf(
-				"%w: get grade: %v",
-				domain.ErrGradingFailed,
-				err,
-			)
+	var grade domain.RepoGrade
+	if as.hasPrivateAccess(ctx, sourceRepo) {
+		grade, err = as.GradesRepo.GetPrivateGradeByRepoID(ctx, repoID)
+		if err != nil {
+			if !errors.Is(err, domain.ErrGradeNotFound) {
+				return nil, fmt.Errorf(
+					"%w: get grade: %v",
+					domain.ErrGradingFailed,
+					err,
+				)
+			}
+			grade = domain.RepoGrade{
+				SourcecraftUUID: repoID,
+			}
 		}
-
-		grade = domain.RepoGrade{
-			SourcecraftUUID: repoID,
+	} else {
+		grade, err = as.GradesRepo.GetPublicGradeByRepoID(ctx, repoID)
+		if err != nil {
+			if !errors.Is(err, domain.ErrGradeNotFound) {
+				return nil, fmt.Errorf(
+					"%w: get grade: %v",
+					domain.ErrGradingFailed,
+					err,
+				)
+			}
+			grade = domain.RepoGrade{
+				SourcecraftUUID: repoID,
+			}
 		}
 	}
-
 	if !needsGrading(repo, grade) {
 		return &grade, nil
 	}
@@ -527,7 +564,7 @@ func (as *AggregatorService) SaveGradingResult(ctx context.Context, grade domain
 				err,
 			)
 		}
-	case "private":
+	case "private", "internal":
 		if err := as.GradesRepo.UpsertPrivateGrade(ctx, grade); err != nil {
 			return fmt.Errorf(
 				"%w: save private grade: %v",
@@ -646,7 +683,7 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 			}
 		}
 
-		grade, err := as.GradesRepo.GetGradeByRepoID(ctx, repoID)
+		grade, err := as.GradesRepo.GetPublicGradeByRepoID(ctx, repoID)
 		if err != nil && !errors.Is(err, domain.ErrGradeNotFound) {
 			return fmt.Errorf(
 				"%w: get grade %s: %v",
@@ -695,4 +732,52 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func tokenFromContext(ctx context.Context) string {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return ""
+	}
+
+	values := md.Get("authorization")
+	if len(values) == 0 {
+		return ""
+	}
+	token := strings.TrimSpace(values[0])
+	if token == "" {
+		return ""
+	}
+
+	token = strings.TrimPrefix(token, "Bearer ")
+	token = strings.TrimPrefix(token, "bearer ")
+	token = strings.TrimSpace(token)
+
+	if token == "" {
+		return ""
+	}
+
+	return token
+}
+
+func (as *AggregatorService) hasPrivateAccess(ctx context.Context, sourceRepo domain.Repo) bool {
+	token := tokenFromContext(ctx)
+	if token == "" {
+		return false
+	} else {
+		response, err := as.clientRPC.GetMyRepos(
+			ctx,
+			&client.GetMyReposRequest{},
+		)
+		if err != nil {
+			return false
+		}
+		repos := response.GetRepositories()
+		for i := 0; i < len(repos); i++ {
+			if repos[i].GetSlug() == sourceRepo.RepoSlug && repos[i].GetOrganization().GetSlug() == sourceRepo.OrgSlug {
+				return true
+			}
+		}
+		return false
+	}
 }

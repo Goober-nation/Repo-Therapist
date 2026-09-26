@@ -164,3 +164,11 @@ CREATE TABLE repo_llm_responses_private (
   model_used         TEXT,
   evaluated_at       TIMESTAMPTZ
 );
+
+
+CREATE TABLE users (
+    id UUID PRIMARY KEY,
+    yandex_id VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+

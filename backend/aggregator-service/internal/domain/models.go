@@ -35,13 +35,9 @@ type RepoLock struct {
 type RepoGrade struct {
 	SourcecraftUUID uuid.UUID `db:"sourcecraft_uuid"`
 
-	PublicScore           *int16          `db:"public_score"`
-	PublicCategoryScores  json.RawMessage `db:"public_category_scores"`
-	PublicRecommendations json.RawMessage `db:"public_recommendations"`
-
-	PrivateScore           *int16          `db:"private_score"`
-	PrivateCategoryScores  json.RawMessage `db:"private_category_scores"`
-	PrivateRecommendations json.RawMessage `db:"private_recommendations"`
+	Score          *int16          `db:"score"`
+	CategoryScores json.RawMessage `db:"category_scores"`
+	Advice         json.RawMessage `db:"advice"`
 
 	MissingData []string `db:"missing_data"`
 
