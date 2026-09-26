@@ -280,4 +280,51 @@ final answer of every work session, not just when asked.
 
 ---
 
+## LLM response validation (user decision, 2026-09-25)
+
+The active Python Yandex model path must validate output format only: JSON structure,
+field types, known check IDs and score ranges. Do not reject a response for inconsistent
+score/deduction arithmetic, unverified quotations or line numbers, evidence contents,
+or semantic judgment. Preserve the model's claims; the active path validates format only.
+Do not reconnect the legacy semantic validator to this path without user approval.
+Kafka Documentation completed v2 and CLI output contain only `grade`, eight
+`subcategories` (id/grade), and a flat `facts` list. Internal 25 checks, severity,
+penalty amounts and model/context metadata do not cross this boundary. Report request
+v2 forwards this compact payload in `documentation`; reports generate advice later.
+
 **End of AGENTS.md**
+
+## Sampled documentation review (user decision, 2026-09-26)
+
+The active LLM path uses algorithmically selected documentation excerpts, not full
+corpus reading or multi-call summarization. Defaults: eight relevant sections, at
+most 30 lines each; prioritize README and rubric topics. Retain existing scoring
+weights and compact Kafka payload. Tell the model it sees a sample and must not
+invent missing-content findings from unreviewed portions. This supersedes earlier
+requirements to send complete documents.
+
+
+Sampling refinement (2026-09-26): the selector prioritizes individual rubric checks,
+reserves README introduction, and follows up to eight existing repository-local
+README document links (one hop; inline and reference links). External links are
+never fetched. Excerpts have a shared 24000-byte content budget; the entire JSON
+context is capped at 32000 bytes. Candidate scanning remains bounded separately.
+Each model check is marked `sampled` or `not_reviewed` in the internal context.
+An unreviewed check contributes neither earned nor maximum points and cannot
+produce deficiency facts. The total is 100 * earned / evaluated maximum. A section
+with no evaluated checks has `grade: null`; this now means either not applicable
+or not reviewed. No estimated score is substituted for omitted material. This
+supersedes earlier wording that required all section grades to be estimated.
+The Kafka object shape is unchanged; consumers must display null as unavailable,
+not as zero. Deterministic required-file checks retain their existing rules.
+
+
+## Active documentation Kafka boundary (2026-09-26)
+
+User-approved topics: `repo.docs.grade.requested` -> `repo.docs.graded`.
+Request: `{sourcecraft_uuid, s3_prefix, requested_at}`.
+Result: `{sourcecraft_uuid, grade, subgrades, advice, evaluated_at}`.
+`subgrades` maps stable section IDs to integer percentages. Omit unreviewed or
+inapplicable sections; normalize total over evaluated checks. `advice` is a string
+array of deficiency facts, not recommendations. This supersedes older envelope
+and wire-null wording above; internal section grades may still be null.
