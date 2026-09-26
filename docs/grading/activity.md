@@ -35,7 +35,7 @@ note for why that matters).
 
 | Metric | Direction | Critical | Healthy* | Weight | Source | Aggregation |
 |---|---|---|---|---|---|---|
-| Commits/week | + | 0.5 | 5 | 0.20 | commits.json | `rate_per_week` |
+| Commits/week | + | 0.5 | 5 | 0.25 | commits.json | `rate_per_week` |
 | Days since last activity | − | 40 | 3 | 0.20 | commits.json | `days_since_last_event` |
 | Unique contributors | + | 1 | 5 | 0.15 | commits.json | `unique_count(author_email)` |
 | Issue rate/week | + | 0.02 | 0.15 | 0.15 | issues.json | `rate_per_week` |
@@ -88,6 +88,8 @@ validated against real repos.
   pulling enough independent signal to justify fixing over dropping — `commits_per_week` and
   `days_since_last_activity` (0.20 weight each) already correctly punish zero/low activity, so the
   category lost no real coverage by removing it.
+- **Its 0.05 weight moved to `commits_per_week` (0.20 -> 0.25), 2026-09-26.** Dropping the metric
+  left the category's weights summing to 0.95, which the config validator rejects at startup.
 - **`issue_rate_per_week`/`milestones_per_year` recalibrated, 2026-09-25.** Real data across 20
   diverse repos (`agents_memory/topics/threshold-calibration-data.md`) — including large orgs like
   gravity-ui/datalens/postgres forks — found median and p75 exactly 0 for both metrics, max 0.117

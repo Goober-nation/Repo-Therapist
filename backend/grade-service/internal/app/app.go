@@ -37,7 +37,8 @@ type GradeOutput struct {
 }
 
 // Grade does the actual work: pull this repo's S3 exports, compute every category's score.
-func Grade(ctx context.Context, repoID string, cfg *config.Config) (*GradeOutput, error) {
+// token is the user's SourceCraft PAT for private grading; empty uses the service PAT.
+func Grade(ctx context.Context, repoID string, cfg *config.Config, token string) (*GradeOutput, error) {
 	s3Client, err := storage.NewClient(ctx, storage.Config{
 		Endpoint:  EnvOrDefault("S3_ENDPOINT", "localhost:9000"),
 		AccessKey: EnvOrDefault("S3_ACCESS_KEY", "repotherapist"),
@@ -97,7 +98,7 @@ func Grade(ctx context.Context, repoID string, cfg *config.Config) (*GradeOutput
 
 	securityResult := scoring.CategoryResult{ID: "security", NoData: true}
 	if securityCfg, ok := cfg.Categories["security"]; ok && securityCfg.Status == config.StatusCalculated {
-		securityResult = gradeSecurity(ctx, repoID)
+		securityResult = gradeSecurity(ctx, repoID, token)
 	}
 
 	codeHealthInputs := scoring.CodeHealthInputs{}
@@ -119,6 +120,21 @@ func Grade(ctx context.Context, repoID string, cfg *config.Config) (*GradeOutput
 		codeHealthResult = scoring.ComputeCodeHealth(codeHealthCfg, codeHealthInputs)
 	}
 
+	ciInputs := scoring.CICDInputs{}
+	if data, err := s3Client.GetObject(ctx, prefix+"/_meta/ci-runs.json"); err != nil {
+		log.Printf("ci-runs.json unavailable for %s: %v (CI/CD category will be no-data)", repoID, err)
+	} else {
+		if err := json.Unmarshal(data, &ciInputs.Export); err != nil {
+			return nil, fmt.Errorf("decoding ci-runs.json: %w", err)
+		}
+		ciInputs.Available = true
+	}
+
+	ciResult := scoring.CategoryResult{ID: "ci_cd", NoData: true}
+	if ciCfg, ok := cfg.Categories["ci_cd"]; ok && ciCfg.Status == config.StatusCalculated {
+		ciResult = scoring.ComputeCICD(ciCfg, ciInputs)
+	}
+
 	return &GradeOutput{
 		RepoID: repoID,
 		Categories: map[string]scoring.CategoryResult{
@@ -126,6 +142,7 @@ func Grade(ctx context.Context, repoID string, cfg *config.Config) (*GradeOutput
 			"issues":      issuesResult,
 			"security":    securityResult,
 			"code_health": codeHealthResult,
+			"ci_cd":       ciResult,
 		},
 	}, nil
 }
@@ -205,10 +222,13 @@ func toContractRecommendations(recs []scoring.Recommendation) []contracts.Recomm
 // gradeSecurity calls security-wrapper-service for repoID's AppSec data and scores it. Any
 // failure to reach the wrapper is logged and treated as no-data, same as a missing S3 export —
 // one category's failure shouldn't fail the whole grading run.
-func gradeSecurity(ctx context.Context, repoID string) scoring.CategoryResult {
-	pat := os.Getenv("SOURCECRAFT_PAT")
+func gradeSecurity(ctx context.Context, repoID, token string) scoring.CategoryResult {
+	pat := token
 	if pat == "" {
-		log.Printf("SOURCECRAFT_PAT not set: Security category will be no-data for %s", repoID)
+		pat = os.Getenv("SOURCECRAFT_PAT")
+	}
+	if pat == "" {
+		log.Printf("no request token and SOURCECRAFT_PAT not set: Security category will be no-data for %s", repoID)
 		return scoring.CategoryResult{ID: "security", NoData: true}
 	}
 

@@ -54,14 +54,16 @@ go run ./backend/repository-service/cmd/repository-service --listen
 go run ./backend/grade-service/cmd/grade-service --listen
 ```
 
-Then trigger a grade from a third terminal:
+Then trigger a grade from a third terminal. This publishes `grading.requests` exactly like the
+Aggregator does and prints the next `grading.results` message:
 
 ```bash
-go run ./backend/grade-service/cmd/grade-service --request-org=examples --request-repo=vulnerable-repo
+go run ./backend/grade-service/cmd/grading-request --org=examples --repo=vulnerable-repo
 ```
 
 Watch the two listener terminals: Repository service logs the clone/upload and publishes
-`repo.ready`; Grade service logs the grading and prints the same JSON result as step 2.
+`repo.ready`; Grade service logs the grading and publishes the result. Failed jobs are only
+logged, no result is published, so `grading-request` times out after `--wait` (default 2m).
 
 **Note**: if testing `--listen` processes via `go run ... &` in a shell script, `kill <pid>` won't
 stop the actual compiled binary (`go run`'s signal handling doesn't propagate to its child) — build
@@ -86,3 +88,32 @@ One test needs a live MinIO with data already uploaded (not run by default `go t
 ```bash
 (cd backend/shared && go test -tags=manual ./storage/ -run TestBatchReadManual -v)
 ```
+
+## CI/CD mock repos
+
+Five public repos under `timoxa102928` with known CI histories — see `docs/ci-mock-repos.json`
+for IDs and expected scores. Needs a PAT that owns that org (`cicd/runs` is owner-only).
+
+Offline fixture tests (part of plain `go test ./...`):
+
+```bash
+(cd backend/grade-service && go test ./internal/scoring/ -run CICD -v)
+```
+
+Live check against the real API (scoring only, reads runs straight from REST):
+
+```bash
+(cd backend/grade-service && go test -tags live ./internal/scoring/ -run LiveMockRepos -v)
+```
+
+Full pipeline for one repo (sourcecraft-wrapper-service must be running):
+
+```bash
+go run ./backend/repository-service/cmd/repository-service --org=timoxa102928 --repo=ci-mock-flaky
+go run ./backend/grade-service/cmd/grade-service --repo-id=01a0dd5d-d258-7af2-9b1b-b2346d6d29b6 | jq .categories.ci_cd
+```
+
+Recreating the repos: `scripts/mock-repos/create-all.sh` (skips repos that already have content;
+`--force` re-pushes and appends new runs, which changes expected scores). Newly pushed runs queue
+on SourceCraft for a few minutes — the live test fails fast while any run is still
+`prepared`/`processing`.

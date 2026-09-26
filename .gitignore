@@ -63,6 +63,9 @@
 # project markdown (AGENTS.md, etc.)
 !*.md
 
+# shell scripts (scripts/mock-repos etc.)
+!*.sh
+
 # --- re-ignore: personal/local files that would otherwise match the allowlist above ---
 backlog/
 agents_memory/

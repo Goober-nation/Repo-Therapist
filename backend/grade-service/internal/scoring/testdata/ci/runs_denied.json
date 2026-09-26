@@ -1,0 +1,7 @@
+{
+  "config_files": [
+    ".sourcecraft/ci.yaml"
+  ],
+  "runs_available": false,
+  "runs": []
+}

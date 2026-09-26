@@ -1,5 +1,4 @@
-// Package transport wires grade-service's Kafka topics (repo.ready in, repo.grade.requested out
-// for manual triggering) to the app package's grading logic.
+// Package transport wires grade-service's Kafka topics to the app package's grading logic.
 package transport
 
 import (
@@ -19,33 +18,9 @@ import (
 	kafkaclient "repo-therapist/grade-service/internal/kafka"
 )
 
-// RunRequest is the manual trigger point: publish repo.grade.requested and exit immediately. The
-// grade itself shows up later, asynchronously, in whatever's running RunListen (this process or a
-// separate one) — that round trip is the thing this phase exists to prove works.
-func RunRequest(org, repo string) error {
-	brokers := []string{app.EnvOrDefault("KAFKA_BROKERS", "localhost:9092")}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	if err := kafkaclient.EnsureTopics(ctx, brokers, contracts.AllTopics, 1); err != nil {
-		return fmt.Errorf("provisioning topics: %w", err)
-	}
-
-	producer := kafkaclient.NewProducer(brokers, contracts.TopicGradeRequested)
-	defer producer.Close()
-
-	req := contracts.GradeRequested{OrgSlug: org, RepoSlug: repo, RequestedAt: time.Now()}
-	if err := producer.Publish(ctx, org+"/"+repo, req); err != nil {
-		return fmt.Errorf("publishing %s: %w", contracts.TopicGradeRequested, err)
-	}
-	log.Printf("published grade request for %s/%s to %s", org, repo, contracts.TopicGradeRequested)
-	return nil
-}
-
 // RunListen runs two consumers concurrently for as long as the process lives:
 //   - grading.requests (the Aggregator's trigger) -> relayed as repo.grade.requested, our own
-//     internal trigger to Repository service. Byte-identical shape, straight passthrough.
+//     internal trigger to Repository service; the job's token is kept in memory for repo.ready.
 //   - repo.ready (Repository service's handoff) -> graded, and the result published to
 //     grading.results for the Aggregator to consume.
 //
@@ -76,9 +51,10 @@ func RunListen(configPath string) error {
 	// Two independent consumer loops, one goroutine each. If either returns (error or shutdown),
 	// stop() cancels the shared ctx so the other one exits too — Consumer.Run treats a cancelled
 	// ctx as a clean stop (returns nil), not an error, so this doesn't mask a real first error.
+	jobs := newJobStore()
 	errCh := make(chan error, 2)
-	go func() { errCh <- runGradingRequestsRelay(ctx, brokers) }()
-	go func() { errCh <- runRepoReadyGrader(ctx, brokers, cfg, catalog) }()
+	go func() { errCh <- runGradingRequestsRelay(ctx, brokers, jobs) }()
+	go func() { errCh <- runRepoReadyGrader(ctx, brokers, cfg, catalog, jobs) }()
 
 	firstErr := <-errCh
 	stop()
@@ -86,10 +62,9 @@ func RunListen(configPath string) error {
 	return firstErr
 }
 
-// runGradingRequestsRelay consumes the Aggregator's grading.requests and republishes each one as
-// our own internal repo.grade.requested — GradingRequestedEvent and GradeRequested are
-// byte-identical in shape by design, so this is a pure passthrough, no field mapping.
-func runGradingRequestsRelay(ctx context.Context, brokers []string) error {
+// runGradingRequestsRelay consumes the Aggregator's grading.requests, remembers the job's token
+// for when repo.ready arrives, and republishes it as our internal repo.grade.requested.
+func runGradingRequestsRelay(ctx context.Context, brokers []string, jobs *jobStore) error {
 	consumer := kafkaclient.NewConsumer(brokers, contracts.TopicGradingRequests, "grade-service")
 	defer consumer.Close()
 	producer := kafkaclient.NewProducer(brokers, contracts.TopicGradeRequested)
@@ -103,8 +78,10 @@ func runGradingRequestsRelay(ctx context.Context, brokers []string) error {
 			return nil
 		}
 
-		out := contracts.GradeRequested{OrgSlug: req.OrgSlug, RepoSlug: req.RepoSlug, RequestedAt: req.RequestedAt}
-		if err := producer.Publish(ctx, req.OrgSlug+"/"+req.RepoSlug, out); err != nil {
+		key := req.OrgSlug + "/" + req.RepoSlug
+		jobs.put(key, req.Token)
+		out := contracts.GradeRequested{OrgSlug: req.OrgSlug, RepoSlug: req.RepoSlug, RequestedAt: req.RequestedAt, Token: req.Token}
+		if err := producer.Publish(ctx, key, out); err != nil {
 			return fmt.Errorf("relaying to %s: %w", contracts.TopicGradeRequested, err)
 		}
 		log.Printf("relayed grading request for %s/%s to %s", req.OrgSlug, req.RepoSlug, contracts.TopicGradeRequested)
@@ -115,7 +92,7 @@ func runGradingRequestsRelay(ctx context.Context, brokers []string) error {
 // runRepoReadyGrader consumes repo.ready, grades each ready repo, and publishes the result to
 // grading.results for the Aggregator. Failed/skipped repos are logged, not silently dropped, but
 // don't kill the loop — one repo's failure shouldn't stop grading for every other repo.
-func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Config, catalog map[string]string) error {
+func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Config, catalog map[string]string, jobs *jobStore) error {
 	consumer := kafkaclient.NewConsumer(brokers, contracts.TopicRepoReady, "grade-service")
 	defer consumer.Close()
 	producer := kafkaclient.NewProducer(brokers, contracts.TopicGradingResults)
@@ -129,6 +106,10 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 			return nil
 		}
 
+		// Taken before the status check so a failed job's token is dropped too. A missing job
+		// (unknown/expired, or relayed by another instance) grades with the service PAT.
+		job, _ := jobs.take(ready.OrgSlug + "/" + ready.RepoSlug)
+
 		if ready.Status != contracts.StatusReady {
 			log.Printf("skipping %s/%s: status=%s error=%q", ready.OrgSlug, ready.RepoSlug, ready.Status, ready.Error)
 			return nil
@@ -136,7 +117,7 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 
 		log.Printf("grading %s/%s (sourcecraft_uuid=%s)", ready.OrgSlug, ready.RepoSlug, ready.SourcecraftUUID)
 		gradeCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-		out, err := app.Grade(gradeCtx, ready.SourcecraftUUID, cfg)
+		out, err := app.Grade(gradeCtx, ready.SourcecraftUUID, cfg, job.token)
 		cancel()
 		if err != nil {
 			log.Printf("grading %s/%s failed: %v", ready.OrgSlug, ready.RepoSlug, err)

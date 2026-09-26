@@ -16,12 +16,14 @@ const (
 var AllTopics = []string{TopicGradeRequested, TopicRepoReady}
 
 // GradeRequested is published to ask Repository service to clone+upload a repo. Consumed by
-// Repository service, produced by a manual trigger for now (grade-service --request-org/--repo) —
-// eventually the Aggregator, not built yet.
+// Repository service, produced by grade-service relaying grading.requests.
 type GradeRequested struct {
 	OrgSlug     string    `json:"org_slug"`
 	RepoSlug    string    `json:"repo_slug"`
 	RequestedAt time.Time `json:"requested_at"`
+	// Token is the user's SourceCraft PAT for private grading; empty means use the service PAT.
+	// Never log it.
+	Token string `json:"token,omitempty"`
 }
 
 // ReadyStatus values for RepoReady.Status.
