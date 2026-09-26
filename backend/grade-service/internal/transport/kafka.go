@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand/v2"
 	"os/signal"
 	"syscall"
 	"time"
@@ -79,12 +80,17 @@ func runGradingRequestsRelay(ctx context.Context, brokers []string, jobs *jobSto
 		}
 
 		key := req.OrgSlug + "/" + req.RepoSlug
-		jobs.put(key, req.Token)
+		visibility, ok := gradingVisibility(req)
+		if !ok {
+			log.Printf("dropping grading request for %s/%s: visibility=%q needs a user token", req.OrgSlug, req.RepoSlug, req.Visibility)
+			return nil
+		}
+		jobs.put(key, req.Token, visibility)
 		out := contracts.GradeRequested{OrgSlug: req.OrgSlug, RepoSlug: req.RepoSlug, RequestedAt: req.RequestedAt, Token: req.Token}
 		if err := producer.Publish(ctx, key, out); err != nil {
 			return fmt.Errorf("relaying to %s: %w", contracts.TopicGradeRequested, err)
 		}
-		log.Printf("relayed grading request for %s/%s to %s", req.OrgSlug, req.RepoSlug, contracts.TopicGradeRequested)
+		log.Printf("relayed %s grading request for %s/%s to %s", visibility, req.OrgSlug, req.RepoSlug, contracts.TopicGradeRequested)
 		return nil
 	})
 }
@@ -107,17 +113,17 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 		}
 
 		// Taken before the status check so a failed job's token is dropped too. A missing job
-		// (unknown/expired, or relayed by another instance) grades with the service PAT.
-		job, _ := jobs.take(ready.OrgSlug + "/" + ready.RepoSlug)
+		// (unknown/expired, or relayed by another instance) is graded publicly with the service PAT.
+		job := jobs.take(ready.OrgSlug + "/" + ready.RepoSlug)
 
 		if ready.Status != contracts.StatusReady {
 			log.Printf("skipping %s/%s: status=%s error=%q", ready.OrgSlug, ready.RepoSlug, ready.Status, ready.Error)
 			return nil
 		}
 
-		log.Printf("grading %s/%s (sourcecraft_uuid=%s)", ready.OrgSlug, ready.RepoSlug, ready.SourcecraftUUID)
+		log.Printf("grading %s/%s %s (sourcecraft_uuid=%s)", ready.OrgSlug, ready.RepoSlug, job.visibility, ready.SourcecraftUUID)
 		gradeCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-		out, err := app.Grade(gradeCtx, ready.SourcecraftUUID, cfg, job.token)
+		out, err := app.Grade(gradeCtx, ready.SourcecraftUUID, cfg, job.token, job.visibility)
 		cancel()
 		if err != nil {
 			log.Printf("grading %s/%s failed: %v", ready.OrgSlug, ready.RepoSlug, err)
@@ -125,7 +131,7 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 		}
 		app.PrintResult(out)
 
-		result, err := app.BuildGradingResult(out, cfg, catalog, time.Now())
+		result, err := app.BuildGradingResult(out, cfg, catalog, job.visibility, time.Now(), rand.Shuffle)
 		if err != nil {
 			log.Printf("building grading result for %s/%s failed: %v", ready.OrgSlug, ready.RepoSlug, err)
 			return nil

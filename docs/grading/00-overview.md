@@ -39,6 +39,36 @@ justified exclusion, not a silent one. The two categories' reasons differ — se
 file: Security is genuinely platform-access-gated; CI/CD's private-only status started as a product
 decision, and its current data source (`cicd/runs`) is also owner-token-only.
 
+## Public vs. private grading and recommendations (2026-09-26)
+
+Each grading job is **either** public **or** private, never both:
+
+- The request carries a user token → **private**: all six categories, graded with the user's
+  token.
+- No token → **public**: only the four public categories, graded with the service's own token.
+  Security and CI/CD are not computed at all (no AppSec call, no CI/CD read).
+- A non-public repo requested without a token can't be graded and the request is dropped.
+
+The result (`grading.results`) says which one it is in `visibility` and fills only that side;
+`missing_data` lists only that view's categories, so a public result never reports Security or
+CI/CD as missing.
+
+**Recommendations**: every graded category's recommendations (one per metric scoring below
+healthy, see `config/recommendations.yaml`) go into one pool, and **3 are picked at random**
+(all of them if there are 3 or fewer). No severity ordering — deliberately, per team decision.
+
+### How a result is put together, step by step
+
+1. The request arrives. Token present → private, otherwise public.
+2. The repo is cloned and its data exported (with the user's token for private jobs).
+3. The categories for that visibility are scored: public = Activity, Documentation, Issues,
+   Code health; private = those plus Security and CI/CD.
+4. The overall score is the weighted average of those categories; categories with no data are
+   dropped and the rest re-weighted.
+5. Every category's recommendations are collected into one list, and 3 are drawn at random.
+6. The result is sent with `visibility` set and only that side (score, category scores,
+   recommendations) filled; `missing_data` names that view's categories that had no data.
+
 ## Design principles
 
 1. **One scoring formula, everywhere** — replaces the original draft's mix of a log-shaped formula

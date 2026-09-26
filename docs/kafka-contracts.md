@@ -30,6 +30,15 @@ the manual `grading-request` command). Consumer: Repository service.
 }
 ```
 
+The Aggregator's own topics, as Grade service reads/writes them:
+
+- `grading.requests`: `{org_slug, repo_slug, visibility, requested_at, token?}`. A token means
+  private grading; no token means public. A non-public `visibility` without a token is dropped.
+- `grading.results`: `{sourcecraft_uuid, visibility, public_score, public_category_scores,
+  public_recommendations, private_score, private_category_scores, private_recommendations,
+  missing_data, graded_at}`. Only the side named by `visibility` is filled, the other side is
+  `null`; recommendations hold at most 3, picked at random.
+
 `token` is copied from `grading.requests`. When present, Repository service uses it for the
 wrapper calls and the git clone; when absent, it falls back to its own `SOURCECRAFT_PAT`. The
 token is never logged and is deliberately **not** echoed on `repo.ready` — Grade service keeps it
