@@ -28,7 +28,8 @@ class Snapshot:
 
 def load_snapshot(store: ObjectStore, prefix: str,
                   selected_paths: set[str] | Callable[[frozenset[str]], set[str]], *,
-                  max_file_bytes: int = 2_000_000, max_total_bytes: int = 8_000_000) -> Snapshot:
+                  max_file_bytes: int = 2_000_000, max_total_bytes: int = 8_000_000,
+                  expand_selection=None) -> Snapshot:
     """Compare full listings and reread selected files to detect concurrent writes.
 
     This is a best-effort consistency check for the current mutable Repository
@@ -59,24 +60,32 @@ def load_snapshot(store: ObjectStore, prefix: str,
     files = {}
     hashes = {}
     total = 0
-    for path in sorted(selected_paths):
-        key = repository_keys[path]
-        listed_size = before[key][0]
-        if listed_size > max_file_bytes or total + listed_size > max_total_bytes:
-            raise SnapshotError("selected documentation exceeds context limits")
-        try:
-            first = store.read_object(key)
-            second = store.read_object(key)
-        except Exception as exc:
-            raise SnapshotError("S3 read failed") from exc
-        if first != second or len(first) != listed_size:
-            raise SnapshotError("S3 content changed during read")
-        total += len(first)
-        try:
-            files[path] = first.decode("utf-8")
-        except UnicodeDecodeError as exc:
-            raise SnapshotError("selected documentation is not UTF-8 text") from exc
-        hashes[path] = sha256(first).hexdigest()
+    def read_paths(paths):
+        nonlocal total
+        for path in sorted(paths):
+            key = repository_keys[path]
+            listed_size = before[key][0]
+            if listed_size > max_file_bytes or total + listed_size > max_total_bytes:
+                raise SnapshotError("selected documentation exceeds context limits")
+            try:
+                first = store.read_object(key)
+                second = store.read_object(key)
+            except Exception as exc:
+                raise SnapshotError("S3 read failed") from exc
+            if first != second or len(first) != listed_size:
+                raise SnapshotError("S3 content changed during read")
+            total += len(first)
+            try:
+                files[path] = first.decode("utf-8")
+            except UnicodeDecodeError as exc:
+                raise SnapshotError("selected documentation is not UTF-8 text") from exc
+            hashes[path] = sha256(first).hexdigest()
+    read_paths(selected_paths)
+    if expand_selection is not None:
+        extra = set(expand_selection(files, frozenset(repository_keys))) - set(files)
+        if not extra <= repository_keys.keys():
+            raise SnapshotError("linked file absent from complete listing")
+        read_paths(extra)
     try:
         after = dict(store.list_objects(root))
     except Exception as exc:

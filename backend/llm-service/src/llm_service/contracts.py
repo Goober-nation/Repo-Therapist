@@ -6,7 +6,7 @@ import json
 import re
 from datetime import datetime, timezone
 from decimal import Decimal
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from .grading import GROUPS
 
@@ -245,8 +245,35 @@ def build_documentation_completed(request: dict, payload: dict) -> dict:
     event = {key: request[key] for key in ("analysis_id", "repository_id", "data_scope")}
     if "commit_sha" in request:
         event["commit_sha"] = request["commit_sha"]
-    event.update(event_id=str(uuid4()), event_type="documentation.analysis.completed",
+    event.update(event_id=_documentation_terminal_id(request), event_type="documentation.analysis.completed",
                  event_version=DOCUMENTATION_RESULT_VERSION, request_event_id=request["event_id"],
                  created_at=datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
                  payload=payload)
     return parse_documentation_result(json.dumps(event, ensure_ascii=False, allow_nan=False).encode("utf-8"))
+
+
+def build_documentation_failed(request: dict, code: str, retryable: bool, message: str) -> dict:
+    """Build a correlated failure even when the request payload/version is invalid."""
+    request = _parse_envelope(json.dumps(request, allow_nan=False).encode("utf-8"))
+    if request.get("event_type") != "documentation.analysis.requested":
+        raise InvalidEvent("expected documentation request")
+    if code not in {
+        "INVALID_EVENT", "UNSUPPORTED_EVENT_VERSION", "S3_PREFIX_NOT_FOUND",
+        "S3_CONTENT_CHANGED", "S3_UNAVAILABLE", "CONTEXT_BUILD_FAILED",
+        "LLM_PROVIDER_UNAVAILABLE", "LLM_RATE_LIMITED", "LLM_INVALID_RESPONSE",
+        "INTERNAL_ERROR",
+    } or type(retryable) is not bool or not isinstance(message, str) or not message:
+        raise InvalidEvent("invalid documentation failure")
+    event = {key: request[key] for key in ("analysis_id", "repository_id", "data_scope")}
+    if "commit_sha" in request:
+        event["commit_sha"] = request["commit_sha"]
+    event.update(event_id=_documentation_terminal_id(request), event_type="documentation.analysis.failed",
+                 event_version=1, request_event_id=request["event_id"],
+                 created_at=datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+                 payload={"error": {"code": code, "retryable": retryable, "message": message}})
+    return event
+
+
+def _documentation_terminal_id(request: dict) -> str:
+    """Keep terminal event identity stable when Kafka redelivers a request."""
+    return str(uuid5(NAMESPACE_URL, f"sourcecraft:documentation:{request['event_id']}"))

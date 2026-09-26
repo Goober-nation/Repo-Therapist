@@ -8,10 +8,14 @@ score normalization, eight subcategory scores, and machine-readable problems.
 and detects a changed listing or selected content during the read.
 `llm_service.contracts` validates incoming v1 Documentation and Russian report
 request envelopes, category scores, and the arithmetic of supplied report problems.
-`llm_service.context` chooses complete user documents and selected build/test
-manifests from the full S3 listing. It excludes source files and `.env`, then
-hashes the exact UTF-8 context that will be sent to the model. Oversized input
-fails explicitly; no document is silently truncated.
+`llm_service.context` ranks at most 12 documentation candidates and eight supporting
+artifacts, in addition to required-file checks. It scans headings algorithmically and
+sends at most eight excerpts of up to 30 lines / 3000 UTF-8 bytes each. Topics cover
+purpose, local run, build, tests, structure and usage, with diverse topics preferred.
+The default model context cap is 32000 bytes. This is a sampled estimate, not a full
+audit. Omitted text is not evidence of missing documentation. Candidate scanning
+reads complete UTF-8 files locally (up to 2 MB each / 8 MB total); only excerpts are
+sent to the model. Large scans still fail explicitly at those limits.
 
 The active Yandex adapter validates **output format only** using
 `llm_service.formatted_response`. It checks JSON structure, types, check IDs,
@@ -63,13 +67,41 @@ variables exported, verify access using a short paid API request from this direc
 PYTHONPATH=src python3 -c 'from llm_service.yandex_model import YandexModel, YandexModelConfig; print(YandexModel(YandexModelConfig.from_env()).complete("Ответь одним словом: готово", max_output_tokens=32).decode())'
 ```
 
-The service is **not ready to consume or publish Kafka events yet**. The next
-implementation slices still need expanded detectors for repository-specific
-inputs that static inspection cannot verify, an S3 client adapter, Kafka
-consumers/producers, and Russian report generation. Real Yandex calls have returned responses during manual testing; the current
-format-only path has been tested locally with simulated provider responses. Real
-S3 integration and end-to-end Kafka delivery remain unverified. The grading result must not be published until
-those integrations and their failure paths are tested.
+The Documentation worker consumes `repo.docs.grade.requested` with
+`{sourcecraft_uuid, s3_prefix, requested_at}` and publishes `repo.docs.graded` with
+`{sourcecraft_uuid, grade, subgrades, advice, evaluated_at}`. The key is
+`sourcecraft_uuid`. `subgrades` maps section IDs to integer percentages, omitting
+unreviewed/inapplicable sections. `advice` is a list of deficiency fact strings,
+not recommendations. Internal local CLI output retains `subcategories` and `facts`.
+See [the active contract](../../docs/kafka-contracts.md#documentation-grading-active-grade--llm-contract).
+The input offset is committed only after publication acknowledgement. Failures
+stop the worker without committing; repair the cause and restart. No failure
+message is defined. Redelivery can repeat results; there is no request ID in this
+contract to distinguish simultaneous grading runs for the same repository.
+
+Install the Python service and start the worker from this directory:
+
+```bash
+python3 -m pip install -e .
+PYTHONPATH=src python3 -m llm_service --listen
+```
+
+Alongside the Yandex settings above, export `S3_ENDPOINT`, `S3_BUCKET`,
+`S3_ACCESS_KEY`, `S3_SECRET_KEY`, and `KAFKA_BROKERS`. For the repository's
+local Docker Compose setup they are `localhost:9000`, `repo-content`, the
+MinIO credentials from the local environment, and `localhost:9092`. Optional
+`S3_USE_SSL=true` switches to HTTPS; optional `LLM_KAFKA_GROUP_ID` overrides
+the default `llm-service-documentation-v1` group. Credentials are required;
+the LLM service never creates buckets or writes S3 objects. Kafka topics must
+exist before starting the consumer; this worker does not provision them.
+
+Real Yandex calls have returned responses during manual testing. The Kafka
+previous envelope request/result round trip was verified against the local Kafka broker with a
+simulated repository and model. S3 list/get and context preparation were
+verified over HTTP against a local S3-compatible test server. The repository's
+MinIO image could not be pulled from Quay (`401`), so MinIO itself and the full
+Kafka → MinIO → Yandex path remain unverified here. Report generation and its
+separate Kafka topics are not implemented yet.
 
 Run the current tests from this directory:
 
@@ -78,5 +110,22 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 python3 -m compileall -q src tests
 ```
 
-Python 3.11 or newer is required. These tests use only the standard library and
-do not contact Kafka, S3, or a model provider.
+Python 3.11 or newer is required. These tests use simulated clients and do not
+contact Kafka, S3, or a model provider.
+
+
+Sampling refinement (2026-09-26): the selector prioritizes individual rubric checks,
+reserves README introduction, and follows up to eight existing repository-local
+README document links (one hop; inline and reference links). External links are
+never fetched. Excerpts have a shared 24000-byte content budget; the entire JSON
+context is capped at 32000 bytes. Candidate scanning remains bounded separately.
+Each model check is marked `sampled` or `not_reviewed` in the internal context.
+An unreviewed check contributes neither earned nor maximum points and cannot
+produce deficiency facts. The total is 100 * earned / evaluated maximum. A section
+with no evaluated checks has `grade: null`; this now means either not applicable
+or not reviewed. No estimated score is substituted for omitted material. This
+supersedes earlier wording that required all section grades to be estimated.
+The Kafka object shape is unchanged; consumers must display null as unavailable,
+not as zero. Deterministic required-file checks retain their existing rules.
+
+The current flat Kafka contract is verified by unit tests; the full real-service path remains unverified.

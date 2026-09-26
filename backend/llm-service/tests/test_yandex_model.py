@@ -118,7 +118,7 @@ class YandexModelTests(unittest.TestCase):
                 json.dumps({"checks": checks}))) as send:
             result = self.model.grade(SNAPSHOT, CONTEXT)
         self.assertEqual(send.call_count, 1)
-        self.assertEqual(result["grade"], 98)
+        self.assertEqual(result["grade"], 93.55)  # 29 / 31 evaluated points
         self.assertEqual(result["facts"][0]["facts"], checks[0]["deductions"][0]["facts"])
         self.assertEqual(result["facts"][0]["evidence"], checks[0]["deductions"][0]["evidence"])
 

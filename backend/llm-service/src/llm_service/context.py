@@ -1,4 +1,4 @@
-"""Choose repository evidence and construct one complete, hashable model context."""
+"""Find candidate files and construct a bounded, sampled model context."""
 
 from __future__ import annotations
 
@@ -10,6 +10,9 @@ from hashlib import sha256
 from .detectors import detect_repository_facts
 from .grading import required_file_paths
 from .snapshot import ObjectStore, Snapshot, load_snapshot
+from .sampling import TOPICS, file_priority, sample_documents, topic
+from .discovery import readme_links
+from .grading import COMPONENTS
 
 DOC_EXTENSIONS = (".md", ".rst", ".adoc", ".txt")
 ROOT_DOCUMENTS = {"readme", "license", "licence", "contributing", "changelog",
@@ -43,7 +46,7 @@ def _is_document(path: str) -> bool:
         return False
     basename = lower.rsplit("/", 1)[-1]
     stem = basename.split(".", 1)[0]
-    if (lower.startswith("docs/") or "/docs/" in lower) and lower.endswith(DOC_EXTENSIONS):
+    if any(part in {"docs", "doc", "documentation"} for part in lower.split("/")[:-1]) and lower.endswith(DOC_EXTENSIONS):
         return True
     if lower.startswith(".github/") and lower.endswith(DOC_EXTENSIONS):
         return True
@@ -53,7 +56,7 @@ def _is_document(path: str) -> bool:
 
 
 def select_context_paths(all_paths: frozenset[str], *, max_paths: int = 10_000) -> set[str]:
-    """Select complete docs and small source manifests; never select secrets or source trees."""
+    """Select at most 12 document candidates and eight artifacts plus required files."""
     if len(all_paths) > max_paths:
         raise ContextBuildError("repository inventory exceeds context path limit")
     required = required_file_paths(set(all_paths))
@@ -69,34 +72,67 @@ def select_context_paths(all_paths: frozenset[str], *, max_paths: int = 10_000) 
             lower.startswith(".github/workflows/") and lower.endswith((".yml", ".yaml"))
         ):
             selected.add(path)
-    return selected
+    candidates = sorted((p for p in selected if _is_document(p)), key=file_priority)
+    documents = candidates[:1]
+    for group in TOPICS:
+        match = next((p for p in candidates if topic(p.rsplit("/", 1)[-1]) == group), None)
+        if match and match not in documents:
+            documents.append(match)
+    documents += [p for p in candidates if p not in documents][:12 - len(documents)]
+    artifacts = sorted((p for p in selected if not _is_document(p)), key=file_priority)[:8]
+    return set(documents) | set(artifacts) | required
 
 
-def build_model_context(snapshot: Snapshot, *, max_context_bytes: int = 512_000) -> ModelContext:
-    """Use only complete selected files; reject overflow instead of silently truncating."""
+def build_model_context(snapshot: Snapshot, *, max_context_bytes: int = 32_000) -> ModelContext:
+    """Build an explicitly sampled context with bounded excerpts and supporting metadata."""
     selected = set(snapshot.files)
     if not selected <= snapshot.all_paths:
         raise ContextBuildError("selected files are absent from inventory")
-    reviewed = frozenset(path for path in selected if _is_document(path))
+    linked = readme_links(snapshot.files, snapshot.all_paths)
+    reviewed = frozenset(path for path in selected if _is_document(path) or path in linked)
+    document_paths = reviewed
+    excerpts = sample_documents({path: snapshot.files[path] for path in reviewed}, linked)
+    reviewed = frozenset(item["path"] for item in excerpts)
+    paths = sorted(snapshot.all_paths, key=lambda p: (p.count("/"), p))[:100]
     data = {
-        "repository_paths": sorted(snapshot.all_paths),
-        "documents": {path: snapshot.files[path] for path in sorted(reviewed)},
-        "artifacts": {path: snapshot.files[path] for path in sorted(selected - reviewed)},
-        "detected_facts": detect_repository_facts(snapshot),
+        "review_mode": "sampled-documentation-v2",
+        "coverage": {check: "sampled" if any(check in item["check_ids"] for item in excerpts)
+                     else "not_reviewed" for check in COMPONENTS},
+        "sampling": {"max_sections": 8, "max_lines_per_section": 30,
+                     "total_file_count": len(snapshot.all_paths),
+                     "inventory_truncated": len(paths) < len(snapshot.all_paths)},
+        "repository_paths": paths,
+        "documents": excerpts,
+        "artifacts": {path: snapshot.files[path].encode("utf-8")[:1000].decode("utf-8", errors="ignore")
+                      for path in sorted(selected) if path not in document_paths},
+        "detected_facts": {key: value[:10] if isinstance(value, list) else value
+                           for key, value in detect_repository_facts(snapshot).items()},
     }
-    text = json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    def serialize():
+        return json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    text = serialize()
+    # Preserve selected evidence first; auxiliary metadata yields to the hard budget.
+    for field in ("artifacts", "detected_facts", "repository_paths"):
+        while len(text.encode("utf-8")) > max_context_bytes and data[field]:
+            if isinstance(data[field], dict):
+                data[field].pop(next(reversed(data[field])))
+            else:
+                data[field].pop()
+                data["sampling"]["inventory_truncated"] = True
+            text = serialize()
     encoded = text.encode("utf-8")
     if len(encoded) > max_context_bytes:
         raise ContextBuildError("complete model context exceeds byte limit")
     return ModelContext(text, sha256(encoded).hexdigest(), reviewed, len(selected),
-                        len(snapshot.all_paths))
+                        len(snapshot.all_paths), truncated=True)
 
 
 def prepare_documentation_context(store: ObjectStore, prefix: str, *,
-                                  max_context_bytes: int = 512_000) -> tuple[Snapshot, ModelContext]:
+                                  max_context_bytes: int = 32_000) -> tuple[Snapshot, ModelContext]:
     """List S3, choose context paths, read them stably, then hash the exact model input."""
     snapshot = load_snapshot(store, prefix, select_context_paths,
-                             max_file_bytes=max_context_bytes, max_total_bytes=max_context_bytes)
+                             max_file_bytes=2_000_000, max_total_bytes=8_000_000,
+                             expand_selection=readme_links)
     return snapshot, build_model_context(snapshot, max_context_bytes=max_context_bytes)
 
 

@@ -8,7 +8,7 @@ Scope: the message shapes published/consumed on the Kafka links in the architect
 - Grade service <-> Repository service — **defined below**. This exchange is entirely within one
   person's scope (Repository + Grade service), so it didn't need to wait on wider team sign-off —
   see `backlog/phase-3-kafka-integration.md` for the implementation notes.
-- Grade service <-> LLM service — **defined below (request v1, completed v2)** for documentation analysis.
+- Grade service <-> LLM service — **defined below as flat `repo.docs.*` messages** for documentation analysis.
 - Aggregator <-> LLM service — **defined below (request/completed v2)** for final report generation.
 
 ## `repo.grade.requested`
@@ -75,7 +75,7 @@ category, normal code performs objective checks and the model performs semantic 
 combines both parts using a versioned grading method and returns the final normalized Documentation
 score, eight section grades, and a flat fact list. Grade service consumes that category score without
 recalculating its internal checks. It also receives subcategory scores and facts about every
-deduction. The documentation response contains no written advice; Russian explanations and
+deduction. The documentation response contains textual deficiency facts in `advice`; Russian explanations and
 recommendations are generated only after a separate request from Aggregator.
 
 Activity, Security, CI/CD, Issues, and Code Health are assessed algorithmically outside LLM service.
@@ -87,8 +87,8 @@ are immutable source material for human-readable synthesis.
 
 | Topic | Producer | Consumer | Kafka message key |
 |---|---|---|---|
-| `llm.documentation.requests` | Grade service | LLM service | `analysis_id` |
-| `llm.documentation.results` | LLM service | Grade service | `analysis_id` |
+| `repo.docs.grade.requested` | Grade service | LLM service | `sourcecraft_uuid` |
+| `repo.docs.graded` | LLM service | Grade service | `sourcecraft_uuid` |
 | `llm.report.requests` | Aggregator | LLM service | `analysis_id` |
 | `llm.report.results` | LLM service | Aggregator | `analysis_id` |
 
@@ -97,13 +97,13 @@ likewise share a separate consumer group. Suggested names are `llm-service-docum
 `llm-service-report-v1`. Different logical consumers must not share a consumer group: members of
 one group divide messages instead of each receiving a copy.
 
-Producers must use a key-aware partitioner so every message with the same `analysis_id` maps to the
-same partition within a topic. Kafka only guarantees order inside one topic partition; no workflow
+Producers must use a key-aware partitioner with the key listed in the table above
+so messages with the same key map to the same partition within a topic. Kafka only guarantees order inside one topic partition; no workflow
 may rely on ordering between different topics.
 
-## Common event envelope
+## Report event envelope (not used for documentation grading)
 
-Every LLM event is UTF-8 JSON with `Content-Type: application/json` semantics and this envelope:
+Report events are UTF-8 JSON with this proposed envelope:
 
 ```json
 {
@@ -149,198 +149,55 @@ No event may contain credentials, SourceCraft/Yandex tokens, S3 secret keys, ful
 repository files. A serialized event should remain below 512 KiB so it stays comfortably below the
 usual Kafka 1 MiB record limit.
 
-## Documentation analysis
+## Documentation grading: active Grade ↔ LLM contract
 
-### `documentation.analysis.requested`
+The active worker uses flat JSON objects, with no event envelope or version fields.
+Both topics use `sourcecraft_uuid` as their Kafka key.
 
-Topic: `llm.documentation.requests`.
-
-The request is published after Grade service consumes `repo.ready` with `status: ready`. It forwards
-that event's `s3_prefix` unchanged. The S3 bucket, endpoint, and credentials are runtime
-configuration of LLM service and are not included in Kafka. Documentation grading does not generate
-prose, so it needs no `output_language` field.
+Grade → LLM, topic `repo.docs.grade.requested`:
 
 ```json
 {
-  "event_id": "018f47d2-6d5a-7b72-82fd-1e9834d57a91",
-  "event_type": "documentation.analysis.requested",
-  "event_version": 1,
-  "analysis_id": "018f47d1-e33b-7af3-a642-229ac22a9e82",
-  "repository_id": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
-  "data_scope": "public",
-  "created_at": "2026-09-21T10:15:30Z",
-  "payload": {
-    "s3_prefix": "repos/019b2102-fa21-7ab7-8ce1-116af406fb5e"
-  }
+  "sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
+  "s3_prefix": "repos/019b2102-fa21-7ab7-8ce1-116af406fb5e",
+  "requested_at": "2026-09-26T12:00:00Z"
 }
 ```
 
-S3 input rules:
-
-- `s3_prefix` is exactly the value from `repo.ready`; object keys are read below
-  `s3_prefix + "/"`, so similarly named repository prefixes cannot overlap;
-- the repository content is read from that prefix; `_meta/` exports are not part of the
-  documentation being graded;
-- LLM service builds an in-memory manifest from the complete object listing and records hashes of
-  selected file contents used for the analysis; this manifest is not another S3 object;
-- Repository service currently reuses `repos/<repository_id>` and does not publish a manifest or
-  commit SHA. LLM service must detect a changed object list or changed selected contents while
-  reading and fail the request instead of publishing a mixed-state result;
-- `file_missing` is allowed only after a complete, successful prefix listing. An inaccessible or
-  unstable prefix produces a failed event, never a false absence.
-
-### `documentation.analysis.completed`
-
-Topic: `llm.documentation.results`. Event version: **2**.
-
-The payload contains exactly three fields: the overall Documentation grade, eight section grades,
-and a flat list of facts describing deficiencies. Correlation IDs remain in the event envelope.
+LLM → Grade, topic `repo.docs.graded`:
 
 ```json
 {
-  "event_id": "018f47d8-e274-7aa8-ac4f-e85ee5f01818",
-  "event_type": "documentation.analysis.completed",
-  "event_version": 2,
-  "request_event_id": "018f47d2-6d5a-7b72-82fd-1e9834d57a91",
-  "analysis_id": "018f47d1-e33b-7af3-a642-229ac22a9e82",
-  "repository_id": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
-  "data_scope": "public",
-  "created_at": "2026-09-21T10:15:44Z",
-  "payload": {
-    "grade": 98,
-    "subcategories": [
-      {
-        "id": "required_files",
-        "grade": 100
-      },
-      {
-        "id": "purpose",
-        "grade": 100
-      },
-      {
-        "id": "local_run",
-        "grade": 90
-      },
-      {
-        "id": "build",
-        "grade": 100
-      },
-      {
-        "id": "testing",
-        "grade": 100
-      },
-      {
-        "id": "usage",
-        "grade": 100
-      },
-      {
-        "id": "structure",
-        "grade": 100
-      },
-      {
-        "id": "consistency",
-        "grade": 100
-      }
-    ],
-    "facts": [
-      {
-        "id": "DOC-0001",
-        "subcategory": "local_run",
-        "code": "DOC_LOCAL_RUN_CONFIGURATION_INCOMPLETE",
-        "facts": {
-          "missing_aspects": [
-            "required_parameters"
-          ]
-        },
-        "evidence": [
-          {
-            "type": "file_content",
-            "path": "README.md",
-            "start_line": 30,
-            "end_line": 38,
-            "quote": "POSTGRES_USER=..."
-          },
-          {
-            "type": "file_missing",
-            "path": ".env.example"
-          }
-        ]
-      }
-    ]
-  }
+  "sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
+  "grade": 85,
+  "subgrades": {"required_files": 100, "purpose": 80, "local_run": 75},
+  "advice": ["Назначение проекта: Назначение проекта описано неясно."],
+  "evaluated_at": "2026-09-26T12:00:10Z"
 }
 ```
 
-Payload rules:
+Section keys: `required_files`, `purpose`, `local_run`, `build`, `testing`, `usage`,
+`structure`, `consistency`. Unreviewed or inapplicable sections are omitted from
+`subgrades`, never replaced with zero or null. The total is normalized over evaluated
+checks before rounding; it is not the arithmetic mean of section percentages.
+All wire grades are integers 0–100, rounded half up. `advice` contains deficiency
+facts as strings, not recommendations. Russian fact titles, original detail values
+and evidence are rendered deterministically without another model call.
+Timestamps are timezone-aware RFC3339. S3 prefix is a relative object-key prefix
+without a trailing slash. The service only reads repository objects.
 
-- `grade`: number from 0 to 100, rounded to two decimals. Grade service uses this value directly.
-- `subcategories`: exactly eight objects with only `id` and `grade`. IDs are `required_files`,
-  `purpose`, `local_run`, `build`, `testing`, `usage`, `structure`, `consistency`.
-- Each section grade is normalized to 0–100 within that section. `null` means every check in
-  the section is not applicable; it is not zero and must not reduce the overall grade.
-- Overall grade uses the existing check weights and evaluated maxima, not the arithmetic mean
-  of the eight section grades. Scoring guidance remains in `documentation-grading.md`.
-- `facts`: an array of objects containing `id`, `subcategory`, `code`, `facts`, and `evidence`.
-  `facts` within an item is an object of structured deficiency details; `evidence` is an array
-  of objects and can be empty. `code` labels the kind of deficiency. There is no advice text.
-- Fact IDs are unique within a result (for example `DOC-0001`). They are assigned in internal
-  check/deduction order and preserved when the same logical event is retried or forwarded.
-  They are not cross-analysis identities. Facts retain their section association.
-- Both objective-file and model-produced facts are included, even minor ones. All supplied
-  model findings are retained without testing their arithmetic against the section score.
-- Validation is format-only. Model facts, quotes, line numbers and semantic claims are not
-  certified by the service; evidence and numeric deduction consistency do not block delivery.
-- The payload does **not** contain `checks`, `components`, `deductions`, `problems`, `severity`,
-  numeric score impacts, coverage, prompt/model metadata, context hashes or validation flags
-  at its top level. Evidence objects may retain their original context hash or file excerpt.
-- Recommendations and human-readable explanations are produced only in the later report flow.
+The worker commits input offsets only after the result is acknowledged by Kafka.
+There is no agreed failure-event format: invalid input, S3/model failures and failed
+publication stop the worker without committing the record. Repair the cause before
+restarting; a malformed record needs operator intervention. No fabricated grade is
+published. Delivery is at least once: a crash between publication and offset commit
+can repeat a result. This minimal contract has no request ID, so concurrent grading
+runs for the same repository cannot be reliably correlated; consumers must account
+for repeated results. The service does not claim exactly-once processing.
 
-The 25 internal checks and component scores remain implementation details. Removing them from
-Kafka does not change the scoring weights. Grade service forwards this complete compact payload
-to Aggregator, which supplies it as `payload.documentation` in report request v2. Neither service
-needs to synthesize severity, numerical per-fact penalties or verified problem records.
-
-Version 2 replaces the former extended v1 completed payload. Consumers must explicitly migrate;
-there is no silent interpretation of v1 `score/checks/problems` as v2 `grade/subcategories/facts`.
-Documentation requests and documentation failure events retain version 1.
-
-### `documentation.analysis.failed`
-
-Topic: `llm.documentation.results`.
-
-```json
-{
-  "event_id": "018f47d8-e274-7aa8-ac4f-e85ee5f01819",
-  "event_type": "documentation.analysis.failed",
-  "event_version": 1,
-  "request_event_id": "018f47d2-6d5a-7b72-82fd-1e9834d57a91",
-  "analysis_id": "018f47d1-e33b-7af3-a642-229ac22a9e82",
-  "repository_id": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
-  "data_scope": "public",
-  "created_at": "2026-09-21T10:15:44Z",
-  "payload": {
-    "error": {
-      "code": "LLM_PROVIDER_UNAVAILABLE",
-      "retryable": true,
-      "message": "Провайдер модели временно недоступен"
-    }
-  }
-}
-```
-
-Documentation error codes:
-
-- `INVALID_EVENT`
-- `UNSUPPORTED_EVENT_VERSION`
-- `S3_PREFIX_NOT_FOUND`
-- `S3_CONTENT_CHANGED`
-- `S3_UNAVAILABLE`
-- `CONTEXT_BUILD_FAILED`
-- `LLM_PROVIDER_UNAVAILABLE`
-- `LLM_RATE_LIMITED`
-- `LLM_INVALID_RESPONSE`
-- `EVIDENCE_VALIDATION_FAILED`
-- `INTERNAL_ERROR`
+The older `documentation.analysis.*` envelopes are legacy helpers only and are not
+used by the active Kafka worker. The report envelope below is a separate proposed
+interface; report generation is not implemented by this worker.
 
 ## Report generation
 
@@ -682,7 +539,7 @@ Report error codes:
 - `REPORT_SOURCE_VALIDATION_FAILED`
 - `INTERNAL_ERROR`
 
-## Delivery, retries, and idempotency
+## Proposed report delivery, retries, and idempotency
 
 Kafka delivery is at-least-once. The contracts do not claim exactly-once processing.
 
@@ -700,7 +557,7 @@ Kafka delivery is at-least-once. The contracts do not claim exactly-once process
   failure event. The consumer logs only non-sensitive metadata, records a metric, and commits it so
   it cannot block its partition. A future dead-letter topic can be added if operations require it.
 
-## Compatibility rules
+## Report envelope compatibility rules
 
 - Adding an optional field is backward-compatible within `event_version: 1`.
 - Removing a field, changing its meaning/type, adding a required field, or changing enum semantics
@@ -709,3 +566,18 @@ Kafka delivery is at-least-once. The contracts do not claim exactly-once process
 - Grading method, prompt, model, and report template versions are result provenance, not Kafka
   schema versions.
 - Timestamps, UUIDs, category IDs, and enum spelling are case-sensitive as shown above.
+
+
+Sampling refinement (2026-09-26): the selector prioritizes individual rubric checks,
+reserves README introduction, and follows up to eight existing repository-local
+README document links (one hop; inline and reference links). External links are
+never fetched. Excerpts have a shared 24000-byte content budget; the entire JSON
+context is capped at 32000 bytes. Candidate scanning remains bounded separately.
+Each model check is marked `sampled` or `not_reviewed` in the internal context.
+An unreviewed check contributes neither earned nor maximum points and cannot
+produce deficiency facts. The total is 100 * earned / evaluated maximum. A section
+with no evaluated checks has `grade: null`; this now means either not applicable
+or not reviewed. No estimated score is substituted for omitted material. This
+supersedes earlier wording that required all section grades to be estimated.
+Internally unavailable grades remain null; the active Kafka adapter omits those
+sections from `subgrades`. Deterministic required-file checks retain their existing rules.

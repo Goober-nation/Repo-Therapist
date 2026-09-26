@@ -1,5 +1,12 @@
 # LLM Documentation result
 
+> Active method (2026-09-26): budget-limited sampled documentation review.
+> The service selects up to eight relevant excerpts (30 lines and 3000 UTF-8 bytes
+> per excerpt). Existing weights and eight section grades apply as estimates
+> from the selected material. Findings must not claim that omitted text was
+> inspected or absent; sampling alone is not a deficiency.
+
+
 The active Python Yandex path checks JSON structure, IDs, types and score ranges only.
 It does not reject model claims for mismatched deduction arithmetic, evidence quotes,
 line numbers, context hashes or applicability. This remains the user-approved behavior.
@@ -45,3 +52,18 @@ PYTHONPATH=src python3 -m unittest discover -s tests -q
 The normal command prints the compact payload as JSON to stdout and progress/errors to
 stderr. Dry-run prepares context without network or credentials. Live generation uses
 `YANDEX_AI_API_KEY`, `YANDEX_FOLDER_ID`, and optional `YANDEX_AI_MODEL` from the environment.
+
+
+Sampling refinement (2026-09-26): the selector prioritizes individual rubric checks,
+reserves README introduction, and follows up to eight existing repository-local
+README document links (one hop; inline and reference links). External links are
+never fetched. Excerpts have a shared 24000-byte content budget; the entire JSON
+context is capped at 32000 bytes. Candidate scanning remains bounded separately.
+Each model check is marked `sampled` or `not_reviewed` in the internal context.
+An unreviewed check contributes neither earned nor maximum points and cannot
+produce deficiency facts. The total is 100 * earned / evaluated maximum. A section
+with no evaluated checks has `grade: null`; this now means either not applicable
+or not reviewed. No estimated score is substituted for omitted material. This
+supersedes earlier wording that required all section grades to be estimated.
+The Kafka object shape is unchanged; consumers must display null as unavailable,
+not as zero. Deterministic required-file checks retain their existing rules.
