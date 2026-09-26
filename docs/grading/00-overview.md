@@ -28,7 +28,7 @@ Kept from the TZ's example weights (§3.2) — they sum cleanly and nothing argu
 | Activity | 15% | yes | **implemented** |
 | Documentation | 15% | yes | blocked (Grade↔LLM Kafka contract) |
 | Issues | 15% | yes | **implemented** |
-| CI/CD | 15% | no | planned |
+| CI/CD | 15% | no | **implemented** |
 
 **Public score** = Activity + Documentation + Issues + Code health (65%, renormalized to /100).
 **Private score** = all six, already summing to 100% directly.
@@ -36,8 +36,8 @@ Kept from the TZ's example weights (§3.2) — they sum cleanly and nothing argu
 Security and CI/CD are private-only, not a TZ requirement — but the TZ explicitly permits excluding
 a category "if the reason and impact on score are explained" (§3.2), so this is a documented,
 justified exclusion, not a silent one. The two categories' reasons differ — see each one's own
-file: Security is genuinely platform-access-gated; CI/CD's private-only status is a product
-decision, not a technical block (its data is viewer-readable on public repos).
+file: Security is genuinely platform-access-gated; CI/CD's private-only status started as a product
+decision, and its current data source (`cicd/runs`) is also owner-token-only.
 
 ## Design principles
 

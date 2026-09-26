@@ -21,12 +21,14 @@ const (
 var AllTopics = []string{TopicGradeRequested, TopicRepoReady, TopicGradingRequests, TopicGradingResults}
 
 // GradeRequested is published to ask Repository service to clone+upload a repo. Consumed by
-// Repository service, produced by a manual trigger for now (grade-service --request-org/--repo) —
-// eventually the Aggregator, not built yet.
+// Repository service, produced by grade-service relaying grading.requests.
 type GradeRequested struct {
 	OrgSlug     string    `json:"org_slug"`
 	RepoSlug    string    `json:"repo_slug"`
 	RequestedAt time.Time `json:"requested_at"`
+	// Token is the user's SourceCraft PAT for private grading; empty means use the service PAT.
+	// Never log it.
+	Token string `json:"token,omitempty"`
 }
 
 // ReadyStatus values for RepoReady.Status.
@@ -60,12 +62,14 @@ const (
 
 // GradingRequestedEvent is published by the Aggregator to ask for a repo to be graded — the exact
 // trigger for GradeRequested above, just from the Aggregator instead of a manual/local trigger.
-// Byte-identical shape to GradeRequested by design: consuming this and republishing GradeRequested
-// is a straight passthrough, no field mapping needed.
 type GradingRequestedEvent struct {
 	OrgSlug     string    `json:"org_slug"`
 	RepoSlug    string    `json:"repo_slug"`
+	Visibility  string    `json:"visibility"`
 	RequestedAt time.Time `json:"requested_at"`
+	// Token present -> private grading with the user's PAT; absent -> public grading with the
+	// service PAT. Never log it.
+	Token string `json:"token,omitempty"`
 }
 
 // Recommendation is one deduction-reason -> pre-written-text pairing, generated while scoring

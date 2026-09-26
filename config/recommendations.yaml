@@ -30,3 +30,9 @@ open_high: "There are open high-severity findings. These should be addressed soo
 open_medium: "There are open medium-severity findings worth scheduling time to address."
 open_low: "There are open low-severity findings. Not urgent, but worth tracking so they don't accumulate."
 days_since_last_scan: "It's been a while since the last security scan. Running a fresh scan ensures the findings reflect the current state of the code."
+
+# --- CI/CD (docs/grading/ci-cd.md) ---
+has_ci: "No CI pipeline was found. Adding a .sourcecraft/ci.yaml that builds and tests every change catches regressions before they reach the main branch."
+ci_success_rate: "A large share of CI runs are failing. Fixing or quarantining the failing checks keeps CI a trustworthy signal instead of noise."
+ci_stability_trend: "CI has been failing more often recently than before. Look at what changed in the recent failing runs before the failures become normal."
+ci_median_duration_min: "CI runs take a long time. Caching dependencies or splitting slow jobs shortens the feedback loop for contributors."

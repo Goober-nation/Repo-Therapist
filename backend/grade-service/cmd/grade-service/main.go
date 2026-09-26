@@ -1,11 +1,11 @@
 // grade-service (per backlog/phase-2-grade-service.md and backlog/phase-3-kafka-integration.md):
 // given a sourcecraft_uuid, read that repo's _meta/*.json exports from S3 (never clones itself,
-// per the architecture diagram) and compute the Activity category score. Three modes:
+// per the architecture diagram) and compute the category scores. Two modes:
 //
-//	--repo-id=<uuid>                    one-shot, grade directly, print JSON to stdout
-//	--listen                            consume repo.ready from Kafka, grade each as it arrives
-//	--request-org=X --request-repo=Y    publish a repo.grade.requested message and exit — the
-//	                                     manual trigger point for testing the Kafka flow
+//	--repo-id=<uuid>    one-shot, grade directly, print JSON to stdout
+//	--listen            consume grading.requests + repo.ready from Kafka
+//
+// Manual Kafka triggering lives in cmd/grading-request.
 package main
 
 import (
@@ -25,20 +25,16 @@ func main() {
 	repoID := flag.String("repo-id", "", "SourceCraft repo UUID (one-shot mode)")
 	configPath := flag.String("config", "config/grading.yaml", "path to grading policy config")
 	listen := flag.Bool("listen", false, "consume repo.ready from Kafka instead of one-shot mode")
-	requestOrg := flag.String("request-org", "", "publish a grade request for this org (with --request-repo) and exit")
-	requestRepo := flag.String("request-repo", "", "publish a grade request for this repo (with --request-org) and exit")
 	flag.Parse()
 
 	var err error
 	switch {
-	case *requestOrg != "" && *requestRepo != "":
-		err = transport.RunRequest(*requestOrg, *requestRepo)
 	case *listen:
 		err = transport.RunListen(*configPath)
 	case *repoID != "":
 		err = runOnce(*repoID, *configPath)
 	default:
-		fmt.Fprintln(os.Stderr, "usage: grade-service --repo-id=<uuid>  OR  --listen  OR  --request-org=<org> --request-repo=<repo>")
+		fmt.Fprintln(os.Stderr, "usage: grade-service --repo-id=<uuid>  OR  --listen")
 		os.Exit(2)
 	}
 	if err != nil {
@@ -54,7 +50,7 @@ func runOnce(repoID, configPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	out, err := app.Grade(ctx, repoID, cfg)
+	out, err := app.Grade(ctx, repoID, cfg, "")
 	if err != nil {
 		return err
 	}

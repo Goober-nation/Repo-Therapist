@@ -18,7 +18,7 @@ categories:
     metrics:
       - id: commits_per_week
         status: calculated
-        weight: 0.20
+        weight: 0.25
         source: commits.json
         aggregation:
           type: rate_per_week
@@ -307,7 +307,64 @@ categories:
   ci_cd:
     weight: 0.15
     public: false
-    status: not_calculated
+    status: calculated
+    # Source: _meta/ci-runs.json (repository-service): CI config files found in the clone + the
+    # newest <=25 runs from the last 180 days via /cicd/runs, which only answers for an owner
+    # token — unreadable runs make the whole category no-data. See docs/grading/ci-cd.md.
+    metrics:
+      # Hard gate: no .sourcecraft/ci.yaml AND zero runs -> whole category = 0. Weight 0: it never
+      # contributes to the weighted average, it only zeroes the category when it fails.
+      - id: has_ci
+        status: calculated
+        weight: 0
+        source: ci-runs.json
+        aggregation:
+          type: ci_has_ci
+        formula:
+          type: gate
+
+      - id: ci_success_rate
+        status: calculated
+        weight: 0.5
+        source: ci-runs.json
+        aggregation:
+          type: ci_success_rate
+          min_sample_size: 3
+        formula:
+          type: linear_clamp
+          direction: "+"
+          critical: 0.5
+          healthy: 0.9
+          provisional: true
+
+      # Newer half's pass share minus older half's, in [-1, 1]. 0 (stable) or better is healthy.
+      - id: ci_stability_trend
+        status: calculated
+        weight: 0.3
+        source: ci-runs.json
+        aggregation:
+          type: ci_stability_trend
+          min_sample_size: 6
+        formula:
+          type: linear_clamp
+          direction: "+"
+          critical: -0.3
+          healthy: 0
+          provisional: true
+
+      - id: ci_median_duration_min
+        status: calculated
+        weight: 0.2
+        source: ci-runs.json
+        aggregation:
+          type: ci_median_duration_min
+          min_sample_size: 3
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 30
+          healthy: 5
+          provisional: true
 
   security:
     weight: 0.20

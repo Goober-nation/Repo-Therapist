@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"repo-therapist/repository-service/internal/service"
 	"repo-therapist/repository-service/internal/contracts"
 	kafkaclient "repo-therapist/repository-service/internal/kafka"
+	"repo-therapist/repository-service/internal/service"
 )
 
 // RunListen consumes repo.grade.requested and publishes repo.ready for each one — a thin loop
@@ -63,7 +63,7 @@ func handleRequest(ctx context.Context, req contracts.GradeRequested) contracts.
 	cloneCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	res, err := service.CloneAndUpload(cloneCtx, req.OrgSlug, req.RepoSlug)
+	res, err := service.CloneAndUpload(cloneCtx, req.OrgSlug, req.RepoSlug, req.Token)
 	if err != nil {
 		log.Printf("clone/upload failed for %s/%s: %v", req.OrgSlug, req.RepoSlug, err)
 		return contracts.RepoReady{
