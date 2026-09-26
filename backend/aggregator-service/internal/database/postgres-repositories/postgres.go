@@ -60,15 +60,23 @@ func (r *RepoRepository) CreateRepository(
 			org_slug,
 			repo_slug,
 			visibility,
-			last_activity_at
+			last_activity_at, 
+		 	main_language,
+  			language_color,
+  			sourcecraft_rating,
+  			web_url
 		)
-		VALUES ($1, $2, $3, $4, $5)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		`,
 		id,
 		repo.OrgSlug,
 		repo.RepoSlug,
 		repo.Visibility,
 		repo.LastActivityAt,
+		repo.Language.Name,
+		repo.Language.Color,
+		repo.RatingValue,
+		repo.WebURL,
 	)
 	if err != nil {
 		return uuid.Nil, mapRepositoryError(err)
@@ -105,7 +113,11 @@ func (r *RepoRepository) UpdateRepository(ctx context.Context, repo domain.Repo)
 			org_slug = $2,
 			repo_slug = $3,
 			visibility = $4,
-			last_activity_at = $5
+			last_activity_at = $5,
+			main_language = $6,
+  			language_color = $7,
+  			sourcecraft_rating = $8,
+  			web_url = $9
 		WHERE sourcecraft_uuid = $1
 		`,
 		repo.SourcecraftUUID,
@@ -113,6 +125,10 @@ func (r *RepoRepository) UpdateRepository(ctx context.Context, repo domain.Repo)
 		repo.RepoSlug,
 		repo.Visibility,
 		repo.LastActivityAt,
+		repo.Language.Name,
+		repo.Language.Color,
+		repo.RatingValue,
+		repo.WebURL,
 	)
 
 	if err != nil {
@@ -158,7 +174,11 @@ func (r *RepoRepository) GetRepositoryByID(ctx context.Context, repoID uuid.UUID
 			org_slug,
 			repo_slug,
 			visibility,
-			last_activity_at
+			last_activity_at,
+			main_language,
+  			language_color,
+  			sourcecraft_rating,
+  			web_url
 		FROM repos
 		WHERE sourcecraft_uuid = $1
 		`,
@@ -169,6 +189,10 @@ func (r *RepoRepository) GetRepositoryByID(ctx context.Context, repoID uuid.UUID
 		&repo.RepoSlug,
 		&repo.Visibility,
 		&repo.LastActivityAt,
+		&repo.Language.Name,
+		&repo.Language.Color,
+		&repo.RatingValue,
+		&repo.WebURL,
 	)
 
 	if err != nil {
@@ -189,7 +213,11 @@ func (r *RepoRepository) GetRepositoryBySlugs(ctx context.Context, orgSlug strin
 			org_slug,
 			repo_slug,
 			visibility,
-			last_activity_at
+			last_activity_at,
+			main_language,
+  			language_color,
+  			sourcecraft_rating,
+  			web_url
 		FROM repos
 		WHERE org_slug = $1
 		  AND repo_slug = $2
@@ -202,6 +230,10 @@ func (r *RepoRepository) GetRepositoryBySlugs(ctx context.Context, orgSlug strin
 		&repo.RepoSlug,
 		&repo.Visibility,
 		&repo.LastActivityAt,
+		&repo.Language.Name,
+		&repo.Language.Color,
+		&repo.RatingValue,
+		&repo.WebURL,
 	)
 
 	if err != nil {
@@ -211,45 +243,33 @@ func (r *RepoRepository) GetRepositoryBySlugs(ctx context.Context, orgSlug strin
 	return repo, nil
 }
 
-func (r *GradesRepository) UpsertGrade(
-	ctx context.Context,
-	grade domain.RepoGrade,
-) error {
+func (r *GradesRepository) UpsertPublicGrade(ctx context.Context, grade domain.RepoGrade) error {
 	_, err := r.db.Exec(
 		ctx,
 		`
-		INSERT INTO repo_grades (
+		INSERT INTO repo_grades_public (
 			sourcecraft_uuid,
-			public_score,
-			public_category_scores,
-			public_recommendations,
-			private_score,
-			private_category_scores,
-			private_recommendations,
+			score,
+			category_scores,
+			advice,
 			missing_data,
 			graded_at
 		)
 		VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9
+			$1, $2, $3, $4, $5, $6
 		)
 		ON CONFLICT (sourcecraft_uuid)
 		DO UPDATE SET
-			public_score = EXCLUDED.public_score,
-			public_category_scores = EXCLUDED.public_category_scores,
-			public_recommendations = EXCLUDED.public_recommendations,
-			private_score = EXCLUDED.private_score,
-			private_category_scores = EXCLUDED.private_category_scores,
-			private_recommendations = EXCLUDED.private_recommendations,
+			score = EXCLUDED.score,
+			category_scores = EXCLUDED.category_scores,
+			advice = EXCLUDED.advice,
 			missing_data = EXCLUDED.missing_data,
 			graded_at = EXCLUDED.graded_at
 		`,
 		grade.SourcecraftUUID,
-		grade.PublicScore,
-		grade.PublicCategoryScores,
-		grade.PublicRecommendations,
-		grade.PrivateScore,
-		grade.PrivateCategoryScores,
-		grade.PrivateRecommendations,
+		grade.Score,
+		grade.CategoryScores,
+		grade.Advice,
 		grade.MissingData,
 		grade.GradedAt,
 	)
@@ -260,28 +280,44 @@ func (r *GradesRepository) UpsertGrade(
 	return nil
 }
 
-func (r *GradesRepository) DeleteGrade(ctx context.Context, repoID uuid.UUID) error {
-	tag, err := r.db.Exec(
+func (r *GradesRepository) UpsertPrivateGrade(ctx context.Context, grade domain.RepoGrade) error {
+	_, err := r.db.Exec(
 		ctx,
 		`
-		DELETE FROM repo_grades
-		WHERE sourcecraft_uuid = $1
+		INSERT INTO repo_grades_private (
+			sourcecraft_uuid,
+			score,
+			category_scores,
+			advice,
+			missing_data,
+			graded_at
+		)
+		VALUES (
+			$1, $2, $3, $4, $5, $6
+		)
+		ON CONFLICT (sourcecraft_uuid)
+		DO UPDATE SET
+			score = EXCLUDED.score,
+			category_scores = EXCLUDED.category_scores,
+			advice = EXCLUDED.advice,
+			missing_data = EXCLUDED.missing_data,
+			graded_at = EXCLUDED.graded_at
 		`,
-		repoID,
+		grade.SourcecraftUUID,
+		grade.Score,
+		grade.CategoryScores,
+		grade.Advice,
+		grade.MissingData,
+		grade.GradedAt,
 	)
-
 	if err != nil {
 		return mapGradeError(err)
-	}
-
-	if tag.RowsAffected() == 0 {
-		return mapGradeError(pgx.ErrNoRows)
 	}
 
 	return nil
 }
 
-func (r *GradesRepository) GetGradeByRepoID(ctx context.Context, repoID uuid.UUID) (domain.RepoGrade, error) {
+func (r *GradesRepository) GetPublicGradeByRepoID(ctx context.Context, repoID uuid.UUID) (domain.RepoGrade, error) {
 	var grade domain.RepoGrade
 
 	err := r.db.QueryRow(
@@ -289,26 +325,53 @@ func (r *GradesRepository) GetGradeByRepoID(ctx context.Context, repoID uuid.UUI
 		`
 		SELECT
 			sourcecraft_uuid,
-			public_score,
-			public_category_scores,
-			public_recommendations,
-			private_score,
-			private_category_scores,
-			private_recommendations,
+			score,
+			category_scores,
+			advice,
 			missing_data,
 			graded_at
-		FROM repo_grades
+		FROM repo_grades_public
 		WHERE sourcecraft_uuid = $1
 		`,
 		repoID,
 	).Scan(
 		&grade.SourcecraftUUID,
-		&grade.PublicScore,
-		&grade.PublicCategoryScores,
-		&grade.PublicRecommendations,
-		&grade.PrivateScore,
-		&grade.PrivateCategoryScores,
-		&grade.PrivateRecommendations,
+		&grade.Score,
+		&grade.CategoryScores,
+		&grade.Advice,
+		&grade.MissingData,
+		&grade.GradedAt,
+	)
+
+	if err != nil {
+		return domain.RepoGrade{}, mapGradeError(err)
+	}
+
+	return grade, nil
+}
+
+func (r *GradesRepository) GetPrivateGradeByRepoID(ctx context.Context, repoID uuid.UUID) (domain.RepoGrade, error) {
+	var grade domain.RepoGrade
+
+	err := r.db.QueryRow(
+		ctx,
+		`
+		SELECT
+			sourcecraft_uuid,
+			score,
+			category_scores,
+			advice,
+			missing_data,
+			graded_at
+		FROM repo_grades_private
+		WHERE sourcecraft_uuid = $1
+		`,
+		repoID,
+	).Scan(
+		&grade.SourcecraftUUID,
+		&grade.Score,
+		&grade.CategoryScores,
+		&grade.Advice,
 		&grade.MissingData,
 		&grade.GradedAt,
 	)

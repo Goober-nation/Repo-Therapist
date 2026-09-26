@@ -6,4 +6,5 @@ use (
 	./backend/security-wrapper-service
 	./backend/sourcecraft-wrapper-service
 	./backend/aggregator-service
+	./backend/gateway-service
 )

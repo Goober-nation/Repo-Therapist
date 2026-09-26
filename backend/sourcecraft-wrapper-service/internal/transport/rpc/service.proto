@@ -75,8 +75,14 @@ message Repository {
   string visibility = 8;
   string last_activity_at = 9;
   Rating rating = 10;
+  Language language = 11;
 }
 
+
+message Language {
+  string name = 1;
+  string color = 2;
+}
 message Organization {
   string id = 1;
   string slug = 2;
@@ -296,4 +302,5 @@ message GetRepositoryBySlugsResponse {
   string visibility = 8;
   string last_activity_at = 9;
   Rating rating = 10;
+  Language language = 11;
 }

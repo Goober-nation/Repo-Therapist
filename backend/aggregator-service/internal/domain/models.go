@@ -12,11 +12,19 @@ type Repo struct {
 
 	OrgSlug  string `db:"org_slug" json:"org_slug"`
 	RepoSlug string `db:"repo_slug" json:"repo_slug"`
+	WebURL   string `json:"web_url"`
 
 	Visibility     string     `db:"visibility" json:"visibility"`
 	LastActivityAt *time.Time `db:"last_activity_at" json:"last_activity_at"`
+
+	RatingValue float64         `json:"rating"`
+	Language    PrimaryLanguage `json:"language"`
 }
 
+type PrimaryLanguage struct {
+	Name  string `json:"name"`
+	Color string `json:"color"`
+}
 type RepoLock struct {
 	SourcecraftUUID uuid.UUID `db:"sourcecraft_uuid"`
 
@@ -27,13 +35,9 @@ type RepoLock struct {
 type RepoGrade struct {
 	SourcecraftUUID uuid.UUID `db:"sourcecraft_uuid"`
 
-	PublicScore           *int16          `db:"public_score"`
-	PublicCategoryScores  json.RawMessage `db:"public_category_scores"`
-	PublicRecommendations json.RawMessage `db:"public_recommendations"`
-
-	PrivateScore           *int16          `db:"private_score"`
-	PrivateCategoryScores  json.RawMessage `db:"private_category_scores"`
-	PrivateRecommendations json.RawMessage `db:"private_recommendations"`
+	Score          *int16          `db:"score"`
+	CategoryScores json.RawMessage `db:"category_scores"`
+	Advice         json.RawMessage `db:"advice"`
 
 	MissingData []string `db:"missing_data"`
 

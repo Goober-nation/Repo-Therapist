@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package aggregator;
+
+option go_package = "aggregator-service/internal/transport/rpc/gen;pb";
+
+import "google/protobuf/timestamp.proto";
+
+service Aggregator {
+  rpc GetMyRepos(GetMyReposRequest)
+      returns (GetMyReposResponse);
+
+  rpc GetGrading(GetGradingRequest)
+      returns (GetGradingResponse);
+
+  rpc RequestLLMRecommendations(RequestLLMRecommendationsRequest)
+      returns (RequestLLMRecommendationsResponse);
+}
+
+message GetMyReposRequest {}
+
+message GetMyReposResponse {
+  repeated Repository repositories = 1;
+  string next_page_token = 2;
+}
+
+message GetGradingRequest {
+  string org_slug = 1;
+  string repo_slug = 2;
+}
+
+message GetGradingResponse {
+  RepoGrade grade = 1;
+}
+
+message RequestLLMRecommendationsRequest {
+  string org_slug = 1;
+  string repo_slug = 2;
+}
+
+message RequestLLMRecommendationsResponse {
+  bytes raw_response = 1;
+  string model_used = 2;
+  google.protobuf.Timestamp evaluated_at = 3;
+}
+
+message Repository {
+  string id = 1;
+  string name = 2;
+  Organization organization = 3;
+  string slug = 4;
+  string description = 5;
+  Logo logo = 6;
+  string web_url = 7;
+  string visibility = 8;
+  string last_activity_at = 9;
+  double rating = 10;
+  Language language = 11;
+
+}
+message Language {
+  string name = 1;
+  string color = 2;
+}
+
+message Logo {
+  string url = 1;
+}
+
+message Organization {
+  string slug = 1;
+}
+
+
+
+message ReactionCount {
+  string type = 1;
+  string count = 2;
+}
+
+message RepoGrade {
+  string sourcecraft_uuid = 1;
+
+  optional int32 public_score = 2;
+  bytes public_category_scores = 3;
+  bytes public_recommendations = 4;
+
+  optional int32 private_score = 5;
+  bytes private_category_scores = 6;
+  bytes private_recommendations = 7;
+
+  repeated string missing_data = 8;
+  google.protobuf.Timestamp graded_at = 9;
+}

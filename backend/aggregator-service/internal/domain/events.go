@@ -43,4 +43,5 @@ type GradingResultReceivedEvent struct {
 
 	MissingData []string  `json:"missing_data"`
 	GradedAt    time.Time `json:"graded_at"`
+	Visibility  string    `json:"visibility"`
 }

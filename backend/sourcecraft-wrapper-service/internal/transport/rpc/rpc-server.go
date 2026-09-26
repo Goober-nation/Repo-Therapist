@@ -76,6 +76,10 @@ func (s *ServerRPC) GetRepositoryBySlugs(
 			Percentile:     repo.Rating.Percentile,
 			ReactionCounts: reactionCounts,
 		},
+		Language: &pb.Language{
+			Name:  repo.Language.Name,
+			Color: repo.Language.Color,
+		},
 	}, nil
 }
 

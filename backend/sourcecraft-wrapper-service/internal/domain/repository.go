@@ -2,35 +2,29 @@ package domain
 
 import "time"
 
-type RepositoryID struct {
-	RepoId       string `json:"id"`
-	OrgSlug      string
-	RepoSlug     string
-	LastActivity *time.Time
-}
-
-type RepositoriesID struct {
-	Repositories []RepositoryID `json:"repositories"`
-}
-
 type MyRepositoriesResponse struct {
 	Repositories  []Repository `json:"repositories"`
 	NextPageToken string       `json:"next_page_token"`
 }
 
 type Repository struct {
-	ID           string       `json:"id"`
-	Name         string       `json:"name"`
-	Organization Organization `json:"organization"`
-	Slug         string       `json:"slug"`
-	Description  string       `json:"description"`
-	Logo         Logo         `json:"logo"`
-	WebURL       string       `json:"web_url"`
-	Visibility   string       `json:"visibility"`
-	LastActivity *time.Time   `json:"last_updated"`
-	Rating       Rating       `json:"rating"`
+	ID           string          `json:"id"`
+	Name         string          `json:"name"`
+	Organization Organization    `json:"organization"`
+	Slug         string          `json:"slug"`
+	Description  string          `json:"description"`
+	Logo         Logo            `json:"logo"`
+	WebURL       string          `json:"web_url"`
+	Visibility   string          `json:"visibility"`
+	LastActivity *time.Time      `json:"last_updated"`
+	Rating       Rating          `json:"rating"`
+	Language     PrimaryLanguage `json:"language"`
 }
 
+type PrimaryLanguage struct {
+	Name  string `json:"name"`
+	Color string `json:"color"`
+}
 type Rating struct {
 	Value          float64         `json:"value"`
 	Percentile     float64         `json:"percentile"`

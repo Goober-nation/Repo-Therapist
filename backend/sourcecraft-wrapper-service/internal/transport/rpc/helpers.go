@@ -67,6 +67,10 @@ func mapRepositories(repos []domain.Repository) []*pb.Repository {
 				Percentile:     repo.Rating.Percentile,
 				ReactionCounts: reactionCounts,
 			},
+			Language: &pb.Language{
+				Name:  repo.Language.Name,
+				Color: repo.Language.Color,
+			},
 		})
 	}
 

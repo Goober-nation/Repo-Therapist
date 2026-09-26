@@ -79,7 +79,7 @@ func (c *GradeConsumer) handleMessage(
 		GradedAt:               &event.GradedAt,
 	}
 
-	if err := c.service.SaveGradingResult(ctx, grade); err != nil {
+	if err := c.service.SaveGradingResult(ctx, grade, event.Visibility); err != nil {
 		return fmt.Errorf("save grading result: %w", err)
 	}
 
