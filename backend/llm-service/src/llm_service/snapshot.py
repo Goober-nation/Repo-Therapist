@@ -47,10 +47,8 @@ def load_snapshot(store: ObjectStore, prefix: str,
     if any(not key.startswith(root) for key in before):
         raise SnapshotError("object listing escaped repository prefix")
     repository_keys = {key[len(root):]: key for key in before
-                       if key[len(root):] and not key[len(root):].startswith("_meta/")}
-    if len(repository_keys) != len([key for key in before if key[len(root):] and
-                                   not key[len(root):].startswith("_meta/")]):
-        raise SnapshotError("duplicate repository paths")
+                       if key[len(root):] and not key.endswith("/")
+                       and not key[len(root):].startswith("_meta/")}
     if callable(selected_paths):
         selected_paths = selected_paths(frozenset(repository_keys))
     if not isinstance(selected_paths, set):

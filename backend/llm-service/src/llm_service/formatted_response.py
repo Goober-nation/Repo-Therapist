@@ -83,6 +83,7 @@ def parse_formatted_response(raw: bytes, snapshot: Snapshot, context: ModelConte
     _object(body, ["checks"], "response")
     if not isinstance(body["checks"], list):
         raise InvalidModelResponse("checks: expected array")
+    coverage = json.loads(context.text).get("coverage", {})
     by_id = {}
     for check in body["checks"]:
         _object(check, ["check_id", "check_type", "outcome", "points_awarded",
@@ -94,6 +95,16 @@ def parse_formatted_response(raw: bytes, snapshot: Snapshot, context: ModelConte
         _integer(check["max_points"], "max_points")
         if check["check_type"] != spec.kind or check["max_points"] != spec.maximum:
             raise InvalidModelResponse(f"{check_id}: wrong check_type or max_points")
+        # Excluded scores never contribute to the result. Canonicalize them
+        # before validating values that will not be used.
+        if coverage.get(check_id) == "not_reviewed" or check["outcome"] == "NOT_APPLICABLE":
+            check["outcome"] = ("NOT_REVIEWED" if coverage.get(check_id) == "not_reviewed"
+                                else "NOT_APPLICABLE")
+            check["points_awarded"] = None
+            check["components"] = None
+            check["deductions"] = []
+            by_id[check_id] = check
+            continue
         if check["outcome"] == "EVALUATED":
             _integer(check["points_awarded"], "points_awarded")
             if not 0 <= check["points_awarded"] <= spec.maximum:
@@ -103,9 +114,6 @@ def parse_formatted_response(raw: bytes, snapshot: Snapshot, context: ModelConte
                 _integer(value, f"components.{name}")
                 if not 0 <= value <= COMPONENTS[check_id][name]:
                     raise InvalidModelResponse(f"components.{name}: outside range")
-        elif check["outcome"] == "NOT_APPLICABLE":
-            if check["points_awarded"] is not None or check["components"] is not None:
-                raise InvalidModelResponse("NOT_APPLICABLE requires null scores")
         else:
             raise InvalidModelResponse("outcome: unknown variant")
         if not isinstance(check["deductions"], list):
@@ -126,14 +134,6 @@ def parse_formatted_response(raw: bytes, snapshot: Snapshot, context: ModelConte
     if set(by_id) != set(COMPONENTS):
         raise InvalidModelResponse("missing model checks: expected all 21 IDs")
 
-    coverage = json.loads(context.text).get("coverage", {})
-    if coverage:
-        for name, check in by_id.items():
-            if coverage.get(name) == "not_reviewed":
-                check["outcome"] = "NOT_REVIEWED"
-                check["points_awarded"] = None
-                check["components"] = None
-                check["deductions"] = []
     by_id.update(deterministic_checks(snapshot.files, set(snapshot.all_paths)))
     checks = [by_id[name] for name in CHECKS]
     subcategories = []

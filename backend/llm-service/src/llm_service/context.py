@@ -50,7 +50,7 @@ def _is_document(path: str) -> bool:
         return True
     if lower.startswith(".github/") and lower.endswith(DOC_EXTENSIONS):
         return True
-    return lower.count("/") <= 4 and stem in ROOT_DOCUMENTS and (
+    return lower.count("/") <= 4 and (stem in ROOT_DOCUMENTS or topic(stem) is not None) and (
         "." not in basename or lower.endswith(DOC_EXTENSIONS)
     )
 
@@ -120,6 +120,15 @@ def build_model_context(snapshot: Snapshot, *, max_context_bytes: int = 32_000) 
                 data[field].pop()
                 data["sampling"]["inventory_truncated"] = True
             text = serialize()
+    # JSON escaping and excerpt metadata also consume the budget. If they exceed
+    # it, drop the lowest-priority selected excerpts and recompute coverage.
+    while len(text.encode("utf-8")) > max_context_bytes and data["documents"]:
+        data["documents"].pop()
+        covered = {check for item in data["documents"] for check in item["check_ids"]}
+        data["coverage"] = {check: "sampled" if check in covered else "not_reviewed"
+                            for check in COMPONENTS}
+        text = serialize()
+    reviewed = frozenset(item["path"] for item in data["documents"])
     encoded = text.encode("utf-8")
     if len(encoded) > max_context_bytes:
         raise ContextBuildError("complete model context exceeds byte limit")
