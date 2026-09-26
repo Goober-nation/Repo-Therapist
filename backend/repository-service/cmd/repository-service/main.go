@@ -2,9 +2,8 @@
 // backlog/phase-3-kafka-integration.md): given an org/repo slug, fetch the repo's metadata from
 // SourceCraft, git clone its default branch, and upload the tree + git history + issues/milestones
 // to S3/MinIO. Two trigger modes: one-shot CLI flags (--org/--repo, for direct manual testing) or
-// --listen (consumes repo.grade.requested from Kafka, publishes repo.ready when done). No
-// Aggregator integration yet — repo.grade.requested is currently only published by
-// grade-service's own manual --request-org/--request-repo mode.
+// --listen (consumes repo.grade.requested from Kafka, publishes repo.ready when done).
+// repo.grade.requested is published by grade-service, relaying grading.requests.
 package main
 
 import (
@@ -33,7 +32,7 @@ func main() {
 	case *org != "" && *repo != "":
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
-		result, err := service.CloneAndUpload(ctx, *org, *repo)
+		result, err := service.CloneAndUpload(ctx, *org, *repo, "")
 		if err != nil {
 			log.Fatalf("repository-service: %v", err)
 		}
