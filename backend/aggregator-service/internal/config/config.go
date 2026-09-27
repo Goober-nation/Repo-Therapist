@@ -17,6 +17,7 @@ type Config struct {
 
 type GRPCConfig struct {
 	Address string
+	Timeout time.Duration
 }
 
 type DatabaseConfig struct {
@@ -72,6 +73,10 @@ func LoadConfig() *Config {
 			Address: getEnvDefault(
 				"GRPC_ADDRESS",
 				":8083",
+			),
+			Timeout: time.Second * getEnvDuration(
+				"GRPC_TIMEOUT",
+				time.Second*10,
 			),
 		},
 

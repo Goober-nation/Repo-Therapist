@@ -24,10 +24,12 @@ type AggregatorService struct {
 	clientRPC        client.CodeHealthClient
 	gradingPublisher domain.GradingPublisher
 	llmPublisher     domain.LLMRecommendationsPublisher
+	RPCTimeout       time.Duration
 }
 
 func NewAggregatorService(reposRepo domain.RepoRepository, gradesRepo domain.GradesRepository, llmRepo domain.LLMRepository,
-	clientRPC client.CodeHealthClient, gradingPublisher domain.GradingPublisher, llmPublisher domain.LLMRecommendationsPublisher) *AggregatorService {
+	clientRPC client.CodeHealthClient, gradingPublisher domain.GradingPublisher, llmPublisher domain.LLMRecommendationsPublisher,
+	rpcTimeout time.Duration) *AggregatorService {
 	return &AggregatorService{
 		ReposRepo:        reposRepo,
 		GradesRepo:       gradesRepo,
@@ -35,10 +37,18 @@ func NewAggregatorService(reposRepo domain.RepoRepository, gradesRepo domain.Gra
 		clientRPC:        clientRPC,
 		gradingPublisher: gradingPublisher,
 		llmPublisher:     llmPublisher,
+		RPCTimeout:       rpcTimeout,
 	}
 }
 
 func (as *AggregatorService) SaveLLMRecommendations(ctx context.Context, event domain.LLMRecommendationsReceivedEvent) error {
+	if event.Error != "" {
+		return fmt.Errorf(
+			"%w: %v",
+			domain.ErrLLMUnavailable,
+			event.Error,
+		)
+	}
 	switch event.Visibility {
 	case "public":
 		if err := as.LLMRepo.UpsertPublicResponse(ctx, event); err != nil {
@@ -74,14 +84,24 @@ func (as *AggregatorService) RequestLLMRecommendations(
 	orgSlug string,
 	repoSlug string,
 ) (domain.RepoLLMResponse, error) {
+	cont, cancel := context.WithTimeout(ctx, as.RPCTimeout)
+	defer cancel()
+
 	response, err := as.clientRPC.GetRepositoryBySlugs(
-		ctx,
+		cont,
 		&client.GetRepositoryBySlugsRequest{
 			OrgSlug:  orgSlug,
 			RepoSlug: repoSlug,
 		},
 	)
 	if err != nil {
+		if status.Code(err) == codes.DeadlineExceeded {
+			return domain.RepoLLMResponse{}, fmt.Errorf(
+				"%w: wrapper RPC timeout: %v",
+				domain.ErrTimeout,
+				err,
+			)
+		}
 		if status.Code(err) == codes.PermissionDenied {
 			return domain.RepoLLMResponse{}, domain.ErrNoAccess
 		}
@@ -282,14 +302,23 @@ func (as *AggregatorService) GetGrading(
 	orgSlug string,
 	repoSlug string,
 ) (*domain.RepoGrade, error) {
+	cont, cancel := context.WithTimeout(ctx, as.RPCTimeout)
+	defer cancel()
 	response, err := as.clientRPC.GetRepositoryBySlugs(
-		ctx,
+		cont,
 		&client.GetRepositoryBySlugsRequest{
 			OrgSlug:  orgSlug,
 			RepoSlug: repoSlug,
 		},
 	)
 	if err != nil {
+		if status.Code(err) == codes.DeadlineExceeded {
+			return nil, fmt.Errorf(
+				"%w: wrapper RPC timeout: %v",
+				domain.ErrTimeout,
+				err,
+			)
+		}
 		if status.Code(err) == codes.PermissionDenied {
 			return nil, domain.ErrNoAccess
 		}
@@ -458,11 +487,21 @@ func needsGrading(repo domain.Repo, grade domain.RepoGrade) bool {
 func (as *AggregatorService) GetMyRepos(
 	ctx context.Context,
 ) (domain.MyRepositoriesResponse, error) {
+	cont, cancel := context.WithTimeout(ctx, as.RPCTimeout)
+	defer cancel()
+
 	response, err := as.clientRPC.GetMyRepos(
-		ctx,
+		cont,
 		&client.GetMyReposRequest{},
 	)
 	if err != nil {
+		if status.Code(err) == codes.DeadlineExceeded {
+			return domain.MyRepositoriesResponse{}, fmt.Errorf(
+				"%w: wrapper RPC timeout: %v",
+				domain.ErrTimeout,
+				err,
+			)
+		}
 		return domain.MyRepositoriesResponse{}, fmt.Errorf(
 			"%w: get my repositories: %v",
 			domain.ErrGradingFailed,
@@ -554,7 +593,15 @@ func (as *AggregatorService) StartPublicGrading(ctx context.Context, interval ti
 	}()
 }
 
-func (as *AggregatorService) SaveGradingResult(ctx context.Context, grade domain.RepoGrade, visibility string) error {
+func (as *AggregatorService) SaveGradingResult(ctx context.Context,
+	grade domain.RepoGrade, visibility string, error string) error {
+	if error != "" {
+		return fmt.Errorf(
+			"%w: %v",
+			domain.ErrGradingFailed,
+			error,
+		)
+	}
 	switch visibility {
 	case "public":
 		if err := as.GradesRepo.UpsertPublicGrade(ctx, grade); err != nil {
@@ -589,11 +636,20 @@ func (as *AggregatorService) SaveGradingResult(ctx context.Context, grade domain
 }
 
 func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
+	cont, cancel := context.WithTimeout(ctx, as.RPCTimeout)
+	defer cancel()
 	response, err := as.clientRPC.ListAllPublicRepos(
-		ctx,
+		cont,
 		&client.ListAllPublicReposRequest{},
 	)
 	if err != nil {
+		if status.Code(err) == codes.DeadlineExceeded {
+			return fmt.Errorf(
+				"%w: wrapper RPC timeout: %v",
+				domain.ErrTimeout,
+				err,
+			)
+		}
 		return fmt.Errorf(
 			"%w: list public repositories: %v",
 			domain.ErrGradingFailed,
@@ -765,8 +821,10 @@ func (as *AggregatorService) hasPrivateAccess(ctx context.Context, sourceRepo do
 	if token == "" {
 		return false
 	} else {
+		cont, cancel := context.WithTimeout(ctx, as.RPCTimeout)
+		defer cancel()
 		response, err := as.clientRPC.GetMyRepos(
-			ctx,
+			cont,
 			&client.GetMyReposRequest{},
 		)
 		if err != nil {

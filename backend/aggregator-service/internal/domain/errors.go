@@ -31,4 +31,5 @@ var (
 	ErrRecommendationsFailed = errors.New("recommendations failed")
 	ErrNoGrade               = errors.New("no grading found")
 	ErrGradeOutdated         = errors.New("grade is outdated")
+	ErrTimeout               = errors.New("wrapper timeout")
 )

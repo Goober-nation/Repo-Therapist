@@ -199,7 +199,11 @@ func mapError(err error) error {
 	switch {
 	case err == nil:
 		return nil
-
+	case errors.Is(err, domain.ErrTimeout):
+		return status.Error(
+			codes.DeadlineExceeded,
+			"wrapper service timeout",
+		)
 	case errors.Is(err, domain.ErrNoAccess):
 		return status.Error(
 			codes.PermissionDenied,
