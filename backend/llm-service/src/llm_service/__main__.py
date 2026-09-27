@@ -52,14 +52,34 @@ def main(argv=None) -> int:
     parser.add_argument("--repo", type=Path, default=Path.cwd())
     parser.add_argument("--dry-run", action="store_true", help="Подготовить контекст без вызова модели")
     parser.add_argument("--listen", action="store_true", help="Обрабатывать запросы документации из Kafka")
+    parser.add_argument("--listen-summary", action="store_true",
+                        help="Обрабатывать запросы summary и рекомендаций из Kafka")
+    parser.add_argument("--summary-file", type=Path,
+                        help="Сформировать summary по JSON-запросу из файла, без Kafka")
     args = parser.parse_args(argv)
+    if sum(map(bool, (args.listen, args.listen_summary, args.summary_file))) > 1:
+        parser.error("--listen, --listen-summary and --summary-file are mutually exclusive")
+    if args.dry_run and (args.listen or args.listen_summary or args.summary_file):
+        parser.error("--dry-run applies only to documentation grading of --repo")
     try:
         if args.listen:
-            if args.dry_run:
-                parser.error("--dry-run cannot be used with --listen")
             from .kafka_worker import main as run_kafka_worker
             run_kafka_worker()
             return 0
+        if args.listen_summary:
+            from .kafka_worker import summary_main
+            summary_main()
+            return 0
+        if args.summary_file:
+            from .kafka_worker import process_summary_request
+            model = YandexModel(YandexModelConfig.from_env())
+            print("Отправляю запрос summary в модель…", file=sys.stderr)
+            result = process_summary_request(args.summary_file.read_bytes(), model)
+            if result is None:
+                print("Ошибка: запрос не содержит корректный sourcecraft_uuid.", file=sys.stderr)
+                return 1
+            print(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False))
+            return 0 if not result["error"] else 1
         snapshot = local_snapshot(args.repo)
         context = build_model_context(snapshot)
         if args.dry_run:
