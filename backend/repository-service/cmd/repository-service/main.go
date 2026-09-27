@@ -24,6 +24,12 @@ func main() {
 	listen := flag.Bool("listen", false, "run as a Kafka consumer instead of one-shot mode")
 	flag.Parse()
 
+	for _, key := range []string{"S3_ACCESS_KEY", "S3_SECRET_KEY"} {
+		if os.Getenv(key) == "" {
+			log.Fatalf("repository-service: %s is required", key)
+		}
+	}
+
 	switch {
 	case *listen:
 		if err := transport.RunListen(); err != nil {

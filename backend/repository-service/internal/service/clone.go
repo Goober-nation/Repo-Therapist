@@ -96,8 +96,8 @@ func CloneAndUpload(ctx context.Context, org, repo, token string) (*Result, erro
 
 	s3Client, err := storage.NewClient(ctx, storage.Config{
 		Endpoint:  envOrDefault("S3_ENDPOINT", "localhost:9000"),
-		AccessKey: envOrDefault("S3_ACCESS_KEY", "repotherapist"),
-		SecretKey: envOrDefault("S3_SECRET_KEY", "repotherapist123"),
+		AccessKey: os.Getenv("S3_ACCESS_KEY"),
+		SecretKey: os.Getenv("S3_SECRET_KEY"),
 		Bucket:    envOrDefault("S3_BUCKET", "repo-content"),
 		UseSSL:    false,
 	})

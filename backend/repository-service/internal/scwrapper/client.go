@@ -42,16 +42,17 @@ func (c *Client) authed(ctx context.Context) context.Context {
 }
 
 // GetRepoID resolves an org/repo slug pair to the wrapper's opaque repo ID, used by every other
-// call below.
+// call below. Goes through GetRepositoryBySlugs: the wrapper still declares GetRepoIDBySlugs in
+// its proto but no longer implements it (answers Unimplemented).
 func (c *Client) GetRepoID(ctx context.Context, orgSlug, repoSlug string) (string, error) {
-	resp, err := c.rpc.GetRepoIDBySlugs(c.authed(ctx), &gen.GetRepoIDBySlugsRequest{
+	resp, err := c.rpc.GetRepositoryBySlugs(c.authed(ctx), &gen.GetRepositoryBySlugsRequest{
 		OrgSlug:  orgSlug,
 		RepoSlug: repoSlug,
 	})
 	if err != nil {
 		return "", err
 	}
-	return resp.GetRepoId(), nil
+	return resp.GetId(), nil
 }
 
 // GitURLs is the pair of clone URLs the wrapper returns for a repo ID.

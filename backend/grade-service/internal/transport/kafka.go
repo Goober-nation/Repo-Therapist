@@ -17,6 +17,7 @@ import (
 	"repo-therapist/grade-service/internal/config"
 	"repo-therapist/grade-service/internal/contracts"
 	kafkaclient "repo-therapist/grade-service/internal/kafka"
+	"repo-therapist/grade-service/internal/scoring"
 )
 
 // RunListen runs two consumers concurrently for as long as the process lives:
@@ -53,12 +54,15 @@ func RunListen(configPath string) error {
 	// stop() cancels the shared ctx so the other one exits too — Consumer.Run treats a cancelled
 	// ctx as a clean stop (returns nil), not an error, so this doesn't mask a real first error.
 	jobs := newJobStore()
-	errCh := make(chan error, 2)
+	docs := newDocsSettings(cfg)
+	errCh := make(chan error, 3)
 	go func() { errCh <- runGradingRequestsRelay(ctx, brokers, jobs) }()
-	go func() { errCh <- runRepoReadyGrader(ctx, brokers, cfg, catalog, jobs) }()
+	go func() { errCh <- runRepoReadyGrader(ctx, brokers, cfg, catalog, jobs, docs) }()
+	go func() { errCh <- runDocsGradedConsumer(ctx, brokers, docs.waiters) }()
 
 	firstErr := <-errCh
 	stop()
+	<-errCh
 	<-errCh
 	return firstErr
 }
@@ -98,11 +102,13 @@ func runGradingRequestsRelay(ctx context.Context, brokers []string, jobs *jobSto
 // runRepoReadyGrader consumes repo.ready, grades each ready repo, and publishes the result to
 // grading.results for the Aggregator. Failed/skipped repos are logged, not silently dropped, but
 // don't kill the loop — one repo's failure shouldn't stop grading for every other repo.
-func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Config, catalog map[string]string, jobs *jobStore) error {
+func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Config, catalog map[string]string, jobs *jobStore, docs docsSettings) error {
 	consumer := kafkaclient.NewConsumer(brokers, contracts.TopicRepoReady, "grade-service")
 	defer consumer.Close()
 	producer := kafkaclient.NewProducer(brokers, contracts.TopicGradingResults)
 	defer producer.Close()
+	docsProducer := kafkaclient.NewProducer(brokers, contracts.TopicDocsGradeRequested)
+	defer docsProducer.Close()
 
 	log.Printf("grade-service listening on %s, publishing results to %s", contracts.TopicRepoReady, contracts.TopicGradingResults)
 	return consumer.Run(ctx, func(ctx context.Context, value []byte) error {
@@ -122,13 +128,23 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 		}
 
 		log.Printf("grading %s/%s %s (sourcecraft_uuid=%s)", ready.OrgSlug, ready.RepoSlug, job.visibility, ready.SourcecraftUUID)
+		// Documentation is asked for first so the LLM works while the other categories are graded.
+		docsCh, docsDeadline := requestDocs(ctx, docsProducer, docs, ready)
 		gradeCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 		out, err := app.Grade(gradeCtx, ready.SourcecraftUUID, cfg, job.token, job.visibility)
 		cancel()
+		var reply *contracts.DocsGraded
+		if docsCh != nil {
+			reply = docs.waiters.wait(ctx, ready.SourcecraftUUID, docsCh, docsDeadline)
+			if reply == nil {
+				log.Printf("no %s reply for %s/%s within %s: Documentation will be no-data", contracts.TopicDocsGraded, ready.OrgSlug, ready.RepoSlug, docs.timeout)
+			}
+		}
 		if err != nil {
 			log.Printf("grading %s/%s failed: %v", ready.OrgSlug, ready.RepoSlug, err)
 			return nil
 		}
+		out.Categories["documentation"] = scoring.ComputeDocumentation(reply)
 		app.PrintResult(out)
 
 		result, err := app.BuildGradingResult(out, cfg, catalog, job.visibility, time.Now(), rand.Shuffle)
@@ -142,4 +158,47 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 		log.Printf("published grading result for %s/%s to %s", ready.OrgSlug, ready.RepoSlug, contracts.TopicGradingResults)
 		return nil
 	})
+}
+
+// docsSettings controls the Documentation round trip to the LLM service. enabled is false when
+// the documentation category is not_calculated or LLM_ENABLED=false; Documentation is then
+// no-data without asking.
+type docsSettings struct {
+	enabled bool
+	timeout time.Duration
+	waiters *docsWaiters
+}
+
+// defaultLLMTimeout bounds how long a grading waits for repo.docs.graded; the LLM service has no
+// failure message, so a refused or crashed request is only ever noticed by this timeout.
+const defaultLLMTimeout = 70 * time.Second
+
+func newDocsSettings(cfg *config.Config) docsSettings {
+	docCfg, ok := cfg.Categories["documentation"]
+	enabled := ok && docCfg.Status == config.StatusCalculated && os.Getenv("LLM_ENABLED") != "false"
+	timeout := defaultLLMTimeout
+	if v := os.Getenv("LLM_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			timeout = d
+		} else {
+			log.Printf("ignoring invalid LLM_TIMEOUT=%q, using %s", v, defaultLLMTimeout)
+		}
+	}
+	return docsSettings{enabled: enabled, timeout: timeout, waiters: newDocsWaiters()}
+}
+
+// requestDocs publishes repo.docs.grade.requested and returns the channel its reply arrives on
+// plus the wait deadline, or a nil channel when docs grading is off or the publish failed.
+func requestDocs(ctx context.Context, producer *kafkaclient.Producer, docs docsSettings, ready contracts.RepoReady) (chan contracts.DocsGraded, time.Time) {
+	if !docs.enabled {
+		return nil, time.Time{}
+	}
+	ch := docs.waiters.register(ready.SourcecraftUUID)
+	req := contracts.DocsGradeRequested{SourcecraftUUID: ready.SourcecraftUUID, S3Prefix: ready.S3Prefix, RequestedAt: time.Now()}
+	if err := producer.Publish(ctx, ready.SourcecraftUUID, req); err != nil {
+		docs.waiters.unregister(ready.SourcecraftUUID)
+		log.Printf("publishing %s for %s/%s failed: %v (Documentation will be no-data)", contracts.TopicDocsGradeRequested, ready.OrgSlug, ready.RepoSlug, err)
+		return nil, time.Time{}
+	}
+	return ch, time.Now().Add(docs.timeout)
 }

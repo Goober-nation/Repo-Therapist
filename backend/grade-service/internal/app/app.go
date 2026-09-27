@@ -52,8 +52,8 @@ func Grade(ctx context.Context, repoID string, cfg *config.Config, token, visibi
 	private := visibility == contracts.VisibilityPrivate
 	s3Client, err := storage.NewClient(ctx, storage.Config{
 		Endpoint:  EnvOrDefault("S3_ENDPOINT", "localhost:9000"),
-		AccessKey: EnvOrDefault("S3_ACCESS_KEY", "repotherapist"),
-		SecretKey: EnvOrDefault("S3_SECRET_KEY", "repotherapist123"),
+		AccessKey: os.Getenv("S3_ACCESS_KEY"),
+		SecretKey: os.Getenv("S3_SECRET_KEY"),
 		Bucket:    EnvOrDefault("S3_BUCKET", "repo-content"),
 		UseSSL:    false,
 	})

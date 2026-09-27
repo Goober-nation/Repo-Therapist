@@ -2,13 +2,12 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v7.36.2
-// source: backend/sourcecraft-wrapper-service/internal/transport/rpc/service.proto
+// source: internal/transport/rpc/service.proto
 
 package gen
 
 import (
 	context "context"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -20,24 +19,28 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	CodeHealth_GetRepositoryBySlugs_FullMethodName = "/code_health.CodeHealth/GetRepositoryBySlugs"
 	CodeHealth_GetRepoIDBySlugs_FullMethodName     = "/code_health.CodeHealth/GetRepoIDBySlugs"
 	CodeHealth_GetGitURL_FullMethodName            = "/code_health.CodeHealth/GetGitURL"
 	CodeHealth_GetCiCDRuns_FullMethodName          = "/code_health.CodeHealth/GetCiCDRuns"
 	CodeHealth_GetIssues_FullMethodName            = "/code_health.CodeHealth/GetIssues"
 	CodeHealth_GetMilestones_FullMethodName        = "/code_health.CodeHealth/GetMilestones"
-	CodeHealth_ListAllPublicRepoIDs_FullMethodName = "/code_health.CodeHealth/ListAllPublicRepoIDs"
+	CodeHealth_ListAllPublicRepos_FullMethodName   = "/code_health.CodeHealth/ListAllPublicRepos"
+	CodeHealth_GetMyRepos_FullMethodName           = "/code_health.CodeHealth/GetMyRepos"
 )
 
 // CodeHealthClient is the client API for CodeHealth service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CodeHealthClient interface {
+	GetRepositoryBySlugs(ctx context.Context, in *GetRepositoryBySlugsRequest, opts ...grpc.CallOption) (*GetRepositoryBySlugsResponse, error)
 	GetRepoIDBySlugs(ctx context.Context, in *GetRepoIDBySlugsRequest, opts ...grpc.CallOption) (*GetRepoIDBySlugsResponse, error)
 	GetGitURL(ctx context.Context, in *GetGitURLRequest, opts ...grpc.CallOption) (*GetGitURLResponse, error)
 	GetCiCDRuns(ctx context.Context, in *GetCiCDRunsRequest, opts ...grpc.CallOption) (*GetCiCDRunsResponse, error)
 	GetIssues(ctx context.Context, in *GetIssuesRequest, opts ...grpc.CallOption) (*GetIssuesResponse, error)
 	GetMilestones(ctx context.Context, in *GetMilestonesRequest, opts ...grpc.CallOption) (*GetMilestonesResponse, error)
-	ListAllPublicRepoIDs(ctx context.Context, in *ListAllPublicRepoIDsRequest, opts ...grpc.CallOption) (*ListAllPublicRepoIDsResponse, error)
+	ListAllPublicRepos(ctx context.Context, in *ListAllPublicReposRequest, opts ...grpc.CallOption) (*ListAllPublicReposResponse, error)
+	GetMyRepos(ctx context.Context, in *GetMyReposRequest, opts ...grpc.CallOption) (*GetMyReposResponse, error)
 }
 
 type codeHealthClient struct {
@@ -46,6 +49,16 @@ type codeHealthClient struct {
 
 func NewCodeHealthClient(cc grpc.ClientConnInterface) CodeHealthClient {
 	return &codeHealthClient{cc}
+}
+
+func (c *codeHealthClient) GetRepositoryBySlugs(ctx context.Context, in *GetRepositoryBySlugsRequest, opts ...grpc.CallOption) (*GetRepositoryBySlugsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetRepositoryBySlugsResponse)
+	err := c.cc.Invoke(ctx, CodeHealth_GetRepositoryBySlugs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *codeHealthClient) GetRepoIDBySlugs(ctx context.Context, in *GetRepoIDBySlugsRequest, opts ...grpc.CallOption) (*GetRepoIDBySlugsResponse, error) {
@@ -98,10 +111,20 @@ func (c *codeHealthClient) GetMilestones(ctx context.Context, in *GetMilestonesR
 	return out, nil
 }
 
-func (c *codeHealthClient) ListAllPublicRepoIDs(ctx context.Context, in *ListAllPublicRepoIDsRequest, opts ...grpc.CallOption) (*ListAllPublicRepoIDsResponse, error) {
+func (c *codeHealthClient) ListAllPublicRepos(ctx context.Context, in *ListAllPublicReposRequest, opts ...grpc.CallOption) (*ListAllPublicReposResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListAllPublicRepoIDsResponse)
-	err := c.cc.Invoke(ctx, CodeHealth_ListAllPublicRepoIDs_FullMethodName, in, out, cOpts...)
+	out := new(ListAllPublicReposResponse)
+	err := c.cc.Invoke(ctx, CodeHealth_ListAllPublicRepos_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *codeHealthClient) GetMyRepos(ctx context.Context, in *GetMyReposRequest, opts ...grpc.CallOption) (*GetMyReposResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMyReposResponse)
+	err := c.cc.Invoke(ctx, CodeHealth_GetMyRepos_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -112,12 +135,14 @@ func (c *codeHealthClient) ListAllPublicRepoIDs(ctx context.Context, in *ListAll
 // All implementations must embed UnimplementedCodeHealthServer
 // for forward compatibility.
 type CodeHealthServer interface {
+	GetRepositoryBySlugs(context.Context, *GetRepositoryBySlugsRequest) (*GetRepositoryBySlugsResponse, error)
 	GetRepoIDBySlugs(context.Context, *GetRepoIDBySlugsRequest) (*GetRepoIDBySlugsResponse, error)
 	GetGitURL(context.Context, *GetGitURLRequest) (*GetGitURLResponse, error)
 	GetCiCDRuns(context.Context, *GetCiCDRunsRequest) (*GetCiCDRunsResponse, error)
 	GetIssues(context.Context, *GetIssuesRequest) (*GetIssuesResponse, error)
 	GetMilestones(context.Context, *GetMilestonesRequest) (*GetMilestonesResponse, error)
-	ListAllPublicRepoIDs(context.Context, *ListAllPublicRepoIDsRequest) (*ListAllPublicRepoIDsResponse, error)
+	ListAllPublicRepos(context.Context, *ListAllPublicReposRequest) (*ListAllPublicReposResponse, error)
+	GetMyRepos(context.Context, *GetMyReposRequest) (*GetMyReposResponse, error)
 	mustEmbedUnimplementedCodeHealthServer()
 }
 
@@ -128,6 +153,9 @@ type CodeHealthServer interface {
 // pointer dereference when methods are called.
 type UnimplementedCodeHealthServer struct{}
 
+func (UnimplementedCodeHealthServer) GetRepositoryBySlugs(context.Context, *GetRepositoryBySlugsRequest) (*GetRepositoryBySlugsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRepositoryBySlugs not implemented")
+}
 func (UnimplementedCodeHealthServer) GetRepoIDBySlugs(context.Context, *GetRepoIDBySlugsRequest) (*GetRepoIDBySlugsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetRepoIDBySlugs not implemented")
 }
@@ -143,8 +171,11 @@ func (UnimplementedCodeHealthServer) GetIssues(context.Context, *GetIssuesReques
 func (UnimplementedCodeHealthServer) GetMilestones(context.Context, *GetMilestonesRequest) (*GetMilestonesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMilestones not implemented")
 }
-func (UnimplementedCodeHealthServer) ListAllPublicRepoIDs(context.Context, *ListAllPublicRepoIDsRequest) (*ListAllPublicRepoIDsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListAllPublicRepoIDs not implemented")
+func (UnimplementedCodeHealthServer) ListAllPublicRepos(context.Context, *ListAllPublicReposRequest) (*ListAllPublicReposResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAllPublicRepos not implemented")
+}
+func (UnimplementedCodeHealthServer) GetMyRepos(context.Context, *GetMyReposRequest) (*GetMyReposResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMyRepos not implemented")
 }
 func (UnimplementedCodeHealthServer) mustEmbedUnimplementedCodeHealthServer() {}
 func (UnimplementedCodeHealthServer) testEmbeddedByValue()                    {}
@@ -165,6 +196,24 @@ func RegisterCodeHealthServer(s grpc.ServiceRegistrar, srv CodeHealthServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&CodeHealth_ServiceDesc, srv)
+}
+
+func _CodeHealth_GetRepositoryBySlugs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRepositoryBySlugsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CodeHealthServer).GetRepositoryBySlugs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CodeHealth_GetRepositoryBySlugs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CodeHealthServer).GetRepositoryBySlugs(ctx, req.(*GetRepositoryBySlugsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _CodeHealth_GetRepoIDBySlugs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -257,20 +306,38 @@ func _CodeHealth_GetMilestones_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
-func _CodeHealth_ListAllPublicRepoIDs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListAllPublicRepoIDsRequest)
+func _CodeHealth_ListAllPublicRepos_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAllPublicReposRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(CodeHealthServer).ListAllPublicRepoIDs(ctx, in)
+		return srv.(CodeHealthServer).ListAllPublicRepos(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: CodeHealth_ListAllPublicRepoIDs_FullMethodName,
+		FullMethod: CodeHealth_ListAllPublicRepos_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CodeHealthServer).ListAllPublicRepoIDs(ctx, req.(*ListAllPublicRepoIDsRequest))
+		return srv.(CodeHealthServer).ListAllPublicRepos(ctx, req.(*ListAllPublicReposRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CodeHealth_GetMyRepos_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMyReposRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CodeHealthServer).GetMyRepos(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CodeHealth_GetMyRepos_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CodeHealthServer).GetMyRepos(ctx, req.(*GetMyReposRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -282,6 +349,10 @@ var CodeHealth_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "code_health.CodeHealth",
 	HandlerType: (*CodeHealthServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetRepositoryBySlugs",
+			Handler:    _CodeHealth_GetRepositoryBySlugs_Handler,
+		},
 		{
 			MethodName: "GetRepoIDBySlugs",
 			Handler:    _CodeHealth_GetRepoIDBySlugs_Handler,
@@ -303,10 +374,14 @@ var CodeHealth_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _CodeHealth_GetMilestones_Handler,
 		},
 		{
-			MethodName: "ListAllPublicRepoIDs",
-			Handler:    _CodeHealth_ListAllPublicRepoIDs_Handler,
+			MethodName: "ListAllPublicRepos",
+			Handler:    _CodeHealth_ListAllPublicRepos_Handler,
+		},
+		{
+			MethodName: "GetMyRepos",
+			Handler:    _CodeHealth_GetMyRepos_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "backend/sourcecraft-wrapper-service/internal/transport/rpc/service.proto",
+	Metadata: "internal/transport/rpc/service.proto",
 }
