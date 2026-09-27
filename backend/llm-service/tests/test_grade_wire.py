@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from llm_service.contracts import InvalidEvent
-from llm_service.grade_wire import parse_grade_request, build_grade_result
+from llm_service.grade_wire import parse_grade_request, build_grade_result, build_grade_failure
 from test_kafka_worker import request, FakeModel, REPOSITORY
 
 
@@ -14,11 +14,6 @@ class GradeWireTests(unittest.TestCase):
         section = doc.split("## Documentation grading: active", 1)[1]
         raw = section.split("```json\n", 1)[1].split("\n```", 1)[0].encode()
         self.assertEqual(parse_grade_request(raw)["sourcecraft_uuid"], REPOSITORY)
-
-    def test_fact_titles_cover_registry(self):
-        from llm_service.deductions import RULES
-        from llm_service.grade_wire import FACT_NAMES
-        self.assertEqual(set(FACT_NAMES), set(RULES))
 
     def test_request_without_envelope(self):
         self.assertEqual(parse_grade_request(request())["sourcecraft_uuid"], REPOSITORY)
@@ -43,10 +38,21 @@ class GradeWireTests(unittest.TestCase):
                              "evidence": [{"path": "README.md", "quote": "Example"}]}]
         event = build_grade_result(parse_grade_request(request()), payload)
         self.assertEqual(event["grade"], 84)
+        self.assertEqual(event["error"], "")
         self.assertEqual(event["subgrades"]["purpose"], 93)
         self.assertNotIn("required_files", event["subgrades"])
         self.assertTrue(all(type(v) is int for v in event["subgrades"].values()))
         self.assertIsInstance(event["advice"][0], str)
-        self.assertIn("README.md", event["advice"][0])
-        self.assertIn("summary", event["advice"][0])
+        self.assertEqual(event["advice"], [
+            "Уточните, какую задачу решает проект, для чего его используют и какой результат он даёт."])
+        self.assertNotIn("README.md", event["advice"][0])
+        self.assertNotIn("summary", event["advice"][0])
         self.assertIsNotNone(datetime.fromisoformat(event["evaluated_at"].replace("Z", "+00:00")).tzinfo)
+
+    def test_failure_contract_has_no_fake_score(self):
+        event = build_grade_failure(REPOSITORY, "CONTENT_FILTER")
+        self.assertEqual(set(event), {"sourcecraft_uuid", "grade", "subgrades", "advice",
+                                      "error", "evaluated_at"})
+        self.assertEqual(event["error"], "CONTENT_FILTER")
+        self.assertIsNone(event["grade"])
+        self.assertEqual(event["subgrades"], {})

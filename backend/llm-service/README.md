@@ -68,16 +68,24 @@ PYTHONPATH=src python3 -c 'from llm_service.yandex_model import YandexModel, Yan
 ```
 
 The Documentation worker consumes `repo.docs.grade.requested` with
-`{sourcecraft_uuid, s3_prefix, requested_at}` and publishes `repo.docs.graded` with
-`{sourcecraft_uuid, grade, subgrades, advice, evaluated_at}`. The key is
+`{sourcecraft_uuid, s3_prefix, requested_at}` and publishes `repo.docs.graded`
+messages with `{sourcecraft_uuid, grade, subgrades, advice, error, evaluated_at}`.
+The key is
 `sourcecraft_uuid`. `subgrades` maps section IDs to integer percentages, omitting
-unreviewed/inapplicable sections. `advice` is a list of deficiency fact strings,
-not recommendations. Internal local CLI output retains `subcategories` and `facts`.
+unreviewed/inapplicable sections. `advice` contains only Russian improvement recommendations selected deterministically
+by deficiency code (or section fallback). Reasons, file references and raw evidence
+are not sent in this field. No additional model call is made. Internal local CLI output retains `subcategories` and `facts`.
 See [the active contract](../../docs/kafka-contracts.md#documentation-grading-active-grade--llm-contract).
-The input offset is committed only after publication acknowledgement. Failures
-stop the worker without committing; repair the cause and restart. No failure
-message is defined. Redelivery can repeat results; there is no request ID in this
-contract to distinguish simultaneous grading runs for the same repository.
+On success `error` is empty. On evaluation failure `error` contains a short code,
+`grade` is null, `subgrades` is empty, and `advice` is empty. The worker continues
+with later requests. The input offset is committed only after Kafka acknowledges
+either result. The Go Grade consumer still needs to handle nonempty `error` as
+Documentation `NO_DATA` instead of using the grade fields.
+The Yandex adapter has a 60-second model-call budget per Documentation evaluation,
+shared by the initial request and its optional format retry. An exhausted budget
+produces `LLM_TIMEOUT`; the Grade service retains its 70-second fallback timeout.
+Redelivery can repeat results; there is no request ID in this contract to
+distinguish simultaneous grading runs for the same repository.
 
 Install the Python service and start the worker from this directory:
 

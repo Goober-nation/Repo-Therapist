@@ -96,8 +96,9 @@ category, normal code performs objective checks and the model performs semantic 
 combines both parts using a versioned grading method and returns the final normalized Documentation
 score, eight section grades, and a flat fact list. Grade service consumes that category score without
 recalculating its internal checks. It also receives subcategory scores and facts about every
-deduction. The documentation response contains textual deficiency facts in `advice`; Russian explanations and
-recommendations are generated only after a separate request from Aggregator.
+deduction. The documentation response contains only template-based Russian improvement
+recommendations in `advice`, without reasons, file references or an additional model call.
+The separate Aggregator report can still provide a broader explanation.
 
 Activity, Security, CI/CD, Issues, and Code Health are assessed algorithmically outside LLM service.
 LLM service does not read their raw inputs, run their analyzers, or calculate their category scores.
@@ -185,36 +186,71 @@ Grade → LLM, topic `repo.docs.grade.requested`:
 }
 ```
 
-LLM → Grade, topic `repo.docs.graded`:
+LLM → Grade, topic `repo.docs.graded` (successful evaluation):
 
 ```json
 {
   "sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
   "grade": 85,
   "subgrades": {"required_files": 100, "purpose": 80, "local_run": 75},
-  "advice": ["Назначение проекта: Назначение проекта описано неясно."],
+  "advice": ["Уточните, какую задачу решает проект, для чего его используют и какой результат он даёт."],
+  "error": "",
   "evaluated_at": "2026-09-26T12:00:10Z"
 }
 ```
+
+LLM → Grade, same topic and Kafka key (evaluation failed):
+
+```json
+{
+  "sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
+  "grade": null,
+  "subgrades": {},
+  "advice": [],
+  "error": "CONTENT_FILTER",
+  "evaluated_at": "2026-09-26T12:00:10Z"
+}
+```
+
+`error` is always a string. An empty string means a successful evaluation; Grade
+uses `grade` and `subgrades`. Any nonempty string means evaluation failed; Grade
+marks Documentation as `NO_DATA` and ignores all grade fields. The string is a
+short, stable error code without secrets or raw model/repository content. On
+failure `grade` is `null`, `subgrades` is `{}`, and `advice` is `[]`; zero is never
+used to represent an unavailable grade. `evaluated_at` records when the attempt
+finished, whether it succeeded or failed. Both outcomes use the original
+`sourcecraft_uuid` as message field and Kafka key.
 
 Section keys: `required_files`, `purpose`, `local_run`, `build`, `testing`, `usage`,
 `structure`, `consistency`. Unreviewed or inapplicable sections are omitted from
 `subgrades`, never replaced with zero or null. The total is normalized over evaluated
 checks before rounding; it is not the arithmetic mean of section percentages.
-All wire grades are integers 0–100, rounded half up. `advice` contains deficiency
-facts as strings, not recommendations. Russian fact titles, original detail values
-and evidence are rendered deterministically without another model call.
+Successful wire grades are integers 0–100, rounded half up. `advice` contains only
+improvement recommendations as Russian strings, selected by deficiency code with
+a section-level fallback for unknown codes. Reasons, filenames, evidence and hashes
+are not included in `advice`. Unreviewed/inapplicable and perfect-score sections
+produce no advice. Internal structured facts and scores are preserved; no additional
+model call is made.
 Timestamps are timezone-aware RFC3339. S3 prefix is a relative object-key prefix
 without a trailing slash. The service only reads repository objects.
 
-The worker commits input offsets only after the result is acknowledged by Kafka.
-There is no agreed failure-event format: invalid input, S3/model failures and failed
-publication stop the worker without committing the record. Repair the cause before
-restarting; a malformed record needs operator intervention. No fabricated grade is
-published. Delivery is at least once: a crash between publication and offset commit
-can repeat a result. This minimal contract has no request ID, so concurrent grading
-runs for the same repository cannot be reliably correlated; consumers must account
-for repeated results. The service does not claim exactly-once processing.
+The worker commits an input offset only after Kafka acknowledges the corresponding
+success or failure result. A content-filter refusal or exhausted model/S3 attempt
+produces a failure result when the request has a valid `sourcecraft_uuid`. If
+the 60-second model-call budget expires, the failure code is `LLM_TIMEOUT`.
+The Grade service retains a 70-second fallback for absent worker or broker failure. If
+result publication itself fails, the worker cannot report that failure through the
+same topic and must leave the input uncommitted; Grade's timeout remains the
+fallback. An invalid request without a trustworthy UUID cannot produce a
+correlated result and needs separate operational handling. Delivery is at least
+once: a crash between publication and offset commit can repeat a result. This
+minimal contract has no request ID, so concurrent grading runs for the same
+repository cannot be reliably correlated; consumers must account for repeated
+results. The service does not claim exactly-once processing.
+
+This section defines the agreed wire format. The Python LLM worker emits both
+outcomes; the Go Grade consumer still needs to interpret `error` and `grade: null`
+before failure results can produce immediate `NO_DATA` in production.
 
 The older `documentation.analysis.*` envelopes are legacy helpers only and are not
 used by the active Kafka worker. The report envelope below is a separate proposed
