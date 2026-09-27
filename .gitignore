@@ -44,6 +44,7 @@
 !tsconfig*.json
 !*.config.js
 !*.config.ts
+frontend/.vite/
 
 # configs generally — kafka, s3, docker, ci, etc. (config files, not database data — see re-ignore
 # block below for data/volume directories)

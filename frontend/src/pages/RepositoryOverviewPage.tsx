@@ -16,8 +16,8 @@ import {
   getHealthLabel,
   getLastActivityLabel,
 } from "../mocks/demoData"
-import { downloadReport } from "../mocks/downloadReport"
 import AnalysisResults from "../components/AnalysisResults"
+import ReportDownloadMenu from "../components/ReportDownloadMenu"
 import type { Recommendation, RepositorySummary } from "../types"
 
 function getTone(score: number): "good" | "warning" | "critical" {
@@ -128,12 +128,10 @@ export default function RepositoryOverviewPage({
         description={`${repository.language} · открытый репозиторий · активность ${getLastActivityLabel(repository.lastActivityDaysAgo).toLocaleLowerCase()}`}
         actions={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => downloadReport(repository)}
-            >
-              Скачать отчёт .md
-            </Button>
+            <ReportDownloadMenu
+              repository={repository}
+              recommendations={recommendations}
+            />
             <Button
               variant="primary"
               onClick={onRunAnalysis}

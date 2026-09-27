@@ -29,6 +29,9 @@ const { default: Security } = await vite.ssrLoadModule(
 )
 const { buildReport } = await vite.ssrLoadModule("/src/mocks/downloadReport.ts")
 const { getCategoryScore } = await vite.ssrLoadModule("/src/metrics.ts")
+const { getLowestCategoryScores } = await vite.ssrLoadModule(
+  "/src/mocks/rankingHealthInfo.ts",
+)
 const { HttpRepoHealthApi } = await vite.ssrLoadModule("/src/api/client.ts")
 const { DEMO_REPOSITORIES } = await vite.ssrLoadModule("/src/mocks/demoData.ts")
 const { MockRepositoryDataSource } = await vite.ssrLoadModule(
@@ -40,6 +43,41 @@ const render = (component, props) =>
   renderToStaticMarkup(createElement(component, props))
 const results = (categories, status) =>
   render(AnalysisResults, { categories, status })
+
+test("ranking info shows the weakest mock categories without changing health", () => {
+  const repository = DEMO_REPOSITORIES.find(
+    (item) => item.id === "awesome-project",
+  )
+  assert.deepEqual(getLowestCategoryScores(repository.categoryScores), [
+    { name: "Безопасность", score: 64 },
+    { name: "Issues", score: 74 },
+    { name: "Состояние кода", score: 78 },
+  ])
+
+  const ranking = render(Ranking, {
+    repositories: [repository],
+    onSelectRepository: () => {},
+  })
+  assert.match(
+    ranking,
+    /aria-label="Открыть анализ sourcecraft\/awesome-project"/,
+  )
+  assert.match(
+    ranking,
+    /aria-label="Показать низкие оценки категорий для sourcecraft\/awesome-project"/,
+  )
+  assert.equal(repository.healthScore, 82)
+})
+
+test("ranking info ignores missing category scores", () => {
+  assert.deepEqual(
+    getLowestCategoryScores({
+      empty: { score: null, trend: null },
+      documentation: { score: 0, trend: null, name: "Документация" },
+    }),
+    [{ name: "Документация", score: 0 }],
+  )
+})
 
 test("HTTP client preserves the browser fetch receiver and passes dynamic JSON to the mapper", async (context) => {
   context.mock.method(globalThis, "fetch", async function (url) {
@@ -87,6 +125,22 @@ test("new and renamed categories reach both the overview and downloaded report",
   assert.match(report, /Мяу: 72\/100/)
   assert.match(report, /Architecture v2: 93\/100/)
   assert.doesNotMatch(report, /undefined|Безопасность:/)
+})
+
+test("Markdown export uses the recommendations currently shown on the page", () => {
+  const repository = DEMO_REPOSITORIES[0]
+  const report = buildReport(repository, [
+    {
+      id: "fresh",
+      priority: "medium",
+      title: "Проверить сборку",
+      description: "",
+      currentScore: 80,
+      projectedScore: 84,
+    },
+  ])
+  assert.match(report, /Проверить сборку/)
+  assert.doesNotMatch(report, /Обновить уязвимые зависимости/)
 })
 
 test("the documented array shape and object shape produce the same categories", () => {
