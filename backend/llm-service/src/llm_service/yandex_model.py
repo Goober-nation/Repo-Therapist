@@ -7,6 +7,7 @@ import os
 import ssl
 from dataclasses import dataclass, field
 from http.client import HTTPException
+from time import monotonic
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -101,12 +102,20 @@ class ModelRateLimited(ModelProviderError):
     """The provider rejected the request because of rate limiting."""
 
 
+class ModelContentFiltered(ModelProviderError):
+    """The provider refused this repository content; retrying cannot help."""
+
+
+class ModelDeadlineExceeded(ModelProviderError):
+    """The time budget for grading this repository expired."""
+
+
 @dataclass(frozen=True)
 class YandexModelConfig:
     api_key: str = field(repr=False)
     folder_id: str
     model: str = "aliceai-llm"
-    timeout_seconds: int = 120
+    timeout_seconds: int = 60
 
     def __post_init__(self) -> None:
         if not self.api_key.strip() or not self.folder_id.strip():
@@ -172,6 +181,7 @@ def build_grading_prompt(context: ModelContext,
         "deductions is an array of objects with deduction_id (string), code (string), "
         "raw_points_lost (integer), facts (object), evidence (array). Use the rubric codes "
         "where appropriate and describe shortcomings as facts in Russian, without advice. "
+        "Include a short human-readable Russian description of each shortcoming in facts.description. "
         "Evidence objects use one of these exact shapes: "
         "{type: file_content, path: string, start_line: integer, end_line: integer, quote: string}; "
         "{type: file_exists or file_missing, path: string}; "
@@ -198,7 +208,8 @@ class YandexModel:
         self.config = config
 
     def complete(self, prompt: str, *, max_output_tokens: int = 16_384,
-                 json_output: bool = False, json_schema: dict | None = None) -> bytes:
+                 json_output: bool = False, json_schema: dict | None = None,
+                 timeout_seconds: float | None = None) -> bytes:
         if not isinstance(prompt, str) or not prompt:
             raise ValueError("model prompt must be nonempty text")
         prompt_bytes = len(prompt.encode("utf-8"))
@@ -232,8 +243,12 @@ class YandexModel:
             "Content-Type": "application/json",
             "x-folder-id": self.config.folder_id,
         })
+        timeout = self.config.timeout_seconds if timeout_seconds is None else min(
+            self.config.timeout_seconds, timeout_seconds)
+        if timeout <= 0:
+            raise ModelDeadlineExceeded("Documentation model time budget expired")
         try:
-            with urlopen(request, timeout=self.config.timeout_seconds) as response:
+            with urlopen(request, timeout=timeout) as response:
                 raw = response.read(1_000_001)
         except HTTPError as exc:
             status = exc.code
@@ -242,13 +257,15 @@ class YandexModel:
                 raise ModelRateLimited("Yandex AI Studio returned HTTP 429") from None
             raise ModelProviderError(f"Yandex AI Studio returned HTTP {status}") from None
         except URLError as exc:
+            if isinstance(exc.reason, TimeoutError):
+                raise ModelDeadlineExceeded("Yandex AI Studio request timed out") from None
             if isinstance(exc.reason, ssl.SSLError):
                 raise ModelProviderError(
                     "TLS connection to Yandex AI Studio failed; check network or VPN"
                 ) from None
             raise ModelProviderError("Yandex AI Studio request failed") from None
         except TimeoutError:
-            raise ModelProviderError("Yandex AI Studio request timed out") from None
+            raise ModelDeadlineExceeded("Yandex AI Studio request timed out") from None
         except (OSError, HTTPException):
             raise ModelProviderError("Yandex AI Studio transport failed while reading the response") from None
         if len(raw) > 1_000_000:
@@ -257,6 +274,11 @@ class YandexModel:
             payload = json.loads(raw)
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise ModelProviderError("Yandex AI Studio returned invalid JSON") from exc
+        if isinstance(payload, dict) and payload.get("status") == "incomplete":
+            details = payload.get("incomplete_details")
+            reason = (details.get("reason") if isinstance(details, dict) else None) or payload.get("reason")
+            if reason == "content_filter":
+                raise ModelContentFiltered("Yandex AI Studio filtered the request")
         if not isinstance(payload, dict) or payload.get("status") != "completed":
             raise ModelProviderError("Yandex AI Studio did not complete the response")
         output = payload.get("output", [])
@@ -278,8 +300,15 @@ class YandexModel:
     def grade(self, snapshot: Snapshot, context: ModelContext) -> dict:
         allowed = allowed_not_applicable_checks(snapshot, context)
         prompt = build_grading_prompt(context, allowed)
+        deadline = monotonic() + self.config.timeout_seconds
         for attempt in range(2):
-            raw = self.complete(prompt, json_schema=GRADING_RESPONSE_SCHEMA)
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                raise ModelDeadlineExceeded("Documentation model time budget expired")
+            raw = self.complete(prompt, json_schema=GRADING_RESPONSE_SCHEMA,
+                                timeout_seconds=remaining)
+            if monotonic() >= deadline:
+                raise ModelDeadlineExceeded("Documentation model time budget expired")
             try:
                 return documentation_payload(parse_formatted_response(raw, snapshot, context))
             except InvalidModelResponse as exc:

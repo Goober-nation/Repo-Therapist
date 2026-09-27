@@ -328,3 +328,14 @@ Result: `{sourcecraft_uuid, grade, subgrades, advice, evaluated_at}`.
 inapplicable sections; normalize total over evaluated checks. `advice` is a string
 array of deficiency facts, not recommendations. This supersedes older envelope
 and wire-null wording above; internal section grades may still be null.
+
+
+## Documentation advice rendering (user decision, 2026-09-27)
+
+The active `repo.docs.graded` field `advice: [string]` contains ONLY Russian
+improvement recommendations, rendered deterministically by deduction code with a
+section-level fallback. Do not send deficiency reasons, file references, raw evidence
+or hashes in advice. Internal structured facts and scores remain available locally.
+This supersedes previous facts-only and reason-plus-recommendation wording.
+Do not add model calls for recommendations. Unreviewed/inapplicable and perfect-score
+sections have no advice. The model evaluation budget is 60 seconds.
