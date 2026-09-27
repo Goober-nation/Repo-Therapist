@@ -1,7 +1,6 @@
 """Local repository grading command; JSON goes to stdout, progress to stderr."""
 
 import argparse
-import hashlib
 import json
 import subprocess
 import sys
@@ -9,9 +8,25 @@ from pathlib import Path
 
 from .context import build_model_context, select_context_paths
 from .discovery import readme_links
+from .grading import required_file_paths
+from .sampling import file_priority
 from .model_response import InvalidModelResponse
-from .snapshot import Snapshot
+from .snapshot import Snapshot, SnapshotError, load_snapshot
 from .yandex_model import ModelProviderError, YandexModel, YandexModelConfig
+
+
+class _LocalStore:
+    """Expose a Git working tree through the S3 snapshot interface."""
+
+    def __init__(self, root: Path, paths: set[str]):
+        self.root, self.paths = root, paths
+
+    def list_objects(self, prefix):
+        return {prefix + name: ((self.root / name).stat().st_size, "") for name in self.paths}
+
+    def read_object(self, key):
+        with (self.root / key.split("/", 1)[1]).open("rb") as handle:
+            return handle.read(2_000_001)
 
 
 def local_snapshot(directory: Path) -> Snapshot:
@@ -30,21 +45,10 @@ def local_snapshot(directory: Path) -> Snapshot:
         if path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(root):
             continue
         paths.add(name)
-    files, hashes = {}, {}
-    total = 0
-    pending = sorted(select_context_paths(frozenset(paths)))
-    initial_count = len(pending)
-    for index, name in enumerate(pending):
-        with (root / name).open("rb") as handle:
-            data = handle.read(2_000_001)
-        total += len(data)
-        if len(data) > 2_000_000 or total > 8_000_000:
-            raise ValueError("Selected candidate files exceed the local scan limit")
-        files[name] = data.decode("utf-8")
-        hashes[name] = hashlib.sha256(data).hexdigest()
-        if index + 1 == initial_count:
-            pending.extend(p for p in readme_links(files, paths) if p not in files)
-    return Snapshot(frozenset(paths), files, hashes)
+    return load_snapshot(_LocalStore(root, paths), "local", select_context_paths,
+                         expand_selection=readme_links,
+                         required=lambda inventory: required_file_paths(set(inventory)),
+                         priority=file_priority)
 
 
 def main(argv=None) -> int:
@@ -100,7 +104,7 @@ def main(argv=None) -> int:
         return 0
     except subprocess.CalledProcessError:
         print("Ошибка: не удалось прочитать Git-репозиторий.", file=sys.stderr)
-    except (ModelProviderError, InvalidModelResponse, ValueError) as exc:
+    except (ModelProviderError, InvalidModelResponse, SnapshotError, ValueError) as exc:
         print(f"Ошибка: {exc}", file=sys.stderr)
     except OSError:
         print("Ошибка: не удалось прочитать файлы или выполнить системную команду.", file=sys.stderr)

@@ -31,6 +31,8 @@ class GradeWireTests(unittest.TestCase):
     def test_omit_unreviewed_round_scores_and_preserve_facts(self):
         payload = FakeModel().grade(None, None)
         payload["grade"] = 83.5
+        for section in payload["subcategories"]:
+            section["grade"] = 100
         payload["subcategories"][0]["grade"] = None
         payload["subcategories"][1]["grade"] = 92.5
         payload["facts"] = [{"id": "DOC-1", "subcategory": "purpose",

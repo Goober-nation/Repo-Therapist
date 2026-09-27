@@ -55,10 +55,11 @@ def _is_document(path: str) -> bool:
     )
 
 
-def select_context_paths(all_paths: frozenset[str], *, max_paths: int = 10_000) -> set[str]:
-    """Select at most 12 document candidates and eight artifacts plus required files."""
-    if len(all_paths) > max_paths:
-        raise ContextBuildError("repository inventory exceeds context path limit")
+def select_context_paths(all_paths: frozenset[str]) -> set[str]:
+    """Select at most 12 document candidates and eight artifacts plus required files.
+
+    Only path strings are scanned, so large inventories need no path limit.
+    """
     required = required_file_paths(set(all_paths))
     selected = set(required)
     for path in all_paths:
@@ -85,7 +86,8 @@ def select_context_paths(all_paths: frozenset[str], *, max_paths: int = 10_000) 
 
 def build_model_context(snapshot: Snapshot, *, max_context_bytes: int = 32_000) -> ModelContext:
     """Build an explicitly sampled context with bounded excerpts and supporting metadata."""
-    selected = set(snapshot.files)
+    # Unreadable (non-UTF-8) required files only support the presence check.
+    selected = set(snapshot.files) - snapshot.unreadable
     if not selected <= snapshot.all_paths:
         raise ContextBuildError("selected files are absent from inventory")
     linked = readme_links(snapshot.files, snapshot.all_paths)
@@ -141,7 +143,9 @@ def prepare_documentation_context(store: ObjectStore, prefix: str, *,
     """List S3, choose context paths, read them stably, then hash the exact model input."""
     snapshot = load_snapshot(store, prefix, select_context_paths,
                              max_file_bytes=2_000_000, max_total_bytes=8_000_000,
-                             expand_selection=readme_links)
+                             expand_selection=readme_links,
+                             required=lambda paths: required_file_paths(set(paths)),
+                             priority=file_priority)
     return snapshot, build_model_context(snapshot, max_context_bytes=max_context_bytes)
 
 
