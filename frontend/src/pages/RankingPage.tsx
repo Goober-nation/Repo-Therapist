@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import { Badge, Button, Card, PageHeading } from "../components/Shell"
+import { RankingHealthInfo } from "../components/RankingHealthInfo"
 import { getHealthLabel, getLastActivityLabel } from "../mocks/demoData"
 import type { RepositorySummary } from "../types"
 import { getCategoryScore } from "../metrics"
@@ -278,13 +279,16 @@ export default function RankingPage({
               <span>Статус</span>
             </div>
             {visibleRepositories.map((repository, index) => (
-              <button
-                className="ranking-row ranking-row--button"
+              <div
+                className="ranking-row ranking-row--interactive"
                 key={repository.id}
-                type="button"
-                onClick={() => onSelectRepository(repository.id)}
-                aria-label={`Открыть анализ ${repository.fullName}`}
               >
+                <button
+                  className="ranking-row__open"
+                  type="button"
+                  onClick={() => onSelectRepository(repository.id)}
+                  aria-label={`Открыть анализ ${repository.fullName}`}
+                />
                 <span className="table-rank">{index + 1}</span>
                 <span className="repository-cell">
                   <strong>{repository.name}</strong>
@@ -305,12 +309,13 @@ export default function RankingPage({
                     "appsec",
                   ) ?? "—"}
                 </span>
-                <span>
+                <span className="ranking-status-cell">
                   <Badge tone={getStatusTone(repository.healthScore)}>
                     {getHealthLabel(repository.healthScore)}
                   </Badge>
+                  <RankingHealthInfo repository={repository} />
                 </span>
-              </button>
+              </div>
             ))}
           </div>
         </div>
