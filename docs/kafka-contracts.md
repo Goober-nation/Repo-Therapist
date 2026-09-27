@@ -14,7 +14,8 @@ Scope: the message shapes published/consumed on the Kafka links in the architect
   person's scope (Repository + Grade service), so it didn't need to wait on wider team sign-off —
   see `backlog/phase-3-kafka-integration.md` for the implementation notes.
 - Grade service <-> LLM service — **defined below as flat `repo.docs.*` messages** for documentation analysis.
-- Aggregator <-> LLM service — **defined below (request/completed v2)** for final report generation.
+- Aggregator <-> LLM service — **defined below as flat `llm.recommendations.*` messages** for
+  the repository summary and prioritized recommendations (supersedes the report v2 envelope).
 
 ## `repo.grade.requested`
 
@@ -111,8 +112,10 @@ are immutable source material for human-readable synthesis.
 |---|---|---|---|
 | `repo.docs.grade.requested` | Grade service | LLM service | `sourcecraft_uuid` |
 | `repo.docs.graded` | LLM service | Grade service | `sourcecraft_uuid` |
-| `llm.report.requests` | Aggregator | LLM service | `analysis_id` |
-| `llm.report.results` | LLM service | Aggregator | `analysis_id` |
+| `llm.recommendations.requested` | Aggregator | LLM service | `sourcecraft_uuid` |
+| `llm.recommendations.received` | LLM service | Aggregator | `sourcecraft_uuid` |
+| `llm.report.requests` | *(superseded, not implemented)* | | `analysis_id` |
+| `llm.report.results` | *(superseded, not implemented)* | | `analysis_id` |
 
 Each LLM service instance that handles documentation uses the same consumer group. Report workers
 likewise share a separate consumer group. Suggested names are `llm-service-documentation-v1` and
@@ -256,7 +259,97 @@ The older `documentation.analysis.*` envelopes are legacy helpers only and are n
 used by the active Kafka worker. The report envelope below is a separate proposed
 interface; report generation is not implemented by this worker.
 
-## Report generation
+## Repository summary and recommendations: active Aggregator ↔ LLM contract (2026-09-27)
+
+Flat JSON, no envelope. Both topics use `sourcecraft_uuid` as the Kafka key. Topic names
+and the consumer group (`llm-service-recommendations-v1`) can be overridden with
+`LLM_SUMMARY_REQUEST_TOPIC`, `LLM_SUMMARY_RESULT_TOPIC` and `LLM_SUMMARY_KAFKA_GROUP_ID`.
+
+Aggregator → LLM, topic `llm.recommendations.requested` (Go `LLMRecommendationsRequestedEvent`):
+
+```json
+{
+  "visibility": "private",
+  "sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
+  "org_slug": "examples",
+  "repo_slug": "demo",
+  "grade": {
+    "Score": 64,
+    "CategoryScores": {"security": 40, "activity": 90, "documentation": 70,
+                       "ci_cd": null, "issues": 80, "code_health": 55},
+    "Advice": ["Обновите уязвимые зависимости."],
+    "MissingData": ["ci_cd"],
+    "GradedAt": "2026-09-27T11:59:00Z"
+  },
+  "requested_at": "2026-09-27T12:00:00+03:00"
+}
+```
+
+`grade` is the Go `RepoGrade`, which has only `db` tags, so its fields arrive with Go names.
+The parser accepts both Go names (`Score`, `CategoryScores`, …) and snake_case
+(`score`, `category_scores`, …); the same field in both spellings is rejected. Rules:
+
+- `visibility` is `public` or `private`; slugs are nonempty; `requested_at` is RFC3339
+  (Go nanosecond precision is accepted).
+- `Score` is an integer 0–100 or `null`. `CategoryScores` maps a category ID to a number
+  0–100, `null` (no data) or an object with a `score` field. `Advice` and `MissingData` are
+  string lists or `null`. Other `grade` fields are ignored.
+- For `public`, `security` and `ci_cd` are hidden from the model even if present.
+
+LLM → Aggregator, topic `llm.recommendations.received` (Go `LLMRecommendationsReceivedEvent`):
+
+```json
+{
+  "sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
+  "raw_response": {
+    "summary": "Репозиторий получил 64 балла из 100. …",
+    "strengths": ["Активность проекта: 90/100", "Issues: 80/100"],
+    "weaknesses": ["Безопасность (Security): 40/100", "Документация: 70/100"],
+    "recommendations": [
+      {"priority": "HIGH", "category": "security", "text": "Обновите уязвимые зависимости."}
+    ]
+  },
+  "model_used": "aliceai-llm",
+  "evaluated_at": "2026-09-27T12:00:08Z",
+  "visibility": "private",
+  "error": ""
+}
+```
+
+`raw_response` rules. The model writes only `summary` and recommendation texts; everything
+else is derived from the request scores by code, so it is complete and reproducible:
+
+- `summary` (model): nonempty Russian text, at most 1500 characters.
+- `strengths`, `weaknesses` (code): every category with a numeric score visible for this
+  `visibility` appears exactly once as `"<name>: <score>/100"` — score 75 or higher in
+  `strengths` (highest first), below 75 in `weaknesses` (lowest first). No-data categories
+  never appear. Either list may be empty.
+- `recommendations`: up to 8 objects `{priority, category, text}`. The model writes `text`
+  (at most 600 characters) and chooses `category` — always a category with a numeric score
+  visible for this `visibility`. `priority` is set by code from that category's score:
+  `HIGH` below 50, or Security below 75; `MEDIUM` below 75; `LOW` otherwise. Sorted by
+  priority, then by weaker category. The model is asked for at least one recommendation per
+  weak category; this is not enforced.
+- Stray list markers and punctuation at the edges of model text are trimmed. The wording is
+  not verified. The model is instructed to use only request data, not to invent figures or
+  facts, and not to treat missing data as a problem. It never changes scores.
+
+On failure `raw_response` is `null` and `error` is a stable code: `INVALID_EVENT`,
+`NO_DATA` (no category has a score, the model is not called), `LLM_TIMEOUT`,
+`LLM_RATE_LIMITED`, `LLM_PROVIDER_UNAVAILABLE`, `LLM_INVALID_RESPONSE`, `CONTENT_FILTER`,
+`INTERNAL_ERROR`. `model_used` is filled in both cases. `visibility` is copied from the
+request, or `""` if the request had no valid value. A request without a valid
+`sourcecraft_uuid` cannot be correlated: it is logged and skipped.
+
+One format-correction retry is allowed inside a 60-second model budget. The input offset is
+committed only after Kafka acknowledges the result. Delivery is at least once, so a repeated
+result for the same `sourcecraft_uuid` is possible.
+
+## Report generation (superseded)
+
+> Superseded on 2026-09-27 by the flat `llm.recommendations.*` contract above. The envelope
+> contract below was never implemented by the Aggregator and is kept only for history;
+> `contracts.py` still contains its unused validator.
 
 ### `report.generation.requested`
 
