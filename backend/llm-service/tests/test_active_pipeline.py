@@ -52,12 +52,14 @@ class ActivePipelineTests(unittest.TestCase):
         self.assertEqual(events, ["produce", "flush", "commit"])
         self.assertEqual(producer.topic, "repo.docs.graded")
         result = producer.event
-        self.assertEqual(set(result), {"sourcecraft_uuid", "grade", "subgrades", "advice", "evaluated_at"})
+        self.assertEqual(set(result), {"sourcecraft_uuid", "grade", "subgrades", "advice", "error", "evaluated_at"})
         self.assertEqual(result["sourcecraft_uuid"], REPOSITORY)
+        self.assertEqual(result["error"], "")
         self.assertEqual(producer.key.decode(), REPOSITORY)
         self.assertTrue(all(type(v) is int and 0 <= v <= 100 for v in result["subgrades"].values()))
         self.assertNotIn("build", result["subgrades"])
-        self.assertTrue(any("Неясно назначение проекта" in fact for fact in result["advice"]))
+        self.assertTrue(any("Уточните, какую задачу решает проект" in item for item in result["advice"]))
+        self.assertFalse(any("Неясно назначение проекта" in item for item in result["advice"]))
 
     def test_folder_markers_are_not_repository_files(self):
         store = FakeStore()

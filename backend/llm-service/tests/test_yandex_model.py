@@ -10,7 +10,8 @@ from llm_service.context import build_model_context
 from llm_service.grading import CHECKS, COMPONENTS
 from llm_service.model_response import InvalidModelResponse
 from llm_service.snapshot import Snapshot
-from llm_service.yandex_model import (API_URL, ModelProviderError, YandexModel,
+from llm_service.yandex_model import (API_URL, ModelContentFiltered, ModelDeadlineExceeded,
+                                      ModelProviderError, YandexModel,
                                       YandexModelConfig, GRADING_RESPONSE_SCHEMA,
                                       build_grading_prompt)
 
@@ -57,7 +58,7 @@ class YandexModelTests(unittest.TestCase):
         request = send.call_args.args[0]
         self.assertEqual(request.full_url, API_URL)
         self.assertEqual(request.get_header("Authorization"), "Api-Key private-key")
-        self.assertEqual(send.call_args.kwargs["timeout"], 120)
+        self.assertEqual(send.call_args.kwargs["timeout"], 60)
         body = json.loads(request.data)
         self.assertEqual(body["model"], "gpt://folder-123/aliceai-llm")
         self.assertEqual(body["temperature"], 0)
@@ -102,6 +103,23 @@ class YandexModelTests(unittest.TestCase):
         retry_prompt = json.loads(send.call_args_list[1].args[0].data)["input"]
         self.assertIn("VALIDATION_FEEDBACK", retry_prompt)
         self.assertIn("missing model checks", retry_prompt)
+
+    def test_format_retry_uses_only_remaining_model_budget(self):
+        invalid = b'{"checks":[]}'
+        valid = json.dumps({"checks": full_checks()}).encode()
+        with patch("llm_service.yandex_model.monotonic", side_effect=[0, 0, 50, 50, 50]):
+            with patch.object(self.model, "complete", side_effect=[invalid, valid]) as complete:
+                self.assertEqual(self.model.grade(SNAPSHOT, CONTEXT)["grade"], 100)
+        self.assertEqual(complete.call_args_list[0].kwargs["timeout_seconds"], 60)
+        self.assertEqual(complete.call_args_list[1].kwargs["timeout_seconds"], 10)
+
+    def test_late_model_response_is_not_published_as_success(self):
+        valid = json.dumps({"checks": full_checks()}).encode()
+        with patch("llm_service.yandex_model.monotonic", side_effect=[0, 0, 61]):
+            with patch.object(self.model, "complete", return_value=valid) as complete:
+                with self.assertRaises(ModelDeadlineExceeded):
+                    self.model.grade(SNAPSHOT, CONTEXT)
+        self.assertEqual(complete.call_count, 1)
 
     def test_semantic_inconsistencies_return_unchanged_without_retry(self):
         checks = full_checks()
@@ -152,6 +170,14 @@ class YandexModelTests(unittest.TestCase):
         payload = json.dumps({"status": "completed", "output_text": "готово"}).encode()
         with patch("llm_service.yandex_model.urlopen", return_value=io.BytesIO(payload)):
             self.assertEqual(self.model.complete("hello"), "готово".encode())
+
+    def test_content_filter_is_distinct_from_provider_outage(self):
+        for body in ({"status": "incomplete", "incomplete_details": {"reason": "content_filter"}},
+                     {"status": "incomplete", "reason": "content_filter"}):
+            with self.subTest(body=body), patch("llm_service.yandex_model.urlopen",
+                                             return_value=io.BytesIO(json.dumps(body).encode())):
+                with self.assertRaises(ModelContentFiltered):
+                    self.model.complete("hello")
 
     def test_prompt_limits_model_to_supported_applicability_decisions(self):
         prompt = build_grading_prompt(CONTEXT, frozenset({"build.commands"}))

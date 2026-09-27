@@ -9,11 +9,13 @@ from dataclasses import dataclass
 
 from .context import ContextBuildError, prepare_documentation_context
 from .contracts import InvalidEvent, UnsupportedEventVersion
-from .grade_wire import REQUEST_TOPIC, RESULT_TOPIC, parse_grade_request, build_grade_result
+from .grade_wire import (REQUEST_TOPIC, RESULT_TOPIC, parse_grade_request,
+                         request_uuid_if_valid, build_grade_result, build_grade_failure)
 from .model_response import InvalidModelResponse
 from .s3_store import S3Config, S3Store
 from .snapshot import SnapshotError
-from .yandex_model import (ModelInputTooLarge, ModelProviderError, ModelRateLimited,
+from .yandex_model import (ModelContentFiltered, ModelDeadlineExceeded, ModelInputTooLarge,
+                           ModelProviderError, ModelRateLimited,
                            YandexModel, YandexModelConfig)
 
 LOG = logging.getLogger(__name__)
@@ -52,25 +54,35 @@ def _failure(exc: Exception) -> tuple[str, bool, str]:
         return "CONTEXT_BUILD_FAILED", False, "Контекст превышает лимит модели"
     if isinstance(exc, InvalidModelResponse):
         return "LLM_INVALID_RESPONSE", True, "Модель вернула ответ неверного формата"
+    if isinstance(exc, ModelContentFiltered):
+        return "CONTENT_FILTER", False, "Провайдер отклонил содержимое репозитория"
     if isinstance(exc, ModelRateLimited):
         return "LLM_RATE_LIMITED", True, "Лимит запросов к модели временно исчерпан"
+    if isinstance(exc, ModelDeadlineExceeded):
+        return "LLM_TIMEOUT", True, "Истекло время обработки запроса моделью"
     if isinstance(exc, ModelProviderError):
         return "LLM_PROVIDER_UNAVAILABLE", True, "Провайдер модели временно недоступен"
     return "INTERNAL_ERROR", True, "Внутренняя ошибка LLM-сервиса"
 
 
-def process_documentation_request(raw: bytes, store, model) -> dict:
-    """Build the agreed flat result; failures never masquerade as a grade."""
+def process_documentation_request(raw: bytes, store, model) -> dict | None:
+    """Return success or failure; only uncorrelatable input lacks a result."""
     try:
         request = parse_grade_request(raw)
+    except InvalidEvent:
+        sourcecraft_uuid = request_uuid_if_valid(raw)
+        LOG.warning("Invalid Documentation request; sourcecraft_uuid=%s", sourcecraft_uuid or "unknown")
+        if sourcecraft_uuid is None:
+            return None
+        return build_grade_failure(sourcecraft_uuid, "INVALID_EVENT")
+    try:
         snapshot, context = prepare_documentation_context(store, request["s3_prefix"])
         return build_grade_result(request, model.grade(snapshot, context))
     except Exception as exc:
         code, _, _ = _failure(exc)
-        LOG.warning("Documentation analysis failed: %s", code)
-        # No failure event is defined by the Grade service contract. Stop without
-        # committing: restarting the worker retries this input record.
-        raise RuntimeError(f"Documentation request failed: {code}") from None
+        LOG.error("Documentation analysis failed: %s; sourcecraft_uuid=%s", code,
+                  request["sourcecraft_uuid"])
+        return build_grade_failure(request["sourcecraft_uuid"], code)
 
 
 def publish_terminal(producer, event: dict, *, timeout: float = 30.0) -> None:
@@ -114,6 +126,8 @@ def run_worker(config: KafkaConfig, store, model, *, consumer=None, producer=Non
             event = process_documentation_request(message.value(), store, model)
             if event is not None:
                 publish_terminal(producer, event)
+            else:
+                LOG.error("Uncorrelatable Documentation request skipped")
             committed = consumer.commit(message=message, asynchronous=False)
             if any(partition.error for partition in committed):
                 raise RuntimeError("Kafka did not commit input offset")
