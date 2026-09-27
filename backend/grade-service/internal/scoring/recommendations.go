@@ -39,12 +39,12 @@ func BuildRecommendations(categories map[string]CategoryResult, categoryIDs []st
 }
 
 // PickRandom returns up to n recommendations chosen uniformly at random from recs (all of them,
-// in random order, when there are n or fewer). shuffle is rand.Shuffle in production; tests pass
+// in random order, when there are n or fewer, or when n is 0). shuffle is rand.Shuffle in production; tests pass
 // a deterministic one. recs itself is not modified.
 func PickRandom(recs []Recommendation, n int, shuffle func(n int, swap func(i, j int))) []Recommendation {
 	picked := append([]Recommendation(nil), recs...)
 	shuffle(len(picked), func(i, j int) { picked[i], picked[j] = picked[j], picked[i] })
-	if len(picked) > n {
+	if n > 0 && len(picked) > n {
 		picked = picked[:n]
 	}
 	return picked

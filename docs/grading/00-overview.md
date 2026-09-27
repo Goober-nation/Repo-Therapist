@@ -67,8 +67,10 @@ The result (`grading.results`) says which one it is in `visibility` and fills on
 CI/CD as missing.
 
 **Recommendations**: every graded category's recommendations (one per metric scoring below
-healthy, see `config/recommendations.yaml`) go into one pool, and **3 are picked at random**
-(all of them if there are 3 or fewer). No severity ordering — deliberately, per team decision.
+healthy, see `config/recommendations.yaml`) go into one pool, and **N are picked at random**
+(all of them if there are N or fewer). N is `GRADE_ADVICE_LIMIT` (default 3, `0` = send all).
+Each text starts with a severity label (`[critical]`, `[high]`, `[medium]`, `[low]`); it is
+display-only — selection is not ordered by it.
 
 ### How a result is put together, step by step
 
@@ -79,7 +81,8 @@ healthy, see `config/recommendations.yaml`) go into one pool, and **3 are picked
 4. The overall score is the weighted average of those categories; categories with no data are
    dropped and the rest re-weighted. In the private view, open Security findings then cap it:
    open critical → at most 59, open high → at most 79 (see `security.md`).
-5. Every category's recommendations are collected into one list, and 3 are drawn at random.
+5. Every category's recommendations are collected into one list, and `GRADE_ADVICE_LIMIT`
+   (default 3; 0 = all) are drawn at random.
 6. The result is sent with `visibility` set and only that side (score, category scores,
    recommendations) filled; `missing_data` names that view's categories that had no data.
 

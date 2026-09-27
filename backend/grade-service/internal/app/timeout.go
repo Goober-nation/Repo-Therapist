@@ -3,6 +3,7 @@ package app
 import (
 	"log"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -38,4 +39,22 @@ func DurationEnv(key string, def time.Duration) time.Duration {
 		return def
 	}
 	return d
+}
+
+// DefaultAdviceLimit is how many recommendations a grading result carries by default.
+const DefaultAdviceLimit = 3
+
+// AdviceLimit returns GRADE_ADVICE_LIMIT (a non-negative integer, 0 = send every recommendation)
+// or DefaultAdviceLimit when it is unset or invalid (an invalid value is logged).
+func AdviceLimit() int {
+	v := os.Getenv("GRADE_ADVICE_LIMIT")
+	if v == "" {
+		return DefaultAdviceLimit
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		log.Printf("ignoring invalid GRADE_ADVICE_LIMIT=%q, using %d", v, DefaultAdviceLimit)
+		return DefaultAdviceLimit
+	}
+	return n
 }

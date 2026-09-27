@@ -25,7 +25,7 @@ func TestBuildGradingResult_RoundsNotTruncates(t *testing.T) {
 		"activity": {Weight: 1.0},
 	}}
 
-	result, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPublic, time.Now(), noShuffle)
+	result, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPublic, time.Now(), DefaultAdviceLimit, noShuffle)
 	if err != nil {
 		t.Fatalf("BuildGradingResult: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestBuildGradingResult_AbsentCategoriesStayAbsent(t *testing.T) {
 		"code_health": {Weight: 0.20}, "security": {Weight: 0.20}, "ci_cd": {Weight: 0.15},
 	}}
 
-	result, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPrivate, time.Now(), noShuffle)
+	result, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPrivate, time.Now(), DefaultAdviceLimit, noShuffle)
 	if err != nil {
 		t.Fatalf("BuildGradingResult: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestBuildGradingResult_FillsOnlyItsVisibility(t *testing.T) {
 	}
 	cfg := &config.Config{Categories: map[string]config.CategoryConfig{"activity": {Weight: 1.0}}}
 
-	pub, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPublic, time.Now(), noShuffle)
+	pub, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPublic, time.Now(), DefaultAdviceLimit, noShuffle)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestBuildGradingResult_FillsOnlyItsVisibility(t *testing.T) {
 		}
 	}
 
-	priv, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPrivate, time.Now(), noShuffle)
+	priv, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPrivate, time.Now(), DefaultAdviceLimit, noShuffle)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestBuildGradingResult_CapsRecommendationsAcrossCategories(t *testing.T) {
 	}}
 	catalog := map[string]string{"a1": "A1", "a2": "A2", "i1": "I1", "i2": "I2", "c1": "C1"}
 
-	result, err := BuildGradingResult(out, cfg, catalog, contracts.VisibilityPublic, time.Now(), noShuffle)
+	result, err := BuildGradingResult(out, cfg, catalog, contracts.VisibilityPublic, time.Now(), DefaultAdviceLimit, noShuffle)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestBuildGradingResult_SecurityCap(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			out := &GradeOutput{RepoID: "r", Categories: tc.categories}
-			result, err := BuildGradingResult(out, cfg, map[string]string{}, tc.visibility, time.Now(), noShuffle)
+			result, err := BuildGradingResult(out, cfg, map[string]string{}, tc.visibility, time.Now(), DefaultAdviceLimit, noShuffle)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -106,7 +106,7 @@ type Recommendation struct {
 
 // GradingResultEvent is published once grading finishes — consumed by the Aggregator, which
 // writes it to the repo_grades_* table matching Visibility and releases the repo_lock. Score is
-// nil only when every category in that view is NoData. Advice holds at most 3 Recommendations,
+// nil only when every category in that view is NoData. Advice holds at most GRADE_ADVICE_LIMIT (default 3, 0 = all) Recommendations,
 // picked at random from all of that view's categories. MissingData names the view's categories
 // that are NoData/not_calculated. A nonempty Error means grading failed: Score, CategoryScores and
 // Advice are null and the Aggregator only releases the lock.

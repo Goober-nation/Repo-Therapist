@@ -103,6 +103,9 @@ func TestPickRandom(t *testing.T) {
 	if got := PickRandom(recs[:2], 3, reverse); len(got) != 2 {
 		t.Errorf("fewer than n recs should return all of them, got %d", len(got))
 	}
+	if got := PickRandom(recs, 0, reverse); len(got) != len(recs) {
+		t.Errorf("n = 0 should return all recs, got %d", len(got))
+	}
 	if got := PickRandom(nil, 3, reverse); len(got) != 0 {
 		t.Errorf("no recs should return none, got %d", len(got))
 	}
