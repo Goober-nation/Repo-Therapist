@@ -7,4 +7,5 @@ use (
 	./backend/sourcecraft-wrapper-service
 	./backend/aggregator-service
 	./backend/gateway-service
+	./backend/rating-service
 )
