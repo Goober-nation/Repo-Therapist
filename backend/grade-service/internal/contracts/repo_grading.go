@@ -12,13 +12,17 @@ import (
 const (
 	TopicGradeRequested = "repo.grade.requested"
 	TopicRepoReady      = "repo.ready"
+
+	// Grade <-> LLM Documentation exchange (docs/kafka-contracts.md, "active Grade ↔ LLM contract").
+	TopicDocsGradeRequested = "repo.docs.grade.requested"
+	TopicDocsGraded         = "repo.docs.graded"
 )
 
 // AllTopics is every topic this exchange uses — pass to kafka.EnsureTopics at service startup so
 // neither service can join a consumer group before its topic exists. Includes the Aggregator's
 // two topics too (grade-service is the only service that touches those, but provisions them here
 // alongside its own internal ones for the same reason).
-var AllTopics = []string{TopicGradeRequested, TopicRepoReady, TopicGradingRequests, TopicGradingResults}
+var AllTopics = []string{TopicGradeRequested, TopicRepoReady, TopicGradingRequests, TopicGradingResults, TopicDocsGradeRequested, TopicDocsGraded}
 
 // GradeRequested is published to ask Repository service to clone+upload a repo. Consumed by
 // Repository service, produced by grade-service relaying grading.requests.
@@ -109,4 +113,21 @@ type GradingResultEvent struct {
 
 	MissingData []string  `json:"missing_data"`
 	GradedAt    time.Time `json:"graded_at"`
+}
+
+// DocsGradeRequested asks the LLM service to grade a repo's documentation from its S3 prefix.
+type DocsGradeRequested struct {
+	SourcecraftUUID string    `json:"sourcecraft_uuid"`
+	S3Prefix        string    `json:"s3_prefix"`
+	RequestedAt     time.Time `json:"requested_at"`
+}
+
+// DocsGraded is the LLM service's reply: grade and subgrades are integers 0-100; sections it
+// didn't review are absent from Subgrades. Advice holds deficiency facts, not recommendations.
+type DocsGraded struct {
+	SourcecraftUUID string         `json:"sourcecraft_uuid"`
+	Grade           int            `json:"grade"`
+	Subgrades       map[string]int `json:"subgrades"`
+	Advice          []string       `json:"advice"`
+	EvaluatedAt     time.Time      `json:"evaluated_at"`
 }
