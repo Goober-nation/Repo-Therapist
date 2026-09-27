@@ -161,7 +161,7 @@ func LoadConfig() *Config {
 		RateLimit: RateLimitConfig{
 			Limit: getEnvIntDefault(
 				"RATE_LIMIT",
-				100,
+				10,
 			),
 			Window: getEnvDuration(
 				"RATE_LIMIT_WINDOW",

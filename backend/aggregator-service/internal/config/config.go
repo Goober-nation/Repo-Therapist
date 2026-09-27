@@ -76,7 +76,7 @@ func LoadConfig() *Config {
 			),
 			Timeout: time.Second * getEnvDuration(
 				"GRPC_TIMEOUT",
-				time.Second*10,
+				10,
 			),
 		},
 

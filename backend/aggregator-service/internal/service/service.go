@@ -596,6 +596,7 @@ func (as *AggregatorService) StartPublicGrading(ctx context.Context, interval ti
 func (as *AggregatorService) SaveGradingResult(ctx context.Context,
 	grade domain.RepoGrade, visibility string, error string) error {
 	if error != "" {
+		as.ReposRepo.ReleaseRepositoryLock(ctx, grade.SourcecraftUUID)
 		return fmt.Errorf(
 			"%w: %v",
 			domain.ErrGradingFailed,

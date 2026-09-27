@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -592,4 +593,11 @@ func (s *GatewayService) LoginWithYandex(
 	return domain.LoginResponse{
 		SessionID: sessionID,
 	}, nil
+}
+func withPAT(ctx context.Context, pat string) context.Context {
+	return metadata.AppendToOutgoingContext(
+		ctx,
+		"authorization",
+		"Bearer "+pat,
+	)
 }

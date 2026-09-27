@@ -717,3 +717,8 @@ func publicErrorMessage(err error) string {
 		return "internal server error"
 	}
 }
+
+func PATFromContext(ctx context.Context) string {
+	token := ctx.Value("PAT")
+	return token
+}
