@@ -11,6 +11,11 @@
 # this file itself
 !.gitignore
 
+# docker
+!.dockerignore
+!**/.dockerignore
+!frontend/nginx.conf
+
 # docs
 !docs/**
 
