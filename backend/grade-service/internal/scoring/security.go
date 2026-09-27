@@ -69,3 +69,39 @@ func daysSinceLastScanMetric(weight float64, timeFinished time.Time, now time.Ti
 		Score:    linearClamp(days, 90, 0),
 	}
 }
+
+// Overall-score caps for open findings (docs/grading/security.md): a repo with an open critical
+// finding can't read as healthy no matter how good the other categories are.
+const (
+	securityCapCritical = 59
+	securityCapHigh     = 79
+)
+
+// SecurityCap returns the ceiling (0-100) that open Security findings put on the overall score,
+// and whether one applies. Only when Security is in categoryIDs (the private view) and was
+// actually graded — no scan means no cap, same as no data never counts as bad.
+func SecurityCap(categories map[string]CategoryResult, categoryIDs []string) (limit float64, ok bool) {
+	included := false
+	for _, id := range categoryIDs {
+		if id == "security" {
+			included = true
+		}
+	}
+	sec, found := categories["security"]
+	if !included || !found || sec.NoData {
+		return 0, false
+	}
+	open := map[string]float64{}
+	for _, m := range sec.Metrics {
+		if !m.NoData {
+			open[m.ID] = m.RawValue
+		}
+	}
+	switch {
+	case open["open_critical"] > 0:
+		return securityCapCritical, true
+	case open["open_high"] > 0:
+		return securityCapHigh, true
+	}
+	return 0, false
+}

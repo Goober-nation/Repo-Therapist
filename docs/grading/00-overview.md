@@ -19,19 +19,32 @@ category file must include the plain-language walkthrough section, kept in sync 
 
 ## Category weights
 
-Kept from the TZ's example weights (§3.2) — they sum cleanly and nothing argues for deviating yet:
+Started from the TZ's example weights (§3.2); re-weighted 2026-09-27 (see below):
 
 | Category | Weight | Public? | Status |
 |---|---|---|---|
-| Code health / tech debt | 20% | yes | **implemented** |
+| Activity | 20% (was 15%) | yes | **implemented** |
+| Issues | 20% (was 15%) | yes | **implemented** |
 | Security | 20% | no | **implemented** |
-| Activity | 15% | yes | **implemented** |
-| Documentation | 15% | yes | blocked (Grade↔LLM Kafka contract) |
-| Issues | 15% | yes | **implemented** |
+| Documentation | 15% | yes | **implemented** (LLM service) |
 | CI/CD | 15% | no | **implemented** |
+| Code health / tech debt | 10% (was 20%) | yes | **implemented** |
 
-**Public score** = Activity + Documentation + Issues + Code health (65%, renormalized to /100).
+**Public score** = Activity + Documentation + Issues + Code health (65%, renormalized to /100):
+Activity and Issues ≈31% each, Documentation ≈23%, Code health ≈15%.
 **Private score** = all six, already summing to 100% directly.
+
+**Re-weighting (2026-09-27).** A batch of 11 real public repos showed Code health scoring 100 for
+8 of them: with fewer than 5 TODO/FIXME markers three of its four metrics are "no data", so marker
+density alone — zero markers → perfect — decided the category, which then carried up to 40% of a
+no-LLM public score. Code health was halved to 10% and the freed 10% split between Activity (the
+category that actually separated those repos) and Issues. Step by step:
+
+1. Each category is scored 0-100 exactly as before; nothing inside a category changed.
+2. The overall score is the weighted average of the categories that have data, with the new
+   weights: Activity 20, Issues 20, Security 20, Documentation 15, CI/CD 15, Code health 10.
+3. Categories without data are dropped and the rest re-weighted, as always — so in the public view
+   Code health counts ≈15% instead of ≈31%.
 
 Security and CI/CD are private-only, not a TZ requirement — but the TZ explicitly permits excluding
 a category "if the reason and impact on score are explained" (§3.2), so this is a documented,
@@ -64,7 +77,8 @@ healthy, see `config/recommendations.yaml`) go into one pool, and **3 are picked
 3. The categories for that visibility are scored: public = Activity, Documentation, Issues,
    Code health; private = those plus Security and CI/CD.
 4. The overall score is the weighted average of those categories; categories with no data are
-   dropped and the rest re-weighted.
+   dropped and the rest re-weighted. In the private view, open Security findings then cap it:
+   open critical → at most 59, open high → at most 79 (see `security.md`).
 5. Every category's recommendations are collected into one list, and 3 are drawn at random.
 6. The result is sent with `visibility` set and only that side (score, category scores,
    recommendations) filled; `missing_data` names that view's categories that had no data.

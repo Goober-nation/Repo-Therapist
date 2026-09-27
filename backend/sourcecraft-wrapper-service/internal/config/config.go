@@ -6,13 +6,19 @@ type Config struct {
 	AppPort        string
 	SourceCraftURL string
 	ClientTimeout  string
+	// RetryAttempts/RetryWaitSeconds govern retries of SourceCraft calls on 429/502/503/504 and
+	// network errors; CLIENT_TIMEOUT applies to each attempt separately.
+	RetryAttempts    string
+	RetryWaitSeconds string
 }
 
 func LoadConfig() *Config {
 	return &Config{
-		AppPort:        getEnvDefault("APP_PORT", "8083"),
-		SourceCraftURL: getEnvDefault("SOURCECRAFT_URL", ""),
-		ClientTimeout:  getEnvDefault("CLIENT_TIMEOUT", "5"),
+		AppPort:          getEnvDefault("APP_PORT", "8083"),
+		SourceCraftURL:   getEnvDefault("SOURCECRAFT_URL", ""),
+		ClientTimeout:    getEnvDefault("CLIENT_TIMEOUT", "5"),
+		RetryAttempts:    getEnvDefault("HTTP_RETRY_ATTEMPTS", "3"),
+		RetryWaitSeconds: getEnvDefault("HTTP_RETRY_WAIT_SECONDS", "1"),
 	}
 }
 

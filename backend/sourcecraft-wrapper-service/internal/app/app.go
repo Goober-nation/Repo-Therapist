@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"sourcecraft-wrapper-service/internal/config"
+	"sourcecraft-wrapper-service/internal/retry"
 	"sourcecraft-wrapper-service/internal/service"
 	pb "sourcecraft-wrapper-service/internal/transport/gen"
 	"sourcecraft-wrapper-service/internal/transport/rpc"
@@ -30,8 +31,23 @@ func StartApp() {
 		log.Println("Invalid client timeout: ", err)
 		return
 	}
+	retryAttempts, err := strconv.Atoi(cfg.RetryAttempts)
+	if err != nil {
+		log.Println("Invalid retry attempts: ", err)
+		return
+	}
+	retryWait, err := strconv.Atoi(cfg.RetryWaitSeconds)
+	if err != nil {
+		log.Println("Invalid retry wait: ", err)
+		return
+	}
+	// No Client.Timeout: it would cap all retry attempts together; the transport times each one.
 	client = http.Client{
-		Timeout: time.Duration(timeout) * time.Second,
+		Transport: &retry.Transport{
+			Attempts:       retryAttempts,
+			Wait:           time.Duration(retryWait) * time.Second,
+			AttemptTimeout: time.Duration(timeout) * time.Second,
+		},
 	}
 	srvc := service.NewSCWrapperService(client, cfg.SourceCraftURL)
 	lis, err := net.Listen("tcp", ":"+cfg.AppPort)

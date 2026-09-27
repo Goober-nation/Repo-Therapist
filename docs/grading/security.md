@@ -20,6 +20,17 @@ data. Open critical/high/medium/low defect-group counts, days since the latest s
    scores near 0.
 5. The five scores are combined into one 0-100 category score by weighted average (open critical
    count matters most).
+6. Separately, open findings cap the **overall** private score: any open critical → at most 59;
+   otherwise any open high → at most 79. A score already below the cap is unchanged. No scan means
+   no cap. The public view has no Security, so it's never capped.
+
+### Overall-score cap (2026-09-27)
+
+Without it, a repo with a leaked secret or a critical vulnerability could still score in the 80s
+if every other category were strong — Security is only 20% of the weighted average. The cap is
+applied in `BuildGradingResult` (`internal/app`) after categories are combined, using
+`scoring.SecurityCap`, which reads the `open_critical`/`open_high` raw counts. AppSec secrets
+arrive as severity-rated findings, so a critical secret triggers the 59 cap like any critical.
 
 ## Data source
 

@@ -31,7 +31,14 @@ type CIExport struct {
 type CICDInputs struct {
 	Export    CIExport
 	Available bool
+	// ConfigContents maps each Export.ConfigFiles path to its bytes, when readable. A path
+	// missing here just skips the no-op check for that file.
+	ConfigContents map[string][]byte
 }
+
+// noOpMetricID is the zero-weight marker metric a no-op pipeline gets, so the verdict is
+// visible in category_scores and picks up its recommendation like any other metric.
+const noOpMetricID = "ci_noop_pipeline"
 
 // Run.Status outcomes. Only these count toward success_rate/stability_trend: canceled, skipped,
 // awaiting_approval and rejected say nothing about whether the code passed, and created/prepared/
@@ -47,13 +54,17 @@ var (
 // Category-level rules, in order:
 //  1. export unavailable, or runs not readable (token doesn't own the repo) → NoData.
 //  2. no config file AND zero runs → hard gate: category score 0 (the has_ci metric fails).
-//  3. config file but zero runs → NoData (CI set up, never observed running — nothing to score).
-//  4. otherwise → metrics computed normally, each with its own min_sample_size floor.
+//  3. config file does no real work (IsNoOpCIConfig) → category score 0.
+//  4. config file but zero runs → NoData (CI set up, never observed running — nothing to score).
+//  5. otherwise → metrics computed normally, each with its own min_sample_size floor.
 func ComputeCICD(cfg config.CategoryConfig, inputs CICDInputs) CategoryResult {
 	if cfg.Status != config.StatusCalculated || !inputs.Available || !inputs.Export.RunsAvailable {
 		return CategoryResult{ID: "ci_cd", NoData: true}
 	}
 	ex := inputs.Export
+	if isNoOpPipeline(ex.ConfigFiles, inputs.ConfigContents) {
+		return CategoryResult{ID: "ci_cd", Score: 0, Metrics: []MetricResult{{ID: noOpMetricID, RawValue: 1}}}
+	}
 	if len(ex.Runs) == 0 && len(ex.ConfigFiles) > 0 {
 		return CategoryResult{ID: "ci_cd", NoData: true}
 	}
@@ -77,6 +88,22 @@ func ComputeCICD(cfg config.CategoryConfig, inputs CICDInputs) CategoryResult {
 	}
 	score, noData := combineWeighted(results)
 	return CategoryResult{ID: "ci_cd", Score: score * ciSuccessMultiplier(results), NoData: noData, Metrics: results}
+}
+
+// isNoOpPipeline: every readable config file is a no-op, and at least one was read.
+func isNoOpPipeline(paths []string, contents map[string][]byte) bool {
+	read := 0
+	for _, p := range paths {
+		data, ok := contents[p]
+		if !ok {
+			continue
+		}
+		if !IsNoOpCIConfig(data) {
+			return false
+		}
+		read++
+	}
+	return read > 0
 }
 
 // ciSuccessFloor: the weighted score is multiplied by ciSuccessFloor + (1-ciSuccessFloor)·s, where

@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"repo-therapist/repository-service/internal/service"
 	"repo-therapist/repository-service/internal/transport"
@@ -36,7 +35,7 @@ func main() {
 			log.Fatalf("repository-service: %v", err)
 		}
 	case *org != "" && *repo != "":
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), service.CloneTimeout())
 		defer cancel()
 		result, err := service.CloneAndUpload(ctx, *org, *repo, "")
 		if err != nil {

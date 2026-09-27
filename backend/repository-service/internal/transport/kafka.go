@@ -60,7 +60,7 @@ func RunListen() error {
 // clone failures are reported via status="failed", not swallowed or left for the consumer to
 // guess at.
 func handleRequest(ctx context.Context, req contracts.GradeRequested) contracts.RepoReady {
-	cloneCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	cloneCtx, cancel := context.WithTimeout(ctx, service.CloneTimeout())
 	defer cancel()
 
 	res, err := service.CloneAndUpload(cloneCtx, req.OrgSlug, req.RepoSlug, req.Token)

@@ -164,3 +164,51 @@ func TestGradingFailureWireShape(t *testing.T) {
 		t.Fatalf("unexpected failure event %s", raw)
 	}
 }
+
+// Open critical/high Security findings cap the private overall score at 59/79; lower scores and
+// the public view (no Security) are untouched.
+func TestBuildGradingResult_SecurityCap(t *testing.T) {
+	cfg := &config.Config{Categories: map[string]config.CategoryConfig{
+		"activity": {Weight: 0.15}, "documentation": {Weight: 0.15}, "issues": {Weight: 0.15},
+		"code_health": {Weight: 0.20}, "security": {Weight: 0.20}, "ci_cd": {Weight: 0.15},
+	}}
+	security := func(critical, high float64) scoring.CategoryResult {
+		return scoring.CategoryResult{ID: "security", Score: 100, Metrics: []scoring.MetricResult{
+			{ID: "open_critical", RawValue: critical}, {ID: "open_high", RawValue: high},
+		}}
+	}
+	all := func(score float64, sec scoring.CategoryResult) map[string]scoring.CategoryResult {
+		return map[string]scoring.CategoryResult{
+			"activity": {ID: "activity", Score: score}, "documentation": {ID: "documentation", Score: score},
+			"issues": {ID: "issues", Score: score}, "code_health": {ID: "code_health", Score: score},
+			"ci_cd": {ID: "ci_cd", Score: score}, "security": sec,
+		}
+	}
+	cases := []struct {
+		name       string
+		categories map[string]scoring.CategoryResult
+		visibility string
+		want       int16
+	}{
+		{"open critical caps at 59", all(100, security(1, 0)), contracts.VisibilityPrivate, 59},
+		{"open high caps at 79", all(100, security(0, 3)), contracts.VisibilityPrivate, 79},
+		{"critical wins over high", all(100, security(2, 2)), contracts.VisibilityPrivate, 59},
+		{"score already below cap unchanged", all(40, scoring.CategoryResult{ID: "security", Score: 40,
+			Metrics: []scoring.MetricResult{{ID: "open_critical", RawValue: 1}}}), contracts.VisibilityPrivate, 40},
+		{"no open findings: no cap", all(100, security(0, 0)), contracts.VisibilityPrivate, 100},
+		{"no scan: no cap", all(100, scoring.CategoryResult{ID: "security", NoData: true}), contracts.VisibilityPrivate, 100},
+		{"public view ignores security", all(100, security(1, 0)), contracts.VisibilityPublic, 100},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			out := &GradeOutput{RepoID: "r", Categories: tc.categories}
+			result, err := BuildGradingResult(out, cfg, map[string]string{}, tc.visibility, time.Now(), noShuffle)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.Score == nil || *result.Score != tc.want {
+				t.Errorf("Score = %v, want %d", result.Score, tc.want)
+			}
+		})
+	}
+}

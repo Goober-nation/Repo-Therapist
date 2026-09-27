@@ -130,7 +130,7 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 		log.Printf("grading %s/%s %s (sourcecraft_uuid=%s)", ready.OrgSlug, ready.RepoSlug, job.visibility, ready.SourcecraftUUID)
 		// Documentation is asked for first so the LLM works while the other categories are graded.
 		docsCh, docsDeadline := requestDocs(ctx, docsProducer, docs, ready)
-		gradeCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+		gradeCtx, cancel := context.WithTimeout(ctx, app.GradeTimeout())
 		out, err := app.Grade(gradeCtx, ready.SourcecraftUUID, cfg, job.token, job.visibility)
 		cancel()
 		var reply *contracts.DocsGraded

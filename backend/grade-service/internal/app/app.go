@@ -148,6 +148,15 @@ func Grade(ctx context.Context, repoID string, cfg *config.Config, token, visibi
 			return nil, fmt.Errorf("decoding ci-runs.json: %w", err)
 		}
 		ciInputs.Available = true
+		ciInputs.ConfigContents = make(map[string][]byte, len(ciInputs.Export.ConfigFiles))
+		for _, path := range ciInputs.Export.ConfigFiles {
+			data, err := s3Client.GetObject(ctx, prefix+"/"+path)
+			if err != nil {
+				log.Printf("CI config %s unavailable for %s: %v (no-op pipeline check skipped)", path, repoID, err)
+				continue
+			}
+			ciInputs.ConfigContents[path] = data
+		}
 	}
 
 	ciResult := scoring.CategoryResult{ID: "ci_cd", NoData: true}
@@ -187,6 +196,9 @@ func BuildGradingResult(out *GradeOutput, cfg *config.Config, catalog map[string
 	// signal regardless of what category_scores does or doesn't contain.
 	ids := CategoryIDs(visibility)
 	score, noData := scoring.CombineCategories(out.Categories, ids, weights)
+	if limit, ok := scoring.SecurityCap(out.Categories, ids); ok && !noData {
+		score = math.Min(score, limit)
+	}
 
 	categoryJSON, err := json.Marshal(scoring.SubsetCategories(out.Categories, ids))
 	if err != nil {

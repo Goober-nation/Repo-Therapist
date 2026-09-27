@@ -12,9 +12,16 @@ version: 1
 
 categories:
   activity:
-    weight: 0.15
+    weight: 0.20  # was 0.15; 2026-09-27 re-weighting, see docs/grading/00-overview.md
     public: true
     status: calculated
+    # Commits dropped before any commits.json metric sees them (docs/grading/activity.md).
+    # merges is off by default: excluding them shifts commit counts across the board.
+    commit_filters:
+      future_dated: true
+      empty: true
+      bots: true
+      merges: false
     metrics:
       - id: commits_per_week
         status: calculated
@@ -72,8 +79,11 @@ categories:
           # gravity-ui/datalens/postgres forks): median and p75 were both exactly 0, max 0.117 —
           # the old critical:0.2/healthy:2 meant nobody ever cleared critical at all, zero
           # discrimination. See agents_memory/topics/threshold-calibration-data.md.
-          critical: 0.02
-          healthy: 0.15
+          # Recalibrated again 2026-09-28 (was 0.02 / 0.15): the 09-25 population was mostly repos
+          # that don't use issues, so any repo that does maxed out. 29 issue-using SourceCraft
+          # repos: p10 0.34, median 1.0, p75 2.7, max 14.9 (docs/grading/activity.md).
+          critical: 0.1
+          healthy: 2
           provisional: true
 
       - id: milestones_per_year
@@ -126,7 +136,7 @@ categories:
           provisional: true
 
   code_health:
-    weight: 0.20
+    weight: 0.10  # was 0.20; 2026-09-27 re-weighting, see docs/grading/00-overview.md
     public: true
     status: calculated
     metrics:
@@ -219,7 +229,7 @@ categories:
           provisional: true
 
   issues:
-    weight: 0.15
+    weight: 0.20  # was 0.15; 2026-09-27 re-weighting, see docs/grading/00-overview.md
     public: true
     status: calculated
     metrics:
@@ -266,12 +276,11 @@ categories:
         formula:
           type: linear_clamp
           direction: "-"
-          critical: 60
-          # healthy: 21, not 7 — the empirical average issue-resolution time across real repos
-          # (OpenSSF Scorecard research, ~30 days) is far above our original 7-day bar, meaning
-          # most well-run projects would never have reached "healthy." 21 splits the difference
-          # rather than jumping straight to the empirical average.
-          healthy: 21
+          # Recalibrated 2026-09-28 (was 60 / 21) against 21 real SourceCraft repos with >=5
+          # resolved issues: min 0.01d, median 1.24d, p90 8.9d, max 13.9d — every repo scored
+          # perfect under the old OSS-average-based bounds (docs/grading/issues.md).
+          critical: 14
+          healthy: 2
           provisional: true
 
       - id: growth_ratio

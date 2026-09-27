@@ -55,20 +55,49 @@ go run ./backend/grade-service/cmd/grade-service --listen
 ```
 
 Then trigger a grade from a third terminal. This publishes `grading.requests` exactly like the
-Aggregator does and prints the next `grading.results` message:
+Aggregator does and prints the `grading.results` message for that repo:
 
 ```bash
 go run ./backend/grade-service/cmd/grading-request --org=examples --repo=vulnerable-repo
 ```
 
+`grading.results` carries only the repo's UUID, so `grading-request` first waits for the
+`repo.ready` message for this org/repo (which has the UUID), then for the result with that UUID
+and visibility. Messages for other requests are skipped, so a late result from an earlier request
+is never printed as this one's. It exits non-zero right away if the clone failed (`repo.ready`
+status `failed`) or the result has an `error`; otherwise it gives up after `--wait` (default 10m,
+covering the default clone limit).
+
 Watch the two listener terminals: Repository service logs the clone/upload and publishes
-`repo.ready`; Grade service logs the grading and publishes the result. Failed jobs are only
-logged, no result is published, so `grading-request` times out after `--wait` (default 2m).
+`repo.ready`; Grade service logs the grading and publishes the result.
 
 **Note**: if testing `--listen` processes via `go run ... &` in a shell script, `kill <pid>` won't
 stop the actual compiled binary (`go run`'s signal handling doesn't propagate to its child) — build
 first and run the binary directly, or use `pkill -f <binary-name>`, if you need to script
 start/stop.
+
+## 4. Batch: all candidate repos
+
+`scripts/grade-candidates.sh` runs step 3 for every repo in `docs/candidate-repos.json` with
+`passes_full_criteria=true`, one at a time:
+
+1. If the dockerized `go-services` is running, it's stopped (it bundles older builds of the same
+   services and would take the batch's messages) and started again when the script exits, including
+   on Ctrl-C.
+2. Only the infra containers are started (postgres, kafka, minio, migrate); the three services are
+   built from the current code and run locally.
+3. Each repo is requested with `--wait=15m`; arguments to the script go to `grading-request` and
+   override that (e.g. `--wait=20m`).
+4. Repos that got no result are retried once at the end, then a summary prints how many were
+   graded, how many recovered on retry, and which still failed.
+
+Documentation needs the LLM service; for a batch without it: `LLM_ENABLED=false scripts/grade-candidates.sh`.
+
+**Time limits** (stability over speed, 2026-09-27): repository-service gives each repo
+`CLONE_TIMEOUT` (default 10m) for clone + export + upload, grade-service `GRADE_TIMEOUT`
+(default 4m) for grading. Each consumer handles one message at a time, so a repo that uses its full
+limit holds up the ones queued behind it. Transient SourceCraft/AppSec errors are retried inside
+the wrappers (`HTTP_RETRY_ATTEMPTS`, `HTTP_RETRY_WAIT_SECONDS`).
 
 ## Build/lint checks
 

@@ -20,6 +20,7 @@ and how long a run takes.
 4. Grade-service decides whether there is anything to grade:
    - runs couldn't be read → **no data** for the whole category;
    - no config file **and** zero runs → **score 0** (hard gate: the repo has no CI);
+   - config file only runs placeholder commands → **score 0** (no-op pipeline, see below);
    - config file but zero runs → **no data** (CI is set up but was never seen running).
 5. Otherwise it keeps only finished runs (passed or failed) and computes three numbers: the share
    that passed; the pass share of the newer half minus the older half; the median run time in
@@ -31,6 +32,27 @@ and how long a run takes.
 8. That score is multiplied by 0.4 + 0.6 × (success-rate score). A pipeline that never passes keeps
    at most 40% of its score (so at most 20), one that passes ≥90% of the time keeps all of it. If
    success rate is "no data", nothing is multiplied.
+
+### No-op pipeline check (anti-gaming, 2026-09-27)
+
+A pipeline that only runs `echo "tests passed"` always goes green and would score as perfect CI.
+Grade-service reads `.sourcecraft/ci.yaml` from the repo files in S3 and checks it:
+
+1. The file is laid out workflows → tasks → cubes. A cube either runs `script` lines or a ready-made
+   image.
+2. Every script line is split on `;`, `&&`, `||`. A command is "trivial" if it's one of `echo`,
+   `printf`, `true`, `:`, `exit` (no status or `0`), `sleep`, `ls`, `pwd`, `cat`, `date`,
+   `whoami`, `env`, `printenv`, `uname`, `hostname`. Blank lines and `#` comments are trivial too.
+3. The pipeline is a no-op only if there is at least one cube and **every** cube's script is all
+   trivial commands.
+4. Any doubt means no verdict and normal scoring: the file can't be parsed or read, a task has no
+   cubes, a cube has no script (an image we can't inspect), or any command is non-trivial.
+5. A no-op pipeline gets CI/CD **score 0** with a single `ci_noop_pipeline` metric (score 0, weight
+   0) in `category_scores`, which also brings its recommendation (`config/recommendations.yaml`).
+   This applies only when runs are readable, i.e. where CI/CD is graded at all.
+
+Deliberately file-only: run duration keeps its normal scoring and isn't used to detect fakes, so
+there's no time floor that could penalise a tiny but real project.
 
 ## Data source
 

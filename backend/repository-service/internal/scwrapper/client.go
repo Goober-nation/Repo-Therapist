@@ -23,10 +23,17 @@ type Client struct {
 	pat  string
 }
 
+// maxRecvMsgBytes raises gRPC's 4 MB default receive cap: a repo's full issue list comes back in
+// one message, and large issue bodies pushed one real repo to 9.5 MB (2026-09-28), failing it
+// outright on every attempt.
+const maxRecvMsgBytes = 64 << 20
+
 // Dial connects to sourcecraft-wrapper-service at addr (e.g. "localhost:8083"). pat is the
 // SourceCraft PAT attached to every RPC made through this client.
 func Dial(addr, pat string) (*Client, error) {
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxRecvMsgBytes)))
 	if err != nil {
 		return nil, fmt.Errorf("dialing sourcecraft-wrapper-service at %s: %w", addr, err)
 	}

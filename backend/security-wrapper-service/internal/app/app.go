@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"repo-therapist/security-wrapper-service/internal/appsecclient"
 	"repo-therapist/security-wrapper-service/internal/config"
+	"repo-therapist/security-wrapper-service/internal/retry"
 	"repo-therapist/security-wrapper-service/internal/service"
 	pb "repo-therapist/security-wrapper-service/internal/transport/gen"
 	"repo-therapist/security-wrapper-service/internal/transport/rpc"
@@ -42,7 +43,23 @@ func StartApp() {
 		return
 	}
 
-	httpClient := http.Client{Timeout: time.Duration(clientTimeout) * time.Second}
+	retryAttempts, err := strconv.Atoi(cfg.RetryAttempts)
+	if err != nil {
+		log.Println("Invalid retry attempts: ", err)
+		return
+	}
+	retryWait, err := strconv.Atoi(cfg.RetryWaitSeconds)
+	if err != nil {
+		log.Println("Invalid retry wait: ", err)
+		return
+	}
+
+	// No Client.Timeout: it would cap all retry attempts together; the transport times each one.
+	httpClient := http.Client{Transport: &retry.Transport{
+		Attempts:       retryAttempts,
+		Wait:           time.Duration(retryWait) * time.Second,
+		AttemptTimeout: time.Duration(clientTimeout) * time.Second,
+	}}
 	client := appsecclient.New(httpClient, cfg.AppsecURL)
 	wrapper := service.NewWrapper(
 		client,

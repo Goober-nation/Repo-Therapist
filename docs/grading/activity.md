@@ -1,4 +1,4 @@
-# Activity (15%, public)
+# Activity (20%, public)
 
 **Status: implemented** (2026-09-19). Last updated 2026-09-22.
 
@@ -12,15 +12,21 @@ popularity (design principle 5 in `00-overview.md`).
 
 1. Repository-service clones the repo and asks SourceCraft for its issues and milestones, saving
    each as one entry per event (commit, issue, milestone) with a timestamp, in S3.
-2. Grade-service turns those into seven numbers: how often commits happen, how long since the
+2. Before counting anything, grade-service drops commits that don't reflect real work — each rule
+   toggled in `config/grading.yaml`'s `activity.commit_filters` (defaults in brackets):
+   - authored in the future — a wrong clock or a forged date [on];
+   - empty — a non-merge commit that changed no files [on];
+   - by a bot — author name or email name part ends in `[bot]`, `-bot` or `_bot` [on];
+   - merges — commits with two or more parents [off: turning it on shifts every repo's counts].
+3. Grade-service turns the remaining commits, issues and milestones into seven numbers: how often commits happen, how long since the
    last one, how many different people are committing, how often issues/milestones show up, how
    long since the last milestone, and how concentrated commits are in one person.
-3. Each number gets placed on a line between a "healthy" value and a "critical" value — close to
+4. Each number gets placed on a line between a "healthy" value and a "critical" value — close to
    healthy scores near 1, close to critical scores near 0.
-4. If a metric's underlying data couldn't be fetched at all, or (for top-contributor share) there
+5. If a metric's underlying data couldn't be fetched at all, or (for top-contributor share) there
    were too few commits to compute a meaningful share, that metric is dropped — "no data," not a
    fabricated 0.
-5. The seven scores are combined into one 0-100 category score by weighted average, stretching
+6. The seven scores are combined into one 0-100 category score by weighted average, stretching
    remaining weights to fill any dropped metric's gap.
 
 ## Data source
@@ -31,6 +37,14 @@ repository-service (`backend/repository-service/internal/service/clone.go`) from
 per-event list with timestamps, never a pre-aggregated count (see `00-overview.md`'s time-decay
 note for why that matters).
 
+### Commit filters (2026-09-27)
+
+`commits.json` carries each commit's `parents` (from `git log %P`): `[]` for a root commit, two or
+more for a merge. `git log --numstat` lists no files for merge commits, so parents are what tells a
+merge apart from an empty commit. Exports written before this field existed have no `parents`;
+for those the empty-commit filter keeps every commit rather than risk dropping merges. Filtering
+happens once, before any commits.json-sourced metric (`ComputeCategory` → `FilterCommits`).
+
 ## Metrics
 
 | Metric | Direction | Critical | Healthy* | Weight | Source | Aggregation |
@@ -38,7 +52,7 @@ note for why that matters).
 | Commits/week | + | 0.5 | 5 | 0.25 | commits.json | `rate_per_week` |
 | Days since last activity | − | 40 | 3 | 0.20 | commits.json | `days_since_last_event` |
 | Unique contributors | + | 1 | 5 | 0.15 | commits.json | `unique_count(author_email)` |
-| Issue rate/week | + | 0.02 | 0.15 | 0.15 | issues.json | `rate_per_week` |
+| Issue rate/week | + | 0.1 | 2 | 0.15 | issues.json | `rate_per_week` |
 | Milestones/year | + | 0 | 3 | 0.05 | milestones.json | `rate_per_year` |
 | Days since last milestone | − | 180 | 30 | 0.10 | milestones.json | `days_since_last_event` |
 | Top-contributor share | − | 1.0 | 0.5 | 0.10 | commits.json | `max_share(author_email)` |
@@ -99,3 +113,11 @@ validated against real repos.
   `issue_rate_per_week` critical `0.02`/healthy `0.15`; `milestones_per_year` critical `0`/healthy
   `3` — both still `provisional: true`, now at least anchored to the real observed range instead
   of an arbitrary guess nothing could reach.
+- **`issue_rate_per_week` recalibrated again, 2026-09-28** (was critical 0.02 / healthy 0.15). The
+  09-25 population was mostly repos that don't use issues, so the bounds sat so low that any repo
+  that does maxed out: 27 of 29 issue-using SourceCraft repos (11 test repos + 18 random from
+  `docs/candidate-repos.json`) scored a perfect 1. Their rates: min 0, p10 0.34, median 1.0,
+  p75 2.7, max 14.9 per week. New bounds 0.1 / 2: 9 full, 18 in between, 2 at 0 (no new issues in
+  the window). Step by step: count issues opened in the last 180 days, divide by the weeks in that
+  window; 2+ per week scores 1, 0.1 or less scores 0, straight line in between (e.g. 1.05/week →
+  0.5). Still `provisional: true`.

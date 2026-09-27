@@ -1,4 +1,4 @@
-# Issues (15%, public)
+# Issues (20%, public)
 
 **Status: implemented.** Last updated 2026-09-25.
 
@@ -29,6 +29,10 @@ it's a separate question the metric set was scoped to answer from the start.
 7. The four scores combine into one 0-100 category score by weighted average. A "no data" metric
    is dropped and the others' weights stretch to fill the gap — never treated as a 0.
 
+**Median closure time, worked through (thresholds from 2026-09-28):** a median of 2 days or less
+scores 1 (full), 14 days or more scores 0, and in between the score falls in a straight line —
+e.g. 8 days → (14 − 8) / (14 − 2) = 0.5.
+
 ## Data source
 
 S3 `_meta/issues.json` (same export Activity reads). `resolved` is judged by `status_type`
@@ -45,7 +49,7 @@ values, not calibrated against a repo population.
 | Metric | Direction | Critical | Healthy | Weight | `min_sample_size` population |
 |---|---|---|---|---|---|
 | Abandoned share (all open issues, untouched 60d) | − | 0.5 | 0.05 | 0.30 | currently-open issue count |
-| Median closure days (created-and-closed cohort) | − | 60 | 21 | 0.25 | resolved-in-cohort count |
+| Median closure days (created-and-closed cohort) | − | 14 | 2 | 0.25 | resolved-in-cohort count |
 | Growth ratio (opened-in-window ÷ closed-in-window, floored at 1) | − | 5 | 1 | 0.20 | opened + closed in window |
 | Share resolved (closed-in-window ÷ (open-now + closed-in-window)) | + | 0.3 | 0.9 | 0.25 | open-now + closed-in-window |
 
@@ -83,12 +87,22 @@ values, not calibrated against a repo population.
 
 ## Open questions
 
-- Threshold calibration against a real repo population — not done, same gap every provisional
-  threshold has.
+- Threshold calibration against a real repo population — done for `median_closure_days` only
+  (2026-09-28, below); the other three are still first-guess values.
 - A supplementary raw backlog-size trend (open-issue count, window start vs. end) — the most
   consistent finding from research was that the field prefers this over a bare ratio; not built.
 
 ## Design history (compressed)
+
+**`median_closure_days` recalibrated, 2026-09-28** (was critical 60 / healthy 21). All 21 real
+SourceCraft repos with enough resolved issues (11 test repos + 10 drawn at random from
+`docs/candidate-repos.json`) scored a perfect 1 — SourceCraft team projects close issues in
+0.01-13.9 days (median 1.24, p90 8.9), far below the ~30-day open-source average the old bounds
+were based on. New bounds 14 / 2: 12 repos full, 9 graded in between, none at 0. Strict
+percentiles (p90 / p25 = 9d / 0.5d) were rejected: they would call a 9-day median "critical" and
+most reward same-day closes, some of which look like tracker bookkeeping rather than work.
+Still `provisional: true` — n is small and SourceCraft-specific. Raw data:
+`agents_memory/topics/threshold-calibration-data.md`.
 
 Originally windowed every metric by issue *creation* date. Two rounds of correction, both
 2026-09-22:

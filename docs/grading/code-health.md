@@ -1,4 +1,4 @@
-# Code health / tech debt (20%, public)
+# Code health / tech debt (10%, public)
 
 **Status: implemented.** Last updated 2026-09-25. See `backlog/phase-2-grade-service.md`
 ("Next task", item 2) for the task-tracking entry.
@@ -24,6 +24,9 @@ are, how concentrated they are. Snapshot metrics over current repo state, not an
 5. The four scores combine into one 0-100 category score by weighted average. A metric that's
    "no data" (see below) is dropped and the others' weights stretch to fill the gap — never
    treated as a 0.
+6. The category counts 10% of the overall score (was 20% until 2026-09-27). Most repos have too
+   few markers for more than the density metric, so "few TODOs" alone gave a perfect category
+   score that weighed heavily on the total; see `00-overview.md` for the re-weighting.
 
 ## Data source
 

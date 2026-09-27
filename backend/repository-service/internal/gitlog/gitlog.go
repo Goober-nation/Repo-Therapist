@@ -28,18 +28,21 @@ type FileChange struct {
 }
 
 type Commit struct {
-	Hash         string       `json:"hash"`
-	AuthorName   string       `json:"author_name"`
-	AuthorEmail  string       `json:"author_email"`
-	AuthoredAt   time.Time    `json:"authored_at"`
-	Subject      string       `json:"subject"`
+	Hash        string    `json:"hash"`
+	AuthorName  string    `json:"author_name"`
+	AuthorEmail string    `json:"author_email"`
+	AuthoredAt  time.Time `json:"authored_at"`
+	Subject     string    `json:"subject"`
+	// Parents are the parent commit hashes: [] for a root commit, 2+ for a merge. nil only in
+	// exports written before this field existed — consumers must treat nil as "unknown".
+	Parents      []string     `json:"parents"`
 	FilesChanged []FileChange `json:"files_changed"`
 }
 
 // ExtractHistory runs `git log --numstat` against repoDir (default branch, current HEAD) for
 // commits authored on/after since, and returns them as structured records.
 func ExtractHistory(ctx context.Context, repoDir string, since time.Time) ([]Commit, error) {
-	format := recordSep + "%H" + unitSep + "%an" + unitSep + "%ae" + unitSep + "%aI" + unitSep + "%s"
+	format := recordSep + "%H" + unitSep + "%an" + unitSep + "%ae" + unitSep + "%aI" + unitSep + "%P" + unitSep + "%s"
 	cmd := exec.CommandContext(ctx, "git", "-C", repoDir, "log",
 		"--since="+since.Format("2006-01-02"),
 		"--date=iso-strict",
@@ -73,7 +76,7 @@ func parseGitLog(output string) ([]Commit, error) {
 			continue
 		}
 		header := strings.Split(scanner.Text(), unitSep)
-		if len(header) != 5 {
+		if len(header) != 6 {
 			return nil, fmt.Errorf("unexpected git log header field count: %q", scanner.Text())
 		}
 		authoredAt, err := time.Parse(time.RFC3339, header[3])
@@ -86,7 +89,11 @@ func parseGitLog(output string) ([]Commit, error) {
 			AuthorName:  header[1],
 			AuthorEmail: header[2],
 			AuthoredAt:  authoredAt,
-			Subject:     header[4],
+			Parents:     strings.Fields(header[4]),
+			Subject:     header[5],
+		}
+		if commit.Parents == nil {
+			commit.Parents = []string{}
 		}
 
 		for scanner.Scan() {

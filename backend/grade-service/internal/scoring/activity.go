@@ -48,6 +48,7 @@ func ComputeCategory(categoryID string, cfg config.CategoryConfig, inputs Activi
 	if cfg.Status != config.StatusCalculated {
 		return CategoryResult{ID: categoryID, NoData: true}
 	}
+	inputs.Commits = FilterCommits(inputs.Commits, cfg.CommitFilters, now)
 
 	results := make([]MetricResult, 0, len(cfg.Metrics))
 	for _, m := range cfg.Metrics {

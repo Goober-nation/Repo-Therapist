@@ -29,6 +29,17 @@ type CategoryConfig struct {
 	Public  bool           `yaml:"public"`
 	Status  string         `yaml:"status"`
 	Metrics []MetricConfig `yaml:"metrics"`
+	// CommitFilters drops commits before any commit-sourced metric sees them. Only Activity sets
+	// it (docs/grading/activity.md); absent means no filtering.
+	CommitFilters CommitFilters `yaml:"commit_filters"`
+}
+
+// CommitFilters toggles which commits are excluded from commits.json-sourced metrics.
+type CommitFilters struct {
+	FutureDated bool `yaml:"future_dated"`
+	Empty       bool `yaml:"empty"`
+	Bots        bool `yaml:"bots"`
+	Merges      bool `yaml:"merges"`
 }
 
 type MetricConfig struct {

@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"repo-therapist/grade-service/internal/app"
 	"repo-therapist/grade-service/internal/config"
@@ -54,7 +53,7 @@ func runOnce(repoID, configPath string) error {
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), app.GradeTimeout())
 	defer cancel()
 
 	// One-shot debugging prints every category, so it grades the full private view.

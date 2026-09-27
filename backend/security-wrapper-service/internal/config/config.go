@@ -6,6 +6,10 @@ type Config struct {
 	AppPort       string
 	AppsecURL     string
 	ClientTimeout string
+	// RetryAttempts/RetryWaitSeconds govern retries of AppSec calls on 429/502/503/504 and network
+	// errors; CLIENT_TIMEOUT applies to each attempt separately.
+	RetryAttempts    string
+	RetryWaitSeconds string
 	// PollInterval/PollTimeout govern polling POST /v1/reports/generate's operation, both
 	// seconds. Defaults are a guess (no real AppSec report-generation latency data yet) — revisit
 	// once tested against the real API.
@@ -20,6 +24,8 @@ func LoadConfig() *Config {
 		ClientTimeout:       getEnvDefault("CLIENT_TIMEOUT", "5"),
 		PollIntervalSeconds: getEnvDefault("REPORT_POLL_INTERVAL_SECONDS", "2"),
 		PollTimeoutSeconds:  getEnvDefault("REPORT_POLL_TIMEOUT_SECONDS", "60"),
+		RetryAttempts:       getEnvDefault("HTTP_RETRY_ATTEMPTS", "3"),
+		RetryWaitSeconds:    getEnvDefault("HTTP_RETRY_WAIT_SECONDS", "1"),
 	}
 }
 
