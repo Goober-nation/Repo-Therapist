@@ -26,13 +26,13 @@ func TestJobStoreExpiry(t *testing.T) {
 	s.now = func() time.Time { return now }
 	s.put("old/repo", "tok", contracts.VisibilityPrivate)
 
-	now = now.Add(jobTTL + time.Minute)
+	now = now.Add(s.ttl + time.Minute)
 	if j := s.take("old/repo"); j.token != "" || j.visibility != contracts.VisibilityPublic {
 		t.Errorf("expired job = %+v; want public job with no token", j)
 	}
 
 	s.put("a/b", "x", contracts.VisibilityPrivate)
-	now = now.Add(jobTTL + time.Minute)
+	now = now.Add(s.ttl + time.Minute)
 	s.put("c/d", "y", contracts.VisibilityPrivate)
 	if _, exists := s.jobs["a/b"]; exists {
 		t.Error("put should sweep expired jobs")

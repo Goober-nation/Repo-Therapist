@@ -199,10 +199,13 @@ distinguishes "exists, no access" from "doesn't exist," unlike GitHub. Keep deni
 don't add new leakage on top of an inherited platform quirk.
 
 ❌ **Never give a category table its own mutex column** — the DB has one shared `repo_lock` table,
-set only by the Aggregator. See `docs/db-design.md`.
+set only by the Aggregator. See `docs/schema.sql`.
 
 ❌ **Never shotgun debug** — form a hypothesis, test it, verify, don't make random changes hoping
 something works.
+
+❌ **Never reference gitignored paths (`backlog/`, `agents_memory/`, `tmp/`) from `docs/`** —
+inline the needed fact instead; those folders don't exist in a fresh checkout.
 
 ❌ **Never leave code in a broken state** — if a fix fails 3x, stop and ask the user; revert to
 last known working state.
@@ -217,7 +220,7 @@ last known working state.
 | `backlog/BACKLOG.md` + `backlog/phase-*.md` | Personal, gitignored, local planning |
 | `agents_memory/MEMORY.md` | Durable cross-session facts, read every session (also gitignored) |
 | `agents_memory/topics/` | Deep domain-specific research, read on-demand |
-| `docs/schema.sql`, `docs/db-design.md`, `docs/CHANGELOG.md` | Current DB schema + rationale |
+| `docs/schema.sql` | Current DB schema |
 | `docs/kafka-contracts.md` | Kafka message shapes (team decision, currently a stub) |
 | `8. Yandex Cloud.pdf` | Original hackathon case brief |
 | `SCS_API_1.0.0_draft (2).pdf` | AppSec API org-provided reference |

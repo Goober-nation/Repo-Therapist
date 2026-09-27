@@ -6,17 +6,29 @@ package contracts
 
 import (
 	"encoding/json"
+	"os"
+	"strings"
 	"time"
 )
 
-const (
-	TopicGradeRequested = "repo.grade.requested"
-	TopicRepoReady      = "repo.ready"
+// Topic names default to the documented contract and can be overridden per environment; the env
+// names are shared with the other services (docs/kafka-contracts.md, "Topic env vars").
+var (
+	TopicGradeRequested = TopicEnv("KAFKA_REPO_GRADE_REQUESTED_TOPIC", "repo.grade.requested")
+	TopicRepoReady      = TopicEnv("KAFKA_REPO_READY_TOPIC", "repo.ready")
 
 	// Grade <-> LLM Documentation exchange (docs/kafka-contracts.md, "active Grade ↔ LLM contract").
-	TopicDocsGradeRequested = "repo.docs.grade.requested"
-	TopicDocsGraded         = "repo.docs.graded"
+	TopicDocsGradeRequested = TopicEnv("KAFKA_DOCS_GRADE_REQUESTED_TOPIC", "repo.docs.grade.requested")
+	TopicDocsGraded         = TopicEnv("KAFKA_DOCS_GRADED_TOPIC", "repo.docs.graded")
 )
+
+// TopicEnv returns the trimmed value of env var key, or def when it is unset or blank.
+func TopicEnv(key, def string) string {
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+		return v
+	}
+	return def
+}
 
 // AllTopics is every topic this exchange uses — pass to kafka.EnsureTopics at service startup so
 // neither service can join a consumer group before its topic exists. Includes the Aggregator's
@@ -59,9 +71,9 @@ type RepoReady struct {
 // The Aggregator's real contract (see agents_memory/topics/aggregator-integration.md) — separate
 // from the two topics above, which are Repository<->Grade service's own internal handoff.
 // Grade service is the only service that talks to these two; Repository service is unaffected.
-const (
-	TopicGradingRequests = "grading.requests"
-	TopicGradingResults  = "grading.results"
+var (
+	TopicGradingRequests = TopicEnv("KAFKA_GRADING_REQUESTS_TOPIC", "grading.requests")
+	TopicGradingResults  = TopicEnv("KAFKA_GRADING_RESULTS_TOPIC", "grading.results")
 )
 
 // Grading visibilities. A job is graded as exactly one of these: private when the request

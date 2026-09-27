@@ -41,6 +41,11 @@ func StartApp() {
 		log.Println("Invalid retry wait: ", err)
 		return
 	}
+	maxPages, err := strconv.Atoi(cfg.MaxPages)
+	if err != nil || maxPages <= 0 {
+		log.Println("Invalid SOURCECRAFT_MAX_PAGES: ", cfg.MaxPages)
+		return
+	}
 	// No Client.Timeout: it would cap all retry attempts together; the transport times each one.
 	client = http.Client{
 		Transport: &retry.Transport{
@@ -50,6 +55,7 @@ func StartApp() {
 		},
 	}
 	srvc := service.NewSCWrapperService(client, cfg.SourceCraftURL)
+	srvc.MaxPages = maxPages
 	lis, err := net.Listen("tcp", ":"+cfg.AppPort)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)

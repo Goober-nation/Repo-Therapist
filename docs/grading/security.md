@@ -39,7 +39,8 @@ directly (`backend/grade-service/internal/appsecwrapper`), forwarding the caller
 (`SOURCECRAFT_PAT` env) as `authorization` metadata. The wrapper itself calls the real AppSec API
 (`https://appsec.sourcecraft.tech`) — latest scan lookup, then per-severity **OPEN** defect-group
 counts via `/v1/defect-groups` filtered by `severity`+`status=OPEN` (never the raw `int32`
-status/severity fields — see `agents_memory/topics/appsec-api.md`'s int32 landmine writeup).
+status/severity fields: `DefectGroupDto` returns them as bare ints with no documented mapping to
+the `DefectGroupStatus`/`Severity` string enums, so the string-enum filters are used instead).
 
 ## Metrics
 
@@ -76,7 +77,9 @@ repos (same caveat Activity's `provisional: true` flags carry).
   live: our own private repo 403'd everywhere on `appsec.sourcecraft.tech` until flipped public).
   Practical effect: the TZ's "analyze my own repo" flow will legitimately hit "Нет данных" for
   Security on a private repo without the add-on connected — expected platform behavior, not a
-  bug. See `agents_memory/topics/appsec-api.md` for the full test matrix.
+  bug. Test matrix (2026-09-21): own private repo without add-on → 403; someone else's public
+  repo (`examples/vulnerable-repo`) → 403; own repo flipped public → 200. Organizers confirmed public
+  repos need no extra setup, private ones need the Security Add-on.
 - Report bytes (SARIF, for human-readable defect summaries) are parsed in-memory and discarded,
   never persisted to S3 — matches the "parse then discard" DB design decision.
 

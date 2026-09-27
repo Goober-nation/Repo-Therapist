@@ -1,7 +1,7 @@
 # Repo Health Score — grading overview (v1)
 
 Team-shared methodology for computing the 6-category Repo Health Score. Supersedes the original
-draft (`tmp/source-docs/grading-policy-original.md`, kept for provenance only). Written against
+draft. Written against
 the case TZ (`yandex_docs/8. Yandex Cloud.pdf`, §3.1, §3.2, §13.2), whose hard requirements shaped
 every design choice below: the score must be **reproducible, explainable, fact-grounded, and must
 distinguish "bad" from "no data"** — judges explicitly test *behavior* on control scenarios, not
@@ -116,8 +116,7 @@ healthy, see `config/recommendations.yaml`) go into one pool, and **3 are picked
    regardless of size, since a hard gate blocks grading small-but-real repos entirely. The gaming
    concern this principle names is real and unaddressed; the intended replacement is a future,
    separate "repo grade trust/confidence factor" (weights the score's reliability rather than
-   refusing to compute one) — not designed yet, parked in
-   `backlog/phase-2-grade-service.md`. Code health's per-metric floors (`min_sample_size`) are a
+   refusing to compute one) — not designed yet. Code health's per-metric floors (`min_sample_size`) are a
    narrower, already-implemented version of the same underlying concern, scoped to individual
    metrics rather than the whole repo.
 5. **Popularity is never a scoring input**, anywhere — matches TZ §11 rule 9 ("Repo Health Score
@@ -138,8 +137,8 @@ The working method every implemented category so far has followed, kept here so 
 Code health/CI/CD/Documentation rather than being reinvented per category:
 
 1. **Before writing code: read the existing state, then propose a plan and get it confirmed.**
-   Read the TZ section the category maps to, the relevant platform-API research already recorded
-   (`agents_memory/topics/`), and any prior backlog notes — never start from a blank assumption
+   Read the TZ section the category maps to and the relevant platform-API research already
+   recorded — never start from a blank assumption
    about what data is available. Lay out the concrete plan (data source, metric list, no-data
    rule per metric) and get it confirmed before writing implementation code, not after.
 2. **Implementation is checked against this doc's own principles, not just "does it compile."**

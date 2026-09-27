@@ -500,7 +500,7 @@ func TestRequestLLMRecommendationsPublishesOnceWhilePending(t *testing.T) {
 	}
 
 	// After the TTL a new request may be published.
-	f.svc.now = func() time.Time { return testNow.Add(llmRequestTTL + time.Second) }
+	f.svc.now = func() time.Time { return testNow.Add(f.svc.LLMRequestTTL + time.Second) }
 	_, _ = f.svc.RequestLLMRecommendations(userCtx(""), "org", "repo")
 	if len(f.llmPub.events) != 2 {
 		t.Errorf("published %d LLM requests after TTL, want 2", len(f.llmPub.events))
@@ -576,5 +576,22 @@ func TestRegradeSkipsWithoutServiceToken(t *testing.T) {
 	}
 	if len(f.wrapper.authSeen) != 0 {
 		t.Errorf("wrapper should not be called without a service token")
+	}
+}
+
+func TestRegradeLimitTakesTopRated(t *testing.T) {
+	f := newFixture("public")
+	f.svc.RegradeLimit = 1
+	low := uuid.New()
+	f.wrapper.publicRepos = []*client.Repository{
+		{Id: low.String(), Slug: "low", Organization: &client.Organization{Slug: "org"}, Visibility: "public", Rating: &client.Rating{Value: 1}},
+		{Id: testRepoID.String(), Slug: "repo", Organization: &client.Organization{Slug: "org"}, Visibility: "public", Rating: &client.Rating{Value: 9}},
+	}
+
+	if err := f.svc.regradePublicRepos(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(f.grading.events) != 1 || f.grading.events[0].RepoSlug != "repo" {
+		t.Errorf("events = %+v, want only the top-rated repo", f.grading.events)
 	}
 }

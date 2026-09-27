@@ -192,13 +192,9 @@ const defaultLLMTimeout = 70 * time.Second
 func newDocsSettings(cfg *config.Config) docsSettings {
 	docCfg, ok := cfg.Categories["documentation"]
 	enabled := ok && docCfg.Status == config.StatusCalculated && os.Getenv("LLM_ENABLED") != "false"
-	timeout := defaultLLMTimeout
-	if v := os.Getenv("LLM_TIMEOUT"); v != "" {
-		if d, err := time.ParseDuration(v); err == nil && d > 0 {
-			timeout = d
-		} else {
-			log.Printf("ignoring invalid LLM_TIMEOUT=%q, using %s", v, defaultLLMTimeout)
-		}
+	timeout := app.DurationEnv("LLM_TIMEOUT", defaultLLMTimeout)
+	if enabled && timeout >= app.GradeTimeout() {
+		log.Printf("LLM_TIMEOUT (%s) is not below GRADE_TIMEOUT (%s): the grade limit may expire before the Documentation reply", timeout, app.GradeTimeout())
 	}
 	return docsSettings{enabled: enabled, timeout: timeout, waiters: newDocsWaiters()}
 }

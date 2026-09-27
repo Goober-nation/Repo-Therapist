@@ -8,14 +8,31 @@ Scope: the message shapes published/consumed on the Kafka links in the architect
 - Grade service <-> LLM service — **still TBD**, same reasoning. Needed for the Documentation
   category (2026-09-22 decision: Documentation is judged by the LLM service, not a deterministic
   heuristic — Grade service ships it repo doc content, e.g. README/CONTRIBUTING/etc., and gets a
-  score back). See `backlog/phase-2-grade-service.md`'s Documentation section for what Grade
-  service's side needs once this contract exists.
+  score back).
 - Grade service <-> Repository service — **defined below**. This exchange is entirely within one
-  person's scope (Repository + Grade service), so it didn't need to wait on wider team sign-off —
-  see `backlog/phase-3-kafka-integration.md` for the implementation notes.
+  person's scope (Repository + Grade service), so it didn't need to wait on wider team sign-off.
 - Grade service <-> LLM service — **defined below as flat `repo.docs.*` messages** for documentation analysis.
 - Aggregator <-> LLM service — **defined below as flat `llm.recommendations.*` messages** for
   the repository summary and prioritized recommendations (supersedes the report v2 envelope).
+
+## Topic env vars (2026-09-28)
+
+Every topic name below is the default. Each service reads the same env var to override it, so
+one value renames a topic everywhere; leave all unset to keep the documented names.
+
+| Topic (default) | Env var | Services reading it |
+|---|---|---|
+| `grading.requests` | `KAFKA_GRADING_REQUESTS_TOPIC` | aggregator, grade |
+| `grading.results` | `KAFKA_GRADING_RESULTS_TOPIC` | aggregator, grade |
+| `repo.grade.requested` | `KAFKA_REPO_GRADE_REQUESTED_TOPIC` | grade, repository |
+| `repo.ready` | `KAFKA_REPO_READY_TOPIC` | grade, repository |
+| `repo.docs.grade.requested` | `KAFKA_DOCS_GRADE_REQUESTED_TOPIC` | grade, llm |
+| `repo.docs.graded` | `KAFKA_DOCS_GRADED_TOPIC` | grade, llm |
+| `llm.recommendations.requested` | `KAFKA_LLM_REQUESTS_TOPIC` | aggregator, llm |
+| `llm.recommendations.received` | `KAFKA_LLM_RECOMMENDATIONS_TOPIC` | aggregator, llm |
+
+The LLM service still accepts the older `LLM_SUMMARY_REQUEST_TOPIC`/`LLM_SUMMARY_RESULT_TOPIC`
+as fallbacks; the `KAFKA_*` name wins when both are set.
 
 ## `repo.grade.requested`
 
@@ -265,8 +282,8 @@ interface; report generation is not implemented by this worker.
 ## Repository summary and recommendations: active Aggregator ↔ LLM contract (2026-09-27)
 
 Flat JSON, no envelope. Both topics use `sourcecraft_uuid` as the Kafka key. Topic names
-and the consumer group (`llm-service-recommendations-v1`) can be overridden with
-`LLM_SUMMARY_REQUEST_TOPIC`, `LLM_SUMMARY_RESULT_TOPIC` and `LLM_SUMMARY_KAFKA_GROUP_ID`.
+are overridable (see "Topic env vars"); the consumer group (`llm-service-recommendations-v1`)
+with `LLM_SUMMARY_KAFKA_GROUP_ID`.
 
 Aggregator → LLM, topic `llm.recommendations.requested` (Go `LLMRecommendationsRequestedEvent`):
 
@@ -333,6 +350,8 @@ else is derived from the request scores by code, so it is complete and reproduci
   `HIGH` below 50, or Security below 75; `MEDIUM` below 75; `LOW` otherwise. Sorted by
   priority, then by weaker category. The model is asked for at least one recommendation per
   weak category; this is not enforced.
+- The 75 boundary above (strengths/weaknesses and `MEDIUM`/`LOW`, and Security's `HIGH`) is
+  `LLM_STRENGTH_THRESHOLD` (integer 0-100, default 75); the 50 `HIGH` boundary is fixed.
 - Stray list markers and punctuation at the edges of model text are trimmed. The wording is
   not verified. The model is instructed to use only request data, not to invent figures or
   facts, and not to treat missing data as a problem. It never changes scores.

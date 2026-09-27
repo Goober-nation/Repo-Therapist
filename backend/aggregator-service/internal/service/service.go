@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -18,9 +19,9 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// llmRequestTTL is how long a published LLM request suppresses publishing another one for the
-// same repo view; the LLM service's own model budget is 60 seconds.
-const llmRequestTTL = 2 * time.Minute
+// DefaultLLMRequestTTL is how long a published LLM request suppresses publishing another one for
+// the same repo view; the LLM service's own model budget is 60 seconds.
+const DefaultLLMRequestTTL = 2 * time.Minute
 
 type AggregatorService struct {
 	ReposRepo        domain.RepoRepository
@@ -34,6 +35,11 @@ type AggregatorService struct {
 	// Token is the service's own SourceCraft PAT: used for wrapper lookups when the caller has
 	// no token and for the public regrade. It never grants access to a private grade.
 	Token string
+	// RegradeLimit caps each public regrade to the top N public repos by SourceCraft rating;
+	// 0 means every listed repo.
+	RegradeLimit int
+	// LLMRequestTTL overrides DefaultLLMRequestTTL (config LLM_REQUEST_TTL).
+	LLMRequestTTL time.Duration
 
 	llmMu       sync.Mutex
 	llmRequests map[string]llmRequest
@@ -58,6 +64,7 @@ func NewAggregatorService(reposRepo domain.RepoRepository, gradesRepo domain.Gra
 		llmPublisher:     llmPublisher,
 		RPCTimeout:       rpcTimeout,
 		Token:            token,
+		LLMRequestTTL:    DefaultLLMRequestTTL,
 		llmRequests:      map[string]llmRequest{},
 		now:              time.Now,
 	}
@@ -406,13 +413,17 @@ func (as *AggregatorService) GetMyRepos(
 }
 
 // StartPublicGrading regrades public repos once at startup and then every interval.
-func (as *AggregatorService) StartPublicGrading(ctx context.Context, interval time.Duration) {
+// StartPublicGrading regrades public repos every interval; onStart also runs one regrade
+// immediately instead of waiting for the first tick.
+func (as *AggregatorService) StartPublicGrading(ctx context.Context, interval time.Duration, onStart bool) {
 	as.ticker = time.NewTicker(interval)
 
 	go func() {
 		defer as.ticker.Stop()
 
-		as.runPublicRegrade(ctx)
+		if onStart {
+			as.runPublicRegrade(ctx)
+		}
 
 		for {
 			select {
@@ -522,9 +533,10 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 		return wrapperError("list public repositories", err)
 	}
 
+	repos := topPublicRepos(response.GetRepos(), as.RegradeLimit)
 	failed := 0
 
-	for _, pbRepo := range response.GetRepos() {
+	for _, pbRepo := range repos {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -540,11 +552,32 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 			"%w: %d of %d public repositories failed",
 			domain.ErrGradingFailed,
 			failed,
-			len(response.GetRepos()),
+			len(repos),
 		)
 	}
 
 	return nil
+}
+
+// topPublicRepos keeps the public repos, highest SourceCraft rating first (listing order breaks
+// ties), cut to limit when limit > 0.
+func topPublicRepos(repos []*client.Repository, limit int) []*client.Repository {
+	public := make([]*client.Repository, 0, len(repos))
+	for _, r := range repos {
+		if r.GetVisibility() == domain.VisibilityPublic {
+			public = append(public, r)
+		}
+	}
+
+	sort.SliceStable(public, func(i, j int) bool {
+		return public[i].GetRating().GetValue() > public[j].GetRating().GetValue()
+	})
+
+	if limit > 0 && len(public) > limit {
+		public = public[:limit]
+	}
+
+	return public
 }
 
 func (as *AggregatorService) regradeRepo(ctx context.Context, pbRepo *client.Repository) error {
@@ -698,7 +731,7 @@ func (as *AggregatorService) markLLMRequested(key string) bool {
 	defer as.llmMu.Unlock()
 
 	now := as.now()
-	if request, ok := as.llmRequests[key]; ok && request.failure == "" && now.Sub(request.requestedAt) < llmRequestTTL {
+	if request, ok := as.llmRequests[key]; ok && request.failure == "" && now.Sub(request.requestedAt) < as.LLMRequestTTL {
 		return false
 	}
 

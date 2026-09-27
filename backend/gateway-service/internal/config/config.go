@@ -18,7 +18,11 @@ type Config struct {
 	Session    SessionConfig
 }
 type HTTPConfig struct {
-	Address string
+	Address           string
+	ReadHeaderTimeout time.Duration
+	ReadTimeout       time.Duration
+	WriteTimeout      time.Duration
+	IdleTimeout       time.Duration
 }
 
 type GRPCServiceConfig struct {
@@ -80,6 +84,10 @@ func LoadConfig() *Config {
 				"HTTP_ADDRESS",
 				":8080",
 			),
+			ReadHeaderTimeout: getEnvDuration("HTTP_READ_HEADER_TIMEOUT", 5*time.Second),
+			ReadTimeout:       getEnvDuration("HTTP_READ_TIMEOUT", 15*time.Second),
+			WriteTimeout:      getEnvDuration("HTTP_WRITE_TIMEOUT", 30*time.Second),
+			IdleTimeout:       getEnvDuration("HTTP_IDLE_TIMEOUT", 60*time.Second),
 		},
 
 		Aggregator: GRPCServiceConfig{

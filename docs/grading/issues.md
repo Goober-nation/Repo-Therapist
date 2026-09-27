@@ -35,7 +35,8 @@ e.g. 8 days → (14 − 8) / (14 − 2) = 0.5.
 
 ## Data source
 
-S3 `_meta/issues.json` (same export Activity reads). `resolved` is judged by `status_type`
+S3 `_meta/issues.json` (same export Activity reads). The export is capped at `SOURCECRAFT_MAX_PAGES` pages (default
+50 of 100 issues), see `activity.md`. `resolved` is judged by `status_type`
 (`completed`/`cancelled`) — the fixed 5-value SourceCraft backend lifecycle enum
 (`initial|in_progress|paused|completed|cancelled`, confirmed from the live Swagger spec) — never
 the per-repo customizable `status` slug/name, which isn't safe to match across repos/orgs.
@@ -79,7 +80,8 @@ values, not calibrated against a repo population.
   `initial`/`in_progress`.
 - Issues carry their own visibility flag independent of the repo's — a public repo can contain
   private issues a viewer-tier PAT never sees, undercounting these metrics for repos that use
-  that feature (`agents_memory/topics/sourcecraft-api.md`).
+  that feature. (SourceCraft: issue visibility is binary `public | private` and non-members only
+  see public issues.)
 - `growth_ratio`/`share_resolved` are a simplification: most real dashboards (CHAOSS, GitHub
   Pulse, OSSInsight) track backlog size as a time series rather than a windowed ratio, since a
   ratio can't distinguish "small and volatile" from "enormous and stable." Defensible for a
@@ -101,8 +103,7 @@ SourceCraft repos with enough resolved issues (11 test repos + 10 drawn at rando
 were based on. New bounds 14 / 2: 12 repos full, 9 graded in between, none at 0. Strict
 percentiles (p90 / p25 = 9d / 0.5d) were rejected: they would call a 9-day median "critical" and
 most reward same-day closes, some of which look like tracker bookkeeping rather than work.
-Still `provisional: true` — n is small and SourceCraft-specific. Raw data:
-`agents_memory/topics/threshold-calibration-data.md`.
+Still `provisional: true` — n is small and SourceCraft-specific.
 
 Originally windowed every metric by issue *creation* date. Two rounds of correction, both
 2026-09-22:

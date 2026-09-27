@@ -85,7 +85,9 @@ func whereClause(language string) (string, []any) {
 	var b strings.Builder
 	var args []any
 
-	b.WriteString("WHERE r.visibility = 'public'")
+	// Only repos with a public grade are ranked; private-only or ungraded repos are left out.
+	b.WriteString("WHERE r.visibility = 'public'" +
+		" AND EXISTS (SELECT 1 FROM repo_grades_public pg WHERE pg.sourcecraft_uuid = r.sourcecraft_uuid)")
 
 	if language != "" {
 		args = append(args, language)
@@ -122,7 +124,7 @@ func buildListQuery(q domain.RankingQuery) (string, []any, error) {
 			COALESCE(r.language_color, ''),
 			r.last_activity_at
 		FROM repos r
-		LEFT JOIN repo_grades_public g ON g.sourcecraft_uuid = r.sourcecraft_uuid
+		JOIN repo_grades_public g ON g.sourcecraft_uuid = r.sourcecraft_uuid
 		%s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d

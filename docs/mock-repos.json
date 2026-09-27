@@ -1,0 +1,237 @@
+{
+  "purpose": "Full grading fixtures on real SourceCraft (backlog phase 8): every category has data, levels vary. Created by scripts/mock-repos/full/generate.py.",
+  "org": "timoxa102928",
+  "known_limits": [
+    "Issue created/closed times are server time (not backdatable): abandoned_share and median_closure_days sit at their healthy extreme in every repo.",
+    "CI runs all happen at generation time.",
+    "Security findings come from AppSec's automatic per-push scan (Trivy/grype/Opengrep); counts are what the engines report."
+  ],
+  "repos": [
+    {
+      "repo": "health-mock-exemplary",
+      "sourcecraft_uuid": "01a0e2b8-2b70-726c-9930-01fc03e666a6",
+      "title": "Exemplary project",
+      "intended_levels": "all high",
+      "docs_level": 4,
+      "security_seed": "clean",
+      "ci_runs_oldest_first": "S S S S S S S S",
+      "issues_total_closed": [
+        12,
+        11
+      ],
+      "milestone_deadlines_days_ago": [
+        20,
+        110,
+        200,
+        290
+      ],
+      "commits_recent_older": [
+        130,
+        60
+      ],
+      "days_since_last_commit": 1,
+      "markers": 2
+    },
+    {
+      "repo": "health-mock-strong",
+      "sourcecraft_uuid": "01a0e2b8-2bc8-71d5-ac01-dde15cfded95",
+      "title": "Strong project",
+      "intended_levels": "high, medium security/docs",
+      "docs_level": 3,
+      "security_seed": "code",
+      "ci_runs_oldest_first": "S S S S S S S F",
+      "issues_total_closed": [
+        10,
+        8
+      ],
+      "milestone_deadlines_days_ago": [
+        35,
+        150,
+        260
+      ],
+      "commits_recent_older": [
+        100,
+        50
+      ],
+      "days_since_last_commit": 2,
+      "markers": 4
+    },
+    {
+      "repo": "health-mock-docs-first",
+      "sourcecraft_uuid": "01a0e2b8-2b89-7bfd-9846-5db59273953b",
+      "title": "Documentation-first project",
+      "intended_levels": "great docs, weak CI",
+      "docs_level": 4,
+      "security_seed": "clean",
+      "ci_runs_oldest_first": "F S F F S F",
+      "issues_total_closed": [
+        8,
+        5
+      ],
+      "milestone_deadlines_days_ago": [
+        80,
+        250
+      ],
+      "commits_recent_older": [
+        40,
+        30
+      ],
+      "days_since_last_commit": 8,
+      "markers": 6
+    },
+    {
+      "repo": "health-mock-average",
+      "sourcecraft_uuid": "01a0e2b8-2ba2-765c-a766-b831b367b0c2",
+      "title": "Average project",
+      "intended_levels": "medium everywhere, flaky CI",
+      "docs_level": 2,
+      "security_seed": "code",
+      "ci_runs_oldest_first": "S F S S F S F S",
+      "issues_total_closed": [
+        10,
+        6
+      ],
+      "milestone_deadlines_days_ago": [
+        90,
+        300
+      ],
+      "commits_recent_older": [
+        35,
+        25
+      ],
+      "days_since_last_commit": 10,
+      "markers": 8
+    },
+    {
+      "repo": "health-mock-average-b",
+      "sourcecraft_uuid": "01a0e2b8-2bcd-7bde-8ced-c7c274eab9a6",
+      "title": "Average project B",
+      "intended_levels": "medium, weak code health and security",
+      "docs_level": 1,
+      "security_seed": "dep",
+      "ci_runs_oldest_first": "S S F S S F",
+      "issues_total_closed": [
+        9,
+        4
+      ],
+      "milestone_deadlines_days_ago": [
+        120
+      ],
+      "commits_recent_older": [
+        30,
+        20
+      ],
+      "days_since_last_commit": 15,
+      "markers": 12
+    },
+    {
+      "repo": "health-mock-busy-messy",
+      "sourcecraft_uuid": "01a0e2b8-2b2d-7b39-9eb0-76ce72f307d8",
+      "title": "Busy but messy project",
+      "intended_levels": "high activity, low code health/docs",
+      "docs_level": 1,
+      "security_seed": "dep",
+      "ci_runs_oldest_first": "S F S F S S",
+      "issues_total_closed": [
+        14,
+        7
+      ],
+      "milestone_deadlines_days_ago": [
+        50,
+        200
+      ],
+      "commits_recent_older": [
+        150,
+        40
+      ],
+      "days_since_last_commit": 1,
+      "markers": 25
+    },
+    {
+      "repo": "health-mock-abandoned",
+      "sourcecraft_uuid": "01a0e2b8-2bd5-7411-9106-c8249a80afbe",
+      "title": "Abandoned project",
+      "intended_levels": "dormant 200+ days",
+      "docs_level": 2,
+      "security_seed": "clean",
+      "ci_runs_oldest_first": "F F S F",
+      "issues_total_closed": [
+        8,
+        1
+      ],
+      "milestone_deadlines_days_ago": [
+        330
+      ],
+      "commits_recent_older": [
+        0,
+        45
+      ],
+      "days_since_last_commit": 210,
+      "markers": 7
+    },
+    {
+      "repo": "health-mock-tiny-lib",
+      "sourcecraft_uuid": "01a0e2b8-2b6b-796e-854e-ef29a109d5d7",
+      "title": "Tiny single-author library",
+      "intended_levels": "solo, clean, well documented",
+      "docs_level": 3,
+      "security_seed": "clean",
+      "ci_runs_oldest_first": "S S F S S",
+      "issues_total_closed": [
+        3,
+        2
+      ],
+      "milestone_deadlines_days_ago": [],
+      "commits_recent_older": [
+        8,
+        10
+      ],
+      "days_since_last_commit": 30,
+      "markers": 0
+    },
+    {
+      "repo": "health-mock-ci-red",
+      "sourcecraft_uuid": "01a0e2b8-2b4e-7a16-8430-98cc21ee6bf7",
+      "title": "Healthy code, broken CI",
+      "intended_levels": "high except CI",
+      "docs_level": 3,
+      "security_seed": "code",
+      "ci_runs_oldest_first": "S F F F F F",
+      "issues_total_closed": [
+        11,
+        10
+      ],
+      "milestone_deadlines_days_ago": [
+        25,
+        140,
+        250
+      ],
+      "commits_recent_older": [
+        110,
+        40
+      ],
+      "days_since_last_commit": 1,
+      "markers": 3
+    },
+    {
+      "repo": "health-mock-disaster",
+      "sourcecraft_uuid": "01a0e2b8-2b89-70b4-b9f0-e5a73b86365c",
+      "title": "Disaster project",
+      "intended_levels": "low everywhere",
+      "docs_level": 0,
+      "security_seed": "multi",
+      "ci_runs_oldest_first": "F F F F F F",
+      "issues_total_closed": [
+        12,
+        1
+      ],
+      "milestone_deadlines_days_ago": [],
+      "commits_recent_older": [
+        3,
+        12
+      ],
+      "days_since_last_commit": 160,
+      "markers": 30
+    }
+  ]
+}

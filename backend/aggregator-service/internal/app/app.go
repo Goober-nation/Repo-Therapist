@@ -82,6 +82,10 @@ func StartApp() {
 		cfg.GRPC.Timeout,
 		cfg.Token.Token,
 	)
+	aggregatorService.RegradeLimit = cfg.Grading.RegradeLimit
+	if cfg.Grading.LLMRequestTTL > 0 {
+		aggregatorService.LLMRequestTTL = cfg.Grading.LLMRequestTTL
+	}
 
 	gradeConsumer := kafka.NewGradeConsumer(
 		cfg.Kafka.Brokers,
@@ -126,6 +130,7 @@ func StartApp() {
 	aggregatorService.StartPublicGrading(
 		ctx,
 		cfg.Grading.RegradeInterval,
+		cfg.Grading.RegradeOnStart,
 	)
 
 	serverErr := make(chan error, 1)

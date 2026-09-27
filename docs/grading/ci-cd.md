@@ -130,8 +130,7 @@ equal size. Duration only counts runs that have both timestamps.
 
 ## Open questions
 
-- How to grade "config but never ran" and "no CI at all" — raised for the team,
-  `backlog/team-sync-2026-09-26.md` item 5. Current behavior: no-data and 0 respectively.
+- How to grade "config but never ran" and "no CI at all" — raised for the team. Current behavior: no-data and 0 respectively.
 - The ownership check is implicit (403 → no-data). An explicit "caller controls this repo" rule at
   the Aggregator is still not designed.
 

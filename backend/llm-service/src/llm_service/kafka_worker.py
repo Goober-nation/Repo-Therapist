@@ -25,19 +25,34 @@ from .yandex_model import (ModelContentFiltered, ModelDeadlineExceeded, ModelInp
 LOG = logging.getLogger(__name__)
 
 
+def _env_first(*keys: str, default: str) -> str:
+    """First nonblank value among env vars keys; the KAFKA_* names shared with the
+    Go services come first, the older LLM_SUMMARY_* names are kept as fallbacks."""
+    for key in keys:
+        value = os.environ.get(key, "").strip()
+        if value:
+            return value
+    return default
+
+
 @dataclass(frozen=True)
 class KafkaConfig:
     brokers: str = "localhost:9092"
     group_id: str = "llm-service-documentation-v1"
+    request_topic: str = REQUEST_TOPIC
+    result_topic: str = RESULT_TOPIC
 
     @classmethod
     def from_env(cls) -> KafkaConfig:
         return cls(os.environ.get("KAFKA_BROKERS", "localhost:9092"),
-                   os.environ.get("LLM_KAFKA_GROUP_ID", "llm-service-documentation-v1"))
+                   os.environ.get("LLM_KAFKA_GROUP_ID", "llm-service-documentation-v1"),
+                   _env_first("KAFKA_DOCS_GRADE_REQUESTED_TOPIC", default=cls.request_topic),
+                   _env_first("KAFKA_DOCS_GRADED_TOPIC", default=cls.result_topic))
 
     def __post_init__(self) -> None:
-        if not self.brokers.strip() or not self.group_id.strip():
-            raise ValueError("Kafka brokers and consumer group are required")
+        if not all(value.strip() for value in (self.brokers, self.group_id,
+                                               self.request_topic, self.result_topic)):
+            raise ValueError("Kafka brokers, consumer group and topics are required")
 
 
 @dataclass(frozen=True)
@@ -52,8 +67,10 @@ class SummaryKafkaConfig:
         env = os.environ.get
         return cls(env("KAFKA_BROKERS", cls.brokers),
                    env("LLM_SUMMARY_KAFKA_GROUP_ID", cls.group_id),
-                   env("LLM_SUMMARY_REQUEST_TOPIC", cls.request_topic),
-                   env("LLM_SUMMARY_RESULT_TOPIC", cls.result_topic))
+                   _env_first("KAFKA_LLM_REQUESTS_TOPIC", "LLM_SUMMARY_REQUEST_TOPIC",
+                              default=cls.request_topic),
+                   _env_first("KAFKA_LLM_RECOMMENDATIONS_TOPIC", "LLM_SUMMARY_RESULT_TOPIC",
+                              default=cls.result_topic))
 
     def __post_init__(self) -> None:
         if not all(value.strip() for value in (self.brokers, self.group_id,
@@ -184,7 +201,7 @@ def _serve(config, request_topic, result_topic, handle, *, consumer=None, produc
 
 
 def run_worker(config: KafkaConfig, store, model, *, consumer=None, producer=None) -> None:
-    _serve(config, REQUEST_TOPIC, RESULT_TOPIC,
+    _serve(config, config.request_topic, config.result_topic,
            lambda raw: process_documentation_request(raw, store, model),
            consumer=consumer, producer=producer)
 

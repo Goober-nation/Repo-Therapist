@@ -37,6 +37,10 @@ repository-service (`backend/repository-service/internal/service/clone.go`) from
 per-event list with timestamps, never a pre-aggregated count (see `00-overview.md`'s time-decay
 note for why that matters).
 
+Issue and milestone exports are capped by sourcecraft-wrapper-service's `SOURCECRAFT_MAX_PAGES`
+(default 50 pages of 100, i.e. 5000 items). A repo above the cap is scored on its first 5000;
+raising it changes scores for such repos only. Commits come from git and are not capped.
+
 ### Commit filters (2026-09-27)
 
 `commits.json` carries each commit's `parents` (from `git log %P`): `[]` for a root commit, two or
@@ -85,7 +89,6 @@ validated against real repos.
 
 ## Open questions
 
-- Threshold validation against real repos — tracked in `backlog/phase-2-grade-service.md`.
 - No automated unit tests yet for `internal/scoring` — same gap for every category.
 
 ## Design history (compressed)
@@ -105,7 +108,7 @@ validated against real repos.
 - **Its 0.05 weight moved to `commits_per_week` (0.20 -> 0.25), 2026-09-26.** Dropping the metric
   left the category's weights summing to 0.95, which the config validator rejects at startup.
 - **`issue_rate_per_week`/`milestones_per_year` recalibrated, 2026-09-25.** Real data across 20
-  diverse repos (`agents_memory/topics/threshold-calibration-data.md`) — including large orgs like
+  diverse repos — including large orgs like
   gravity-ui/datalens/postgres forks — found median and p75 exactly 0 for both metrics, max 0.117
   and 4 respectively. The old thresholds (`critical: 0.2/1`, `healthy: 2/6`) meant essentially no
   real repo ever cleared critical, zero discrimination. Not evidence 20 real repos are badly run —

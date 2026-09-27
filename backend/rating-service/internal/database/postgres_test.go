@@ -74,17 +74,24 @@ func TestBuildListQueryPlaceholders(t *testing.T) {
 	}
 }
 
-func TestBuildListQueryPublicLeftJoin(t *testing.T) {
+func TestBuildListQueryGradedOnly(t *testing.T) {
 	query, _, err := buildListQuery(domain.RankingQuery{SortBy: domain.SortByScore, Limit: 20})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Ungraded repos must stay in the ranking (NULLs last), so the grades join can't be inner.
-	if !strings.Contains(query, "LEFT JOIN repo_grades_public g") {
-		t.Errorf("expected LEFT JOIN on repo_grades_public:\n%s", query)
+	// Only repos with a public grade are ranked, so the grades join is inner.
+	if !strings.Contains(query, "JOIN repo_grades_public g") || strings.Contains(query, "LEFT JOIN") {
+		t.Errorf("expected inner JOIN on repo_grades_public:\n%s", query)
 	}
 	if !strings.Contains(query, "WHERE r.visibility = 'public'") {
 		t.Errorf("expected public-only filter:\n%s", query)
+	}
+
+	// The count must apply the same graded-only filter so total_count matches the entries.
+	for name, q := range map[string]string{"list": query, "count": func() string { c, _ := buildCountQuery(""); return c }()} {
+		if !strings.Contains(q, "EXISTS (SELECT 1 FROM repo_grades_public pg") {
+			t.Errorf("%s query: expected graded-only filter:\n%s", name, q)
+		}
 	}
 }
 

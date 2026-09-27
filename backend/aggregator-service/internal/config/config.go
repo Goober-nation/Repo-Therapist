@@ -68,6 +68,12 @@ type WrapperConfig struct {
 
 type GradingConfig struct {
 	RegradeInterval time.Duration
+	// RegradeOnStart runs the public regrade once at startup, before the first interval tick.
+	RegradeOnStart bool
+	// RegradeLimit caps each public regrade to the top N public repos by SourceCraft rating;
+	// 0 means every listed repo.
+	RegradeLimit  int
+	LLMRequestTTL time.Duration
 }
 
 func LoadConfig() *Config {
@@ -165,6 +171,18 @@ func LoadConfig() *Config {
 				"GRADING_REGRADE_INTERVAL",
 				24*time.Hour,
 			),
+			RegradeOnStart: getEnvBool(
+				"GRADING_REGRADE_ON_START",
+				true,
+			),
+			RegradeLimit: getEnvInt(
+				"GRADING_REGRADE_LIMIT",
+				0,
+			),
+			LLMRequestTTL: getEnvDuration(
+				"LLM_REQUEST_TTL",
+				2*time.Minute,
+			),
 		},
 	}
 }
@@ -172,6 +190,24 @@ func LoadConfig() *Config {
 func getEnvDefault(key string, def string) string {
 	value := os.Getenv(key)
 	if value == "" {
+		return def
+	}
+
+	return value
+}
+
+func getEnvBool(key string, def bool) bool {
+	value, err := strconv.ParseBool(os.Getenv(key))
+	if err != nil {
+		return def
+	}
+
+	return value
+}
+
+func getEnvInt(key string, def int) int {
+	value, err := strconv.Atoi(os.Getenv(key))
+	if err != nil || value < 0 {
 		return def
 	}
 

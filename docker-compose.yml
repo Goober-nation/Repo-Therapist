@@ -20,11 +20,23 @@ services:
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:?set in .env}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?set in .env}
+      # Soft cap: MinIO otherwise grows caches to fit available memory. GC works harder near it; never OOM-kills.
+      GOMEMLIMIT: 256MiB
     ports:
       - "9000:9000" # S3 API
       - "9001:9001" # web console
     volumes:
       - miniodata:/data
+
+  # Gateway sessions and rate limiting.
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
 
   kafka:
     image: apache/kafka:latest
@@ -41,10 +53,13 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # Default heap is 1G; a single dev broker with small messages needs far less.
+      KAFKA_HEAP_OPTS: "-Xmx256m -Xms256m"
     ports:
       - "9092:9092"
     volumes:
-      - kafkadata:/tmp/kraft-combined-logs
+      # The apache/kafka image's log.dirs; anything else leaves data on an anonymous volume lost on recreate.
+      - kafkadata:/var/lib/kafka/data
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:29092 >/dev/null 2>&1"]
       interval: 10s

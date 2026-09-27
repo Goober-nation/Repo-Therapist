@@ -21,3 +21,18 @@ func TestGradeTimeout(t *testing.T) {
 		}
 	}
 }
+
+func TestJobTTL(t *testing.T) {
+	t.Setenv("GRADE_JOB_TTL", "")
+	if got := JobTTL(); got != DefaultJobTTL {
+		t.Errorf("unset: got %s, want %s", got, DefaultJobTTL)
+	}
+	t.Setenv("GRADE_JOB_TTL", "45m")
+	if got := JobTTL(); got != 45*time.Minute {
+		t.Errorf("45m: got %s", got)
+	}
+	t.Setenv("GRADE_JOB_TTL", "0s")
+	if got := JobTTL(); got != DefaultJobTTL {
+		t.Errorf("0s: got %s, want %s", got, DefaultJobTTL)
+	}
+}

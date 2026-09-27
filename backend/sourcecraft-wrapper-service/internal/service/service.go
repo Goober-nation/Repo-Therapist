@@ -12,9 +12,9 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-// maxPages bounds pagination loops so a pathologically large repo (thousands of issues/
-// milestones) can't make a single fetch run unbounded.
-const maxPages = 50
+// DefaultMaxPages bounds pagination loops so a pathologically large repo (thousands of issues/
+// milestones) can't make a single fetch run unbounded. Overridable via SOURCECRAFT_MAX_PAGES.
+const DefaultMaxPages = 50
 
 type SCService interface {
 	GetRepositoryBySlugs(ctx context.Context, repoSlug string, orgSlug string) (domain.Repository, error)
@@ -29,12 +29,15 @@ type SCService interface {
 type SCWrapper struct {
 	client http.Client
 	apiURL string
+	// MaxPages caps every paginated fetch (commits, runs, issues, milestones).
+	MaxPages int
 }
 
 func NewSCWrapperService(client http.Client, apiURL string) *SCWrapper {
 	return &SCWrapper{
-		client: client,
-		apiURL: apiURL,
+		client:   client,
+		apiURL:   apiURL,
+		MaxPages: DefaultMaxPages,
 	}
 }
 
@@ -198,7 +201,7 @@ func (scw *SCWrapper) GetIssues(ctx context.Context, repoID string) (domain.Issu
 
 	var all domain.Issues
 	pageToken := ""
-	for page := 0; page < maxPages; page++ {
+	for page := 0; page < scw.MaxPages; page++ {
 		var resp domain.Issues
 		next, err := scw.getPage(ctx, token, basePath, pageToken, &resp, func() string { return resp.NextPageToken })
 		if err != nil {
@@ -222,7 +225,7 @@ func (scw *SCWrapper) GetMilestones(ctx context.Context, repoID string) (domain.
 
 	var all domain.Milestones
 	pageToken := ""
-	for page := 0; page < maxPages; page++ {
+	for page := 0; page < scw.MaxPages; page++ {
 		var resp domain.Milestones
 		next, err := scw.getPage(ctx, token, basePath, pageToken, &resp, func() string { return resp.NextPageToken })
 		if err != nil {
@@ -286,7 +289,7 @@ func (scw *SCWrapper) ListAllPublicRepos(
 	var repositories []domain.Repository
 	pageToken := ""
 
-	for page := 0; page < maxPages; page++ {
+	for page := 0; page < scw.MaxPages; page++ {
 		url := fmt.Sprintf("%s/repos", scw.apiURL)
 
 		if pageToken != "" {
@@ -394,7 +397,7 @@ func (scw *SCWrapper) GetMyRepos(ctx context.Context) (domain.MyRepositoriesResp
 	var all domain.MyRepositoriesResponse
 	pageToken := ""
 
-	for page := 0; page < maxPages; page++ {
+	for page := 0; page < scw.MaxPages; page++ {
 		var rr domain.MyRepositoriesResponse
 
 		next, err := scw.getPage(

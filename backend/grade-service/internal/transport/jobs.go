@@ -4,11 +4,9 @@ import (
 	"sync"
 	"time"
 
+	"repo-therapist/grade-service/internal/app"
 	"repo-therapist/grade-service/internal/contracts"
 )
-
-// jobTTL bounds how long a user token can sit in memory if repo.ready never arrives.
-const jobTTL = 30 * time.Minute
 
 type job struct {
 	token      string
@@ -23,10 +21,11 @@ type jobStore struct {
 	mu   sync.Mutex
 	jobs map[string]job
 	now  func() time.Time
+	ttl  time.Duration // how long a user token can sit in memory if repo.ready never arrives
 }
 
 func newJobStore() *jobStore {
-	return &jobStore{jobs: map[string]job{}, now: time.Now}
+	return &jobStore{jobs: map[string]job{}, now: time.Now, ttl: app.JobTTL()}
 }
 
 func (s *jobStore) put(key, token, visibility string) {
@@ -34,7 +33,7 @@ func (s *jobStore) put(key, token, visibility string) {
 	defer s.mu.Unlock()
 	now := s.now()
 	for k, j := range s.jobs {
-		if now.Sub(j.createdAt) > jobTTL {
+		if now.Sub(j.createdAt) > s.ttl {
 			delete(s.jobs, k)
 		}
 	}
@@ -48,7 +47,7 @@ func (s *jobStore) take(key string) job {
 	defer s.mu.Unlock()
 	j, ok := s.jobs[key]
 	delete(s.jobs, key)
-	if !ok || s.now().Sub(j.createdAt) > jobTTL {
+	if !ok || s.now().Sub(j.createdAt) > s.ttl {
 		return job{visibility: contracts.VisibilityPublic}
 	}
 	return j

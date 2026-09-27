@@ -1,6 +1,6 @@
 # Manual testing
 
-No automated test suite yet (tracked as an open item in `backlog/`) — this is how to exercise
+No automated test suite yet — this is how to exercise
 everything by hand, matching what's actually been verified so far.
 
 ## Setup

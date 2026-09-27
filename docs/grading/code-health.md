@@ -1,7 +1,6 @@
 # Code health / tech debt (10%, public)
 
-**Status: implemented.** Last updated 2026-09-25. See `backlog/phase-2-grade-service.md`
-("Next task", item 2) for the task-tracking entry.
+**Status: implemented.** Last updated 2026-09-25.
 
 ## What it measures
 
@@ -122,7 +121,7 @@ full analysis.
   "insufficient data" (extending 00-overview.md's aspirational principle 4 into a real
   cross-cutting gate, reusing `total_loc` as the signal). Rejected outright: every repo should be
   gradeable regardless of size — parked instead as a future "repo grade trust factor" concept
-  (separate mechanism, not built now — see `backlog/phase-2-grade-service.md`).
+  (separate mechanism, not built now).
 - **"Oldest marker age" replaced with "share of markers stale ≥ a threshold" (180d originally,
   293d after later recalibration below).** A raw max is an order
   statistic: with more markers sampled from the same underlying age distribution, the max skews
@@ -156,8 +155,8 @@ full analysis.
   distribution's p90/p25 (192 markers, 6 repos), not a guess. Re-verified against all 12 repos:
   real partial credit and a 58.3-100 spread, no clustering, no backwards incentive.
 
-- **`density_per_kloc` recalibrated, 2026-09-25.** A follow-up 20-repo run (5 to 17,651 files —
-  see `agents_memory/topics/threshold-calibration-data.md`) found the max observed density across
+- **`density_per_kloc` recalibrated, 2026-09-25.** A follow-up 20-repo run (5 to 17,651 files)
+  found the max observed density across
   32 repos tested total (both batches) was 2.01/kLOC — the old `critical: 20/healthy: 1` meant
   virtually every real repo scored ~1.0 here regardless of actual density, no discrimination.
   New: `critical: 3` / `healthy: 0.3`, anchored to the real observed range instead of an arbitrary

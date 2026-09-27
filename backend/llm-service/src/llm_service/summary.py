@@ -7,6 +7,8 @@ The local validator checks model output format only.
 """
 
 import json
+import logging
+import os
 from time import monotonic
 
 from .model_response import InvalidModelResponse
@@ -22,7 +24,27 @@ CATEGORY_NAMES = {
 }
 PRIVATE_ONLY = frozenset({"security", "ci_cd"})
 PRIORITIES = ("HIGH", "MEDIUM", "LOW")
-STRENGTH_THRESHOLD = 75
+DEFAULT_STRENGTH_THRESHOLD = 75
+
+
+def strength_threshold_from_env() -> int:
+    """LLM_STRENGTH_THRESHOLD (integer 0-100): scores at or above it are strengths, below
+    it weaknesses; it also sets the MEDIUM/LOW priority boundary. Invalid values fall back."""
+    value = os.environ.get("LLM_STRENGTH_THRESHOLD", "").strip()
+    if not value:
+        return DEFAULT_STRENGTH_THRESHOLD
+    try:
+        threshold = int(value)
+    except ValueError:
+        threshold = -1
+    if not 0 <= threshold <= 100:
+        logging.getLogger(__name__).warning(
+            "ignoring invalid LLM_STRENGTH_THRESHOLD=%r, using %d", value, DEFAULT_STRENGTH_THRESHOLD)
+        return DEFAULT_STRENGTH_THRESHOLD
+    return threshold
+
+
+STRENGTH_THRESHOLD = strength_threshold_from_env()
 LIMITS = {"summary": 1500, "text": 600, "recommendations": 8}
 _EDGE_PUNCTUATION = " \t\n.,;:!?-–—•*·"
 

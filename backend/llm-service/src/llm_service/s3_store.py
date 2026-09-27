@@ -13,6 +13,8 @@ class S3Config:
     access_key: str = field(default="", repr=False)
     secret_key: str = field(default="", repr=False)
     use_ssl: bool = False
+    connect_timeout: float = 5
+    read_timeout: float = 15
 
     @classmethod
     def from_env(cls) -> S3Config:
@@ -25,12 +27,26 @@ class S3Config:
             access_key=os.environ.get("S3_ACCESS_KEY", ""),
             secret_key=os.environ.get("S3_SECRET_KEY", ""),
             use_ssl=ssl == "true",
+            connect_timeout=_seconds_env("S3_CONNECT_TIMEOUT", cls.connect_timeout),
+            read_timeout=_seconds_env("S3_READ_TIMEOUT", cls.read_timeout),
         )
 
     def __post_init__(self) -> None:
         if (not self.endpoint or "://" in self.endpoint or "/" in self.endpoint or
                 not self.bucket or not self.access_key or not self.secret_key):
             raise ValueError("S3 endpoint, bucket and credentials are required")
+        if self.connect_timeout <= 0 or self.read_timeout <= 0:
+            raise ValueError("S3 timeouts must be positive")
+
+
+def _seconds_env(key: str, default: float) -> float:
+    value = os.environ.get(key, "").strip()
+    if not value:
+        return default
+    try:
+        return float(value)
+    except ValueError:
+        raise ValueError(f"{key} must be a number of seconds") from None
 
 
 class S3Store:
@@ -46,7 +62,8 @@ class S3Store:
                 "s3", endpoint_url=f"{'https' if config.use_ssl else 'http'}://{config.endpoint}",
                 aws_access_key_id=config.access_key, aws_secret_access_key=config.secret_key,
                 region_name="us-east-1", config=Config(s3={"addressing_style": "path"},
-                                                     connect_timeout=5, read_timeout=15,
+                                                     connect_timeout=config.connect_timeout,
+                                                     read_timeout=config.read_timeout,
                                                      retries={"mode": "standard", "total_max_attempts": 2}),
             )
         self.client = client

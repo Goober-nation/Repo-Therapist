@@ -4,12 +4,26 @@
 // wider team sign-off, per backlog/phase-3-kafka-integration.md.
 package contracts
 
-import "time"
-
-const (
-	TopicGradeRequested = "repo.grade.requested"
-	TopicRepoReady      = "repo.ready"
+import (
+	"os"
+	"strings"
+	"time"
 )
+
+// Topic names default to the documented contract and can be overridden per environment; the env
+// names are shared with grade-service (docs/kafka-contracts.md, "Topic env vars").
+var (
+	TopicGradeRequested = TopicEnv("KAFKA_REPO_GRADE_REQUESTED_TOPIC", "repo.grade.requested")
+	TopicRepoReady      = TopicEnv("KAFKA_REPO_READY_TOPIC", "repo.ready")
+)
+
+// TopicEnv returns the trimmed value of env var key, or def when it is unset or blank.
+func TopicEnv(key, def string) string {
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+		return v
+	}
+	return def
+}
 
 // AllTopics is every topic this exchange uses — pass to kafka.EnsureTopics at service startup so
 // neither service can join a consumer group before its topic exists.

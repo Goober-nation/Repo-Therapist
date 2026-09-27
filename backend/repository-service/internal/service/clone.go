@@ -276,8 +276,10 @@ func cloneTempBase() string {
 
 	minFree := int64(defaultMinShmFreeBytes)
 	if v := os.Getenv("CLONE_SHM_MIN_FREE_BYTES"); v != "" {
-		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n >= 0 {
 			minFree = n
+		} else {
+			log.Printf("ignoring invalid CLONE_SHM_MIN_FREE_BYTES=%q, using %d", v, minFree)
 		}
 	}
 
