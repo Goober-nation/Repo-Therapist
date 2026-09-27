@@ -35,10 +35,13 @@ The Aggregator's own topics, as Grade service reads/writes them:
 
 - `grading.requests`: `{org_slug, repo_slug, visibility, requested_at, token?}`. A token means
   private grading; no token means public. A non-public `visibility` without a token is dropped.
-- `grading.results`: `{sourcecraft_uuid, visibility, public_score, public_category_scores,
-  public_recommendations, private_score, private_category_scores, private_recommendations,
-  missing_data, graded_at}`. Only the side named by `visibility` is filled, the other side is
-  `null`; recommendations hold at most 3, picked at random.
+- `grading.results`: `{sourcecraft_uuid, visibility, score, category_scores, advice,
+  missing_data, graded_at, error}`. `visibility` names the grades table the Aggregator writes to.
+  `advice` is a list of at most 3 recommendations `{category_id, metric_id, text}`, picked at
+  random. `error` is `""` on success. On failure it is a code — `REPO_FETCH_FAILED` (repo.ready
+  status failed), `GRADING_FAILED`, `RESULT_BUILD_FAILED` — with `score`, `category_scores` and
+  `advice` null; the Aggregator then only releases the repo lock. A failure without a
+  `sourcecraft_uuid` cannot be correlated and is not published.
 
 `token` is copied from `grading.requests`. When present, Repository service uses it for the
 wrapper calls and the git clone; when absent, it falls back to its own `SOURCECRAFT_PAT`. The
@@ -252,8 +255,8 @@ repository cannot be reliably correlated; consumers must account for repeated
 results. The service does not claim exactly-once processing.
 
 This section defines the agreed wire format. The Python LLM worker emits both
-outcomes; the Go Grade consumer still needs to interpret `error` and `grade: null`
-before failure results can produce immediate `NO_DATA` in production.
+outcomes; the Go Grade consumer treats a nonempty `error` or `grade: null` as
+immediate Documentation `NO_DATA`.
 
 The older `documentation.analysis.*` envelopes are legacy helpers only and are not
 used by the active Kafka worker. The report envelope below is a separate proposed
