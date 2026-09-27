@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package rating;
 
-option go_package = "gateway-service/internal/transport/rating/gen;pb";
+option go_package = "gateway-service/internal/transport/rpc/gen/rank;rank";
 
 import "google/protobuf/timestamp.proto";
 

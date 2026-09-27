@@ -163,10 +163,8 @@ func mapUserDBError(err error) error {
 
 	switch pgErr.Code {
 	case "23505":
-		switch pgErr.ConstraintName {
-		case "users_yandex_id_unique":
-			return domain.ErrUserAlreadyExists
-		}
+		// users has one unique key besides the primary key: yandex_id.
+		return domain.ErrUserAlreadyExists
 
 	case "23514",
 		"23502",

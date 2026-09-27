@@ -5,33 +5,43 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	stdhttp "net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"gateway-service/internal/domain"
 )
 
-const sessionCookieName = "session_id"
+const (
+	sessionCookieName = "session_id"
+
+	// patHeader carries the caller's SourceCraft PAT. Without it only public data is returned.
+	patHeader = "PAT"
+
+	statusPending  = "PENDING"
+	statusFinished = "FINISHED"
+)
 
 type GatewayService interface {
 	GetMyRepos(
 		ctx context.Context,
-		sessionID string,
 		clientIP string,
+		pat string,
 	) (domain.GetMyReposDTO, error)
 
 	GetGrading(
 		ctx context.Context,
 		clientIP string,
+		pat string,
 		request domain.GetGradingDTO,
 	) (domain.GetGradingResponse, error)
 
 	RequestLLMRecommendations(
 		ctx context.Context,
 		clientIP string,
+		pat string,
 		request domain.RequestLLMRecommendationsDTO,
 	) (domain.RequestLLMRecommendationsResponse, error)
 
@@ -43,6 +53,7 @@ type GatewayService interface {
 
 	LoginWithYandex(
 		ctx context.Context,
+		clientIP string,
 		request domain.YandexLoginDTO,
 	) (domain.LoginResponse, error)
 }
@@ -57,6 +68,15 @@ func NewHandler(service GatewayService) *Handler {
 	}
 }
 
+// Register mounts the gateway's routes on mux.
+func (h *Handler) Register(mux *stdhttp.ServeMux) {
+	mux.HandleFunc("POST /auth/yandex", h.LoginWithYandex)
+	mux.HandleFunc("GET /repos", h.GetMyRepos)
+	mux.HandleFunc("GET /grading/{org}/{repo}", h.GetGrading)
+	mux.HandleFunc("GET /recommendations/{org}/{repo}", h.RequestLLMRecommendations)
+	mux.HandleFunc("GET /ranking", h.GetRanking)
+}
+
 func (h *Handler) LoginWithYandex(
 	w stdhttp.ResponseWriter,
 	r *stdhttp.Request,
@@ -69,6 +89,7 @@ func (h *Handler) LoginWithYandex(
 
 	result, err := h.service.LoginWithYandex(
 		r.Context(),
+		clientIP(r),
 		domain.YandexLoginDTO{
 			OAuthToken: token,
 		},
@@ -96,25 +117,21 @@ func (h *Handler) LoginWithYandex(
 	)
 }
 
+// yandexOAuthToken reads the Yandex OAuth token from an "OAuth: <token>" header, or from
+// "Authorization: OAuth <token>".
 func yandexOAuthToken(
 	r *stdhttp.Request,
 ) (string, error) {
-	header := strings.TrimSpace(
-		r.Header.Get("Authorization"),
-	)
+	token := strings.TrimSpace(r.Header.Get("OAuth"))
 
-	const prefix = "OAuth "
+	if token == "" {
+		header := strings.TrimSpace(r.Header.Get("Authorization"))
 
-	if !strings.HasPrefix(header, prefix) {
-		return "", httpError{
-			status: stdhttp.StatusUnauthorized,
-			err:    domain.ErrUnauthenticated,
+		const prefix = "OAuth "
+		if strings.HasPrefix(header, prefix) {
+			token = strings.TrimSpace(strings.TrimPrefix(header, prefix))
 		}
 	}
-
-	token := strings.TrimSpace(
-		strings.TrimPrefix(header, prefix),
-	)
 
 	if token == "" {
 		return "", httpError{
@@ -126,21 +143,32 @@ func yandexOAuthToken(
 	return token, nil
 }
 
+// patFromRequest reads the PAT header; a "Bearer " prefix is tolerated.
+func patFromRequest(r *stdhttp.Request) string {
+	token := strings.TrimSpace(r.Header.Get(patHeader))
+	token = strings.TrimPrefix(token, "Bearer ")
+	token = strings.TrimPrefix(token, "bearer ")
+
+	return strings.TrimSpace(token)
+}
+
 func (h *Handler) GetMyRepos(
 	w stdhttp.ResponseWriter,
 	r *stdhttp.Request,
 ) {
-
-	sessionID, err := sessionIDFromRequest(r)
-	if err != nil {
-		writeError(w, err)
+	pat := patFromRequest(r)
+	if pat == "" {
+		writeError(w, httpError{
+			status: stdhttp.StatusUnauthorized,
+			err:    domain.ErrUnauthenticated,
+		})
 		return
 	}
 
 	result, err := h.service.GetMyRepos(
 		r.Context(),
-		sessionID,
 		clientIP(r),
+		pat,
 	)
 	if err != nil {
 		writeError(w, err)
@@ -154,26 +182,18 @@ func (h *Handler) GetMyRepos(
 	)
 }
 
-type getGradingRequest struct {
-	OrgSlug  string `json:"org_slug"`
-	RepoSlug string `json:"repo_slug"`
-}
-
 func (h *Handler) GetGrading(
 	w stdhttp.ResponseWriter,
 	r *stdhttp.Request,
 ) {
-	var req getGradingRequest
-
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, err)
-		return
-	}
-
 	result, err := h.service.GetGrading(
 		r.Context(),
 		clientIP(r),
-		mapGetGradingRequest(req),
+		patFromRequest(r),
+		domain.GetGradingDTO{
+			OrgSlug:  strings.TrimSpace(r.PathValue("org")),
+			RepoSlug: strings.TrimSpace(r.PathValue("repo")),
+		},
 	)
 	if err != nil {
 		writeError(w, err)
@@ -187,35 +207,18 @@ func (h *Handler) GetGrading(
 	)
 }
 
-func mapGetGradingRequest(
-	req getGradingRequest,
-) domain.GetGradingDTO {
-	return domain.GetGradingDTO{
-		OrgSlug:  strings.TrimSpace(req.OrgSlug),
-		RepoSlug: strings.TrimSpace(req.RepoSlug),
-	}
-}
-
-type requestLLMRecommendationsRequest struct {
-	OrgSlug  string `json:"org_slug"`
-	RepoSlug string `json:"repo_slug"`
-}
-
 func (h *Handler) RequestLLMRecommendations(
 	w stdhttp.ResponseWriter,
 	r *stdhttp.Request,
 ) {
-	var req requestLLMRecommendationsRequest
-
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, err)
-		return
-	}
-
 	result, err := h.service.RequestLLMRecommendations(
 		r.Context(),
 		clientIP(r),
-		mapRequestLLMRecommendationsRequest(req),
+		patFromRequest(r),
+		domain.RequestLLMRecommendationsDTO{
+			OrgSlug:  strings.TrimSpace(r.PathValue("org")),
+			RepoSlug: strings.TrimSpace(r.PathValue("repo")),
+		},
 	)
 	if err != nil {
 		writeError(w, err)
@@ -229,34 +232,11 @@ func (h *Handler) RequestLLMRecommendations(
 	)
 }
 
-func mapRequestLLMRecommendationsRequest(
-	req requestLLMRecommendationsRequest,
-) domain.RequestLLMRecommendationsDTO {
-	return domain.RequestLLMRecommendationsDTO{
-		OrgSlug:  strings.TrimSpace(req.OrgSlug),
-		RepoSlug: strings.TrimSpace(req.RepoSlug),
-	}
-}
-
-type getRankingRequest struct {
-	Page     int32  `json:"page"`
-	PageSize int32  `json:"page_size"`
-	Language string `json:"language"`
-	SortBy   string `json:"sort_by"`
-}
-
 func (h *Handler) GetRanking(
 	w stdhttp.ResponseWriter,
 	r *stdhttp.Request,
 ) {
-	var req getRankingRequest
-
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, err)
-		return
-	}
-
-	dto, err := mapGetRankingRequest(req)
+	dto, err := mapGetRankingRequest(r)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -279,20 +259,54 @@ func (h *Handler) GetRanking(
 	)
 }
 
+// mapGetRankingRequest reads ?sortby=&filter=&page=&page_size=, all optional.
 func mapGetRankingRequest(
-	req getRankingRequest,
+	r *stdhttp.Request,
 ) (domain.GetRankingDTO, error) {
-	sortBy, err := mapHTTPRankingSortBy(req.SortBy)
+	query := r.URL.Query()
+
+	sortBy, err := mapHTTPRankingSortBy(query.Get("sortby"))
+	if err != nil {
+		return domain.GetRankingDTO{}, err
+	}
+
+	page, err := queryInt32(query.Get("page"), "page")
+	if err != nil {
+		return domain.GetRankingDTO{}, err
+	}
+
+	pageSize, err := queryInt32(query.Get("page_size"), "page_size")
 	if err != nil {
 		return domain.GetRankingDTO{}, err
 	}
 
 	return domain.GetRankingDTO{
-		Page:     req.Page,
-		PageSize: req.PageSize,
-		Language: strings.TrimSpace(req.Language),
+		Page:     page,
+		PageSize: pageSize,
+		Language: strings.TrimSpace(query.Get("filter")),
 		SortBy:   sortBy,
 	}, nil
+}
+
+func queryInt32(value, name string) (int32, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, nil
+	}
+
+	parsed, err := strconv.ParseInt(value, 10, 32)
+	if err != nil || parsed < 0 {
+		return 0, httpError{
+			status: stdhttp.StatusBadRequest,
+			err: fmt.Errorf(
+				"%w: %s must be a non-negative integer",
+				domain.ErrInvalidRequest,
+				name,
+			),
+		}
+	}
+
+	return int32(parsed), nil
 }
 
 func mapHTTPRankingSortBy(
@@ -312,7 +326,7 @@ func mapHTTPRankingSortBy(
 		return 0, httpError{
 			status: stdhttp.StatusBadRequest,
 			err: fmt.Errorf(
-				"%w: invalid sort_by",
+				"%w: invalid sortby",
 				domain.ErrInvalidRequest,
 			),
 		}
@@ -321,6 +335,10 @@ func mapHTTPRankingSortBy(
 
 type loginResponse struct {
 	SessionID string `json:"session_id"`
+}
+
+type pendingResponse struct {
+	Status string `json:"status"`
 }
 
 type getMyReposResponse struct {
@@ -345,7 +363,8 @@ type languageResponse struct {
 }
 
 type getGradingResponse struct {
-	Grade repoGradeResponse `json:"grade"`
+	Status string            `json:"status"`
+	Grade  repoGradeResponse `json:"grade"`
 }
 
 type repoGradeResponse struct {
@@ -358,6 +377,7 @@ type repoGradeResponse struct {
 }
 
 type requestLLMRecommendationsResponse struct {
+	Status      string          `json:"status"`
 	RawResponse json.RawMessage `json:"raw_response"`
 	ModelUsed   string          `json:"model_used"`
 	EvaluatedAt string          `json:"evaluated_at"`
@@ -431,7 +451,8 @@ func mapGetGradingResponse(
 	result domain.GetGradingResponse,
 ) getGradingResponse {
 	return getGradingResponse{
-		Grade: mapRepoGradeResponse(result.Grade),
+		Status: statusFinished,
+		Grade:  mapRepoGradeResponse(result.Grade),
 	}
 }
 
@@ -441,18 +462,29 @@ func mapRepoGradeResponse(
 	return repoGradeResponse{
 		SourcecraftUUID: grade.SourcecraftUUID.String(),
 		Score:           grade.Score,
-		CategoryScores:  append([]byte(nil), grade.CategoryScores...),
-		Advice:          append([]byte(nil), grade.Advice...),
+		CategoryScores:  rawJSON(grade.CategoryScores),
+		Advice:          rawJSON(grade.Advice),
 		MissingData:     append([]string(nil), grade.MissingData...),
 		GradedAt:        grade.GradedAt.Format(time.RFC3339Nano),
 	}
+}
+
+// rawJSON passes stored JSON through unchanged; empty or invalid input is dropped rather than
+// breaking the whole response.
+func rawJSON(value []byte) json.RawMessage {
+	if len(value) == 0 || !json.Valid(value) {
+		return nil
+	}
+
+	return append(json.RawMessage(nil), value...)
 }
 
 func mapRequestLLMRecommendationsResponse(
 	result domain.RequestLLMRecommendationsResponse,
 ) requestLLMRecommendationsResponse {
 	return requestLLMRecommendationsResponse{
-		RawResponse: append([]byte(nil), result.RawResponse...),
+		Status:      statusFinished,
+		RawResponse: rawJSON(result.RawResponse),
 		ModelUsed:   result.ModelUsed,
 		EvaluatedAt: result.EvaluatedAt.Format(time.RFC3339Nano),
 	}
@@ -506,36 +538,6 @@ func mapRankingEntryResponse(
 	return result
 }
 
-func sessionIDFromRequest(
-	r *stdhttp.Request,
-) (string, error) {
-	cookie, err := r.Cookie(sessionCookieName)
-	if err != nil {
-		if errors.Is(err, stdhttp.ErrNoCookie) {
-			return "", httpError{
-				status: stdhttp.StatusUnauthorized,
-				err:    domain.ErrUnauthenticated,
-			}
-		}
-
-		return "", httpError{
-			status: stdhttp.StatusBadRequest,
-			err:    err,
-		}
-	}
-
-	sessionID := strings.TrimSpace(cookie.Value)
-
-	if sessionID == "" {
-		return "", httpError{
-			status: stdhttp.StatusUnauthorized,
-			err:    domain.ErrUnauthenticated,
-		}
-	}
-
-	return sessionID, nil
-}
-
 func clientIP(
 	r *stdhttp.Request,
 ) string {
@@ -545,48 +547,6 @@ func clientIP(
 	}
 
 	return r.RemoteAddr
-}
-
-func decodeJSON(
-	r *stdhttp.Request,
-	dst any,
-) error {
-	if r.Body == nil {
-		return httpError{
-			status: stdhttp.StatusBadRequest,
-			err: fmt.Errorf(
-				"%w: empty request body",
-				domain.ErrInvalidRequest,
-			),
-		}
-	}
-
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-
-	if err := decoder.Decode(dst); err != nil {
-		return httpError{
-			status: stdhttp.StatusBadRequest,
-			err: fmt.Errorf(
-				"%w: invalid json",
-				domain.ErrInvalidRequest,
-			),
-		}
-	}
-
-	var extra any
-
-	if err := decoder.Decode(&extra); err != io.EOF {
-		return httpError{
-			status: stdhttp.StatusBadRequest,
-			err: fmt.Errorf(
-				"%w: request body must contain exactly one json value",
-				domain.ErrInvalidRequest,
-			),
-		}
-	}
-
-	return nil
 }
 
 func writeJSON(
@@ -621,15 +581,25 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
+// writeError writes a pending result as 202 {"status":"PENDING"}, anything else as an error.
 func writeError(
 	w stdhttp.ResponseWriter,
 	err error,
 ) {
-	status := mapErrorStatus(err)
+	if errors.Is(err, domain.ErrPending) {
+		writeJSON(
+			w,
+			stdhttp.StatusAccepted,
+			pendingResponse{
+				Status: statusPending,
+			},
+		)
+		return
+	}
 
 	writeJSON(
 		w,
-		status,
+		mapErrorStatus(err),
 		errorResponse{
 			Error: publicErrorMessage(err),
 		},
@@ -644,35 +614,33 @@ func mapErrorStatus(err error) int {
 	}
 
 	switch {
-	case errors.Is(err, domain.ErrUnauthenticated):
+	case errors.Is(err, domain.ErrUnauthenticated),
+		errors.Is(err, domain.ErrSessionExpired),
+		errors.Is(err, domain.ErrSessionNotFound),
+		errors.Is(err, domain.ErrIdentityInvalid),
+		errors.Is(err, domain.ErrIdentityNotFound):
 		return stdhttp.StatusUnauthorized
 
-	case errors.Is(err, domain.ErrSessionExpired):
-		return stdhttp.StatusUnauthorized
-
-	case errors.Is(err, domain.ErrSessionNotFound):
-		return stdhttp.StatusUnauthorized
-
-	case errors.Is(err, domain.ErrIdentityInvalid):
-		return stdhttp.StatusUnauthorized
-
-	case errors.Is(err, domain.ErrIdentityNotFound):
-		return stdhttp.StatusUnauthorized
-
-	case errors.Is(err, domain.ErrInvalidRequest):
+	case errors.Is(err, domain.ErrInvalidRequest),
+		errors.Is(err, domain.ErrInvalidUser):
 		return stdhttp.StatusBadRequest
 
-	case errors.Is(err, domain.ErrInvalidUser):
-		return stdhttp.StatusBadRequest
+	case errors.Is(err, domain.ErrForbidden):
+		return stdhttp.StatusForbidden
 
-	case errors.Is(err, domain.ErrUserAlreadyExists):
-		return stdhttp.StatusConflict
-
-	case errors.Is(err, domain.ErrUserNotFound):
+	case errors.Is(err, domain.ErrNotFound),
+		errors.Is(err, domain.ErrUserNotFound):
 		return stdhttp.StatusNotFound
+
+	case errors.Is(err, domain.ErrConflict),
+		errors.Is(err, domain.ErrUserAlreadyExists):
+		return stdhttp.StatusConflict
 
 	case errors.Is(err, domain.ErrLimitExceeded):
 		return stdhttp.StatusTooManyRequests
+
+	case errors.Is(err, domain.ErrUnavailable):
+		return stdhttp.StatusServiceUnavailable
 
 	case errors.Is(err, domain.ErrTimeout):
 		return stdhttp.StatusGatewayTimeout
@@ -690,10 +658,8 @@ func publicErrorMessage(err error) string {
 	case errors.Is(err, domain.ErrUnauthenticated):
 		return "unauthenticated"
 
-	case errors.Is(err, domain.ErrSessionExpired):
-		return "session expired"
-
-	case errors.Is(err, domain.ErrSessionNotFound):
+	case errors.Is(err, domain.ErrSessionExpired),
+		errors.Is(err, domain.ErrSessionNotFound):
 		return "session expired"
 
 	case errors.Is(err, domain.ErrIdentityInvalid):
@@ -705,8 +671,20 @@ func publicErrorMessage(err error) string {
 	case errors.Is(err, domain.ErrInvalidRequest):
 		return "invalid request"
 
+	case errors.Is(err, domain.ErrForbidden):
+		return "access denied"
+
+	case errors.Is(err, domain.ErrNotFound):
+		return "not found"
+
+	case errors.Is(err, domain.ErrConflict):
+		return "conflict"
+
 	case errors.Is(err, domain.ErrLimitExceeded):
 		return "rate limit exceeded"
+
+	case errors.Is(err, domain.ErrUnavailable):
+		return "upstream unavailable"
 
 	case errors.Is(err, domain.ErrTimeout):
 		return "upstream timeout"

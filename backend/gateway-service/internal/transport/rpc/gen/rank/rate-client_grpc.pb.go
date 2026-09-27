@@ -2,13 +2,12 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v7.36.2
-// source: internal/transport/rpc/rate-client.proto
+// source: rate-client.proto
 
 package rank
 
 import (
 	context "context"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -20,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Rating_GetRanking_FullMethodName = "/rating_client.Rating/GetRanking"
+	Rating_GetRanking_FullMethodName = "/rating.Rating/GetRanking"
 )
 
 // RatingClient is the client API for Rating service.
@@ -109,7 +108,7 @@ func _Rating_GetRanking_Handler(srv interface{}, ctx context.Context, dec func(i
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Rating_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "rating_client.Rating",
+	ServiceName: "rating.Rating",
 	HandlerType: (*RatingServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -118,5 +117,5 @@ var Rating_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "internal/transport/rpc/rate-client.proto",
+	Metadata: "rate-client.proto",
 }

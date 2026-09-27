@@ -2,18 +2,17 @@
 // versions:
 // 	protoc-gen-go v1.36.12
 // 	protoc        v7.36.2
-// source: internal/transport/rpc/rate-client.proto
+// source: rate-client.proto
 
 package rank
 
 import (
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
 )
 
 const (
@@ -56,11 +55,11 @@ func (x SortBy) String() string {
 }
 
 func (SortBy) Descriptor() protoreflect.EnumDescriptor {
-	return file_internal_transport_rpc_rate_client_proto_enumTypes[0].Descriptor()
+	return file_rate_client_proto_enumTypes[0].Descriptor()
 }
 
 func (SortBy) Type() protoreflect.EnumType {
-	return &file_internal_transport_rpc_rate_client_proto_enumTypes[0]
+	return &file_rate_client_proto_enumTypes[0]
 }
 
 func (x SortBy) Number() protoreflect.EnumNumber {
@@ -69,22 +68,22 @@ func (x SortBy) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SortBy.Descriptor instead.
 func (SortBy) EnumDescriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_rate_client_proto_rawDescGZIP(), []int{0}
+	return file_rate_client_proto_rawDescGZIP(), []int{0}
 }
 
 type GetRankingRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Page          int32                  `protobuf:"varint,1,opt,name=page,proto3" json:"page,omitempty"`
 	PageSize      int32                  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	Language      string `protobuf:"bytes,3,opt,name=language,proto3" json:"language,omitempty"`
-	SortBy        SortBy `protobuf:"varint,4,opt,name=sort_by,json=sortBy,proto3,enum=rating_client.SortBy" json:"sort_by,omitempty"`
+	Language      string                 `protobuf:"bytes,3,opt,name=language,proto3" json:"language,omitempty"`
+	SortBy        SortBy                 `protobuf:"varint,4,opt,name=sort_by,json=sortBy,proto3,enum=rating.SortBy" json:"sort_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetRankingRequest) Reset() {
 	*x = GetRankingRequest{}
-	mi := &file_internal_transport_rpc_rate_client_proto_msgTypes[0]
+	mi := &file_rate_client_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -96,7 +95,7 @@ func (x *GetRankingRequest) String() string {
 func (*GetRankingRequest) ProtoMessage() {}
 
 func (x *GetRankingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_rate_client_proto_msgTypes[0]
+	mi := &file_rate_client_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -109,7 +108,7 @@ func (x *GetRankingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRankingRequest.ProtoReflect.Descriptor instead.
 func (*GetRankingRequest) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_rate_client_proto_rawDescGZIP(), []int{0}
+	return file_rate_client_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *GetRankingRequest) GetPage() int32 {
@@ -156,7 +155,7 @@ type RankingEntry struct {
 
 func (x *RankingEntry) Reset() {
 	*x = RankingEntry{}
-	mi := &file_internal_transport_rpc_rate_client_proto_msgTypes[1]
+	mi := &file_rate_client_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -168,7 +167,7 @@ func (x *RankingEntry) String() string {
 func (*RankingEntry) ProtoMessage() {}
 
 func (x *RankingEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_rate_client_proto_msgTypes[1]
+	mi := &file_rate_client_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -181,7 +180,7 @@ func (x *RankingEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RankingEntry.ProtoReflect.Descriptor instead.
 func (*RankingEntry) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_rate_client_proto_rawDescGZIP(), []int{1}
+	return file_rate_client_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *RankingEntry) GetPlace() int32 {
@@ -250,7 +249,7 @@ type Language struct {
 
 func (x *Language) Reset() {
 	*x = Language{}
-	mi := &file_internal_transport_rpc_rate_client_proto_msgTypes[2]
+	mi := &file_rate_client_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -262,7 +261,7 @@ func (x *Language) String() string {
 func (*Language) ProtoMessage() {}
 
 func (x *Language) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_rate_client_proto_msgTypes[2]
+	mi := &file_rate_client_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -275,7 +274,7 @@ func (x *Language) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Language.ProtoReflect.Descriptor instead.
 func (*Language) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_rate_client_proto_rawDescGZIP(), []int{2}
+	return file_rate_client_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Language) GetName() string {
@@ -304,7 +303,7 @@ type GetRankingResponse struct {
 
 func (x *GetRankingResponse) Reset() {
 	*x = GetRankingResponse{}
-	mi := &file_internal_transport_rpc_rate_client_proto_msgTypes[3]
+	mi := &file_rate_client_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -316,7 +315,7 @@ func (x *GetRankingResponse) String() string {
 func (*GetRankingResponse) ProtoMessage() {}
 
 func (x *GetRankingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_rate_client_proto_msgTypes[3]
+	mi := &file_rate_client_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -329,7 +328,7 @@ func (x *GetRankingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRankingResponse.ProtoReflect.Descriptor instead.
 func (*GetRankingResponse) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_rate_client_proto_rawDescGZIP(), []int{3}
+	return file_rate_client_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetRankingResponse) GetEntries() []*RankingEntry {
@@ -360,32 +359,32 @@ func (x *GetRankingResponse) GetPageSize() int32 {
 	return 0
 }
 
-var File_internal_transport_rpc_rate_client_proto protoreflect.FileDescriptor
+var File_rate_client_proto protoreflect.FileDescriptor
 
-const file_internal_transport_rpc_rate_client_proto_rawDesc = "" +
+const file_rate_client_proto_rawDesc = "" +
 	"\n" +
-	"(internal/transport/rpc/rate-client.proto\x12\rrating_client\x1a\x1fgoogle/protobuf/timestamp.proto\"\x90\x01\n" +
+	"\x11rate-client.proto\x12\x06rating\x1a\x1fgoogle/protobuf/timestamp.proto\"\x89\x01\n" +
 	"\x11GetRankingRequest\x12\x12\n" +
 	"\x04page\x18\x01 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x1a\n" +
-	"\blanguage\x18\x03 \x01(\tR\blanguage\x12.\n" +
-	"\asort_by\x18\x04 \x01(\x0e2\x15.rating_client.SortByR\x06sortBy\"\xd5\x02\n" +
+	"\blanguage\x18\x03 \x01(\tR\blanguage\x12'\n" +
+	"\asort_by\x18\x04 \x01(\x0e2\x0e.rating.SortByR\x06sortBy\"\xce\x02\n" +
 	"\fRankingEntry\x12\x14\n" +
 	"\x05place\x18\x01 \x01(\x05R\x05place\x12)\n" +
 	"\x10sourcecraft_uuid\x18\x02 \x01(\tR\x0fsourcecraftUuid\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x17\n" +
 	"\aweb_url\x18\x04 \x01(\tR\x06webUrl\x12&\n" +
 	"\fpublic_score\x18\x05 \x01(\x05H\x00R\vpublicScore\x88\x01\x01\x12\x19\n" +
-	"\x05likes\x18\x06 \x01(\x01H\x01R\x05likes\x88\x01\x01\x123\n" +
-	"\blanguage\x18\a \x01(\v2\x17.rating_client.LanguageR\blanguage\x12D\n" +
+	"\x05likes\x18\x06 \x01(\x01H\x01R\x05likes\x88\x01\x01\x12,\n" +
+	"\blanguage\x18\a \x01(\v2\x10.rating.LanguageR\blanguage\x12D\n" +
 	"\x10last_activity_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x0elastActivityAtB\x0f\n" +
 	"\r_public_scoreB\b\n" +
 	"\x06_likes\"4\n" +
 	"\bLanguage\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05color\x18\x02 \x01(\tR\x05color\"\x9d\x01\n" +
-	"\x12GetRankingResponse\x125\n" +
-	"\aentries\x18\x01 \x03(\v2\x1b.rating_client.RankingEntryR\aentries\x12\x1f\n" +
+	"\x05color\x18\x02 \x01(\tR\x05color\"\x96\x01\n" +
+	"\x12GetRankingResponse\x12.\n" +
+	"\aentries\x18\x01 \x03(\v2\x14.rating.RankingEntryR\aentries\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
 	"totalCount\x12\x12\n" +
 	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
@@ -393,40 +392,40 @@ const file_internal_transport_rpc_rate_client_proto_rawDesc = "" +
 	"\x06SortBy\x12\x11\n" +
 	"\rSORT_BY_SCORE\x10\x00\x12\x19\n" +
 	"\x15SORT_BY_LAST_ACTIVITY\x10\x01\x12\x11\n" +
-	"\rSORT_BY_LIKES\x10\x022[\n" +
-	"\x06Rating\x12Q\n" +
+	"\rSORT_BY_LIKES\x10\x022M\n" +
+	"\x06Rating\x12C\n" +
 	"\n" +
-	"GetRanking\x12 .rating_client.GetRankingRequest\x1a!.rating_client.GetRankingResponseB2Z0gateway-service/internal/transport/rating/gen;pbb\x06proto3"
+	"GetRanking\x12\x19.rating.GetRankingRequest\x1a\x1a.rating.GetRankingResponseB6Z4gateway-service/internal/transport/rpc/gen/rank;rankb\x06proto3"
 
 var (
-	file_internal_transport_rpc_rate_client_proto_rawDescOnce sync.Once
-	file_internal_transport_rpc_rate_client_proto_rawDescData []byte
+	file_rate_client_proto_rawDescOnce sync.Once
+	file_rate_client_proto_rawDescData []byte
 )
 
-func file_internal_transport_rpc_rate_client_proto_rawDescGZIP() []byte {
-	file_internal_transport_rpc_rate_client_proto_rawDescOnce.Do(func() {
-		file_internal_transport_rpc_rate_client_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_transport_rpc_rate_client_proto_rawDesc), len(file_internal_transport_rpc_rate_client_proto_rawDesc)))
+func file_rate_client_proto_rawDescGZIP() []byte {
+	file_rate_client_proto_rawDescOnce.Do(func() {
+		file_rate_client_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_rate_client_proto_rawDesc), len(file_rate_client_proto_rawDesc)))
 	})
-	return file_internal_transport_rpc_rate_client_proto_rawDescData
+	return file_rate_client_proto_rawDescData
 }
 
-var file_internal_transport_rpc_rate_client_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_internal_transport_rpc_rate_client_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
-var file_internal_transport_rpc_rate_client_proto_goTypes = []any{
-	(SortBy)(0),                   // 0: rating_client.SortBy
-	(*GetRankingRequest)(nil),     // 1: rating_client.GetRankingRequest
-	(*RankingEntry)(nil),          // 2: rating_client.RankingEntry
-	(*Language)(nil),              // 3: rating_client.Language
-	(*GetRankingResponse)(nil),    // 4: rating_client.GetRankingResponse
+var file_rate_client_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_rate_client_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_rate_client_proto_goTypes = []any{
+	(SortBy)(0),                   // 0: rating.SortBy
+	(*GetRankingRequest)(nil),     // 1: rating.GetRankingRequest
+	(*RankingEntry)(nil),          // 2: rating.RankingEntry
+	(*Language)(nil),              // 3: rating.Language
+	(*GetRankingResponse)(nil),    // 4: rating.GetRankingResponse
 	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
 }
-var file_internal_transport_rpc_rate_client_proto_depIdxs = []int32{
-	0, // 0: rating_client.GetRankingRequest.sort_by:type_name -> rating_client.SortBy
-	3, // 1: rating_client.RankingEntry.language:type_name -> rating_client.Language
-	5, // 2: rating_client.RankingEntry.last_activity_at:type_name -> google.protobuf.Timestamp
-	2, // 3: rating_client.GetRankingResponse.entries:type_name -> rating_client.RankingEntry
-	1, // 4: rating_client.Rating.GetRanking:input_type -> rating_client.GetRankingRequest
-	4, // 5: rating_client.Rating.GetRanking:output_type -> rating_client.GetRankingResponse
+var file_rate_client_proto_depIdxs = []int32{
+	0, // 0: rating.GetRankingRequest.sort_by:type_name -> rating.SortBy
+	3, // 1: rating.RankingEntry.language:type_name -> rating.Language
+	5, // 2: rating.RankingEntry.last_activity_at:type_name -> google.protobuf.Timestamp
+	2, // 3: rating.GetRankingResponse.entries:type_name -> rating.RankingEntry
+	1, // 4: rating.Rating.GetRanking:input_type -> rating.GetRankingRequest
+	4, // 5: rating.Rating.GetRanking:output_type -> rating.GetRankingResponse
 	5, // [5:6] is the sub-list for method output_type
 	4, // [4:5] is the sub-list for method input_type
 	4, // [4:4] is the sub-list for extension type_name
@@ -434,28 +433,28 @@ var file_internal_transport_rpc_rate_client_proto_depIdxs = []int32{
 	0, // [0:4] is the sub-list for field type_name
 }
 
-func init() { file_internal_transport_rpc_rate_client_proto_init() }
-func file_internal_transport_rpc_rate_client_proto_init() {
-	if File_internal_transport_rpc_rate_client_proto != nil {
+func init() { file_rate_client_proto_init() }
+func file_rate_client_proto_init() {
+	if File_rate_client_proto != nil {
 		return
 	}
-	file_internal_transport_rpc_rate_client_proto_msgTypes[1].OneofWrappers = []any{}
+	file_rate_client_proto_msgTypes[1].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_transport_rpc_rate_client_proto_rawDesc), len(file_internal_transport_rpc_rate_client_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rate_client_proto_rawDesc), len(file_rate_client_proto_rawDesc)),
 			NumEnums:      1,
 			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_internal_transport_rpc_rate_client_proto_goTypes,
-		DependencyIndexes: file_internal_transport_rpc_rate_client_proto_depIdxs,
-		EnumInfos:         file_internal_transport_rpc_rate_client_proto_enumTypes,
-		MessageInfos:      file_internal_transport_rpc_rate_client_proto_msgTypes,
+		GoTypes:           file_rate_client_proto_goTypes,
+		DependencyIndexes: file_rate_client_proto_depIdxs,
+		EnumInfos:         file_rate_client_proto_enumTypes,
+		MessageInfos:      file_rate_client_proto_msgTypes,
 	}.Build()
-	File_internal_transport_rpc_rate_client_proto = out.File
-	file_internal_transport_rpc_rate_client_proto_goTypes = nil
-	file_internal_transport_rpc_rate_client_proto_depIdxs = nil
+	File_rate_client_proto = out.File
+	file_rate_client_proto_goTypes = nil
+	file_rate_client_proto_depIdxs = nil
 }

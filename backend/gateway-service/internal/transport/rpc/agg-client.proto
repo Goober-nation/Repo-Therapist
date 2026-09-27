@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package aggregator;
 
-option go_package = "gateway-service/internal/transport/rpc/gen;pb";
+option go_package = "gateway-service/internal/transport/rpc/gen/agg;agg";
 
 import "google/protobuf/timestamp.proto";
 

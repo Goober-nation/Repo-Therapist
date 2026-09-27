@@ -2,18 +2,17 @@
 // versions:
 // 	protoc-gen-go v1.36.12
 // 	protoc        v7.36.2
-// source: internal/transport/rpc/client.proto
+// source: agg-client.proto
 
 package agg
 
 import (
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
 )
 
 const (
@@ -31,7 +30,7 @@ type GetMyReposRequest struct {
 
 func (x *GetMyReposRequest) Reset() {
 	*x = GetMyReposRequest{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[0]
+	mi := &file_agg_client_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +42,7 @@ func (x *GetMyReposRequest) String() string {
 func (*GetMyReposRequest) ProtoMessage() {}
 
 func (x *GetMyReposRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[0]
+	mi := &file_agg_client_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +55,7 @@ func (x *GetMyReposRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMyReposRequest.ProtoReflect.Descriptor instead.
 func (*GetMyReposRequest) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{0}
+	return file_agg_client_proto_rawDescGZIP(), []int{0}
 }
 
 type GetMyReposResponse struct {
@@ -69,7 +68,7 @@ type GetMyReposResponse struct {
 
 func (x *GetMyReposResponse) Reset() {
 	*x = GetMyReposResponse{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[1]
+	mi := &file_agg_client_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -81,7 +80,7 @@ func (x *GetMyReposResponse) String() string {
 func (*GetMyReposResponse) ProtoMessage() {}
 
 func (x *GetMyReposResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[1]
+	mi := &file_agg_client_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -94,7 +93,7 @@ func (x *GetMyReposResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMyReposResponse.ProtoReflect.Descriptor instead.
 func (*GetMyReposResponse) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{1}
+	return file_agg_client_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *GetMyReposResponse) GetRepositories() []*Repository {
@@ -121,7 +120,7 @@ type GetGradingRequest struct {
 
 func (x *GetGradingRequest) Reset() {
 	*x = GetGradingRequest{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[2]
+	mi := &file_agg_client_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -133,7 +132,7 @@ func (x *GetGradingRequest) String() string {
 func (*GetGradingRequest) ProtoMessage() {}
 
 func (x *GetGradingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[2]
+	mi := &file_agg_client_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -146,7 +145,7 @@ func (x *GetGradingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGradingRequest.ProtoReflect.Descriptor instead.
 func (*GetGradingRequest) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{2}
+	return file_agg_client_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetGradingRequest) GetOrgSlug() string {
@@ -172,7 +171,7 @@ type GetGradingResponse struct {
 
 func (x *GetGradingResponse) Reset() {
 	*x = GetGradingResponse{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[3]
+	mi := &file_agg_client_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -184,7 +183,7 @@ func (x *GetGradingResponse) String() string {
 func (*GetGradingResponse) ProtoMessage() {}
 
 func (x *GetGradingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[3]
+	mi := &file_agg_client_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -197,7 +196,7 @@ func (x *GetGradingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGradingResponse.ProtoReflect.Descriptor instead.
 func (*GetGradingResponse) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{3}
+	return file_agg_client_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetGradingResponse) GetGrade() *RepoGrade {
@@ -217,7 +216,7 @@ type RequestLLMRecommendationsRequest struct {
 
 func (x *RequestLLMRecommendationsRequest) Reset() {
 	*x = RequestLLMRecommendationsRequest{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[4]
+	mi := &file_agg_client_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -229,7 +228,7 @@ func (x *RequestLLMRecommendationsRequest) String() string {
 func (*RequestLLMRecommendationsRequest) ProtoMessage() {}
 
 func (x *RequestLLMRecommendationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[4]
+	mi := &file_agg_client_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -242,7 +241,7 @@ func (x *RequestLLMRecommendationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestLLMRecommendationsRequest.ProtoReflect.Descriptor instead.
 func (*RequestLLMRecommendationsRequest) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{4}
+	return file_agg_client_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *RequestLLMRecommendationsRequest) GetOrgSlug() string {
@@ -270,7 +269,7 @@ type RequestLLMRecommendationsResponse struct {
 
 func (x *RequestLLMRecommendationsResponse) Reset() {
 	*x = RequestLLMRecommendationsResponse{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[5]
+	mi := &file_agg_client_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -282,7 +281,7 @@ func (x *RequestLLMRecommendationsResponse) String() string {
 func (*RequestLLMRecommendationsResponse) ProtoMessage() {}
 
 func (x *RequestLLMRecommendationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[5]
+	mi := &file_agg_client_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -295,7 +294,7 @@ func (x *RequestLLMRecommendationsResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use RequestLLMRecommendationsResponse.ProtoReflect.Descriptor instead.
 func (*RequestLLMRecommendationsResponse) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{5}
+	return file_agg_client_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *RequestLLMRecommendationsResponse) GetRawResponse() []byte {
@@ -322,23 +321,23 @@ func (x *RequestLLMRecommendationsResponse) GetEvaluatedAt() *timestamppb.Timest
 type Repository struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name           string        `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Organization   *Organization `protobuf:"bytes,3,opt,name=organization,proto3" json:"organization,omitempty"`
-	Slug           string        `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
-	Description    string        `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
-	Logo           *Logo         `protobuf:"bytes,6,opt,name=logo,proto3" json:"logo,omitempty"`
-	WebUrl         string        `protobuf:"bytes,7,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
+	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Organization   *Organization          `protobuf:"bytes,3,opt,name=organization,proto3" json:"organization,omitempty"`
+	Slug           string                 `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
+	Description    string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	Logo           *Logo                  `protobuf:"bytes,6,opt,name=logo,proto3" json:"logo,omitempty"`
+	WebUrl         string                 `protobuf:"bytes,7,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
 	Visibility     string                 `protobuf:"bytes,8,opt,name=visibility,proto3" json:"visibility,omitempty"`
 	LastActivityAt string                 `protobuf:"bytes,9,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
-	Rating         float64       `protobuf:"fixed64,10,opt,name=rating,proto3" json:"rating,omitempty"`
-	Language       *Language     `protobuf:"bytes,11,opt,name=language,proto3" json:"language,omitempty"`
+	Rating         float64                `protobuf:"fixed64,10,opt,name=rating,proto3" json:"rating,omitempty"`
+	Language       *Language              `protobuf:"bytes,11,opt,name=language,proto3" json:"language,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Repository) Reset() {
 	*x = Repository{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[6]
+	mi := &file_agg_client_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -350,7 +349,7 @@ func (x *Repository) String() string {
 func (*Repository) ProtoMessage() {}
 
 func (x *Repository) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[6]
+	mi := &file_agg_client_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -363,7 +362,7 @@ func (x *Repository) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Repository.ProtoReflect.Descriptor instead.
 func (*Repository) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{6}
+	return file_agg_client_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Repository) GetId() string {
@@ -453,7 +452,7 @@ type Language struct {
 
 func (x *Language) Reset() {
 	*x = Language{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[7]
+	mi := &file_agg_client_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -465,7 +464,7 @@ func (x *Language) String() string {
 func (*Language) ProtoMessage() {}
 
 func (x *Language) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[7]
+	mi := &file_agg_client_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -478,7 +477,7 @@ func (x *Language) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Language.ProtoReflect.Descriptor instead.
 func (*Language) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{7}
+	return file_agg_client_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Language) GetName() string {
@@ -504,7 +503,7 @@ type Logo struct {
 
 func (x *Logo) Reset() {
 	*x = Logo{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[8]
+	mi := &file_agg_client_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -516,7 +515,7 @@ func (x *Logo) String() string {
 func (*Logo) ProtoMessage() {}
 
 func (x *Logo) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[8]
+	mi := &file_agg_client_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -529,7 +528,7 @@ func (x *Logo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Logo.ProtoReflect.Descriptor instead.
 func (*Logo) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{8}
+	return file_agg_client_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Logo) GetUrl() string {
@@ -548,7 +547,7 @@ type Organization struct {
 
 func (x *Organization) Reset() {
 	*x = Organization{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[9]
+	mi := &file_agg_client_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -560,7 +559,7 @@ func (x *Organization) String() string {
 func (*Organization) ProtoMessage() {}
 
 func (x *Organization) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[9]
+	mi := &file_agg_client_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -573,7 +572,7 @@ func (x *Organization) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Organization.ProtoReflect.Descriptor instead.
 func (*Organization) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{9}
+	return file_agg_client_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Organization) GetSlug() string {
@@ -589,15 +588,15 @@ type RepoGrade struct {
 	Score           *int32                 `protobuf:"varint,2,opt,name=score,proto3,oneof" json:"score,omitempty"`
 	CategoryScores  []byte                 `protobuf:"bytes,3,opt,name=category_scores,json=categoryScores,proto3" json:"category_scores,omitempty"`
 	Advice          []byte                 `protobuf:"bytes,4,opt,name=advice,proto3" json:"advice,omitempty"`
-	MissingData     []string               `protobuf:"bytes,8,rep,name=missing_data,json=missingData,proto3" json:"missing_data,omitempty"`
-	GradedAt        *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=graded_at,json=gradedAt,proto3" json:"graded_at,omitempty"`
+	MissingData     []string               `protobuf:"bytes,5,rep,name=missing_data,json=missingData,proto3" json:"missing_data,omitempty"`
+	GradedAt        *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=graded_at,json=gradedAt,proto3" json:"graded_at,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
 
 func (x *RepoGrade) Reset() {
 	*x = RepoGrade{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[10]
+	mi := &file_agg_client_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -609,7 +608,7 @@ func (x *RepoGrade) String() string {
 func (*RepoGrade) ProtoMessage() {}
 
 func (x *RepoGrade) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[10]
+	mi := &file_agg_client_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -622,7 +621,7 @@ func (x *RepoGrade) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RepoGrade.ProtoReflect.Descriptor instead.
 func (*RepoGrade) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{10}
+	return file_agg_client_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *RepoGrade) GetSourcecraftUuid() string {
@@ -667,20 +666,21 @@ func (x *RepoGrade) GetGradedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-var File_internal_transport_rpc_client_proto protoreflect.FileDescriptor
+var File_agg_client_proto protoreflect.FileDescriptor
 
-const file_internal_transport_rpc_client_proto_rawDesc = "" +
+const file_agg_client_proto_rawDesc = "" +
 	"\n" +
-	"#internal/transport/rpc/client.proto\x12\agateway\x1a\x1fgoogle/protobuf/timestamp.proto\"\x13\n" +
-	"\x11GetMyReposRequest\"u\n" +
-	"\x12GetMyReposResponse\x127\n" +
-	"\frepositories\x18\x01 \x03(\v2\x13.gateway.RepositoryR\frepositories\x12&\n" +
+	"\x10agg-client.proto\x12\n" +
+	"aggregator\x1a\x1fgoogle/protobuf/timestamp.proto\"\x13\n" +
+	"\x11GetMyReposRequest\"x\n" +
+	"\x12GetMyReposResponse\x12:\n" +
+	"\frepositories\x18\x01 \x03(\v2\x16.aggregator.RepositoryR\frepositories\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"K\n" +
 	"\x11GetGradingRequest\x12\x19\n" +
 	"\borg_slug\x18\x01 \x01(\tR\aorgSlug\x12\x1b\n" +
-	"\trepo_slug\x18\x02 \x01(\tR\brepoSlug\">\n" +
-	"\x12GetGradingResponse\x12(\n" +
-	"\x05grade\x18\x01 \x01(\v2\x12.gateway.RepoGradeR\x05grade\"Z\n" +
+	"\trepo_slug\x18\x02 \x01(\tR\brepoSlug\"A\n" +
+	"\x12GetGradingResponse\x12+\n" +
+	"\x05grade\x18\x01 \x01(\v2\x15.aggregator.RepoGradeR\x05grade\"Z\n" +
 	" RequestLLMRecommendationsRequest\x12\x19\n" +
 	"\borg_slug\x18\x01 \x01(\tR\aorgSlug\x12\x1b\n" +
 	"\trepo_slug\x18\x02 \x01(\tR\brepoSlug\"\xa4\x01\n" +
@@ -688,23 +688,23 @@ const file_internal_transport_rpc_client_proto_rawDesc = "" +
 	"\fraw_response\x18\x01 \x01(\fR\vrawResponse\x12\x1d\n" +
 	"\n" +
 	"model_used\x18\x02 \x01(\tR\tmodelUsed\x12=\n" +
-	"\fevaluated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\vevaluatedAt\"\xee\x02\n" +
+	"\fevaluated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\vevaluatedAt\"\xf7\x02\n" +
 	"\n" +
 	"Repository\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x129\n" +
-	"\forganization\x18\x03 \x01(\v2\x15.gateway.OrganizationR\forganization\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12<\n" +
+	"\forganization\x18\x03 \x01(\v2\x18.aggregator.OrganizationR\forganization\x12\x12\n" +
 	"\x04slug\x18\x04 \x01(\tR\x04slug\x12 \n" +
-	"\vdescription\x18\x05 \x01(\tR\vdescription\x12!\n" +
-	"\x04logo\x18\x06 \x01(\v2\r.gateway.LogoR\x04logo\x12\x17\n" +
+	"\vdescription\x18\x05 \x01(\tR\vdescription\x12$\n" +
+	"\x04logo\x18\x06 \x01(\v2\x10.aggregator.LogoR\x04logo\x12\x17\n" +
 	"\aweb_url\x18\a \x01(\tR\x06webUrl\x12\x1e\n" +
 	"\n" +
 	"visibility\x18\b \x01(\tR\n" +
 	"visibility\x12(\n" +
 	"\x10last_activity_at\x18\t \x01(\tR\x0elastActivityAt\x12\x16\n" +
 	"\x06rating\x18\n" +
-	" \x01(\x01R\x06rating\x12-\n" +
-	"\blanguage\x18\v \x01(\v2\x11.gateway.LanguageR\blanguage\"4\n" +
+	" \x01(\x01R\x06rating\x120\n" +
+	"\blanguage\x18\v \x01(\v2\x14.aggregator.LanguageR\blanguage\"4\n" +
 	"\bLanguage\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05color\x18\x02 \x01(\tR\x05color\"\x18\n" +
@@ -717,57 +717,58 @@ const file_internal_transport_rpc_client_proto_rawDesc = "" +
 	"\x05score\x18\x02 \x01(\x05H\x00R\x05score\x88\x01\x01\x12'\n" +
 	"\x0fcategory_scores\x18\x03 \x01(\fR\x0ecategoryScores\x12\x16\n" +
 	"\x06advice\x18\x04 \x01(\fR\x06advice\x12!\n" +
-	"\fmissing_data\x18\b \x03(\tR\vmissingData\x127\n" +
-	"\tgraded_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\bgradedAtB\b\n" +
-	"\x06_score2\x8b\x02\n" +
-	"\aGateway\x12E\n" +
+	"\fmissing_data\x18\x05 \x03(\tR\vmissingData\x127\n" +
+	"\tgraded_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\bgradedAtB\b\n" +
+	"\x06_score2\xa0\x02\n" +
 	"\n" +
-	"GetMyRepos\x12\x1a.gateway.GetMyReposRequest\x1a\x1b.gateway.GetMyReposResponse\x12E\n" +
+	"Aggregator\x12K\n" +
 	"\n" +
-	"GetGrading\x12\x1a.gateway.GetGradingRequest\x1a\x1b.gateway.GetGradingResponse\x12r\n" +
-	"\x19RequestLLMRecommendations\x12).gateway.RequestLLMRecommendationsRequest\x1a*.gateway.RequestLLMRecommendationsResponseB/Z-gateway-service/internal/transport/rpc/gen;pbb\x06proto3"
+	"GetMyRepos\x12\x1d.aggregator.GetMyReposRequest\x1a\x1e.aggregator.GetMyReposResponse\x12K\n" +
+	"\n" +
+	"GetGrading\x12\x1d.aggregator.GetGradingRequest\x1a\x1e.aggregator.GetGradingResponse\x12x\n" +
+	"\x19RequestLLMRecommendations\x12,.aggregator.RequestLLMRecommendationsRequest\x1a-.aggregator.RequestLLMRecommendationsResponseB4Z2gateway-service/internal/transport/rpc/gen/agg;aggb\x06proto3"
 
 var (
-	file_internal_transport_rpc_client_proto_rawDescOnce sync.Once
-	file_internal_transport_rpc_client_proto_rawDescData []byte
+	file_agg_client_proto_rawDescOnce sync.Once
+	file_agg_client_proto_rawDescData []byte
 )
 
-func file_internal_transport_rpc_client_proto_rawDescGZIP() []byte {
-	file_internal_transport_rpc_client_proto_rawDescOnce.Do(func() {
-		file_internal_transport_rpc_client_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_transport_rpc_client_proto_rawDesc), len(file_internal_transport_rpc_client_proto_rawDesc)))
+func file_agg_client_proto_rawDescGZIP() []byte {
+	file_agg_client_proto_rawDescOnce.Do(func() {
+		file_agg_client_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_agg_client_proto_rawDesc), len(file_agg_client_proto_rawDesc)))
 	})
-	return file_internal_transport_rpc_client_proto_rawDescData
+	return file_agg_client_proto_rawDescData
 }
 
-var file_internal_transport_rpc_client_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
-var file_internal_transport_rpc_client_proto_goTypes = []any{
-	(*GetMyReposRequest)(nil),                 // 0: gateway.GetMyReposRequest
-	(*GetMyReposResponse)(nil),                // 1: gateway.GetMyReposResponse
-	(*GetGradingRequest)(nil),                 // 2: gateway.GetGradingRequest
-	(*GetGradingResponse)(nil),                // 3: gateway.GetGradingResponse
-	(*RequestLLMRecommendationsRequest)(nil),  // 4: gateway.RequestLLMRecommendationsRequest
-	(*RequestLLMRecommendationsResponse)(nil), // 5: gateway.RequestLLMRecommendationsResponse
-	(*Repository)(nil),                        // 6: gateway.Repository
-	(*Language)(nil),                          // 7: gateway.Language
-	(*Logo)(nil),                              // 8: gateway.Logo
-	(*Organization)(nil),                      // 9: gateway.Organization
-	(*RepoGrade)(nil),                         // 10: gateway.RepoGrade
+var file_agg_client_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_agg_client_proto_goTypes = []any{
+	(*GetMyReposRequest)(nil),                 // 0: aggregator.GetMyReposRequest
+	(*GetMyReposResponse)(nil),                // 1: aggregator.GetMyReposResponse
+	(*GetGradingRequest)(nil),                 // 2: aggregator.GetGradingRequest
+	(*GetGradingResponse)(nil),                // 3: aggregator.GetGradingResponse
+	(*RequestLLMRecommendationsRequest)(nil),  // 4: aggregator.RequestLLMRecommendationsRequest
+	(*RequestLLMRecommendationsResponse)(nil), // 5: aggregator.RequestLLMRecommendationsResponse
+	(*Repository)(nil),                        // 6: aggregator.Repository
+	(*Language)(nil),                          // 7: aggregator.Language
+	(*Logo)(nil),                              // 8: aggregator.Logo
+	(*Organization)(nil),                      // 9: aggregator.Organization
+	(*RepoGrade)(nil),                         // 10: aggregator.RepoGrade
 	(*timestamppb.Timestamp)(nil),             // 11: google.protobuf.Timestamp
 }
-var file_internal_transport_rpc_client_proto_depIdxs = []int32{
-	6,  // 0: gateway.GetMyReposResponse.repositories:type_name -> gateway.Repository
-	10, // 1: gateway.GetGradingResponse.grade:type_name -> gateway.RepoGrade
-	11, // 2: gateway.RequestLLMRecommendationsResponse.evaluated_at:type_name -> google.protobuf.Timestamp
-	9,  // 3: gateway.Repository.organization:type_name -> gateway.Organization
-	8,  // 4: gateway.Repository.logo:type_name -> gateway.Logo
-	7,  // 5: gateway.Repository.language:type_name -> gateway.Language
-	11, // 6: gateway.RepoGrade.graded_at:type_name -> google.protobuf.Timestamp
-	0,  // 7: gateway.Gateway.GetMyRepos:input_type -> gateway.GetMyReposRequest
-	2,  // 8: gateway.Gateway.GetGrading:input_type -> gateway.GetGradingRequest
-	4,  // 9: gateway.Gateway.RequestLLMRecommendations:input_type -> gateway.RequestLLMRecommendationsRequest
-	1,  // 10: gateway.Gateway.GetMyRepos:output_type -> gateway.GetMyReposResponse
-	3,  // 11: gateway.Gateway.GetGrading:output_type -> gateway.GetGradingResponse
-	5,  // 12: gateway.Gateway.RequestLLMRecommendations:output_type -> gateway.RequestLLMRecommendationsResponse
+var file_agg_client_proto_depIdxs = []int32{
+	6,  // 0: aggregator.GetMyReposResponse.repositories:type_name -> aggregator.Repository
+	10, // 1: aggregator.GetGradingResponse.grade:type_name -> aggregator.RepoGrade
+	11, // 2: aggregator.RequestLLMRecommendationsResponse.evaluated_at:type_name -> google.protobuf.Timestamp
+	9,  // 3: aggregator.Repository.organization:type_name -> aggregator.Organization
+	8,  // 4: aggregator.Repository.logo:type_name -> aggregator.Logo
+	7,  // 5: aggregator.Repository.language:type_name -> aggregator.Language
+	11, // 6: aggregator.RepoGrade.graded_at:type_name -> google.protobuf.Timestamp
+	0,  // 7: aggregator.Aggregator.GetMyRepos:input_type -> aggregator.GetMyReposRequest
+	2,  // 8: aggregator.Aggregator.GetGrading:input_type -> aggregator.GetGradingRequest
+	4,  // 9: aggregator.Aggregator.RequestLLMRecommendations:input_type -> aggregator.RequestLLMRecommendationsRequest
+	1,  // 10: aggregator.Aggregator.GetMyRepos:output_type -> aggregator.GetMyReposResponse
+	3,  // 11: aggregator.Aggregator.GetGrading:output_type -> aggregator.GetGradingResponse
+	5,  // 12: aggregator.Aggregator.RequestLLMRecommendations:output_type -> aggregator.RequestLLMRecommendationsResponse
 	10, // [10:13] is the sub-list for method output_type
 	7,  // [7:10] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
@@ -775,27 +776,27 @@ var file_internal_transport_rpc_client_proto_depIdxs = []int32{
 	0,  // [0:7] is the sub-list for field type_name
 }
 
-func init() { file_internal_transport_rpc_client_proto_init() }
-func file_internal_transport_rpc_client_proto_init() {
-	if File_internal_transport_rpc_client_proto != nil {
+func init() { file_agg_client_proto_init() }
+func file_agg_client_proto_init() {
+	if File_agg_client_proto != nil {
 		return
 	}
-	file_internal_transport_rpc_client_proto_msgTypes[10].OneofWrappers = []any{}
+	file_agg_client_proto_msgTypes[10].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_transport_rpc_client_proto_rawDesc), len(file_internal_transport_rpc_client_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agg_client_proto_rawDesc), len(file_agg_client_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_internal_transport_rpc_client_proto_goTypes,
-		DependencyIndexes: file_internal_transport_rpc_client_proto_depIdxs,
-		MessageInfos:      file_internal_transport_rpc_client_proto_msgTypes,
+		GoTypes:           file_agg_client_proto_goTypes,
+		DependencyIndexes: file_agg_client_proto_depIdxs,
+		MessageInfos:      file_agg_client_proto_msgTypes,
 	}.Build()
-	File_internal_transport_rpc_client_proto = out.File
-	file_internal_transport_rpc_client_proto_goTypes = nil
-	file_internal_transport_rpc_client_proto_depIdxs = nil
+	File_agg_client_proto = out.File
+	file_agg_client_proto_goTypes = nil
+	file_agg_client_proto_depIdxs = nil
 }

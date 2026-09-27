@@ -209,6 +209,12 @@ func mapError(err error) error {
 			"no access rights",
 		)
 
+	case errors.Is(err, domain.ErrUnauthenticated):
+		return status.Error(
+			codes.Unauthenticated,
+			"missing or invalid user token",
+		)
+
 	case errors.Is(err, domain.ErrRepositoryNotFound):
 		return status.Error(
 			codes.NotFound,
@@ -228,6 +234,12 @@ func mapError(err error) error {
 			"grading is pending",
 		)
 
+	case errors.Is(err, domain.ErrGradeOutdated):
+		return status.Error(
+			codes.FailedPrecondition,
+			"grade is outdated",
+		)
+
 	case errors.Is(err, domain.ErrRepoLocked):
 		return status.Error(
 			codes.Aborted,
@@ -240,7 +252,8 @@ func mapError(err error) error {
 			"llm service unavailable",
 		)
 
-	case errors.Is(err, domain.ErrSourceCraftUnavailable):
+	case errors.Is(err, domain.ErrSourceCraftUnavailable),
+		errors.Is(err, domain.ErrExternalAPI):
 		return status.Error(
 			codes.Unavailable,
 			"sourcecraft service unavailable",

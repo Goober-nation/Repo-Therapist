@@ -24,7 +24,8 @@ var (
 
 	ErrGradingFailed = errors.New("repository grading failed")
 
-	ErrNoAccess = errors.New("no access rights")
+	ErrNoAccess        = errors.New("no access rights")
+	ErrUnauthenticated = errors.New("missing or invalid user token")
 
 	GradingPending           = errors.New("grading pending")
 	ErrExternalAPI           = errors.New("external api error")

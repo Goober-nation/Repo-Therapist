@@ -39,7 +39,7 @@ func NewGradeConsumer(
 func (c *GradeConsumer) Start(ctx context.Context) {
 	go func() {
 		for {
-			msg, err := c.reader.ReadMessage(ctx)
+			msg, err := c.reader.FetchMessage(ctx)
 			if err != nil {
 				if ctx.Err() != nil {
 					return
@@ -49,9 +49,14 @@ func (c *GradeConsumer) Start(ctx context.Context) {
 				continue
 			}
 
+			// Committed after handling, so a crash mid-way redelivers the message. A message
+			// that fails to handle is logged and committed: retrying it wouldn't change the outcome.
 			if err := c.handleMessage(ctx, msg.Value); err != nil {
 				log.Printf("grade consumer handle error: %v", err)
-				continue
+			}
+
+			if err := c.reader.CommitMessages(ctx, msg); err != nil && ctx.Err() == nil {
+				log.Printf("grade consumer commit error: %v", err)
 			}
 		}
 	}()
@@ -119,7 +124,7 @@ func NewLLMConsumer(
 func (c *LLMConsumer) Start(ctx context.Context) {
 	go func() {
 		for {
-			msg, err := c.reader.ReadMessage(ctx)
+			msg, err := c.reader.FetchMessage(ctx)
 			if err != nil {
 				if ctx.Err() != nil {
 					return
@@ -129,9 +134,14 @@ func (c *LLMConsumer) Start(ctx context.Context) {
 				continue
 			}
 
+			// Committed after handling, so a crash mid-way redelivers the message. A message
+			// that fails to handle is logged and committed: retrying it wouldn't change the outcome.
 			if err := c.handleMessage(ctx, msg.Value); err != nil {
 				log.Printf("llm consumer handle error: %v", err)
-				continue
+			}
+
+			if err := c.reader.CommitMessages(ctx, msg); err != nil && ctx.Err() == nil {
+				log.Printf("llm consumer commit error: %v", err)
 			}
 		}
 	}()

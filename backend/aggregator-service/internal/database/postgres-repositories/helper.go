@@ -5,8 +5,8 @@ import (
 
 	"aggregator-service/internal/domain"
 
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func mapRepositoryError(err error) error {

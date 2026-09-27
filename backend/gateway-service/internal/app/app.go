@@ -95,7 +95,7 @@ func StartApp() {
 	}
 	defer aggregatorConn.Close()
 
-	aggregatorClient := agg.NewGatewayClient(
+	aggregatorClient := agg.NewAggregatorClient(
 		aggregatorConn,
 	)
 
@@ -144,7 +144,6 @@ func StartApp() {
 		cfg.Aggregator.Timeout,
 		cfg.Rating.Timeout,
 		cfg.Yandex.Timeout,
-		cfg.Token.Token,
 	)
 
 	handler := httptransport.NewHandler(
@@ -153,30 +152,7 @@ func StartApp() {
 
 	router := http.NewServeMux()
 
-	router.HandleFunc(
-		"POST /auth/yandex",
-		handler.LoginWithYandex,
-	)
-
-	router.HandleFunc(
-		"POST /repos",
-		handler.GetMyRepos,
-	)
-
-	router.HandleFunc(
-		"POST /grading",
-		handler.GetGrading,
-	)
-
-	router.HandleFunc(
-		"POST /recommendations",
-		handler.RequestLLMRecommendations,
-	)
-
-	router.HandleFunc(
-		"POST /ranking",
-		handler.GetRanking,
-	)
+	handler.Register(router)
 
 	loggedHandler := loggingMiddleware(router)
 

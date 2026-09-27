@@ -16,10 +16,6 @@ type Config struct {
 	Yandex     YandexConfig
 	RateLimit  RateLimitConfig
 	Session    SessionConfig
-	Token      ServiceToken
-}
-type ServiceToken struct {
-	Token string
 }
 type HTTPConfig struct {
 	Address string
@@ -89,7 +85,7 @@ func LoadConfig() *Config {
 		Aggregator: GRPCServiceConfig{
 			Address: getEnvDefault(
 				"AGGREGATOR_GRPC_ADDRESS",
-				"localhost:8081",
+				"localhost:8083",
 			),
 			Timeout: getEnvDuration(
 				"AGGREGATOR_GRPC_TIMEOUT",
@@ -100,7 +96,7 @@ func LoadConfig() *Config {
 		Rating: GRPCServiceConfig{
 			Address: getEnvDefault(
 				"RATING_GRPC_ADDRESS",
-				"localhost:8084",
+				"localhost:8086",
 			),
 			Timeout: getEnvDuration(
 				"RATING_GRPC_TIMEOUT",
@@ -181,9 +177,6 @@ func LoadConfig() *Config {
 				"SESSION_KEY_PREFIX",
 				"session:",
 			),
-		},
-		Token: ServiceToken{
-			Token: getEnvDefault("SERVICE_TOKEN", ""),
 		},
 	}
 }

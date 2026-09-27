@@ -278,8 +278,8 @@ message MilestoneUser {
 }
 
 message GetRepositoryBySlugsRequest {
-  string org_slug = 1;
-  string repo_slug = 2;
+  string repo_slug = 1;
+  string org_slug = 2;
 }
 message Rating {
   double value = 1;

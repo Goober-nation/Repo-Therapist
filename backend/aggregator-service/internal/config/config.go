@@ -83,9 +83,9 @@ func LoadConfig() *Config {
 				"GRPC_ADDRESS",
 				":8083",
 			),
-			Timeout: time.Second * getEnvDuration(
+			Timeout: getEnvDuration(
 				"GRPC_TIMEOUT",
-				10,
+				10*time.Second,
 			),
 		},
 
@@ -129,7 +129,7 @@ func LoadConfig() *Config {
 
 			LLMRequestsTopic: getEnvDefault(
 				"KAFKA_LLM_REQUESTS_TOPIC",
-				"llm.recommendations.requests",
+				"llm.recommendations.requested",
 			),
 
 			GradingResultsTopic: getEnvDefault(
@@ -139,7 +139,7 @@ func LoadConfig() *Config {
 
 			LLMRecommendationsTopic: getEnvDefault(
 				"KAFKA_LLM_RECOMMENDATIONS_TOPIC",
-				"llm.recommendations.results",
+				"llm.recommendations.received",
 			),
 
 			GradingConsumerGroup: getEnvDefault(

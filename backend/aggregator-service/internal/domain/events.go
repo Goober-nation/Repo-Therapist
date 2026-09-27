@@ -7,10 +7,20 @@ import (
 	"github.com/google/uuid"
 )
 
+// Grading views. A grade is stored and requested as exactly one of these.
+const (
+	VisibilityPublic  = "public"
+	VisibilityPrivate = "private"
+)
+
+// GradingRequestedEvent is grading.requests (docs/kafka-contracts.md). Visibility is the repo's
+// SourceCraft visibility; Token is the caller's PAT and is set only for private grading.
 type GradingRequestedEvent struct {
 	OrgSlug     string    `json:"org_slug"`
 	RepoSlug    string    `json:"repo_slug"`
+	Visibility  string    `json:"visibility"`
 	RequestedAt time.Time `json:"requested_at"`
+	Token       string    `json:"token,omitempty"`
 }
 
 type LLMRecommendationsRequestedEvent struct {
@@ -18,8 +28,18 @@ type LLMRecommendationsRequestedEvent struct {
 	SourcecraftUUID uuid.UUID `json:"sourcecraft_uuid"`
 	OrgSlug         string    `json:"org_slug"`
 	RepoSlug        string    `json:"repo_slug"`
-	Grade           RepoGrade `json:"grade"`
+	Grade           LLMGrade  `json:"grade"`
 	RequestedAt     time.Time `json:"requested_at"`
+}
+
+// LLMGrade is the grade in the shape the LLM service accepts: category scores are 0-100 numbers
+// or null for no-data, advice is a list of recommendation texts.
+type LLMGrade struct {
+	Score          *int16              `json:"score"`
+	CategoryScores map[string]*float64 `json:"category_scores"`
+	Advice         []string            `json:"advice"`
+	MissingData    []string            `json:"missing_data"`
+	GradedAt       *time.Time          `json:"graded_at"`
 }
 
 type LLMRecommendationsReceivedEvent struct {
