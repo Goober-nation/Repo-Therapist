@@ -374,4 +374,4 @@ categories:
   documentation:
     weight: 0.15
     public: true
-    status: not_calculated
+    status: calculated  # graded by the LLM service over Kafka; no reply within LLM_TIMEOUT -> no_data

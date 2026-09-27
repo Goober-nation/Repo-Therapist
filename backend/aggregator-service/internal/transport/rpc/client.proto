@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package code_health;
+
+option go_package = "aggregator-service/internal/transport/rpc/gen;pb";
+
+service CodeHealth {
+  rpc GetRepositoryBySlugs(GetRepositoryBySlugsRequest)
+      returns (GetRepositoryBySlugsResponse);
+
+  rpc ListAllPublicRepos(ListAllPublicReposRequest)
+      returns (ListAllPublicReposResponse);
+
+  rpc GetMyRepos(GetMyReposRequest)
+      returns (GetMyReposResponse);
+}
+
+message GetRepositoryBySlugsRequest {
+  string repo_slug = 1;
+  string org_slug = 2;
+}
+
+message GetRepositoryBySlugsResponse {
+  string id = 1;
+  string name = 2;
+  Organization organization = 3;
+  string slug = 4;
+  string description = 5;
+  Logo logo = 6;
+  string web_url = 7;
+  string visibility = 8;
+  string last_activity_at = 9;
+  Rating rating = 10;
+  Language language = 11;
+}
+
+message ListAllPublicReposRequest {}
+
+message ListAllPublicReposResponse {
+  repeated Repository repos = 1;
+}
+
+message GetMyReposRequest {}
+
+message GetMyReposResponse {
+  repeated Repository repositories = 1;
+  string next_page_token = 2;
+}
+
+message Repository {
+  string id = 1;
+  string name = 2;
+  Organization organization = 3;
+  string slug = 4;
+  string description = 5;
+  Logo logo = 6;
+  string web_url = 7;
+  string visibility = 8;
+  string last_activity_at = 9;
+  Rating rating = 10;
+  Language language = 11;
+}
+
+message Language {
+  string name = 1;
+  string color = 2;
+}
+
+message Organization {
+  string id = 1;
+  string slug = 2;
+}
+
+message Logo {
+  string url = 1;
+}
+
+message Rating {
+  double value = 1;
+  double percentile = 2;
+  repeated ReactionCount reaction_counts = 3;
+}
+
+message ReactionCount {
+  string type = 1;
+  string count = 2;
+}

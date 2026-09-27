@@ -7,7 +7,6 @@
 package server
 
 import (
-	"aggregator-service/internal/transport/rpc/gen/client"
 	context "context"
 
 	grpc "google.golang.org/grpc"
@@ -30,7 +29,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AggregatorClient interface {
-	GetMyRepos(ctx context.Context, in *client.GetMyReposRequest, opts ...grpc.CallOption) (*client.GetMyReposResponse, error)
+	GetMyRepos(ctx context.Context, in *GetMyReposRequest, opts ...grpc.CallOption) (*GetMyReposResponse, error)
 	GetGrading(ctx context.Context, in *GetGradingRequest, opts ...grpc.CallOption) (*GetGradingResponse, error)
 	RequestLLMRecommendations(ctx context.Context, in *RequestLLMRecommendationsRequest, opts ...grpc.CallOption) (*RequestLLMRecommendationsResponse, error)
 }
@@ -43,9 +42,9 @@ func NewAggregatorClient(cc grpc.ClientConnInterface) AggregatorClient {
 	return &aggregatorClient{cc}
 }
 
-func (c *aggregatorClient) GetMyRepos(ctx context.Context, in *client.GetMyReposRequest, opts ...grpc.CallOption) (*client.GetMyReposResponse, error) {
+func (c *aggregatorClient) GetMyRepos(ctx context.Context, in *GetMyReposRequest, opts ...grpc.CallOption) (*GetMyReposResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(client.GetMyReposResponse)
+	out := new(GetMyReposResponse)
 	err := c.cc.Invoke(ctx, Aggregator_GetMyRepos_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -77,7 +76,7 @@ func (c *aggregatorClient) RequestLLMRecommendations(ctx context.Context, in *Re
 // All implementations must embed UnimplementedAggregatorServer
 // for forward compatibility.
 type AggregatorServer interface {
-	GetMyRepos(context.Context, *client.GetMyReposRequest) (*client.GetMyReposResponse, error)
+	GetMyRepos(context.Context, *GetMyReposRequest) (*GetMyReposResponse, error)
 	GetGrading(context.Context, *GetGradingRequest) (*GetGradingResponse, error)
 	RequestLLMRecommendations(context.Context, *RequestLLMRecommendationsRequest) (*RequestLLMRecommendationsResponse, error)
 	mustEmbedUnimplementedAggregatorServer()
@@ -90,7 +89,7 @@ type AggregatorServer interface {
 // pointer dereference when methods are called.
 type UnimplementedAggregatorServer struct{}
 
-func (UnimplementedAggregatorServer) GetMyRepos(context.Context, *client.GetMyReposRequest) (*client.GetMyReposResponse, error) {
+func (UnimplementedAggregatorServer) GetMyRepos(context.Context, *GetMyReposRequest) (*GetMyReposResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMyRepos not implemented")
 }
 func (UnimplementedAggregatorServer) GetGrading(context.Context, *GetGradingRequest) (*GetGradingResponse, error) {
@@ -121,7 +120,7 @@ func RegisterAggregatorServer(s grpc.ServiceRegistrar, srv AggregatorServer) {
 }
 
 func _Aggregator_GetMyRepos_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(client.GetMyReposRequest)
+	in := new(GetMyReposRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -133,7 +132,7 @@ func _Aggregator_GetMyRepos_Handler(srv interface{}, ctx context.Context, dec fu
 		FullMethod: Aggregator_GetMyRepos_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AggregatorServer).GetMyRepos(ctx, req.(*client.GetMyReposRequest))
+		return srv.(AggregatorServer).GetMyRepos(ctx, req.(*GetMyReposRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

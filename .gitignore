@@ -11,6 +11,11 @@
 # this file itself
 !.gitignore
 
+# docker
+!.dockerignore
+!**/.dockerignore
+!frontend/nginx.conf
+
 # docs
 !docs/**
 
@@ -29,6 +34,8 @@
 
 # protobuf (source contract for generated *.pb.go — the allowlist missed this type)
 !*.proto
+# python LLM service
+!*.py
 
 # react/frontend (covers html + tsconfig per project decision)
 !*.js
@@ -42,6 +49,7 @@
 !tsconfig*.json
 !*.config.js
 !*.config.ts
+frontend/.vite/
 
 # configs generally — kafka, s3, docker, ci, etc. (config files, not database data — see re-ignore
 # block below for data/volume directories)

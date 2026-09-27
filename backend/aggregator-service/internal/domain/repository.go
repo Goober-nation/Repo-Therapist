@@ -18,10 +18,10 @@ type RepoRepository interface {
 }
 
 type GradesRepository interface {
-	UpsertGrade(ctx context.Context, grade RepoGrade) error
-
-	DeleteGrade(ctx context.Context, repoID uuid.UUID) error
-	GetGradeByRepoID(ctx context.Context, repoID uuid.UUID) (RepoGrade, error)
+	UpsertPublicGrade(ctx context.Context, grade RepoGrade) error
+	UpsertPrivateGrade(ctx context.Context, grade RepoGrade) error
+	GetPublicGradeByRepoID(ctx context.Context, repoID uuid.UUID) (RepoGrade, error)
+	GetPrivateGradeByRepoID(ctx context.Context, repoID uuid.UUID) (RepoGrade, error)
 }
 
 type LLMRepository interface {

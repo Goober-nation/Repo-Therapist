@@ -4,9 +4,14 @@ import {
   getHealthLabel,
   getLastActivityLabel,
 } from "./demoData"
-import type { RepositorySummary } from "../types"
+import type { Recommendation, RepositorySummary } from "../types"
 
-export function buildReport(repository: RepositorySummary): string {
+export function buildReport(
+  repository: RepositorySummary,
+  recommendations: Recommendation[] = repository.id === DEFAULT_REPOSITORY_ID
+    ? DEMO_RECOMMENDATIONS
+    : [],
+): string {
   const metricLines = Object.entries(repository.categoryScores)
     .map(
       ([metricId, result]) =>
@@ -15,12 +20,14 @@ export function buildReport(repository: RepositorySummary): string {
         }`,
     )
     .join("\n")
-  const recommendations =
-    repository.id === DEFAULT_REPOSITORY_ID
-      ? DEMO_RECOMMENDATIONS.map(
-          (item) =>
-            `- ${item.title} (+${item.projectedScore - item.currentScore} балла)`,
-        ).join("\n")
+  const recommendationLines =
+    recommendations.length > 0
+      ? recommendations
+          .map(
+            (item) =>
+              `- ${item.title} (+${item.projectedScore - item.currentScore} балла)`,
+          )
+          .join("\n")
       : "Подробные рекомендации для этого репозитория отсутствуют."
   return [
     `# Отчёт о здоровье ${repository.fullName}`,
@@ -35,12 +42,15 @@ export function buildReport(repository: RepositorySummary): string {
     metricLines || "Оценки по категориям отсутствуют.",
     "",
     "## Рекомендации",
-    recommendations,
+    recommendationLines,
   ].join("\n")
 }
 
-export function downloadReport(repository: RepositorySummary): void {
-  const file = new Blob([buildReport(repository)], {
+export function downloadReport(
+  repository: RepositorySummary,
+  recommendations?: Recommendation[],
+): void {
+  const file = new Blob([buildReport(repository, recommendations)], {
     type: "text/markdown;charset=utf-8",
   })
   const fileUrl = URL.createObjectURL(file)

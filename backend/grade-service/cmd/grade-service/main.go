@@ -28,6 +28,12 @@ func main() {
 	listen := flag.Bool("listen", false, "consume repo.ready from Kafka instead of one-shot mode")
 	flag.Parse()
 
+	for _, key := range []string{"S3_ACCESS_KEY", "S3_SECRET_KEY"} {
+		if os.Getenv(key) == "" {
+			log.Fatalf("grade-service: %s is required", key)
+		}
+	}
+
 	var err error
 	switch {
 	case *listen:

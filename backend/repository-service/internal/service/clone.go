@@ -60,12 +60,6 @@ func CloneAndUpload(ctx context.Context, org, repo, token string) (*Result, erro
 	}
 	log.Printf("resolved: id=%s", repoID)
 
-	tmpDir, err := os.MkdirTemp(cloneTempBase(), "repo-therapist-clone-*")
-	if err != nil {
-		return nil, fmt.Errorf("creating temp dir: %w", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
 	cloneURL, err := authenticatedCloneURL(gitURLs.HTTPURL, pat)
 	if err != nil {
 		return nil, fmt.Errorf("building authenticated clone URL: %w", err)
@@ -79,10 +73,14 @@ func CloneAndUpload(ctx context.Context, org, repo, token string) (*Result, erro
 
 	// No --branch: the wrapper doesn't report default_branch, so this relies on git clone's own
 	// default of checking out whatever HEAD points to on the remote.
-	log.Printf("cloning %s (history since %s) into %s", gitURLs.HTTPURL, since.Format("2006-01-02"), tmpDir)
-	if err := gitClone(ctx, cloneURL, since, tmpDir); err != nil {
-		return nil, fmt.Errorf("git clone: %w", err)
+	log.Printf("cloning %s (history since %s)", gitURLs.HTTPURL, since.Format("2006-01-02"))
+	tmpDir, err := cloneWithDiskFallback(ctx, cloneTempBase(), os.TempDir(), func(dir string) error {
+		return gitClone(ctx, cloneURL, since, dir)
+	})
+	if err != nil {
+		return nil, err
 	}
+	defer os.RemoveAll(tmpDir)
 
 	log.Printf("extracting commit history since %s", since.Format("2006-01-02"))
 	commits, err := gitlog.ExtractHistory(ctx, tmpDir, since)
@@ -96,8 +94,8 @@ func CloneAndUpload(ctx context.Context, org, repo, token string) (*Result, erro
 
 	s3Client, err := storage.NewClient(ctx, storage.Config{
 		Endpoint:  envOrDefault("S3_ENDPOINT", "localhost:9000"),
-		AccessKey: envOrDefault("S3_ACCESS_KEY", "repotherapist"),
-		SecretKey: envOrDefault("S3_SECRET_KEY", "repotherapist123"),
+		AccessKey: os.Getenv("S3_ACCESS_KEY"),
+		SecretKey: os.Getenv("S3_SECRET_KEY"),
 		Bucket:    envOrDefault("S3_BUCKET", "repo-content"),
 		UseSSL:    false,
 	})
@@ -226,10 +224,34 @@ func gitClone(ctx context.Context, cloneURL string, since time.Time, destDir str
 }
 
 // defaultMinShmFreeBytes is the free-space floor cloneTempBase requires on /dev/shm before using
-// it — matches the container's recommended `--shm-size=150m` (docker-compose.yml doesn't set
-// this yet since no repository-service container exists there; set it to match when it does).
-// Overridable via CLONE_SHM_MIN_FREE_BYTES.
+// it. docker-compose.yml gives the container 400m of shm; a repo that outgrows what is free is
+// retried on disk by cloneWithDiskFallback. Overridable via CLONE_SHM_MIN_FREE_BYTES.
 const defaultMinShmFreeBytes = 150 * 1024 * 1024
+
+// cloneWithDiskFallback runs clone into a fresh temp dir under base and returns that dir. If base
+// is not diskBase and the clone fails (typically tmpfs filling up mid-clone, since a repo's size
+// can't be known in advance), the partial clone is removed and the clone is retried once under
+// diskBase. On error no temp dir is left behind.
+func cloneWithDiskFallback(ctx context.Context, base, diskBase string, clone func(dir string) error) (string, error) {
+	dir, err := cloneInto(base, clone)
+	if err == nil || base == diskBase || ctx.Err() != nil {
+		return dir, err
+	}
+	log.Printf("clone under %s failed (%v), retrying on disk under %s", base, err, diskBase)
+	return cloneInto(diskBase, clone)
+}
+
+func cloneInto(base string, clone func(dir string) error) (string, error) {
+	dir, err := os.MkdirTemp(base, "repo-therapist-clone-*")
+	if err != nil {
+		return "", fmt.Errorf("creating temp dir: %w", err)
+	}
+	if err := clone(dir); err != nil {
+		os.RemoveAll(dir)
+		return "", fmt.Errorf("git clone: %w", err)
+	}
+	return dir, nil
+}
 
 // cloneTempBase picks where the temporary clone gets written. Writing the full checked-out tree
 // to real disk on every analysis run, repeated on every periodic regrade, is real avoidable I/O —
