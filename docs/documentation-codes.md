@@ -1,5 +1,12 @@
 # Documentation deduction registry (`documentation-grading-v1`)
 
+> Current active output: `documentation.analysis.completed` v2 contains only `grade`,
+> eight `subcategories`, and a flat `facts` list. Internal checks/components and
+> numeric deduction impacts are not transmitted. The active model path checks format
+> only; strict evidence/impact rules below describe the legacy validator and scoring
+> guidance, not acceptance requirements for the current Yandex response. See
+> [Kafka contract](kafka-contracts.md) and [active model output](llm-model-output.md).
+
 This registry defines the machine-readable deductions emitted by LLM service. A grading response
 contains no user-facing titles, explanations, or recommendations. Unknown codes, fact fields, enum
 values, or evidence variants are invalid.

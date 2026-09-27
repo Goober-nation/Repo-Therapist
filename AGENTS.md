@@ -280,4 +280,16 @@ final answer of every work session, not just when asked.
 
 ---
 
+## LLM response validation (user decision, 2026-09-25)
+
+The active Python Yandex model path must validate output format only: JSON structure,
+field types, known check IDs and score ranges. Do not reject a response for inconsistent
+score/deduction arithmetic, unverified quotations or line numbers, evidence contents,
+or semantic judgment. Preserve the model's claims; the active path validates format only.
+Do not reconnect the legacy semantic validator to this path without user approval.
+Kafka Documentation completed v2 and CLI output contain only `grade`, eight
+`subcategories` (id/grade), and a flat `facts` list. Internal 25 checks, severity,
+penalty amounts and model/context metadata do not cross this boundary. Report request
+v2 forwards this compact payload in `documentation`; reports generate advice later.
+
 **End of AGENTS.md**

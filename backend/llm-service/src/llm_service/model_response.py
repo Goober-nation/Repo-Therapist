@@ -6,7 +6,7 @@ import json
 
 from .context import (ContextBuildError, ModelContext, allowed_not_applicable_checks,
                       build_model_context)
-from .deductions import RULES
+from .deductions import RULES, _COUNT_FIELDS, _LIST_FIELDS
 from .detectors import detect_repository_facts
 from .grading import COMPONENTS, grade_documentation
 from .snapshot import Snapshot
@@ -23,6 +23,26 @@ def _unique_pairs(pairs):
             raise InvalidModelResponse(f"duplicate model field: {key}")
         result[key] = value
     return result
+
+
+def _derive_file_evidence_lines(evidence: object, files: dict[str, str]) -> None:
+    """Derive line locations from an exact quote instead of trusting model line numbers."""
+    if not isinstance(evidence, list):
+        return
+    for item in evidence:
+        if not isinstance(item, dict) or item.get("type") != "file_content":
+            continue
+        path, quote = item.get("path"), item.get("quote")
+        if not isinstance(path, str) or path not in files or not isinstance(quote, str) or not quote:
+            continue  # The normal evidence validator will reject malformed fields.
+        content = "\n".join(files[path].splitlines())
+        normalized_quote = quote.replace("\r\n", "\n").replace("\r", "\n")
+        offset = content.find(normalized_quote)
+        if offset < 0:
+            raise InvalidModelResponse(f"file quote is not an exact excerpt: {path}")
+        start = content.count("\n", 0, offset) + 1
+        item["start_line"] = start
+        item["end_line"] = start + normalized_quote.count("\n")
 
 
 def validate_model_response(raw: bytes, snapshot: Snapshot, context: ModelContext, *,
@@ -62,6 +82,15 @@ def validate_model_response(raw: bytes, snapshot: Snapshot, context: ModelContex
         check_id = check.get("check_id")
         if not isinstance(check_id, str) or check_id not in expected or check_id in semantic:
             raise InvalidModelResponse("unknown or duplicate model check")
+        if check.get("outcome") == "EVALUATED":
+            components = check.get("components")
+            if (not isinstance(components, dict) or
+                    any(type(value) is not int for value in components.values())):
+                raise InvalidModelResponse(f"invalid integer components: {check_id}")
+            if type(check.get("points_awarded")) is not int:
+                raise InvalidModelResponse(f"invalid points_awarded: {check_id}")
+            # Derive this duplicate total from model-scored components.
+            check["points_awarded"] = sum(components.values())
         if check.get("outcome") == "NO_DATA" and check_id not in allowed_no_data:
             raise InvalidModelResponse(f"unjustified NO_DATA: {check_id}")
         if check.get("outcome") == "NOT_APPLICABLE" and check_id not in allowed_not_applicable:
@@ -84,15 +113,27 @@ def validate_model_response(raw: bytes, snapshot: Snapshot, context: ModelContex
                 raise InvalidModelResponse("model supplied a detector fact")
             code = deduction.get("code")
             rule = RULES.get(code) if isinstance(code, str) else None
+            trusted_facts = dict(detected)
             if rule is not None:
                 for name in rule.required | rule.optional:
-                    if name.startswith("detected_") and name in detected:
+                    if not name.startswith("detected_"):
+                        continue
+                    if name in detected:
                         facts[name] = detected[name]
+                    elif name in rule.required and name in _LIST_FIELDS:
+                        # The complete repository inventory was scanned; an empty
+                        # result means this detector found no matching entries.
+                        facts[name] = []
+                    elif name in rule.required and name in _COUNT_FIELDS:
+                        facts[name] = 0
+                    if name in facts and name.startswith("detected_"):
+                        trusted_facts[name] = facts[name]
             copy = dict(deduction)
             copy["facts"] = facts
+            _derive_file_evidence_lines(copy.get("evidence"), snapshot.files)
             enriched.append(copy)
             if isinstance(copy.get("deduction_id"), str):
-                trusted_by_deduction[copy["deduction_id"]] = detected
+                trusted_by_deduction[copy["deduction_id"]] = trusted_facts
         check["deductions"] = enriched
     try:
         result = grade_documentation(

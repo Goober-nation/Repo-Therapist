@@ -11,29 +11,65 @@ request envelopes, category scores, and the arithmetic of supplied report proble
 `llm_service.context` chooses complete user documents and selected build/test
 manifests from the full S3 listing. It excludes source files and `.env`, then
 hashes the exact UTF-8 context that will be sent to the model. Oversized input
-fails explicitly; no document is silently truncated. `llm_service.model_response`
-accepts only the 21 semantic/hybrid check objects, validates their deduction
-codes and typed facts against the closed registry, verifies evidence against
-the stable snapshot, and lets ordinary code calculate the final score.
-`llm_service.detectors` reads filenames and selected manifests without running
-repository code. Its verified facts are included in the hashed model context
-and inserted into deductions by Python after the model responds. A model
-response containing its own `detected_*` values is rejected.
+fails explicitly; no document is silently truncated.
 
-Model output is one JSON object with a `checks` array and no prose. Each check
-contains `check_id`, `check_type`, `outcome`, `points_awarded`, `max_points`,
-`components`, and `deductions`. The provider adapter will request this shape;
-unknown fields, duplicate IDs, unverified detector facts, and fabricated file
-quotes are rejected. `NO_DATA` and `NOT_APPLICABLE` require an ordinary-code
-decision before the model may return them.
+The active Yandex adapter validates **output format only** using
+`llm_service.formatted_response`. It checks JSON structure, types, check IDs,
+integer score ranges and evidence object shapes. Quotes, line numbers, facts,
+applicability judgments, and consistency between component/score/deduction totals
+are not verified and do not block a correctly formatted response.
 
-The service is **not ready to consume or publish Kafka events yet**. Model choice
-was intentionally deferred. The next implementation slice needs a model adapter,
-expanded detectors for repository-specific inputs that static inspection cannot
-yet verify, an S3 client adapter, Kafka consumers/producers, and Russian report
-generation. A real S3
-service and model provider have not been used yet. The grading result must not
-be published until those integrations and their failure paths are tested.
+`grade(snapshot, context)` returns exactly `grade`, `subcategories`, and `facts`.
+The eight section grades are normalized to 0–100; an inapplicable section uses null.
+The flat fact list includes objective-file and model findings, each with an ID,
+section, code, fact details and evidence. No internal checks, component values,
+severity, numeric penalties, context or provider metadata are exported.
+The same object is the payload of `documentation.analysis.completed` v2.
+`contracts.build_documentation_completed` builds the correlation envelope but does not
+publish it to Kafka. Report request v2 accepts this payload in `documentation`;
+legacy report request v1 remains readable.
+
+Internally, the adapter scores 21 model checks plus four objective checks and derives
+summary scores from `points_awarded`. The legacy strict validator remains separate
+and is not called by the Yandex adapter.
+
+One correction request is made only when output format is invalid, so a grading
+call can incur up to two generation charges. Transport errors are reported directly.
+Input above the local UTF-8 size cap fails explicitly; this cap is not an exact
+measure of model tokens. No files are silently truncated.
+
+Run against a local repository from this directory:
+
+```bash
+PYTHONPATH=src python3 -m llm_service --repo ../..
+```
+
+The entire result is printed as JSON. Add `--dry-run` to inspect the selected file
+list and context size without calling the model. See
+[model output boundary](../../docs/llm-model-output.md) for the result semantics.
+
+Set these environment variables locally (do not commit the API key):
+
+```text
+YANDEX_AI_API_KEY=<secret key from AI Studio>
+YANDEX_FOLDER_ID=<folder ID>
+YANDEX_AI_MODEL=aliceai-llm
+```
+
+`YANDEX_AI_MODEL=aliceai-llm-flash` is also supported for comparison. With the
+variables exported, verify access using a short paid API request from this directory:
+
+```bash
+PYTHONPATH=src python3 -c 'from llm_service.yandex_model import YandexModel, YandexModelConfig; print(YandexModel(YandexModelConfig.from_env()).complete("Ответь одним словом: готово", max_output_tokens=32).decode())'
+```
+
+The service is **not ready to consume or publish Kafka events yet**. The next
+implementation slices still need expanded detectors for repository-specific
+inputs that static inspection cannot verify, an S3 client adapter, Kafka
+consumers/producers, and Russian report generation. Real Yandex calls have returned responses during manual testing; the current
+format-only path has been tested locally with simulated provider responses. Real
+S3 integration and end-to-end Kafka delivery remain unverified. The grading result must not be published until
+those integrations and their failure paths are tested.
 
 Run the current tests from this directory:
 
