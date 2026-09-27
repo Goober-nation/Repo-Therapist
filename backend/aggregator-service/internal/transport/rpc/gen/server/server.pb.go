@@ -636,18 +636,15 @@ func (x *ReactionCount) GetCount() string {
 }
 
 type RepoGrade struct {
-	state                  protoimpl.MessageState `protogen:"open.v1"`
-	SourcecraftUuid        string                 `protobuf:"bytes,1,opt,name=sourcecraft_uuid,json=sourcecraftUuid,proto3" json:"sourcecraft_uuid,omitempty"`
-	PublicScore            *int32                 `protobuf:"varint,2,opt,name=public_score,json=publicScore,proto3,oneof" json:"public_score,omitempty"`
-	PublicCategoryScores   []byte                 `protobuf:"bytes,3,opt,name=public_category_scores,json=publicCategoryScores,proto3" json:"public_category_scores,omitempty"`
-	PublicRecommendations  []byte                 `protobuf:"bytes,4,opt,name=public_recommendations,json=publicRecommendations,proto3" json:"public_recommendations,omitempty"`
-	PrivateScore           *int32                 `protobuf:"varint,5,opt,name=private_score,json=privateScore,proto3,oneof" json:"private_score,omitempty"`
-	PrivateCategoryScores  []byte                 `protobuf:"bytes,6,opt,name=private_category_scores,json=privateCategoryScores,proto3" json:"private_category_scores,omitempty"`
-	PrivateRecommendations []byte                 `protobuf:"bytes,7,opt,name=private_recommendations,json=privateRecommendations,proto3" json:"private_recommendations,omitempty"`
-	MissingData            []string               `protobuf:"bytes,8,rep,name=missing_data,json=missingData,proto3" json:"missing_data,omitempty"`
-	GradedAt               *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=graded_at,json=gradedAt,proto3" json:"graded_at,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SourcecraftUuid string                 `protobuf:"bytes,1,opt,name=sourcecraft_uuid,json=sourcecraftUuid,proto3" json:"sourcecraft_uuid,omitempty"`
+	Score           *int32                 `protobuf:"varint,2,opt,name=score,proto3,oneof" json:"score,omitempty"`
+	CategoryScores  []byte                 `protobuf:"bytes,3,opt,name=category_scores,json=categoryScores,proto3" json:"category_scores,omitempty"`
+	Advice          []byte                 `protobuf:"bytes,4,opt,name=advice,proto3" json:"advice,omitempty"`
+	MissingData     []string               `protobuf:"bytes,5,rep,name=missing_data,json=missingData,proto3" json:"missing_data,omitempty"`
+	GradedAt        *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=graded_at,json=gradedAt,proto3" json:"graded_at,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *RepoGrade) Reset() {
@@ -687,44 +684,23 @@ func (x *RepoGrade) GetSourcecraftUuid() string {
 	return ""
 }
 
-func (x *RepoGrade) GetPublicScore() int32 {
-	if x != nil && x.PublicScore != nil {
-		return *x.PublicScore
+func (x *RepoGrade) GetScore() int32 {
+	if x != nil && x.Score != nil {
+		return *x.Score
 	}
 	return 0
 }
 
-func (x *RepoGrade) GetPublicCategoryScores() []byte {
+func (x *RepoGrade) GetCategoryScores() []byte {
 	if x != nil {
-		return x.PublicCategoryScores
+		return x.CategoryScores
 	}
 	return nil
 }
 
-func (x *RepoGrade) GetPublicRecommendations() []byte {
+func (x *RepoGrade) GetAdvice() []byte {
 	if x != nil {
-		return x.PublicRecommendations
-	}
-	return nil
-}
-
-func (x *RepoGrade) GetPrivateScore() int32 {
-	if x != nil && x.PrivateScore != nil {
-		return *x.PrivateScore
-	}
-	return 0
-}
-
-func (x *RepoGrade) GetPrivateCategoryScores() []byte {
-	if x != nil {
-		return x.PrivateCategoryScores
-	}
-	return nil
-}
-
-func (x *RepoGrade) GetPrivateRecommendations() []byte {
-	if x != nil {
-		return x.PrivateRecommendations
+		return x.Advice
 	}
 	return nil
 }
@@ -791,19 +767,15 @@ const file_internal_transport_rpc_server_proto_rawDesc = "" +
 	"\x04slug\x18\x01 \x01(\tR\x04slug\"9\n" +
 	"\rReactionCount\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x14\n" +
-	"\x05count\x18\x02 \x01(\tR\x05count\"\xe5\x03\n" +
+	"\x05count\x18\x02 \x01(\tR\x05count\"\xf8\x01\n" +
 	"\tRepoGrade\x12)\n" +
-	"\x10sourcecraft_uuid\x18\x01 \x01(\tR\x0fsourcecraftUuid\x12&\n" +
-	"\fpublic_score\x18\x02 \x01(\x05H\x00R\vpublicScore\x88\x01\x01\x124\n" +
-	"\x16public_category_scores\x18\x03 \x01(\fR\x14publicCategoryScores\x125\n" +
-	"\x16public_recommendations\x18\x04 \x01(\fR\x15publicRecommendations\x12(\n" +
-	"\rprivate_score\x18\x05 \x01(\x05H\x01R\fprivateScore\x88\x01\x01\x126\n" +
-	"\x17private_category_scores\x18\x06 \x01(\fR\x15privateCategoryScores\x127\n" +
-	"\x17private_recommendations\x18\a \x01(\fR\x16privateRecommendations\x12!\n" +
-	"\fmissing_data\x18\b \x03(\tR\vmissingData\x127\n" +
-	"\tgraded_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\bgradedAtB\x0f\n" +
-	"\r_public_scoreB\x10\n" +
-	"\x0e_private_score2\xa0\x02\n" +
+	"\x10sourcecraft_uuid\x18\x01 \x01(\tR\x0fsourcecraftUuid\x12\x19\n" +
+	"\x05score\x18\x02 \x01(\x05H\x00R\x05score\x88\x01\x01\x12'\n" +
+	"\x0fcategory_scores\x18\x03 \x01(\fR\x0ecategoryScores\x12\x16\n" +
+	"\x06advice\x18\x04 \x01(\fR\x06advice\x12!\n" +
+	"\fmissing_data\x18\x05 \x03(\tR\vmissingData\x127\n" +
+	"\tgraded_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\bgradedAtB\b\n" +
+	"\x06_score2\xa0\x02\n" +
 	"\n" +
 	"Aggregator\x12K\n" +
 	"\n" +

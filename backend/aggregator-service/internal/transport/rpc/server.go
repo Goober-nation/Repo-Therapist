@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"aggregator-service/internal/domain"
-	"aggregator-service/internal/transport/rpc/gen/client"
 	"aggregator-service/internal/transport/rpc/gen/server"
 	"context"
 	"errors"
@@ -45,13 +44,12 @@ func NewServer(service AggregatorService) *Server {
 
 func (s *Server) GetMyRepos(
 	ctx context.Context,
-	req *client.GetMyReposRequest,
+	req *server.GetMyReposRequest,
 ) (*server.GetMyReposResponse, error) {
 	response, err := s.service.GetMyRepos(ctx)
 	if err != nil {
 		return nil, mapError(err)
 	}
-
 	repositories := make([]*server.Repository, 0, len(response.Repositories))
 
 	for _, repo := range response.Repositories {
@@ -177,22 +175,16 @@ func repoToProto(repo domain.Repo) (*server.Repository, error) {
 
 func gradeToProto(grade domain.RepoGrade) *server.RepoGrade {
 	result := &server.RepoGrade{
-		SourcecraftUuid:        grade.SourcecraftUUID.String(),
-		PublicCategoryScores:   grade.PublicCategoryScores,
-		PublicRecommendations:  grade.PublicRecommendations,
-		PrivateCategoryScores:  grade.PrivateCategoryScores,
-		PrivateRecommendations: grade.PrivateRecommendations,
-		MissingData:            grade.MissingData,
+		SourcecraftUuid: grade.SourcecraftUUID.String(),
+		CategoryScores:  grade.CategoryScores,
+		Advice:          grade.Advice,
+
+		MissingData: grade.MissingData,
 	}
 
-	if grade.PublicScore != nil {
-		value := int32(*grade.PublicScore)
-		result.PublicScore = &value
-	}
-
-	if grade.PrivateScore != nil {
-		value := int32(*grade.PrivateScore)
-		result.PrivateScore = &value
+	if grade.Score != nil {
+		value := int32(*grade.Score)
+		result.Score = &value
 	}
 
 	if grade.GradedAt != nil {
@@ -206,11 +198,21 @@ func mapError(err error) error {
 	switch {
 	case err == nil:
 		return nil
-
+	case errors.Is(err, domain.ErrTimeout):
+		return status.Error(
+			codes.DeadlineExceeded,
+			"wrapper service timeout",
+		)
 	case errors.Is(err, domain.ErrNoAccess):
 		return status.Error(
 			codes.PermissionDenied,
 			"no access rights",
+		)
+
+	case errors.Is(err, domain.ErrUnauthenticated):
+		return status.Error(
+			codes.Unauthenticated,
+			"missing or invalid user token",
 		)
 
 	case errors.Is(err, domain.ErrRepositoryNotFound):
@@ -232,6 +234,12 @@ func mapError(err error) error {
 			"grading is pending",
 		)
 
+	case errors.Is(err, domain.ErrGradeOutdated):
+		return status.Error(
+			codes.FailedPrecondition,
+			"grade is outdated",
+		)
+
 	case errors.Is(err, domain.ErrRepoLocked):
 		return status.Error(
 			codes.Aborted,
@@ -244,7 +252,8 @@ func mapError(err error) error {
 			"llm service unavailable",
 		)
 
-	case errors.Is(err, domain.ErrSourceCraftUnavailable):
+	case errors.Is(err, domain.ErrSourceCraftUnavailable),
+		errors.Is(err, domain.ErrExternalAPI):
 		return status.Error(
 			codes.Unavailable,
 			"sourcecraft service unavailable",

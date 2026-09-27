@@ -17,7 +17,7 @@ type GradeConsumer struct {
 }
 
 type GradeSaver interface {
-	SaveGradingResult(ctx context.Context, grade domain.RepoGrade) error
+	SaveGradingResult(ctx context.Context, grade domain.RepoGrade, visibility string, error string) error
 }
 
 func NewGradeConsumer(
@@ -39,7 +39,7 @@ func NewGradeConsumer(
 func (c *GradeConsumer) Start(ctx context.Context) {
 	go func() {
 		for {
-			msg, err := c.reader.ReadMessage(ctx)
+			msg, err := c.reader.FetchMessage(ctx)
 			if err != nil {
 				if ctx.Err() != nil {
 					return
@@ -49,9 +49,14 @@ func (c *GradeConsumer) Start(ctx context.Context) {
 				continue
 			}
 
+			// Committed after handling, so a crash mid-way redelivers the message. A message
+			// that fails to handle is logged and committed: retrying it wouldn't change the outcome.
 			if err := c.handleMessage(ctx, msg.Value); err != nil {
 				log.Printf("grade consumer handle error: %v", err)
-				continue
+			}
+
+			if err := c.reader.CommitMessages(ctx, msg); err != nil && ctx.Err() == nil {
+				log.Printf("grade consumer commit error: %v", err)
 			}
 		}
 	}()
@@ -68,18 +73,16 @@ func (c *GradeConsumer) handleMessage(
 	}
 
 	grade := domain.RepoGrade{
-		SourcecraftUUID:        event.SourcecraftUUID,
-		PublicScore:            event.PublicScore,
-		PublicCategoryScores:   event.PublicCategoryScores,
-		PublicRecommendations:  event.PublicRecommendations,
-		PrivateScore:           event.PrivateScore,
-		PrivateCategoryScores:  event.PrivateCategoryScores,
-		PrivateRecommendations: event.PrivateRecommendations,
-		MissingData:            event.MissingData,
-		GradedAt:               &event.GradedAt,
+		SourcecraftUUID: event.SourcecraftUUID,
+		Score:           event.Score,
+		CategoryScores:  event.CategoryScores,
+		Advice:          event.Advice,
+
+		MissingData: event.MissingData,
+		GradedAt:    &event.GradedAt,
 	}
 
-	if err := c.service.SaveGradingResult(ctx, grade, event.Visibility); err != nil {
+	if err := c.service.SaveGradingResult(ctx, grade, event.Visibility, event.Error); err != nil {
 		return fmt.Errorf("save grading result: %w", err)
 	}
 
@@ -121,7 +124,7 @@ func NewLLMConsumer(
 func (c *LLMConsumer) Start(ctx context.Context) {
 	go func() {
 		for {
-			msg, err := c.reader.ReadMessage(ctx)
+			msg, err := c.reader.FetchMessage(ctx)
 			if err != nil {
 				if ctx.Err() != nil {
 					return
@@ -131,9 +134,14 @@ func (c *LLMConsumer) Start(ctx context.Context) {
 				continue
 			}
 
+			// Committed after handling, so a crash mid-way redelivers the message. A message
+			// that fails to handle is logged and committed: retrying it wouldn't change the outcome.
 			if err := c.handleMessage(ctx, msg.Value); err != nil {
 				log.Printf("llm consumer handle error: %v", err)
-				continue
+			}
+
+			if err := c.reader.CommitMessages(ctx, msg); err != nil && ctx.Err() == nil {
+				log.Printf("llm consumer commit error: %v", err)
 			}
 		}
 	}()

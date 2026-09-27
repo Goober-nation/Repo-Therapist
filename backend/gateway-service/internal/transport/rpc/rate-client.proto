@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package rating;
+
+option go_package = "gateway-service/internal/transport/rpc/gen/rank;rank";
+
+import "google/protobuf/timestamp.proto";
+
+service Rating {
+  rpc GetRanking(GetRankingRequest) returns (GetRankingResponse);
+}
+
+enum SortBy {
+  SORT_BY_SCORE = 0;
+  SORT_BY_LAST_ACTIVITY = 1;
+  SORT_BY_LIKES = 2;
+}
+
+message GetRankingRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string language = 3;
+  SortBy sort_by = 4;
+}
+
+message RankingEntry {
+  int32 place = 1;
+  string sourcecraft_uuid = 2;
+  string name = 3;
+  string web_url = 4;
+  optional int32 public_score = 5;
+  optional double likes = 6;
+  Language language = 7;
+  google.protobuf.Timestamp last_activity_at = 8;
+}
+
+message Language {
+  string name = 1;
+  string color = 2;
+}
+
+message GetRankingResponse {
+  repeated RankingEntry entries = 1;
+  int32 total_count = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}

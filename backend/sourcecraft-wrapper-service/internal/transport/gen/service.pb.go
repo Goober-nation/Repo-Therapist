@@ -2448,8 +2448,8 @@ func (x *MilestoneUser) GetSlug() string {
 
 type GetRepositoryBySlugsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	OrgSlug       string                 `protobuf:"bytes,1,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
-	RepoSlug      string                 `protobuf:"bytes,2,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
+	RepoSlug      string                 `protobuf:"bytes,1,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
+	OrgSlug       string                 `protobuf:"bytes,2,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2484,16 +2484,16 @@ func (*GetRepositoryBySlugsRequest) Descriptor() ([]byte, []int) {
 	return file_internal_transport_rpc_service_proto_rawDescGZIP(), []int{38}
 }
 
-func (x *GetRepositoryBySlugsRequest) GetOrgSlug() string {
+func (x *GetRepositoryBySlugsRequest) GetRepoSlug() string {
 	if x != nil {
-		return x.OrgSlug
+		return x.RepoSlug
 	}
 	return ""
 }
 
-func (x *GetRepositoryBySlugsRequest) GetRepoSlug() string {
+func (x *GetRepositoryBySlugsRequest) GetOrgSlug() string {
 	if x != nil {
-		return x.RepoSlug
+		return x.OrgSlug
 	}
 	return ""
 }
@@ -2935,9 +2935,9 @@ const file_internal_transport_rpc_service_proto_rawDesc = "" +
 	"\rMilestoneUser\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04slug\x18\x02 \x01(\tR\x04slug\"U\n" +
-	"\x1bGetRepositoryBySlugsRequest\x12\x19\n" +
-	"\borg_slug\x18\x01 \x01(\tR\aorgSlug\x12\x1b\n" +
-	"\trepo_slug\x18\x02 \x01(\tR\brepoSlug\"\x83\x01\n" +
+	"\x1bGetRepositoryBySlugsRequest\x12\x1b\n" +
+	"\trepo_slug\x18\x01 \x01(\tR\brepoSlug\x12\x19\n" +
+	"\borg_slug\x18\x02 \x01(\tR\aorgSlug\"\x83\x01\n" +
 	"\x06Rating\x12\x14\n" +
 	"\x05value\x18\x01 \x01(\x01R\x05value\x12\x1e\n" +
 	"\n" +

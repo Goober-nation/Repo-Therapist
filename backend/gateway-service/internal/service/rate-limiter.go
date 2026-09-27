@@ -60,7 +60,7 @@ func (rl *RedisLimiter) Allow(
 		ctx,
 		rl.client,
 		[]string{key},
-		rl.window.Seconds(),
+		rl.window.Milliseconds(),
 		rl.limit,
 	).Int()
 	if err != nil {

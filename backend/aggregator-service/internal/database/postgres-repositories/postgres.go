@@ -44,7 +44,10 @@ func (r *RepoRepository) CreateRepository(
 	ctx context.Context,
 	repo domain.Repo,
 ) (uuid.UUID, error) {
-	id := uuid.New()
+	id := repo.SourcecraftUUID
+	if id == uuid.Nil {
+		return uuid.Nil, domain.ErrInvalidRepository
+	}
 
 	tx, err := r.db.Begin(ctx)
 	if err != nil {

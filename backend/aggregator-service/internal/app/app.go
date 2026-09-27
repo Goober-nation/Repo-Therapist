@@ -79,6 +79,8 @@ func StartApp() {
 		wrapperClient,
 		gradingPublisher,
 		llmPublisher,
+		cfg.GRPC.Timeout,
+		cfg.Token.Token,
 	)
 
 	gradeConsumer := kafka.NewGradeConsumer(

@@ -13,10 +13,14 @@ type Config struct {
 	Kafka              KafkaConfig
 	SourceCraftWrapper WrapperConfig
 	Grading            GradingConfig
+	Token              ServiceToken
 }
-
+type ServiceToken struct {
+	Token string
+}
 type GRPCConfig struct {
 	Address string
+	Timeout time.Duration
 }
 
 type DatabaseConfig struct {
@@ -68,10 +72,20 @@ type GradingConfig struct {
 
 func LoadConfig() *Config {
 	return &Config{
+		Token: ServiceToken{
+			Token: getEnvDefault(
+				"SERVICE_TOKEN",
+				"",
+			),
+		},
 		GRPC: GRPCConfig{
 			Address: getEnvDefault(
 				"GRPC_ADDRESS",
 				":8083",
+			),
+			Timeout: getEnvDuration(
+				"GRPC_TIMEOUT",
+				10*time.Second,
 			),
 		},
 
@@ -115,7 +129,7 @@ func LoadConfig() *Config {
 
 			LLMRequestsTopic: getEnvDefault(
 				"KAFKA_LLM_REQUESTS_TOPIC",
-				"llm.recommendations.requests",
+				"llm.recommendations.requested",
 			),
 
 			GradingResultsTopic: getEnvDefault(
@@ -125,7 +139,7 @@ func LoadConfig() *Config {
 
 			LLMRecommendationsTopic: getEnvDefault(
 				"KAFKA_LLM_RECOMMENDATIONS_TOPIC",
-				"llm.recommendations.results",
+				"llm.recommendations.received",
 			),
 
 			GradingConsumerGroup: getEnvDefault(

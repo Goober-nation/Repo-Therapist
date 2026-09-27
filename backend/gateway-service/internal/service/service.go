@@ -1,4 +1,557 @@
 package service
 
-type GatewayService interface {
+import (
+	"context"
+	"errors"
+	"fmt"
+	"gateway-service/internal/domain"
+	"gateway-service/internal/transport/http"
+	"gateway-service/internal/transport/rpc/gen/agg"
+	"gateway-service/internal/transport/rpc/gen/rank"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+)
+
+type GatewayService struct {
+	aggregatorClient agg.AggregatorClient
+	ratingClient     rank.RatingClient
+
+	aggregatorTimeout time.Duration
+	ratingTimeout     time.Duration
+	yandexTimeout     time.Duration
+
+	rateLimiter  Limiter
+	yandexClient http.YandexIDClient
+
+	userRepository    domain.UserRepository
+	sessionRepository domain.SessionRepository
+}
+
+func NewGatewayService(
+	aggregatorClient agg.AggregatorClient,
+	ratingClient rank.RatingClient,
+	yandexClient http.YandexIDClient,
+	rateLimiter Limiter,
+	userRepository domain.UserRepository,
+	sessionRepository domain.SessionRepository,
+	aggregatorTimeout time.Duration,
+	ratingTimeout time.Duration,
+	yandexTimeout time.Duration,
+) *GatewayService {
+	return &GatewayService{
+		aggregatorClient:  aggregatorClient,
+		ratingClient:      ratingClient,
+		yandexClient:      yandexClient,
+		rateLimiter:       rateLimiter,
+		userRepository:    userRepository,
+		sessionRepository: sessionRepository,
+		ratingTimeout:     ratingTimeout,
+		aggregatorTimeout: aggregatorTimeout,
+		yandexTimeout:     yandexTimeout,
+	}
+}
+
+func (s *GatewayService) checkRateLimit(
+	ctx context.Context,
+	clientIP string,
+) error {
+	allowed, err := s.rateLimiter.Allow(
+		ctx,
+		"rate_limit:gateway:ip:"+clientIP,
+	)
+	if err != nil {
+		return fmt.Errorf("check rate limit: %w", err)
+	}
+
+	if !allowed {
+		return domain.ErrLimitExceeded
+	}
+
+	return nil
+}
+
+// withPAT attaches the caller's SourceCraft PAT for the aggregator. Without one the aggregator
+// answers with public data only.
+func withPAT(ctx context.Context, pat string) context.Context {
+	if pat == "" {
+		return ctx
+	}
+
+	return metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+pat)
+}
+
+// rpcError maps an upstream gRPC status to the domain error the HTTP layer understands.
+func rpcError(op string, err error) error {
+	var target error
+
+	switch status.Code(err) {
+	case codes.DeadlineExceeded:
+		target = domain.ErrTimeout
+	case codes.InvalidArgument:
+		target = domain.ErrInvalidRequest
+	case codes.NotFound:
+		target = domain.ErrNotFound
+	case codes.PermissionDenied:
+		target = domain.ErrForbidden
+	case codes.Unauthenticated:
+		target = domain.ErrUnauthenticated
+	case codes.FailedPrecondition:
+		target = domain.ErrPending
+	case codes.Aborted:
+		target = domain.ErrConflict
+	case codes.ResourceExhausted:
+		target = domain.ErrLimitExceeded
+	case codes.Unavailable:
+		target = domain.ErrUnavailable
+	default:
+		target = domain.ErrRequestFailed
+	}
+
+	return fmt.Errorf("%s rpc: %w: %v", op, target, err)
+}
+
+func (s *GatewayService) GetMyRepos(
+	ctx context.Context,
+	clientIP string,
+	pat string,
+) (domain.GetMyReposDTO, error) {
+	if err := s.checkRateLimit(ctx, clientIP); err != nil {
+		return domain.GetMyReposDTO{}, err
+	}
+
+	if pat == "" {
+		return domain.GetMyReposDTO{}, domain.ErrUnauthenticated
+	}
+
+	rpcCtx, cancel := context.WithTimeout(withPAT(ctx, pat), s.aggregatorTimeout)
+	defer cancel()
+
+	resp, err := s.aggregatorClient.GetMyRepos(
+		rpcCtx,
+		&agg.GetMyReposRequest{},
+	)
+	if err != nil {
+		return domain.GetMyReposDTO{}, rpcError("get my repos", err)
+	}
+
+	return mapGetMyReposResponse(resp)
+}
+
+func mapGetMyReposResponse(
+	resp *agg.GetMyReposResponse,
+) (domain.GetMyReposDTO, error) {
+	repositories := make([]domain.Repo, 0, len(resp.GetRepositories()))
+
+	for _, repo := range resp.GetRepositories() {
+		mapped, err := mapRepository(repo)
+		if err != nil {
+			return domain.GetMyReposDTO{}, err
+		}
+
+		repositories = append(repositories, mapped)
+	}
+
+	return domain.GetMyReposDTO{
+		Repositories:  repositories,
+		NextPageToken: resp.GetNextPageToken(),
+	}, nil
+}
+
+func mapRepository(repo *agg.Repository) (domain.Repo, error) {
+	repoID, err := uuid.Parse(repo.GetId())
+	if err != nil {
+		return domain.Repo{}, fmt.Errorf("%w: %v", domain.ErrRequestFailed, err)
+	}
+
+	result := domain.Repo{
+		SourcecraftUUID: repoID,
+		OrgSlug:         repo.GetOrganization().GetSlug(),
+		RepoSlug:        repo.GetSlug(),
+		WebURL:          repo.GetWebUrl(),
+		Visibility:      repo.GetVisibility(),
+		RatingValue:     repo.GetRating(),
+		Language: domain.PrimaryLanguage{
+			Name:  repo.GetLanguage().GetName(),
+			Color: repo.GetLanguage().GetColor(),
+		},
+	}
+
+	if value := repo.GetLastActivityAt(); value != "" {
+		parsed, err := time.Parse(time.RFC3339Nano, value)
+		if err != nil {
+			return domain.Repo{}, fmt.Errorf("%w: %v", domain.ErrRequestFailed, err)
+		}
+
+		result.LastActivityAt = &parsed
+	}
+
+	return result, nil
+}
+
+func validateSlugs(orgSlug, repoSlug string) error {
+	if orgSlug == "" {
+		return fmt.Errorf("%w: org_slug is required", domain.ErrInvalidRequest)
+	}
+
+	if repoSlug == "" {
+		return fmt.Errorf("%w: repo_slug is required", domain.ErrInvalidRequest)
+	}
+
+	return nil
+}
+
+// RequestLLMRecommendations returns ErrPending while the recommendations (or the grade they
+// need) are still being computed.
+func (s *GatewayService) RequestLLMRecommendations(
+	ctx context.Context,
+	clientIP string,
+	pat string,
+	request domain.RequestLLMRecommendationsDTO,
+) (domain.RequestLLMRecommendationsResponse, error) {
+	if err := s.checkRateLimit(ctx, clientIP); err != nil {
+		return domain.RequestLLMRecommendationsResponse{}, err
+	}
+
+	if err := validateSlugs(request.OrgSlug, request.RepoSlug); err != nil {
+		return domain.RequestLLMRecommendationsResponse{}, err
+	}
+
+	rpcCtx, cancel := context.WithTimeout(withPAT(ctx, pat), s.aggregatorTimeout)
+	defer cancel()
+
+	resp, err := s.aggregatorClient.RequestLLMRecommendations(
+		rpcCtx,
+		&agg.RequestLLMRecommendationsRequest{
+			OrgSlug:  request.OrgSlug,
+			RepoSlug: request.RepoSlug,
+		},
+	)
+	if err != nil {
+		return domain.RequestLLMRecommendationsResponse{}, rpcError("request llm recommendations", err)
+	}
+
+	if resp.GetEvaluatedAt() == nil {
+		return domain.RequestLLMRecommendationsResponse{}, fmt.Errorf(
+			"%w: evaluated_at is missing",
+			domain.ErrRequestFailed,
+		)
+	}
+
+	if err := resp.GetEvaluatedAt().CheckValid(); err != nil {
+		return domain.RequestLLMRecommendationsResponse{}, fmt.Errorf(
+			"%w: invalid evaluated_at: %v",
+			domain.ErrRequestFailed,
+			err,
+		)
+	}
+
+	return domain.RequestLLMRecommendationsResponse{
+		ModelUsed:   resp.GetModelUsed(),
+		EvaluatedAt: resp.GetEvaluatedAt().AsTime(),
+		RawResponse: append([]byte(nil), resp.GetRawResponse()...),
+	}, nil
+}
+
+// GetGrading returns ErrPending while the grade is still being computed.
+func (s *GatewayService) GetGrading(
+	ctx context.Context,
+	clientIP string,
+	pat string,
+	request domain.GetGradingDTO,
+) (domain.GetGradingResponse, error) {
+	if err := s.checkRateLimit(ctx, clientIP); err != nil {
+		return domain.GetGradingResponse{}, err
+	}
+
+	if err := validateSlugs(request.OrgSlug, request.RepoSlug); err != nil {
+		return domain.GetGradingResponse{}, err
+	}
+
+	rpcCtx, cancel := context.WithTimeout(withPAT(ctx, pat), s.aggregatorTimeout)
+	defer cancel()
+
+	resp, err := s.aggregatorClient.GetGrading(
+		rpcCtx,
+		&agg.GetGradingRequest{
+			OrgSlug:  request.OrgSlug,
+			RepoSlug: request.RepoSlug,
+		},
+	)
+	if err != nil {
+		return domain.GetGradingResponse{}, rpcError("get grading", err)
+	}
+
+	grade, err := mapRepoGrade(resp.GetGrade())
+	if err != nil {
+		return domain.GetGradingResponse{}, err
+	}
+
+	return domain.GetGradingResponse{
+		Grade: grade,
+	}, nil
+}
+
+func mapRepoGrade(
+	grade *agg.RepoGrade,
+) (domain.RepoGrade, error) {
+	if grade == nil {
+		return domain.RepoGrade{}, fmt.Errorf(
+			"%w: grade is nil",
+			domain.ErrRequestFailed,
+		)
+	}
+
+	sourcecraftUUID, err := uuid.Parse(grade.GetSourcecraftUuid())
+	if err != nil {
+		return domain.RepoGrade{}, fmt.Errorf(
+			"%w: invalid sourcecraft uuid: %v",
+			domain.ErrRequestFailed,
+			err,
+		)
+	}
+
+	if grade.GetGradedAt() == nil {
+		return domain.RepoGrade{}, fmt.Errorf(
+			"%w: graded_at is missing",
+			domain.ErrRequestFailed,
+		)
+	}
+
+	if err := grade.GetGradedAt().CheckValid(); err != nil {
+		return domain.RepoGrade{}, fmt.Errorf(
+			"%w: invalid graded_at: %v",
+			domain.ErrRequestFailed,
+			err,
+		)
+	}
+
+	return domain.RepoGrade{
+		SourcecraftUUID: sourcecraftUUID,
+		Score:           grade.Score,
+		CategoryScores:  append([]byte(nil), grade.GetCategoryScores()...),
+		Advice:          append([]byte(nil), grade.GetAdvice()...),
+		MissingData:     append([]string(nil), grade.GetMissingData()...),
+		GradedAt:        grade.GetGradedAt().AsTime(),
+	}, nil
+}
+
+func (s *GatewayService) GetRanking(
+	ctx context.Context,
+	clientIP string,
+	request domain.GetRankingDTO,
+) (domain.GetRankingResponse, error) {
+	if err := s.checkRateLimit(ctx, clientIP); err != nil {
+		return domain.GetRankingResponse{}, err
+	}
+
+	rpcCtx, cancel := context.WithTimeout(
+		ctx,
+		s.ratingTimeout,
+	)
+	defer cancel()
+
+	resp, err := s.ratingClient.GetRanking(
+		rpcCtx,
+		&rank.GetRankingRequest{
+			Page:     request.Page,
+			PageSize: request.PageSize,
+			Language: request.Language,
+			SortBy:   mapRankingSortBy(request.SortBy),
+		},
+	)
+	if err != nil {
+		return domain.GetRankingResponse{}, rpcError("get ranking", err)
+	}
+
+	return mapGetRankingResponse(resp)
+}
+
+func mapRankingSortBy(
+	sortBy domain.RankingSortBy,
+) rank.SortBy {
+	switch sortBy {
+	case domain.RankingSortByLastActivity:
+		return rank.SortBy_SORT_BY_LAST_ACTIVITY
+
+	case domain.RankingSortByLikes:
+		return rank.SortBy_SORT_BY_LIKES
+
+	default:
+		return rank.SortBy_SORT_BY_SCORE
+	}
+}
+
+func mapGetRankingResponse(
+	resp *rank.GetRankingResponse,
+) (domain.GetRankingResponse, error) {
+	entries := make(
+		[]domain.RankingEntry,
+		0,
+		len(resp.GetEntries()),
+	)
+
+	for _, entry := range resp.GetEntries() {
+		if entry == nil {
+			return domain.GetRankingResponse{}, fmt.Errorf(
+				"%w: ranking entry is nil",
+				domain.ErrRequestFailed,
+			)
+		}
+
+		mapped, err := mapRankingEntry(entry)
+		if err != nil {
+			return domain.GetRankingResponse{}, err
+		}
+
+		entries = append(entries, mapped)
+	}
+
+	return domain.GetRankingResponse{
+		Entries:    entries,
+		TotalCount: resp.GetTotalCount(),
+		Page:       resp.GetPage(),
+		PageSize:   resp.GetPageSize(),
+	}, nil
+}
+
+func mapRankingEntry(
+	entry *rank.RankingEntry,
+) (domain.RankingEntry, error) {
+	sourcecraftUUID, err := uuid.Parse(
+		entry.GetSourcecraftUuid(),
+	)
+	if err != nil {
+		return domain.RankingEntry{}, fmt.Errorf(
+			"%w: invalid sourcecraft uuid %q: %v",
+			domain.ErrRequestFailed,
+			entry.GetSourcecraftUuid(),
+			err,
+		)
+	}
+
+	result := domain.RankingEntry{
+		Place:           entry.GetPlace(),
+		SourcecraftUUID: sourcecraftUUID,
+		Name:            entry.GetName(),
+		WebURL:          entry.GetWebUrl(),
+		Language: domain.PrimaryLanguage{
+			Name:  entry.GetLanguage().GetName(),
+			Color: entry.GetLanguage().GetColor(),
+		},
+	}
+
+	if entry.PublicScore != nil {
+		score := entry.GetPublicScore()
+		result.PublicScore = &score
+	}
+
+	if entry.Likes != nil {
+		likes := entry.GetLikes()
+		result.Likes = &likes
+	}
+
+	if entry.GetLastActivityAt() != nil {
+		if err := entry.GetLastActivityAt().CheckValid(); err != nil {
+			return domain.RankingEntry{}, fmt.Errorf(
+				"%w: invalid last_activity_at: %v",
+				domain.ErrRequestFailed,
+				err,
+			)
+		}
+
+		lastActivityAt := entry.GetLastActivityAt().AsTime()
+		result.LastActivityAt = &lastActivityAt
+	}
+
+	return result, nil
+}
+
+func (s *GatewayService) LoginWithYandex(
+	ctx context.Context,
+	clientIP string,
+	request domain.YandexLoginDTO,
+) (domain.LoginResponse, error) {
+	if err := s.checkRateLimit(ctx, clientIP); err != nil {
+		return domain.LoginResponse{}, err
+	}
+
+	if strings.TrimSpace(request.OAuthToken) == "" {
+		return domain.LoginResponse{}, fmt.Errorf(
+			"%w: oauth token is required",
+			domain.ErrInvalidRequest,
+		)
+	}
+
+	yandexCtx, cancel := context.WithTimeout(ctx, s.yandexTimeout)
+	defer cancel()
+
+	yandexUser, err := s.yandexClient.GetUser(
+		yandexCtx,
+		request.OAuthToken,
+	)
+	if err != nil {
+		return domain.LoginResponse{}, fmt.Errorf(
+			"get yandex user: %w",
+			err,
+		)
+	}
+
+	user, err := s.userRepository.GetUserByYID(
+		ctx,
+		yandexUser.ID,
+	)
+	if err != nil {
+		if !errors.Is(err, domain.ErrUserNotFound) {
+			return domain.LoginResponse{}, fmt.Errorf(
+				"get user by yandex id: %w",
+				err,
+			)
+		}
+
+		user = domain.User{
+			ID:        uuid.New(),
+			YandexID:  yandexUser.ID,
+			CreatedAt: time.Now(),
+		}
+
+		if err := s.userRepository.CreateUser(ctx, user); err != nil {
+			if !errors.Is(err, domain.ErrUserAlreadyExists) {
+				return domain.LoginResponse{}, fmt.Errorf(
+					"create user: %w",
+					err,
+				)
+			}
+
+			user, err = s.userRepository.GetUserByYID(
+				ctx,
+				yandexUser.ID,
+			)
+			if err != nil {
+				return domain.LoginResponse{}, fmt.Errorf(
+					"get existing user after create conflict: %w",
+					err,
+				)
+			}
+		}
+	}
+
+	sessionID, err := s.sessionRepository.CreateSession(
+		ctx,
+		user.ID,
+	)
+	if err != nil {
+		return domain.LoginResponse{}, fmt.Errorf(
+			"create session: %w",
+			err,
+		)
+	}
+
+	return domain.LoginResponse{
+		SessionID: sessionID,
+	}, nil
 }

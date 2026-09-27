@@ -81,14 +81,9 @@ message ReactionCount {
 message RepoGrade {
   string sourcecraft_uuid = 1;
 
-  optional int32 public_score = 2;
-  bytes public_category_scores = 3;
-  bytes public_recommendations = 4;
-
-  optional int32 private_score = 5;
-  bytes private_category_scores = 6;
-  bytes private_recommendations = 7;
-
-  repeated string missing_data = 8;
-  google.protobuf.Timestamp graded_at = 9;
+  optional int32 score = 2;
+  bytes category_scores = 3;
+  bytes advice = 4;
+  repeated string missing_data = 5;
+  google.protobuf.Timestamp graded_at = 6;
 }

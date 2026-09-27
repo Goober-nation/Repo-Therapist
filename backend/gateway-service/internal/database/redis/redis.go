@@ -71,45 +71,45 @@ func (sr *SessionRepository) GetSession(
 	return userID, nil
 }
 
-func (sr *SessionRepository) DeleteSession(
-	ctx context.Context,
-	sessionID string,
-) error {
-	key := sr.buildSessionKey(sessionID)
-
-	result, err := sr.client.Del(ctx, key).Result()
-	if err != nil {
-		return fmt.Errorf("delete session: %w", err)
-	}
-
-	if result == 0 {
-		return domain.ErrSessionNotFound
-	}
-
-	return nil
-}
-
-func (sr *SessionRepository) UpdateSession(
-	ctx context.Context,
-	sessionID string,
-) error {
-	key := sr.buildSessionKey(sessionID)
-
-	updated, err := sr.client.Expire(
-		ctx,
-		key,
-		sr.sessionTTL,
-	).Result()
-	if err != nil {
-		return fmt.Errorf("update session: %w", err)
-	}
-
-	if !updated {
-		return domain.ErrSessionNotFound
-	}
-
-	return nil
-}
+//func (sr *SessionRepository) DeleteSession(
+//	ctx context.Context,
+//	sessionID string,
+//) error {
+//	key := sr.buildSessionKey(sessionID)
+//
+//	result, err := sr.client.Del(ctx, key).Result()
+//	if err != nil {
+//		return fmt.Errorf("delete session: %w", err)
+//	}
+//
+//	if result == 0 {
+//		return domain.ErrSessionNotFound
+//	}
+//
+//	return nil
+//}
+//
+//func (sr *SessionRepository) UpdateSession(
+//	ctx context.Context,
+//	sessionID string,
+//) error {
+//	key := sr.buildSessionKey(sessionID)
+//
+//	updated, err := sr.client.Expire(
+//		ctx,
+//		key,
+//		sr.sessionTTL,
+//	).Result()
+//	if err != nil {
+//		return fmt.Errorf("update session: %w", err)
+//	}
+//
+//	if !updated {
+//		return domain.ErrSessionNotFound
+//	}
+//
+//	return nil
+//}
 
 func (sr *SessionRepository) buildSessionKey(sessionID string) string {
 	return sr.keyPrefix + sessionID
