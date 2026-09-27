@@ -1,7 +1,20 @@
 # Documentation (15%, public)
 
-**Status: blocked — Grade↔LLM Kafka contract not defined yet** (`docs/kafka-contracts.md`, still
-TBD). Last updated 2026-09-22. See `backlog/phase-2-grade-service.md` ("Next task", item 4).
+**Status: implemented** — contract is `repo.docs.grade.requested` → `repo.docs.graded`
+(`docs/kafka-contracts.md`). Last updated 2026-09-27.
+
+## How the grade is calculated (step by step)
+
+1. Grade service publishes `repo.docs.grade.requested` for the repo and keeps grading the other
+   categories while it waits (up to the LLM timeout, 70s by default).
+2. If no reply arrives in time → the whole Documentation section is **no data**.
+3. If the reply has a nonempty `error` (e.g. `CONTENT_FILTER`, `LLM_TIMEOUT`), or `grade` is
+   `null` → the whole Documentation section is **no data**; subgrades and advice are ignored and
+   the error code is logged.
+4. Otherwise the LLM's `grade` (0–100) is taken as the category score unchanged; `subgrades` are
+   shown as metrics for display only and do not recompute the score.
+5. A no-data Documentation section is dropped from the overall grade and the remaining category
+   weights are renormalized, the same as any other no-data category.
 
 ## What it measures
 
@@ -33,7 +46,8 @@ the Kafka contract.
 ## No-data vs. real-zero
 
 - Repo below the minimum-content threshold (`00-overview.md` principle 4) → `NoData`.
-- The LLM call failing or timing out → `NoData` — never a fabricated score.
+- The LLM call failing or timing out → `NoData` — never a fabricated score. This covers a missing
+  reply and a reply with a nonempty `error` / `grade: null` (2026-09-27).
 - A repo the LLM successfully judges as having *no* README at all is a real, harsh score from the
   LLM — not `NoData`. Same "measured harsh vs. unmeasurable" distinction every other category
   draws, just evaluated by the LLM instead of a formula.

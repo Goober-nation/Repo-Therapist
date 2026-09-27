@@ -123,8 +123,8 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 		job := jobs.take(ready.OrgSlug + "/" + ready.RepoSlug)
 
 		if ready.Status != contracts.StatusReady {
-			log.Printf("skipping %s/%s: status=%s error=%q", ready.OrgSlug, ready.RepoSlug, ready.Status, ready.Error)
-			return nil
+			log.Printf("not grading %s/%s: status=%s error=%q", ready.OrgSlug, ready.RepoSlug, ready.Status, ready.Error)
+			return publishFailure(ctx, producer, ready, job.visibility, contracts.GradingErrRepoFailed)
 		}
 
 		log.Printf("grading %s/%s %s (sourcecraft_uuid=%s)", ready.OrgSlug, ready.RepoSlug, job.visibility, ready.SourcecraftUUID)
@@ -138,11 +138,13 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 			reply = docs.waiters.wait(ctx, ready.SourcecraftUUID, docsCh, docsDeadline)
 			if reply == nil {
 				log.Printf("no %s reply for %s/%s within %s: Documentation will be no-data", contracts.TopicDocsGraded, ready.OrgSlug, ready.RepoSlug, docs.timeout)
+			} else if reply.Error != "" {
+				log.Printf("LLM documentation evaluation for %s/%s failed with %s: Documentation will be no-data", ready.OrgSlug, ready.RepoSlug, reply.Error)
 			}
 		}
 		if err != nil {
 			log.Printf("grading %s/%s failed: %v", ready.OrgSlug, ready.RepoSlug, err)
-			return nil
+			return publishFailure(ctx, producer, ready, job.visibility, contracts.GradingErrGrading)
 		}
 		out.Categories["documentation"] = scoring.ComputeDocumentation(reply)
 		app.PrintResult(out)
@@ -150,7 +152,7 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 		result, err := app.BuildGradingResult(out, cfg, catalog, job.visibility, time.Now(), rand.Shuffle)
 		if err != nil {
 			log.Printf("building grading result for %s/%s failed: %v", ready.OrgSlug, ready.RepoSlug, err)
-			return nil
+			return publishFailure(ctx, producer, ready, job.visibility, contracts.GradingErrBuildResult)
 		}
 		if err := producer.Publish(ctx, ready.SourcecraftUUID, result); err != nil {
 			return fmt.Errorf("publishing %s: %w", contracts.TopicGradingResults, err)
@@ -158,6 +160,20 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 		log.Printf("published grading result for %s/%s to %s", ready.OrgSlug, ready.RepoSlug, contracts.TopicGradingResults)
 		return nil
 	})
+}
+
+// publishFailure reports a repo that couldn't be graded, so the Aggregator releases its lock. A
+// failure without a sourcecraft_uuid can't be correlated to a lock and is only logged.
+func publishFailure(ctx context.Context, producer *kafkaclient.Producer, ready contracts.RepoReady, visibility, code string) error {
+	if ready.SourcecraftUUID == "" {
+		log.Printf("no sourcecraft_uuid for %s/%s: cannot publish %s failure", ready.OrgSlug, ready.RepoSlug, code)
+		return nil
+	}
+	if err := producer.Publish(ctx, ready.SourcecraftUUID, app.GradingFailure(ready.SourcecraftUUID, visibility, code, time.Now())); err != nil {
+		return fmt.Errorf("publishing %s failure: %w", contracts.TopicGradingResults, err)
+	}
+	log.Printf("published %s failure for %s/%s to %s", code, ready.OrgSlug, ready.RepoSlug, contracts.TopicGradingResults)
+	return nil
 }
 
 // docsSettings controls the Documentation round trip to the LLM service. enabled is false when

@@ -93,27 +93,28 @@ type Recommendation struct {
 }
 
 // GradingResultEvent is published once grading finishes — consumed by the Aggregator, which
-// writes it via UpsertGrade and releases the repo_lock. Only the side matching Visibility is
-// filled; the other side's fields are null. The filled side's score is nil only when every
-// category in that view is NoData. Recommendations hold at most 3, picked at random from all of
-// that view's categories. MissingData names the view's categories that are NoData/not_calculated.
+// writes it to the repo_grades_* table matching Visibility and releases the repo_lock. Score is
+// nil only when every category in that view is NoData. Advice holds at most 3 Recommendations,
+// picked at random from all of that view's categories. MissingData names the view's categories
+// that are NoData/not_calculated. A nonempty Error means grading failed: Score, CategoryScores and
+// Advice are null and the Aggregator only releases the lock.
 type GradingResultEvent struct {
-	SourcecraftUUID string `json:"sourcecraft_uuid"`
-	// Visibility says which side below is filled (VisibilityPublic/VisibilityPrivate); the other
-	// side is null. The Aggregator writes to the matching repo_grades_* table.
-	Visibility string `json:"visibility"`
-
-	PublicScore           *int16          `json:"public_score"`
-	PublicCategoryScores  json.RawMessage `json:"public_category_scores"`
-	PublicRecommendations json.RawMessage `json:"public_recommendations"`
-
-	PrivateScore           *int16          `json:"private_score"`
-	PrivateCategoryScores  json.RawMessage `json:"private_category_scores"`
-	PrivateRecommendations json.RawMessage `json:"private_recommendations"`
-
-	MissingData []string  `json:"missing_data"`
-	GradedAt    time.Time `json:"graded_at"`
+	SourcecraftUUID string          `json:"sourcecraft_uuid"`
+	Visibility      string          `json:"visibility"` // VisibilityPublic or VisibilityPrivate
+	Score           *int16          `json:"score"`
+	CategoryScores  json.RawMessage `json:"category_scores"`
+	Advice          json.RawMessage `json:"advice"`
+	MissingData     []string        `json:"missing_data"`
+	GradedAt        time.Time       `json:"graded_at"`
+	Error           string          `json:"error"`
 }
+
+// Grading failure codes carried in GradingResultEvent.Error.
+const (
+	GradingErrRepoFailed  = "REPO_FETCH_FAILED"
+	GradingErrGrading     = "GRADING_FAILED"
+	GradingErrBuildResult = "RESULT_BUILD_FAILED"
+)
 
 // DocsGradeRequested asks the LLM service to grade a repo's documentation from its S3 prefix.
 type DocsGradeRequested struct {
@@ -123,11 +124,14 @@ type DocsGradeRequested struct {
 }
 
 // DocsGraded is the LLM service's reply: grade and subgrades are integers 0-100; sections it
-// didn't review are absent from Subgrades. Advice holds deficiency facts, not recommendations.
+// didn't review are absent from Subgrades. Advice holds Russian improvement recommendations.
+// A nonempty Error means the evaluation failed: Grade is null, the other fields empty, and the
+// reply must be read as Documentation no-data. Grade is a pointer so null never decodes as 0.
 type DocsGraded struct {
 	SourcecraftUUID string         `json:"sourcecraft_uuid"`
-	Grade           int            `json:"grade"`
+	Grade           *int           `json:"grade"`
 	Subgrades       map[string]int `json:"subgrades"`
 	Advice          []string       `json:"advice"`
+	Error           string         `json:"error"`
 	EvaluatedAt     time.Time      `json:"evaluated_at"`
 }

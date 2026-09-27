@@ -29,8 +29,8 @@ func TestBuildGradingResult_RoundsNotTruncates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildGradingResult: %v", err)
 	}
-	if result.PublicScore == nil || *result.PublicScore != 51 {
-		t.Errorf("PublicScore = %v, want 51 (50.7 rounds up, a bare int16 cast would truncate to 50)", result.PublicScore)
+	if result.Score == nil || *result.Score != 51 {
+		t.Errorf("Score = %v, want 51 (50.7 rounds up, a bare int16 cast would truncate to 50)", result.Score)
 	}
 }
 
@@ -63,7 +63,7 @@ func TestBuildGradingResult_AbsentCategoriesStayAbsent(t *testing.T) {
 	}
 
 	var privateCategories map[string]scoring.CategoryResult
-	if err := json.Unmarshal(result.PrivateCategoryScores, &privateCategories); err != nil {
+	if err := json.Unmarshal(result.CategoryScores, &privateCategories); err != nil {
 		t.Fatalf("unmarshaling private_category_scores: %v", err)
 	}
 
@@ -104,9 +104,8 @@ func TestBuildGradingResult_FillsOnlyItsVisibility(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pub.Visibility != contracts.VisibilityPublic || pub.PublicScore == nil || pub.PrivateScore != nil ||
-		pub.PrivateCategoryScores != nil || pub.PrivateRecommendations != nil {
-		t.Errorf("public result should fill only the public side: %+v", pub)
+	if pub.Visibility != contracts.VisibilityPublic || pub.Score == nil || pub.Error != "" {
+		t.Errorf("unexpected public result: %+v", pub)
 	}
 	for _, id := range pub.MissingData {
 		if id == "security" || id == "ci_cd" {
@@ -118,9 +117,8 @@ func TestBuildGradingResult_FillsOnlyItsVisibility(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if priv.Visibility != contracts.VisibilityPrivate || priv.PrivateScore == nil || priv.PublicScore != nil ||
-		priv.PublicCategoryScores != nil || priv.PublicRecommendations != nil {
-		t.Errorf("private result should fill only the private side: %+v", priv)
+	if priv.Visibility != contracts.VisibilityPrivate || priv.Score == nil || priv.Error != "" {
+		t.Errorf("unexpected private result: %+v", priv)
 	}
 }
 
@@ -144,10 +142,25 @@ func TestBuildGradingResult_CapsRecommendationsAcrossCategories(t *testing.T) {
 		t.Fatal(err)
 	}
 	var recs []contracts.Recommendation
-	if err := json.Unmarshal(result.PublicRecommendations, &recs); err != nil {
+	if err := json.Unmarshal(result.Advice, &recs); err != nil {
 		t.Fatal(err)
 	}
 	if len(recs) != 3 {
 		t.Fatalf("got %d recommendations from a pool of 5, want 3", len(recs))
+	}
+}
+
+func TestGradingFailureWireShape(t *testing.T) {
+	raw, err := json.Marshal(GradingFailure("u1", contracts.VisibilityPublic, contracts.GradingErrGrading, time.Unix(0, 0).UTC()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["error"] != "GRADING_FAILED" || got["score"] != nil || got["category_scores"] != nil || got["advice"] != nil ||
+		got["sourcecraft_uuid"] != "u1" || got["visibility"] != "public" {
+		t.Fatalf("unexpected failure event %s", raw)
 	}
 }

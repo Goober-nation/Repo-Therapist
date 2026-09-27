@@ -11,11 +11,11 @@ import (
 func TestDocsWaitersDeliversReply(t *testing.T) {
 	w := newDocsWaiters()
 	ch := w.register("u1")
-	if !w.deliver(contracts.DocsGraded{SourcecraftUUID: "u1", Grade: 84}) {
+	if !w.deliver(contracts.DocsGraded{SourcecraftUUID: "u1", Grade: intPtr(84)}) {
 		t.Fatal("reply for a waiting repo was not delivered")
 	}
 	got := w.wait(context.Background(), "u1", ch, time.Now().Add(time.Second))
-	if got == nil || got.Grade != 84 {
+	if got == nil || *got.Grade != 84 {
 		t.Fatalf("got %+v, want grade 84", got)
 	}
 }
@@ -44,3 +44,5 @@ func TestDocsWaitersDuplicateAndUnknownDropped(t *testing.T) {
 		t.Fatal("duplicate reply was delivered")
 	}
 }
+
+func intPtr(v int) *int { return &v }

@@ -211,15 +211,19 @@ func BuildGradingResult(out *GradeOutput, cfg *config.Config, catalog map[string
 	result := contracts.GradingResultEvent{
 		SourcecraftUUID: out.RepoID,
 		Visibility:      visibility,
+		Score:           scorePtr,
+		CategoryScores:  categoryJSON,
+		Advice:          recsJSON,
 		MissingData:     scoring.MissingCategories(out.Categories, ids),
 		GradedAt:        now,
 	}
-	if visibility == contracts.VisibilityPrivate {
-		result.PrivateScore, result.PrivateCategoryScores, result.PrivateRecommendations = scorePtr, categoryJSON, recsJSON
-	} else {
-		result.PublicScore, result.PublicCategoryScores, result.PublicRecommendations = scorePtr, categoryJSON, recsJSON
-	}
 	return result, nil
+}
+
+// GradingFailure is the result published when a repo couldn't be graded, so the Aggregator can
+// release its lock instead of waiting on a result that will never come.
+func GradingFailure(sourcecraftUUID, visibility, code string, now time.Time) contracts.GradingResultEvent {
+	return contracts.GradingResultEvent{SourcecraftUUID: sourcecraftUUID, Visibility: visibility, GradedAt: now, Error: code}
 }
 
 func toContractRecommendations(recs []scoring.Recommendation) []contracts.Recommendation {
