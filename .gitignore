@@ -11,6 +11,9 @@
 # this file itself
 !.gitignore
 
+# license
+!LICENSE
+
 # docker
 !.dockerignore
 !**/.dockerignore
