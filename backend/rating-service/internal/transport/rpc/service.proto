@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package rating;
+
+option go_package = "rating-service/internal/transport/gen;pb";
+
+import "google/protobuf/timestamp.proto";
+
+service Rating {
+  // GetRanking returns one page of the public repositories ranking. Read-only — the rating
+  // service never writes to the DB.
+  rpc GetRanking(GetRankingRequest) returns (GetRankingResponse);
+}
+
+enum SortBy {
+  // Treated as SORT_BY_SCORE.
+  SORT_BY_UNSPECIFIED = 0;
+  SORT_BY_SCORE = 1;
+  SORT_BY_LAST_ACTIVITY = 2;
+  SORT_BY_LIKES = 3;
+}
+
+message GetRankingRequest {
+  // 1-based page number; 0 means the first page.
+  int32 page = 1;
+  // Entries per page; 0 means the default (20), max 100.
+  int32 page_size = 2;
+  // Primary language filter, matched case-insensitively. Empty means all languages.
+  string language = 3;
+  // Always descending, NULLs last. Ties are broken by public_score, so health stays the dominant
+  // ranking factor whichever sort is chosen.
+  SortBy sort_by = 4;
+}
+
+message RankingEntry {
+  // Position within the current filtered and sorted list: (page-1)*page_size + index + 1.
+  int32 place = 1;
+  string sourcecraft_uuid = 2;
+  string name = 3;
+  string web_url = 4;
+  // Unset when the repo has not been graded yet ("нет данных").
+  optional int32 public_score = 5;
+  // SourceCraft rating value (likes). Unset when unknown.
+  optional double likes = 6;
+  // Unset when unknown.
+  optional string language = 7;
+  // Unset when unknown.
+  google.protobuf.Timestamp last_activity_at = 8;
+}
+
+message GetRankingResponse {
+  repeated RankingEntry entries = 1;
+  // Number of repos matching the filter across all pages.
+  int32 total_count = 2;
+  // Effective page and page_size after defaults were applied.
+  int32 page = 3;
+  int32 page_size = 4;
+}
