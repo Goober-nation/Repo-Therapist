@@ -4,6 +4,7 @@ from unittest.mock import patch
 import io
 
 from llm_service.grading import GROUPS
+from llm_service.recommendations import FALLBACKS
 from llm_service.kafka_worker import (KafkaConfig, process_documentation_request,
                                       publish_terminal, run_worker)
 from llm_service.yandex_model import (ModelContentFiltered, ModelDeadlineExceeded, ModelInputTooLarge,
@@ -107,7 +108,8 @@ class KafkaWorkerTests(unittest.TestCase):
         self.assertEqual(set(event), {"sourcecraft_uuid", "grade", "subgrades", "advice", "error", "evaluated_at"})
         self.assertEqual(event["sourcecraft_uuid"], REPOSITORY)
         self.assertEqual(event["subgrades"], {group: 95 for group in GROUPS})
-        self.assertEqual(event["advice"], [])
+        # Every section is reduced without facts, so each gets its fallback once.
+        self.assertEqual(event["advice"], [FALLBACKS[group] for group in GROUPS])
         self.assertEqual(event["error"], "")
         self.assertEqual(model.calls, 1)
 

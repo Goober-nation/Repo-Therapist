@@ -3,6 +3,7 @@ import unittest
 
 from llm_service.context import (ContextBuildError, allowed_not_applicable_checks, build_model_context,
                                  prepare_documentation_context, select_context_paths)
+from llm_service.grading import deterministic_checks
 from llm_service.snapshot import Snapshot
 
 
@@ -43,9 +44,23 @@ class ContextTests(unittest.TestCase):
         with self.assertRaisesRegex(ContextBuildError, "byte limit"):
             build_model_context(snapshot, max_context_bytes=20)
 
-    def test_inventory_limit_fails(self):
-        with self.assertRaisesRegex(ContextBuildError, "path limit"):
-            select_context_paths(frozenset({"README.md", "docs/run.md"}), max_paths=1)
+    def test_large_inventory_is_selected_without_limit(self):
+        paths = frozenset({"README.md", "docs/run.md", "src/Main.go", "src/main.go",
+                           "odd\\name.txt"} | {f"src/f{i}.go" for i in range(20_000)})
+        selected = select_context_paths(paths)
+        self.assertEqual(selected & {"README.md", "docs/run.md"}, {"README.md", "docs/run.md"})
+        self.assertLessEqual(len(selected), 20)
+
+    def test_unreadable_required_file_counts_as_present_but_is_not_sent(self):
+        store = FakeStore()
+        store.objects["repos/id/LICENSE"] = "Лицензия MIT".encode("cp1251")
+        snapshot, context = prepare_documentation_context(store, "repos/id")
+        self.assertEqual(snapshot.unreadable, {"LICENSE"})
+        data = json.loads(context.text)
+        self.assertNotIn("LICENSE", {item["path"] for item in data["documents"]})
+        self.assertNotIn("LICENSE", data["artifacts"])
+        checks = deterministic_checks(snapshot.files, set(snapshot.all_paths))
+        self.assertEqual(checks["license.exists"]["points_awarded"], 5)
 
     def test_applicability_comes_from_repository_artifacts(self):
         snapshot, context = prepare_documentation_context(FakeStore(), "repos/id")

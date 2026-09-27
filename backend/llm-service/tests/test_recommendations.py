@@ -3,7 +3,7 @@ from copy import deepcopy
 
 from llm_service.deductions import RULES
 from llm_service.grade_wire import build_grade_result, parse_grade_request
-from llm_service.recommendations import RECOMMENDATIONS, render_advice
+from llm_service.recommendations import FALLBACKS, RECOMMENDATIONS, render_advice
 from test_kafka_worker import FakeModel, request
 
 
@@ -44,12 +44,22 @@ class RecommendationTests(unittest.TestCase):
         for grade in (None, 100):
             payload = FakeModel().grade(None, None)
             for section in payload['subcategories']:
-                if section['id'] == 'purpose':
-                    section['grade'] = grade
+                section['grade'] = grade if section['id'] == 'purpose' else 100
             payload['facts'] = [{'id': 'DOC-1', 'subcategory': 'purpose',
                                  'code': 'DOC_PURPOSE_UNCLEAR', 'facts': {}, 'evidence': []}]
             event = build_grade_result(parse_grade_request(request()), payload)
             self.assertEqual(event['advice'], [])
+
+    def test_duplicates_removed_and_reduced_section_without_facts_gets_fallback(self):
+        payload = FakeModel().grade(None, None)
+        for section in payload['subcategories']:
+            section['grade'] = {'purpose': 50, 'testing': 80}.get(section['id'], 100)
+        fact = {'subcategory': 'purpose', 'code': 'DOC_PURPOSE_UNCLEAR', 'facts': {},
+                'evidence': []}
+        payload['facts'] = [dict(fact, id=f'DOC-{i}') for i in range(3)]
+        event = build_grade_result(parse_grade_request(request()), payload)
+        self.assertEqual(event['advice'], [RECOMMENDATIONS['DOC_PURPOSE_UNCLEAR'],
+                                           FALLBACKS['testing']])
 
     def test_deterministic_missing_file_has_specific_recommendation(self):
         text = render_advice({'subcategory': 'required_files', 'code': 'DOC_LICENSE_MISSING',

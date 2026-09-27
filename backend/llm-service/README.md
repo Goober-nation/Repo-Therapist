@@ -108,8 +108,31 @@ previous envelope request/result round trip was verified against the local Kafka
 simulated repository and model. S3 list/get and context preparation were
 verified over HTTP against a local S3-compatible test server. The repository's
 MinIO image could not be pulled from Quay (`401`), so MinIO itself and the full
-Kafka → MinIO → Yandex path remain unverified here. Report generation and its
-separate Kafka topics are not implemented yet.
+Kafka → MinIO → Yandex path remain unverified here. The legacy report envelope
+(`llm.report.*`) is superseded by the summary worker below.
+
+## Repository summary and recommendations
+
+The summary worker consumes `llm.recommendations.requested` from the Aggregator and
+publishes `llm.recommendations.received`; see
+[the contract](../../docs/kafka-contracts.md#repository-summary-and-recommendations-active-aggregator--llm-contract-2026-09-27).
+Input is the final grade only (overall score, category scores, recommendations, missing
+data); repository files are not read. The model writes a Russian `summary` and up to eight
+recommendation texts. Code derives `strengths`, `weaknesses` and each recommendation's
+`priority` from the scores. Output format and category IDs are validated; the wording is not. Public requests never expose Security or
+CI/CD to the model. One format retry fits in a 60-second budget; failures produce
+`raw_response: null` and an error code.
+
+```bash
+# Kafka worker (needs the Yandex variables and KAFKA_BROKERS; S3 is not used)
+PYTHONPATH=src python3 -m llm_service --listen-summary
+
+# One request from a JSON file, printed as the result event (paid model call)
+PYTHONPATH=src python3 -m llm_service --summary-file request.json
+```
+
+Optional: `LLM_SUMMARY_KAFKA_GROUP_ID` (default `llm-service-recommendations-v1`),
+`LLM_SUMMARY_REQUEST_TOPIC`, `LLM_SUMMARY_RESULT_TOPIC`.
 
 Run the current tests from this directory:
 

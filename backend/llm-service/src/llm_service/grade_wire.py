@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 from .contracts import InvalidEvent, _unique_pairs, _reject_constant, _uuid, validate_documentation_payload
-from .recommendations import render_advice
+from .recommendations import FALLBACKS, render_advice
 
 REQUEST_TOPIC = 'repo.docs.grade.requested'
 RESULT_TOPIC = 'repo.docs.graded'
@@ -53,6 +53,19 @@ def request_uuid_if_valid(raw):
     return value
 
 
+def _advice(payload, reduced_groups):
+    """One copy of each recommendation; a reduced section without facts gets its fallback."""
+    advice = []
+    covered = set()
+    for fact in payload["facts"]:
+        if fact["subcategory"] in reduced_groups:
+            covered.add(fact["subcategory"])
+            advice.append(render_advice(fact))
+    advice += [FALLBACKS[item["id"]] for item in payload["subcategories"]
+               if item["id"] in reduced_groups and item["id"] not in covered]
+    return list(dict.fromkeys(advice))
+
+
 def build_grade_result(request, payload):
     validate_documentation_payload(payload)
     reduced_groups = {item["id"] for item in payload["subcategories"]
@@ -64,8 +77,7 @@ def build_grade_result(request, payload):
         "grade": integer(payload["grade"]),
         "subgrades": {item["id"]: integer(item["grade"])
                       for item in payload["subcategories"] if item["grade"] is not None},
-        "advice": [render_advice(fact) for fact in payload["facts"]
-                   if fact["subcategory"] in reduced_groups],
+        "advice": _advice(payload, reduced_groups),
         "error": "",
         "evaluated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }

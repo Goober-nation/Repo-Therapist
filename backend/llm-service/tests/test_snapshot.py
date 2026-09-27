@@ -50,6 +50,34 @@ class SnapshotTests(unittest.TestCase):
         with self.assertRaisesRegex(SnapshotError, "prefix not found"):
             load_snapshot(FakeStore(), "repos/unknown", set())
 
+    def test_oversized_file_keeps_its_beginning_without_split_characters(self):
+        store = FakeStore()
+        store.objects["repos/123/README.md"] = "# Проект\n".encode() + "я".encode() * 20
+        # "# Проект\n" is 15 bytes; a 16-byte cap splits the next two-byte "я".
+        result = load_snapshot(store, "repos/123", {"README.md"}, max_file_bytes=16)
+        self.assertEqual(result.files["README.md"], "# Проект\n")
+        result = load_snapshot(store, "repos/123", {"README.md"}, max_file_bytes=17)
+        self.assertEqual(result.files["README.md"], "# Проект\nя")
+
+    def test_budget_skips_optional_files_but_always_reads_required(self):
+        store = FakeStore()
+        store.objects["repos/123/LICENSE"] = b"MIT " * 10
+        store.objects["repos/123/docs/a.md"] = b"a" * 30
+        store.objects["repos/123/docs/b.md"] = b"b" * 30
+        result = load_snapshot(store, "repos/123", {"LICENSE", "docs/a.md", "docs/b.md"},
+                               max_total_bytes=75, required={"LICENSE"})
+        self.assertEqual(set(result.files), {"LICENSE", "docs/a.md"})
+
+    def test_non_utf8_optional_is_skipped_and_required_is_kept_unreadable(self):
+        store = FakeStore()
+        store.objects["repos/123/LICENSE"] = "Лицензия".encode("cp1251")
+        store.objects["repos/123/docs/a.md"] = "Документ".encode("cp1251")
+        result = load_snapshot(store, "repos/123", {"LICENSE", "docs/a.md"},
+                               required={"LICENSE"})
+        self.assertEqual(set(result.files), {"LICENSE"})
+        self.assertEqual(result.unreadable, {"LICENSE"})
+        self.assertTrue(result.files["LICENSE"].strip())
+
 
 if __name__ == "__main__":
     unittest.main()

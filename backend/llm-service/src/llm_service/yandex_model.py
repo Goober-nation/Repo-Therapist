@@ -207,8 +207,14 @@ class YandexModel:
     def __init__(self, config: YandexModelConfig):
         self.config = config
 
+    @property
+    def name(self) -> str:
+        return self.config.model
+
     def complete(self, prompt: str, *, max_output_tokens: int = 16_384,
                  json_output: bool = False, json_schema: dict | None = None,
+                 schema_name: str = "documentation_grading",
+                 schema_description: str = "Documentation grading checks only",
                  timeout_seconds: float | None = None) -> bytes:
         if not isinstance(prompt, str) or not prompt:
             raise ValueError("model prompt must be nonempty text")
@@ -228,8 +234,8 @@ class YandexModel:
         if json_schema is not None:
             payload["text"] = {"format": {
                 "type": "json_schema",
-                "name": "documentation_grading",
-                "description": "Documentation grading checks only",
+                "name": schema_name,
+                "description": schema_description,
                 "strict": False,
                 "schema": json_schema,
             }}
