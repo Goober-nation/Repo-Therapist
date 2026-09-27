@@ -100,9 +100,7 @@ _FILE_RULES = {
 
 def required_file_paths(all_paths: set[str]) -> set[str]:
     """Select the objective-check documents from a complete S3 object listing."""
-    folded = {path.lower(): path for path in all_paths}
-    if len(folded) != len(all_paths):
-        raise ValueError("case-insensitive duplicate paths")
+    folded = _folded(all_paths)
     selected = set()
     for check_id, (stem, extensions, dirs, _) in _FILE_RULES.items():
         names = [f"{directory}{stem}{ext}" for directory in dirs for ext in extensions]
@@ -112,6 +110,14 @@ def required_file_paths(all_paths: set[str]) -> set[str]:
         if found is not None:
             selected.add(found)
     return selected
+
+
+def _folded(all_paths) -> dict[str, str]:
+    """Case-insensitive lookup; paths differing only by case resolve deterministically."""
+    folded = {}
+    for path in sorted(all_paths):
+        folded.setdefault(path.lower(), path)
+    return folded
 
 
 def _path(path: str) -> str:
@@ -160,11 +166,8 @@ def deterministic_checks(files: Mapping[str, str], all_paths: set[str] | None = 
     all_paths = set(files) if all_paths is None else set(all_paths)
     if not set(files) <= all_paths:
         raise ValueError("selected file absent from listing")
-    for path in all_paths:
-        _path(path)
-    folded = {path.lower(): path for path in all_paths}
-    if len(folded) != len(all_paths):
-        raise ValueError("case-insensitive duplicate paths")
+    # Only read files are validated: large repositories may contain unusual names.
+    folded = _folded(all_paths)
 
     result = {}
     for check_id, (stem, extensions, dirs, code_prefix) in _FILE_RULES.items():

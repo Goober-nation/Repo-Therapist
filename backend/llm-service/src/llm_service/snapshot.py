@@ -24,16 +24,34 @@ class Snapshot:
     all_paths: frozenset[str]
     files: Mapping[str, str]
     hashes: Mapping[str, str]
+    # Required files that exist but are not UTF-8: kept for the presence check,
+    # never shown to the model.
+    unreadable: frozenset[str] = frozenset()
+
+
+def _decode(data: bytes, truncated: bool) -> str:
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        # A byte cap can split the last multibyte character; drop only that tail.
+        if truncated and exc.end == len(data) and exc.start >= len(data) - 3:
+            return data[:exc.start].decode("utf-8")
+        raise
 
 
 def load_snapshot(store: ObjectStore, prefix: str,
                   selected_paths: set[str] | Callable[[frozenset[str]], set[str]], *,
                   max_file_bytes: int = 2_000_000, max_total_bytes: int = 8_000_000,
-                  expand_selection=None) -> Snapshot:
+                  expand_selection=None, required: set[str] | Callable | None = None,
+                  priority: Callable[[str], object] | None = None) -> Snapshot:
     """Compare full listings and reread selected files to detect concurrent writes.
 
     This is a best-effort consistency check for the current mutable Repository
     prefix. A truly atomic snapshot needs Repository service support later.
+
+    Oversized files are read up to ``max_file_bytes``. Required files are read
+    first and always; other files are skipped once ``max_total_bytes`` is spent or
+    when they are not UTF-8. A required non-UTF-8 file is kept as unreadable.
     """
     if not prefix or prefix.startswith("/") or prefix.endswith("/") or ".." in prefix.split("/"):
         raise ValueError("invalid S3 prefix")
@@ -49,38 +67,50 @@ def load_snapshot(store: ObjectStore, prefix: str,
     repository_keys = {key[len(root):]: key for key in before
                        if key[len(root):] and not key.endswith("/")
                        and not key[len(root):].startswith("_meta/")}
+    inventory = frozenset(repository_keys)
     if callable(selected_paths):
-        selected_paths = selected_paths(frozenset(repository_keys))
+        selected_paths = selected_paths(inventory)
     if not isinstance(selected_paths, set):
         raise ValueError("selected_paths must be a set")
     if not selected_paths <= repository_keys.keys():
         raise SnapshotError("selected file absent from complete listing")
+    required = set(required(inventory) if callable(required) else required or ())
+    order = priority or (lambda path: path)
     files = {}
     hashes = {}
+    unreadable = set()
     total = 0
+
     def read_paths(paths):
         nonlocal total
-        for path in sorted(paths):
+        for path in sorted(paths, key=lambda item: (item not in required, order(item), item)):
             key = repository_keys[path]
             listed_size = before[key][0]
-            if listed_size > max_file_bytes or total + listed_size > max_total_bytes:
-                raise SnapshotError("selected documentation exceeds context limits")
+            expected = min(listed_size, max_file_bytes)
+            if path not in required and total + expected > max_total_bytes:
+                continue
             try:
-                first = store.read_object(key)
-                second = store.read_object(key)
+                first = store.read_object(key)[:max_file_bytes]
+                second = store.read_object(key)[:max_file_bytes]
             except Exception as exc:
                 raise SnapshotError("S3 read failed") from exc
-            if first != second or len(first) != listed_size:
+            if first != second or len(first) != expected:
                 raise SnapshotError("S3 content changed during read")
-            total += len(first)
             try:
-                files[path] = first.decode("utf-8")
-            except UnicodeDecodeError as exc:
-                raise SnapshotError("selected documentation is not UTF-8 text") from exc
+                text = _decode(first, listed_size > max_file_bytes)
+            except UnicodeDecodeError:
+                if path not in required:
+                    continue
+                unreadable.add(path)
+                text = first.decode("utf-8", errors="replace")
+            total += len(first)
+            files[path] = text
             hashes[path] = sha256(first).hexdigest()
+
     read_paths(selected_paths)
     if expand_selection is not None:
-        extra = set(expand_selection(files, frozenset(repository_keys))) - set(files)
+        readable = {path: text for path, text in files.items() if path not in unreadable}
+        extra = set(expand_selection(readable, inventory)) - set(files)
         if not extra <= repository_keys.keys():
             raise SnapshotError("linked file absent from complete listing")
         read_paths(extra)
@@ -90,4 +120,4 @@ def load_snapshot(store: ObjectStore, prefix: str,
         raise SnapshotError("S3 listing failed") from exc
     if before != after:
         raise SnapshotError("S3 object listing changed during read")
-    return Snapshot(frozenset(repository_keys), files, hashes)
+    return Snapshot(inventory, files, hashes, frozenset(unreadable))
