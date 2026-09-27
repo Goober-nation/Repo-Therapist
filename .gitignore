@@ -37,6 +37,8 @@
 
 # protobuf (source contract for generated *.pb.go — the allowlist missed this type)
 !*.proto
+# python LLM service
+!*.py
 
 # react/frontend (covers html + tsconfig per project decision)
 !*.js
