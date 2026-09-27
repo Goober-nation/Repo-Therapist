@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"aggregator-service/internal/domain"
-	"aggregator-service/internal/transport/rpc/gen/client"
 	"aggregator-service/internal/transport/rpc/gen/server"
 	"context"
 	"errors"
@@ -45,7 +44,7 @@ func NewServer(service AggregatorService) *Server {
 
 func (s *Server) GetMyRepos(
 	ctx context.Context,
-	req *client.GetMyReposRequest,
+	req *server.GetMyReposRequest,
 ) (*server.GetMyReposResponse, error) {
 	response, err := s.service.GetMyRepos(ctx)
 	if err != nil {
@@ -177,22 +176,16 @@ func repoToProto(repo domain.Repo) (*server.Repository, error) {
 
 func gradeToProto(grade domain.RepoGrade) *server.RepoGrade {
 	result := &server.RepoGrade{
-		SourcecraftUuid:        grade.SourcecraftUUID.String(),
-		PublicCategoryScores:   grade.PublicCategoryScores,
-		PublicRecommendations:  grade.PublicRecommendations,
-		PrivateCategoryScores:  grade.PrivateCategoryScores,
-		PrivateRecommendations: grade.PrivateRecommendations,
-		MissingData:            grade.MissingData,
+		SourcecraftUuid: grade.SourcecraftUUID.String(),
+		CategoryScores:  grade.CategoryScores,
+		Advice:          grade.Advice,
+
+		MissingData: grade.MissingData,
 	}
 
-	if grade.PublicScore != nil {
-		value := int32(*grade.PublicScore)
-		result.PublicScore = &value
-	}
-
-	if grade.PrivateScore != nil {
-		value := int32(*grade.PrivateScore)
-		result.PrivateScore = &value
+	if grade.Score != nil {
+		value := int32(*grade.Score)
+		result.Score = &value
 	}
 
 	if grade.GradedAt != nil {

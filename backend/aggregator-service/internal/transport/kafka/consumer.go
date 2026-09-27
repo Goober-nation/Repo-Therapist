@@ -17,7 +17,7 @@ type GradeConsumer struct {
 }
 
 type GradeSaver interface {
-	SaveGradingResult(ctx context.Context, grade domain.RepoGrade) error
+	SaveGradingResult(ctx context.Context, grade domain.RepoGrade, visibility string) error
 }
 
 func NewGradeConsumer(
@@ -68,15 +68,13 @@ func (c *GradeConsumer) handleMessage(
 	}
 
 	grade := domain.RepoGrade{
-		SourcecraftUUID:        event.SourcecraftUUID,
-		PublicScore:            event.PublicScore,
-		PublicCategoryScores:   event.PublicCategoryScores,
-		PublicRecommendations:  event.PublicRecommendations,
-		PrivateScore:           event.PrivateScore,
-		PrivateCategoryScores:  event.PrivateCategoryScores,
-		PrivateRecommendations: event.PrivateRecommendations,
-		MissingData:            event.MissingData,
-		GradedAt:               &event.GradedAt,
+		SourcecraftUUID: event.SourcecraftUUID,
+		Score:           event.Score,
+		CategoryScores:  event.CategoryScores,
+		Advice:          event.Advice,
+
+		MissingData: event.MissingData,
+		GradedAt:    &event.GradedAt,
 	}
 
 	if err := c.service.SaveGradingResult(ctx, grade, event.Visibility); err != nil {

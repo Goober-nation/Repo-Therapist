@@ -33,13 +33,9 @@ type LLMRecommendationsReceivedEvent struct {
 type GradingResultReceivedEvent struct {
 	SourcecraftUUID uuid.UUID `json:"sourcecraft_uuid"`
 
-	PublicScore           *int16          `json:"public_score"`
-	PublicCategoryScores  json.RawMessage `json:"public_category_scores"`
-	PublicRecommendations json.RawMessage `json:"public_recommendations"`
-
-	PrivateScore           *int16          `json:"private_score"`
-	PrivateCategoryScores  json.RawMessage `json:"private_category_scores"`
-	PrivateRecommendations json.RawMessage `json:"private_recommendations"`
+	Score          *int16          `json:"score"`
+	CategoryScores json.RawMessage `json:"category_scores"`
+	Advice         json.RawMessage `json:"advice"`
 
 	MissingData []string  `json:"missing_data"`
 	GradedAt    time.Time `json:"graded_at"`
