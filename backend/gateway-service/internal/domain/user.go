@@ -11,3 +11,7 @@ type User struct {
 	YandexID  string
 	CreatedAt time.Time
 }
+
+type YandexUser struct {
+	ID string
+}

@@ -13,4 +13,8 @@ var (
 	ErrIdentityInvalid       = errors.New("invalid identity")
 	ErrRelatedEntityNotFound = errors.New("related entity not found")
 	ErrInvalidEntity         = errors.New("invalid entity")
+	ErrLimitExceeded         = errors.New("request limit exceeded")
+	ErrRequestFailed         = errors.New("request failed")
+	ErrTimeout               = errors.New("rpc client timeout")
+	ErrInvalidRequest        = errors.New("invalid request payload")
 )
