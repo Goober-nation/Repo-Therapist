@@ -50,7 +50,6 @@ func (s *Server) GetMyRepos(
 	if err != nil {
 		return nil, mapError(err)
 	}
-
 	repositories := make([]*server.Repository, 0, len(response.Repositories))
 
 	for _, repo := range response.Repositories {

@@ -16,8 +16,11 @@ type Config struct {
 	Yandex     YandexConfig
 	RateLimit  RateLimitConfig
 	Session    SessionConfig
+	Token      ServiceToken
 }
-
+type ServiceToken struct {
+	Token string
+}
 type HTTPConfig struct {
 	Address string
 }
@@ -178,6 +181,9 @@ func LoadConfig() *Config {
 				"SESSION_KEY_PREFIX",
 				"session:",
 			),
+		},
+		Token: ServiceToken{
+			Token: getEnvDefault("SERVICE_TOKEN", ""),
 		},
 	}
 }

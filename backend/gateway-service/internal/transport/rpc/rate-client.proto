@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package rating_client;
+package rating;
 
 option go_package = "gateway-service/internal/transport/rating/gen;pb";
 

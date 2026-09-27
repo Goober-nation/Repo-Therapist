@@ -25,11 +25,12 @@ type AggregatorService struct {
 	gradingPublisher domain.GradingPublisher
 	llmPublisher     domain.LLMRecommendationsPublisher
 	RPCTimeout       time.Duration
+	Token            string
 }
 
 func NewAggregatorService(reposRepo domain.RepoRepository, gradesRepo domain.GradesRepository, llmRepo domain.LLMRepository,
 	clientRPC client.CodeHealthClient, gradingPublisher domain.GradingPublisher, llmPublisher domain.LLMRecommendationsPublisher,
-	rpcTimeout time.Duration) *AggregatorService {
+	rpcTimeout time.Duration, token string) *AggregatorService {
 	return &AggregatorService{
 		ReposRepo:        reposRepo,
 		GradesRepo:       gradesRepo,
@@ -38,6 +39,7 @@ func NewAggregatorService(reposRepo domain.RepoRepository, gradesRepo domain.Gra
 		gradingPublisher: gradingPublisher,
 		llmPublisher:     llmPublisher,
 		RPCTimeout:       rpcTimeout,
+		Token:            token,
 	}
 }
 
@@ -84,7 +86,8 @@ func (as *AggregatorService) RequestLLMRecommendations(
 	orgSlug string,
 	repoSlug string,
 ) (domain.RepoLLMResponse, error) {
-	cont, cancel := context.WithTimeout(ctx, as.RPCTimeout)
+	mdctx := forwardAuthorization(ctx)
+	cont, cancel := context.WithTimeout(mdctx, as.RPCTimeout)
 	defer cancel()
 
 	response, err := as.clientRPC.GetRepositoryBySlugs(
@@ -302,7 +305,8 @@ func (as *AggregatorService) GetGrading(
 	orgSlug string,
 	repoSlug string,
 ) (*domain.RepoGrade, error) {
-	cont, cancel := context.WithTimeout(ctx, as.RPCTimeout)
+	mdctx := forwardAuthorization(ctx)
+	cont, cancel := context.WithTimeout(mdctx, as.RPCTimeout)
 	defer cancel()
 	response, err := as.clientRPC.GetRepositoryBySlugs(
 		cont,
@@ -487,9 +491,9 @@ func needsGrading(repo domain.Repo, grade domain.RepoGrade) bool {
 func (as *AggregatorService) GetMyRepos(
 	ctx context.Context,
 ) (domain.MyRepositoriesResponse, error) {
-	cont, cancel := context.WithTimeout(ctx, as.RPCTimeout)
+	mdctx := forwardAuthorization(ctx)
+	cont, cancel := context.WithTimeout(mdctx, as.RPCTimeout)
 	defer cancel()
-
 	response, err := as.clientRPC.GetMyRepos(
 		cont,
 		&client.GetMyReposRequest{},
@@ -637,7 +641,8 @@ func (as *AggregatorService) SaveGradingResult(ctx context.Context,
 }
 
 func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
-	cont, cancel := context.WithTimeout(ctx, as.RPCTimeout)
+	mdctx := metadata.AppendToOutgoingContext(ctx, "authorization", as.Token)
+	cont, cancel := context.WithTimeout(mdctx, as.RPCTimeout)
 	defer cancel()
 	response, err := as.clientRPC.ListAllPublicRepos(
 		cont,
@@ -839,4 +844,30 @@ func (as *AggregatorService) hasPrivateAccess(ctx context.Context, sourceRepo do
 		}
 		return false
 	}
+}
+
+func PATFromContext(ctx context.Context) string {
+	token, ok := ctx.Value("PAT").(string)
+	if !ok {
+		return ""
+	}
+	return token
+}
+
+func forwardAuthorization(ctx context.Context) context.Context {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return ctx
+	}
+
+	values := md.Get("authorization")
+	if len(values) == 0 {
+		return ctx
+	}
+
+	return metadata.AppendToOutgoingContext(
+		ctx,
+		"authorization",
+		values[0],
+	)
 }

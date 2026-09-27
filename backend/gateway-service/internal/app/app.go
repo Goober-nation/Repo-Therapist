@@ -144,6 +144,7 @@ func StartApp() {
 		cfg.Aggregator.Timeout,
 		cfg.Rating.Timeout,
 		cfg.Yandex.Timeout,
+		cfg.Token.Token,
 	)
 
 	handler := httptransport.NewHandler(
@@ -153,27 +154,27 @@ func StartApp() {
 	router := http.NewServeMux()
 
 	router.HandleFunc(
-		"POST /api/auth/yandex",
+		"POST /auth/yandex",
 		handler.LoginWithYandex,
 	)
 
 	router.HandleFunc(
-		"POST /api/repos",
+		"POST /repos",
 		handler.GetMyRepos,
 	)
 
 	router.HandleFunc(
-		"POST /api/grading",
+		"POST /grading",
 		handler.GetGrading,
 	)
 
 	router.HandleFunc(
-		"POST /api/recommendations",
+		"POST /recommendations",
 		handler.RequestLLMRecommendations,
 	)
 
 	router.HandleFunc(
-		"POST /api/ranking",
+		"POST /ranking",
 		handler.GetRanking,
 	)
 

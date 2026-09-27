@@ -30,6 +30,7 @@ type GatewayService struct {
 
 	userRepository    domain.UserRepository
 	sessionRepository domain.SessionRepository
+	ServiceToken      string
 }
 
 func NewGatewayService(
@@ -42,6 +43,7 @@ func NewGatewayService(
 	aggregatorTimeout time.Duration,
 	ratingTimeout time.Duration,
 	yandexTimeout time.Duration,
+	serviceToken string,
 ) *GatewayService {
 	return &GatewayService{
 		aggregatorClient:  aggregatorClient,
@@ -53,6 +55,7 @@ func NewGatewayService(
 		ratingTimeout:     ratingTimeout,
 		aggregatorTimeout: aggregatorTimeout,
 		yandexTimeout:     yandexTimeout,
+		ServiceToken:      serviceToken,
 	}
 }
 func (s *GatewayService) checkRateLimit(
@@ -113,7 +116,12 @@ func (s *GatewayService) GetMyRepos(
 	if err != nil {
 		return domain.GetMyReposDTO{}, err
 	}
-	cont, cancel := context.WithTimeout(ctx, s.aggregatorTimeout)
+	token := PATFromContext(ctx)
+	if token == "" {
+		return domain.GetMyReposDTO{}, domain.ErrInvalidRequest
+	}
+	mdctx := metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token)
+	cont, cancel := context.WithTimeout(mdctx, s.aggregatorTimeout)
 	defer cancel()
 	resp, err := s.aggregatorClient.GetMyRepos(
 		cont,
@@ -201,8 +209,12 @@ func (s *GatewayService) RequestLLMRecommendations(
 	if err := s.checkRateLimit(ctx, clientIP); err != nil {
 		return domain.RequestLLMRecommendationsResponse{}, err
 	}
-
-	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorTimeout)
+	token := PATFromContext(ctx)
+	if token == "" {
+		token = s.ServiceToken
+	}
+	mdctx := metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token)
+	rpcCtx, cancel := context.WithTimeout(mdctx, s.aggregatorTimeout)
 	defer cancel()
 
 	resp, err := s.aggregatorClient.RequestLLMRecommendations(
@@ -277,8 +289,12 @@ func (s *GatewayService) GetGrading(
 			domain.ErrInvalidRequest,
 		)
 	}
-
-	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorTimeout)
+	token := PATFromContext(ctx)
+	if token == "" {
+		token = s.ServiceToken
+	}
+	mdctx := metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token)
+	rpcCtx, cancel := context.WithTimeout(mdctx, s.aggregatorTimeout)
 	defer cancel()
 
 	resp, err := s.aggregatorClient.GetGrading(
@@ -371,9 +387,13 @@ func (s *GatewayService) GetRanking(
 	if err := s.checkRateLimit(ctx, clientIP); err != nil {
 		return domain.GetRankingResponse{}, err
 	}
-
+	token := PATFromContext(ctx)
+	if token == "" {
+		token = s.ServiceToken
+	}
+	mdctx := metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token)
 	rpcCtx, cancel := context.WithTimeout(
-		ctx,
+		mdctx,
 		s.ratingTimeout,
 	)
 	defer cancel()
@@ -600,4 +620,12 @@ func withPAT(ctx context.Context, pat string) context.Context {
 		"authorization",
 		"Bearer "+pat,
 	)
+}
+
+func PATFromContext(ctx context.Context) string {
+	token, ok := ctx.Value("PAT").(string)
+	if !ok {
+		return ""
+	}
+	return token
 }

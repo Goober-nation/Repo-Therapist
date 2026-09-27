@@ -130,6 +130,7 @@ func (h *Handler) GetMyRepos(
 	w stdhttp.ResponseWriter,
 	r *stdhttp.Request,
 ) {
+
 	sessionID, err := sessionIDFromRequest(r)
 	if err != nil {
 		writeError(w, err)
@@ -348,18 +349,18 @@ type getGradingResponse struct {
 }
 
 type repoGradeResponse struct {
-	SourcecraftUUID string   `json:"sourcecraft_uuid"`
-	Score           *int32   `json:"score,omitempty"`
-	CategoryScores  []byte   `json:"category_scores,omitempty"`
-	Advice          []byte   `json:"advice,omitempty"`
-	MissingData     []string `json:"missing_data,omitempty"`
-	GradedAt        string   `json:"graded_at"`
+	SourcecraftUUID string          `json:"sourcecraft_uuid"`
+	Score           *int32          `json:"score,omitempty"`
+	CategoryScores  json.RawMessage `json:"category_scores,omitempty"`
+	Advice          json.RawMessage `json:"advice,omitempty"`
+	MissingData     []string        `json:"missing_data,omitempty"`
+	GradedAt        string          `json:"graded_at"`
 }
 
 type requestLLMRecommendationsResponse struct {
-	RawResponse []byte `json:"raw_response"`
-	ModelUsed   string `json:"model_used"`
-	EvaluatedAt string `json:"evaluated_at"`
+	RawResponse json.RawMessage `json:"raw_response"`
+	ModelUsed   string          `json:"model_used"`
+	EvaluatedAt string          `json:"evaluated_at"`
 }
 
 type getRankingResponse struct {
@@ -716,9 +717,4 @@ func publicErrorMessage(err error) string {
 	default:
 		return "internal server error"
 	}
-}
-
-func PATFromContext(ctx context.Context) string {
-	token := ctx.Value("PAT")
-	return token
 }

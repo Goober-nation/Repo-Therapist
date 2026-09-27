@@ -1,12 +1,12 @@
 syntax = "proto3";
 
-package gateway;
+package aggregator;
 
 option go_package = "gateway-service/internal/transport/rpc/gen;pb";
 
 import "google/protobuf/timestamp.proto";
 
-service Gateway {
+service Aggregator {
   rpc GetMyRepos(GetMyReposRequest)
       returns (GetMyReposResponse);
 
@@ -78,6 +78,6 @@ message RepoGrade {
   bytes category_scores = 3;
   bytes advice = 4;
 
-  repeated string missing_data = 8;
-  google.protobuf.Timestamp graded_at = 9;
+  repeated string missing_data = 5;
+  google.protobuf.Timestamp graded_at = 6;
 }
