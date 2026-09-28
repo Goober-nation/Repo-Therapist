@@ -2,13 +2,10 @@
 
 Scope: the message shapes published/consumed on the Kafka links in the architecture diagram —
 
-- Aggregator <-> Grade service — **still TBD**, a team decision (needs whoever owns the
-  Aggregator), not filled in here.
-- Grade service <-> Security wrapper — **still TBD**, same reasoning.
-- Grade service <-> LLM service — **still TBD**, same reasoning. Needed for the Documentation
-  category (2026-09-22 decision: Documentation is judged by the LLM service, not a deterministic
-  heuristic — Grade service ships it repo doc content, e.g. README/CONTRIBUTING/etc., and gets a
-  score back).
+- Aggregator <-> Grade service — `grading.requests` / `grading.results`, see the topic table
+  and the `grading.results` description below.
+- Grade service <-> Security wrapper — not Kafka: a synchronous gRPC call
+  (`backend/grade-service/internal/appsecwrapper`).
 - Grade service <-> Repository service — **defined below**. This exchange is entirely within one
   person's scope (Repository + Grade service), so it didn't need to wait on wider team sign-off.
 - Grade service <-> LLM service — **defined below as flat `repo.docs.*` messages** for documentation analysis.

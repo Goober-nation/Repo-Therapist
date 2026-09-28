@@ -1,7 +1,8 @@
 # Manual testing
 
-No automated test suite yet — this is how to exercise
-everything by hand, matching what's actually been verified so far.
+Automated tests live next to the code: `go test ./...` for the Go services,
+`pytest` in `backend/llm-service`, `pnpm test` in `frontend`. This file covers the
+end-to-end checks that need the running stack and are done by hand.
 
 ## Setup
 

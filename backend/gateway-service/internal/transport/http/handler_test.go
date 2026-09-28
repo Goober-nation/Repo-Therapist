@@ -244,3 +244,25 @@ func TestOldPostRoutesAreGone(t *testing.T) {
 		}
 	}
 }
+
+func TestClientIPTrustsRealIPOnlyFromProxy(t *testing.T) {
+	cases := []struct {
+		remote, realIP, want string
+	}{
+		{"172.18.0.5:41000", "203.0.113.7", "203.0.113.7"},
+		{"127.0.0.1:5000", "203.0.113.8", "203.0.113.8"},
+		{"203.0.113.9:5000", "10.0.0.1", "203.0.113.9"},
+		{"172.18.0.5:41000", "not-an-ip", "172.18.0.5"},
+		{"172.18.0.5:41000", "", "172.18.0.5"},
+	}
+	for _, c := range cases {
+		r := httptest.NewRequest(stdhttp.MethodGet, "/ranking", nil)
+		r.RemoteAddr = c.remote
+		if c.realIP != "" {
+			r.Header.Set("X-Real-IP", c.realIP)
+		}
+		if got := clientIP(r); got != c.want {
+			t.Errorf("clientIP(remote=%q, X-Real-IP=%q) = %q, want %q", c.remote, c.realIP, got, c.want)
+		}
+	}
+}

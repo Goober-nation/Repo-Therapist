@@ -1,160 +1,97 @@
 import { useMemo, useState } from "react"
+import { RANKING_PAGE_SIZE, type RankingSort } from "../api/client"
 import { Badge, Button, Card, PageHeading } from "../components/Shell"
-import { RankingHealthInfo } from "../components/RankingHealthInfo"
-import { getHealthLabel, getLastActivityLabel } from "../mocks/demoData"
+import { formatDateTime, getLastActivityLabel, HEALTHY_SCORE, healthLevel } from "../metrics"
 import type { RepositorySummary } from "../types"
-import { getCategoryScore } from "../metrics"
 
-type RankingView = "overall" | "growing" | "security" | "issues"
-type SortOption = "health-desc" | "health-asc" | "likes-desc" | "activity-recent"
-
-const rankingViews: {
-  id: RankingView
-  label: string
-}[] = [
-  { id: "overall", label: "Общий рейтинг" },
-  { id: "growing", label: "Быстрый рост" },
-  { id: "security", label: "Безопасность" },
-  { id: "issues", label: "Issues" },
-]
-
-function getStatusTone(score: number): "good" | "warning" | "critical" {
-  if (score >= 85) return "good"
-  if (score >= 60) return "warning"
-  return "critical"
+export interface RankingQuery {
+  page: number
+  sort: RankingSort
+  language: string
 }
 
-function sortRepositories(
-  repositories: RepositorySummary[],
-  view: RankingView,
-  sort: SortOption,
-) {
-  const sortComparators: Record<SortOption, (
-    left: RepositorySummary,
-    right: RepositorySummary,
-  ) => number> = {
-    "health-desc": (left, right) => right.healthScore - left.healthScore,
-    "health-asc": (left, right) => left.healthScore - right.healthScore,
-    "likes-desc": (left, right) => right.likes - left.likes,
-    "activity-recent": (left, right) =>
-      left.lastActivityDaysAgo - right.lastActivityDaysAgo,
-  }
-
-  const viewComparator =
-    view === "growing"
-      ? (left: RepositorySummary, right: RepositorySummary) =>
-          right.trend - left.trend
-      : view === "security"
-        ? (left: RepositorySummary, right: RepositorySummary) =>
-            (getCategoryScore(right.categoryScores, "security", "appsec") ??
-              -1) -
-            (getCategoryScore(left.categoryScores, "security", "appsec") ?? -1)
-        : view === "issues"
-          ? (left: RepositorySummary, right: RepositorySummary) =>
-              (getCategoryScore(right.categoryScores, "issues", "community") ??
-                -1) -
-              (getCategoryScore(left.categoryScores, "issues", "community") ??
-                -1)
-          : sortComparators[sort]
-
-  return repositories.sort(
-    (left, right) =>
-      viewComparator(left, right) || sortComparators[sort](left, right),
-  )
-}
+export const DEFAULT_RANKING_QUERY: RankingQuery = { page: 1, sort: "score", language: "" }
 
 export default function RankingPage({
   repositories,
   onSelectRepository,
+  total = repositories.length,
+  query = DEFAULT_RANKING_QUERY,
+  languages = [],
+  isLoading = false,
+  error,
+  onQueryChange = () => {},
+  onRetry = () => {},
 }: {
   repositories: RepositorySummary[]
-  onSelectRepository: (repositoryId: string) => void
+  onSelectRepository: (repository: RepositorySummary) => void
+  /** Repositories in the whole ranking (all pages) for the current language filter. */
+  total?: number
+  query?: RankingQuery
+  /** Languages seen so far, for the server-side language filter. */
+  languages?: string[]
+  isLoading?: boolean
+  error?: string
+  onQueryChange?: (query: RankingQuery) => void
+  onRetry?: () => void
 }) {
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedLanguage, setSelectedLanguage] = useState("all")
   const [minimumHealth, setMinimumHealth] = useState(0)
-  const [minimumActivity, setMinimumActivity] = useState(0)
-  const [minimumSecurity, setMinimumSecurity] = useState(0)
-  const [sortOption, setSortOption] = useState<SortOption>("health-desc")
-  const [activeView, setActiveView] = useState<RankingView>("overall")
+  const pageCount = Math.max(1, Math.ceil(total / RANKING_PAGE_SIZE))
 
-  const languages = useMemo(
-    () =>
-      [
-        ...new Set(repositories.map((repository) => repository.language)),
-      ].sort(),
-    [repositories],
-  )
-
+  // Search and the minimum score narrow the loaded page only; the catalog is paged on the server.
   const visibleRepositories = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLocaleLowerCase()
-    const matchingRepositories = repositories.filter((repository) => {
-      const matchesSearch =
-        normalizedQuery.length === 0 ||
-        repository.fullName.toLocaleLowerCase().includes(normalizedQuery) ||
-        repository.language.toLocaleLowerCase().includes(normalizedQuery)
-      const matchesLanguage =
-        selectedLanguage === "all" || repository.language === selectedLanguage
+    const text = searchQuery.trim().toLocaleLowerCase()
+    return repositories.filter(
+      (repository) =>
+        (!text ||
+          repository.fullName.toLocaleLowerCase().includes(text) ||
+          repository.language.toLocaleLowerCase().includes(text)) &&
+        (minimumHealth === 0 || (repository.healthScore ?? -1) >= minimumHealth),
+    )
+  }, [minimumHealth, repositories, searchQuery])
 
-      return (
-        matchesSearch &&
-        matchesLanguage &&
-        repository.healthScore >= minimumHealth &&
-        (minimumActivity === 0 ||
-          (getCategoryScore(repository.categoryScores, "activity") ?? -1) >=
-            minimumActivity) &&
-        (minimumSecurity === 0 ||
-          (getCategoryScore(repository.categoryScores, "security", "appsec") ??
-            -1) >= minimumSecurity)
-      )
-    })
-
-    return sortRepositories(matchingRepositories, activeView, sortOption)
-  }, [
-    activeView,
-    minimumActivity,
-    minimumHealth,
-    minimumSecurity,
-    repositories,
-    searchQuery,
-    selectedLanguage,
-    sortOption,
-  ])
-
-  const averageScore = Math.round(
-    repositories.reduce(
-      (total, repository) => total + repository.healthScore,
-      0,
-    ) / Math.max(repositories.length, 1),
+  const scores = repositories.flatMap((repository) =>
+    repository.healthScore === null ? [] : [repository.healthScore],
   )
-  const healthyShare = Math.round(
-    (repositories.filter((repository) => repository.healthScore >= 75).length /
-      Math.max(repositories.length, 1)) *
-      100,
-  )
+  const averageScore = scores.length
+    ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+    : null
+
+  const change = (next: Partial<RankingQuery>) => onQueryChange({ ...query, page: 1, ...next })
+
+  const resetFilters = () => {
+    setSearchQuery("")
+    setMinimumHealth(0)
+    if (query.language) change({ language: "" })
+  }
 
   return (
     <div className="page-stack">
       <PageHeading
-        eyebrow="Открытые репозитории"
+        eyebrow="Публичные репозитории"
         title="Рейтинг здоровья"
-        description="Сравнивайте состояние проектов и открывайте подробный отчёт по репозиторию."
+        description="Открытые репозитории SourceCraft, отсортированные по Repo Health Score. Лайки показаны для справки и на место в рейтинге не влияют. Выберите репозиторий, чтобы увидеть подробную оценку и рекомендации."
       />
 
-      <div className="stat-grid">
-        <Card className="stat-card">
-          <span>В выборке</span>
-          <strong>{repositories.length}</strong>
-        </Card>
-        <Card className="stat-card">
-          <span>Средний Repo Health Score</span>
-          <strong>{averageScore}</strong>
-        </Card>
-        <Card className="stat-card">
-          <span>Score от 75</span>
-          <strong>{healthyShare}%</strong>
-        </Card>
-      </div>
+      {total > 0 && (
+        <div className="stat-grid">
+          <Card className="stat-card">
+            <span>В рейтинге{query.language ? ` (${query.language})` : ""}</span>
+            <strong>{total}</strong>
+          </Card>
+          <Card className="stat-card">
+            <span>Средний Score на странице</span>
+            <strong>{averageScore ?? "—"}</strong>
+          </Card>
+          <Card className="stat-card">
+            <span>Страница</span>
+            <strong>
+              {query.page} из {pageCount}
+            </strong>
+          </Card>
+        </div>
+      )}
 
       <Card className="ranking-card">
         <div className="ranking-toolbar">
@@ -166,20 +103,16 @@ export default function RankingPage({
             </svg>
             <input
               type="search"
-              placeholder="Найти репозиторий или язык"
+              placeholder="Поиск на этой странице"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
             />
           </label>
-
           <label className="filter-field">
             <span>Язык</span>
-            <select
-              value={selectedLanguage}
-              onChange={(event) => setSelectedLanguage(event.target.value)}
-            >
-              <option value="all">Все</option>
-              {languages.map((language) => (
+            <select value={query.language} onChange={(event) => change({ language: event.target.value })}>
+              <option value="">Все</option>
+              {[...new Set([...languages, query.language].filter(Boolean))].sort().map((language) => (
                 <option key={language} value={language}>
                   {language}
                 </option>
@@ -187,162 +120,144 @@ export default function RankingPage({
             </select>
           </label>
           <label className="filter-field">
-            <span>Score</span>
-            <select
-              value={minimumHealth}
-              onChange={(event) => setMinimumHealth(Number(event.target.value))}
-            >
+            <span>Score (на странице)</span>
+            <select value={minimumHealth} onChange={(event) => setMinimumHealth(Number(event.target.value))}>
               <option value={0}>Любой</option>
-              <option value={70}>От 70</option>
-              <option value={80}>От 80</option>
-              <option value={90}>От 90</option>
-            </select>
-          </label>
-          <label className="filter-field">
-            <span>Активность</span>
-            <select
-              value={minimumActivity}
-              onChange={(event) =>
-                setMinimumActivity(Number(event.target.value))
-              }
-            >
-              <option value={0}>Любая</option>
-              <option value={70}>От 70</option>
-              <option value={80}>От 80</option>
-              <option value={90}>От 90</option>
-            </select>
-          </label>
-          <label className="filter-field">
-            <span>Безопасность</span>
-            <select
-              value={minimumSecurity}
-              onChange={(event) =>
-                setMinimumSecurity(Number(event.target.value))
-              }
-            >
-              <option value={0}>Любая</option>
               <option value={60}>От 60</option>
-              <option value={75}>От 75</option>
+              <option value={HEALTHY_SCORE}>От {HEALTHY_SCORE}</option>
               <option value={90}>От 90</option>
             </select>
           </label>
           <label className="filter-field filter-field--sort">
             <span>Сортировка</span>
-            <select
-              value={sortOption}
-              onChange={(event) =>
-                setSortOption(event.target.value as SortOption)
-              }
-            >
-              <option value="health-desc">Score: выше сначала</option>
-              <option value="health-asc">Score: ниже сначала</option>
-              <option value="likes-desc">Лайки</option>
-              <option value="activity-recent">Последняя активность</option>
+            <select value={query.sort} onChange={(event) => change({ sort: event.target.value as RankingSort })}>
+              <option value="score">Repo Health Score</option>
+              <option value="likes">Лайки</option>
+              <option value="last_activity">Последняя активность</option>
             </select>
           </label>
-        </div>
-
-        <div
-          className="ranking-tabs"
-          role="tablist"
-          aria-label="Вариант рейтинга"
-        >
-          {rankingViews.map((view) => (
-            <button
-              key={view.id}
-              className={`ranking-tab ${
-                activeView === view.id ? "ranking-tab--active" : ""
-              }`}
-              type="button"
-              role="tab"
-              aria-selected={activeView === view.id}
-              onClick={() => setActiveView(view.id)}
-            >
-              {view.label}
-            </button>
-          ))}
-          <span className="ranking-count">
-            {visibleRepositories.length} проектов
+          <span className="ranking-count" aria-live="polite">
+            {visibleRepositories.length} проектов{visibleRepositories.length !== repositories.length ? " на странице" : ""}
           </span>
         </div>
 
         <div className="table-scroll">
-          <div className="ranking-table" aria-label="Рейтинг репозиториев">
-            <div className="ranking-row ranking-row--header">
-              <span>#</span>
-              <span>Репозиторий</span>
-              <span>Язык</span>
-              <span>Health</span>
-              <span>Лайки</span>
-              <span>Активность</span>
-              <span>Security</span>
-              <span>Статус</span>
+          <div className="ranking-table" role="table" aria-label="Рейтинг репозиториев">
+            <div className="ranking-row ranking-row--header" role="row">
+              <span role="columnheader">Место</span>
+              <span role="columnheader">Репозиторий</span>
+              <span role="columnheader">Язык</span>
+              <span role="columnheader">Score</span>
+              <span role="columnheader">Лайки</span>
+              <span role="columnheader">Активность</span>
+              <span role="columnheader">Статус</span>
             </div>
-            {visibleRepositories.map((repository, index) => (
-              <div
-                className="ranking-row ranking-row--interactive"
-                key={repository.id}
-              >
-                <button
-                  className="ranking-row__open"
-                  type="button"
-                  onClick={() => onSelectRepository(repository.id)}
-                  aria-label={`Открыть анализ ${repository.fullName}`}
-                />
-                <span className="table-rank">{index + 1}</span>
-                <span className="repository-cell">
-                  <strong>{repository.name}</strong>
-                  <small>{repository.fullName}</small>
-                </span>
-                <span>{repository.language}</span>
-                <strong className="table-score">
-                  {repository.healthScore}
-                </strong>
-                <span>{repository.likes.toLocaleString("ru-RU")}</span>
-                <span>
-                  {getLastActivityLabel(repository.lastActivityDaysAgo)}
-                </span>
-                <span>
-                  {getCategoryScore(
-                    repository.categoryScores,
-                    "security",
-                    "appsec",
-                  ) ?? "—"}
-                </span>
-                <span className="ranking-status-cell">
-                  <Badge tone={getStatusTone(repository.healthScore)}>
-                    {getHealthLabel(repository.healthScore)}
-                  </Badge>
-                  <RankingHealthInfo repository={repository} />
-                </span>
-              </div>
-            ))}
+            {!isLoading && !error && visibleRepositories.map((repository, index) => {
+              const level = healthLevel(repository.healthScore)
+              return (
+                <div
+                  className={`ranking-row ranking-row--interactive ${
+                    repository.healthScore === null ? "ranking-row--no-data" : ""
+                  }`}
+                  role="row"
+                  key={repository.id}
+                >
+                  <span className="table-rank" role="cell">
+                    {repository.place ?? (query.page - 1) * RANKING_PAGE_SIZE + index + 1}
+                  </span>
+                  <span className="repository-cell" role="cell">
+                    <button
+                      className="ranking-row__open"
+                      type="button"
+                      onClick={() => onSelectRepository(repository)}
+                      aria-label={`Открыть анализ ${repository.fullName}`}
+                    />
+                    <strong>{repository.name}</strong>
+                    {repository.webUrl ? (
+                      <a
+                        className="repository-link"
+                        href={repository.webUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`${repository.fullName} в SourceCraft (новая вкладка)`}
+                      >
+                        {repository.fullName} ↗
+                      </a>
+                    ) : (
+                      <small>{repository.fullName}</small>
+                    )}
+                  </span>
+                  <span role="cell">{repository.language}</span>
+                  <strong className="table-score" role="cell">
+                    {repository.healthScore ?? "Нет данных"}
+                  </strong>
+                  <span role="cell">{repository.likes?.toLocaleString("ru-RU") ?? "—"}</span>
+                  <span role="cell" title={formatDateTime(repository.lastUpdated)}>
+                    {getLastActivityLabel(repository.lastActivityDaysAgo)}
+                  </span>
+                  <span className="ranking-status-cell" role="cell">
+                    <Badge tone={level.tone}>{level.label}</Badge>
+                  </span>
+                </div>
+              )
+            })}
           </div>
         </div>
 
-        {visibleRepositories.length === 0 && (
+        {error ? (
+          <div className="empty-state" role="alert">
+            <strong>Не удалось загрузить рейтинг</strong>
+            <p>{error}</p>
+            <Button variant="secondary" onClick={onRetry}>
+              Повторить
+            </Button>
+          </div>
+        ) : isLoading ? (
+          <div className="empty-state" role="status">
+            Загружаем рейтинг…
+          </div>
+        ) : repositories.length === 0 ? (
           <div className="empty-state">
-            <strong>Ничего не найдено</strong>
-            <p>Попробуйте изменить поисковый запрос или фильтры.</p>
-            <Button
-              variant="quiet"
-              onClick={() => {
-                setSearchQuery("")
-                setSelectedLanguage("all")
-                setMinimumHealth(0)
-                setMinimumActivity(0)
-                setMinimumSecurity(0)
-              }}
-            >
+            <strong>{query.language ? "Нет репозиториев на этом языке" : "Пока нет репозиториев в общем рейтинге"}</strong>
+            <p>Здесь появятся публичные репозитории после расчёта их рейтинга.</p>
+            {query.language && (
+              <Button variant="quiet" onClick={resetFilters}>
+                Сбросить фильтры
+              </Button>
+            )}
+          </div>
+        ) : visibleRepositories.length === 0 ? (
+          <div className="empty-state">
+            <strong>На этой странице ничего не найдено</strong>
+            <p>Поиск и фильтр по Score работают в пределах загруженной страницы.</p>
+            <Button variant="quiet" onClick={resetFilters}>
               Сбросить фильтры
             </Button>
           </div>
+        ) : null}
+
+        {pageCount > 1 && !error && (
+          <nav className="ranking-pagination" aria-label="Страницы рейтинга">
+            <Button
+              variant="secondary"
+              disabled={query.page <= 1 || isLoading}
+              onClick={() => onQueryChange({ ...query, page: query.page - 1 })}
+            >
+              ← Назад
+            </Button>
+            <span>
+              Страница {query.page} из {pageCount}
+            </span>
+            <Button
+              variant="secondary"
+              disabled={query.page >= pageCount || isLoading}
+              onClick={() => onQueryChange({ ...query, page: query.page + 1 })}
+            >
+              Вперёд →
+            </Button>
+          </nav>
         )}
       </Card>
-      <p className="data-caption">
-        Показатели отображаются через единый источник данных и могут быть
-        заменены на API Gateway.
-      </p>
     </div>
   )
 }

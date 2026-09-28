@@ -10,6 +10,7 @@
 
 # this file itself
 !.gitignore
+!.gitattributes
 
 # license
 !LICENSE

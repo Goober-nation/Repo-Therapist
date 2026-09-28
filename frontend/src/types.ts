@@ -1,13 +1,35 @@
-export type PageId = "overview" | "ranking" | "security"
+export type GradeStatus = "PENDING" | "FINISHED" | "NO_DATA"
+
+export type Priority = "high" | "medium" | "low"
+
+/**
+ * A measured input behind a category score. `value` is the raw measurement and `score` the
+ * metric's own grade (0–1) from grade-service; both are null when the metric had no data.
+ */
+export interface MetricFact {
+  id: string
+  value: number | null
+  score: number | null
+}
 
 export interface MetricResult {
   score: number | null
   trend: number | null
   name?: string
   description?: string
+  facts?: MetricFact[]
 }
 
 export type CategoryScores = Record<string, MetricResult>
+
+export interface Recommendation {
+  id: string
+  priority: Priority
+  title: string
+  description: string
+  category?: string
+  location?: string
+}
 
 export interface RepositorySummary {
   id: string
@@ -17,44 +39,31 @@ export interface RepositorySummary {
   name: string
   fullName: string
   language: string
-  defaultBranch?: string
+  /** Position in the public ranking, as reported by the backend. */
+  place?: number
   visibility?: "public" | "internal" | "private"
-  description?: string
+  /** "private" = graded with the owner's SourceCraft token (all six categories). */
+  analysisMode?: "public" | "private"
   webUrl?: string
   lastUpdated?: string
-  healthScore: number
-  trend: number
-  likes: number
+  healthScore: number | null
+  likes?: number
   lastActivityDaysAgo: number
   categoryScores: CategoryScores
-  gradeStatus?: "PENDING" | "FINISHED"
+  gradeStatus?: GradeStatus
   gradedAt?: string
   missingData?: string[]
+  /** Rule-based recommendations computed by grade-service (`grade.advice`). */
+  advice?: Recommendation[]
 }
 
-export interface AttentionItem {
-  id: string
-  severity: "critical" | "warning"
-  category: string
-  title: string
-  description: string
-  impact: number
+/** AI summary produced by llm-service (`raw_response`). */
+export interface AiReport {
+  status?: GradeStatus
+  summary?: string
+  strengths: string[]
+  weaknesses: string[]
+  recommendations: Recommendation[]
 }
 
-export interface Recommendation {
-  id: string
-  priority: "high" | "medium"
-  title: string
-  description: string
-  currentScore: number
-  projectedScore: number
-}
-
-export interface SecurityFinding {
-  id: string
-  severity: "critical" | "high"
-  packageName: string
-  cve: string
-  installedVersion: string
-  fixAvailable: boolean
-}
+export type PageId = "ranking" | "my" | "overview"

@@ -1,17 +1,9 @@
-import type { GradingResponse, RecommendationsResponse } from "./contracts"
-
-export interface RepoHealthApi {
-  getGrading(
-    orgSlug: string,
-    repoSlug: string,
-    userToken?: string,
-  ): Promise<GradingResponse>
-  getRecommendations(
-    orgSlug: string,
-    repoSlug: string,
-    userToken?: string,
-  ): Promise<RecommendationsResponse>
-}
+import type {
+  GatewayRankingResponse,
+  GradingResponse,
+  MyRepositoriesResponse,
+  RecommendationsResponse,
+} from "./contracts"
 
 export class ApiRequestError extends Error {
   readonly status: number
@@ -26,66 +18,103 @@ export class ApiRequestError extends Error {
 export interface HttpRepoHealthApiOptions {
   baseUrl?: string
   fetcher?: typeof fetch
+  timeoutMs?: number
 }
 
-/** HTTP adapter for the documented Gateway routes. */
-export class HttpRepoHealthApi implements RepoHealthApi {
+/** Largest page rating-service accepts. */
+export const RANKING_PAGE_SIZE = 100
+
+export type RankingSort = "score" | "likes" | "last_activity"
+
+function statusMessage(status: number): string {
+  // One message for "no access" and "not found": AGENTS.md forbids telling them apart in the UI.
+  if (status === 401 || status === 403 || status === 404) {
+    return "Репозиторий не найден или нет доступа. Проверьте ссылку и токен SourceCraft."
+  }
+  if (status === 429) return "Слишком много запросов. Подождите минуту и повторите."
+  return `Не удалось выполнить запрос (HTTP ${status}). Попробуйте ещё раз.`
+}
+
+/** The owner's SourceCraft PAT switches Gateway to private grading. */
+function patHeader(pat?: string): Record<string, string> {
+  const token = pat?.trim()
+  return token ? { PAT: token } : {}
+}
+
+function repoPath(orgSlug: string, repoSlug: string) {
+  return `${encodeURIComponent(orgSlug)}/${encodeURIComponent(repoSlug)}`
+}
+
+/** HTTP adapter for the Gateway routes (backend/gateway-service/internal/transport/http). */
+export class HttpRepoHealthApi {
   private readonly baseUrl: string
   private readonly fetcher: typeof fetch
+  private readonly timeoutMs: number
 
   constructor(options: HttpRepoHealthApiOptions = {}) {
-    this.baseUrl = (
-      options.baseUrl ??
-      import.meta.env.VITE_API_BASE_URL ??
-      "/api"
-    ).replace(/\/$/, "")
+    this.baseUrl = (options.baseUrl ?? "/api").replace(/\/$/, "")
     this.fetcher = options.fetcher ?? fetch.bind(globalThis)
+    this.timeoutMs = options.timeoutMs ?? 15000
   }
 
-  getGrading(
-    orgSlug: string,
-    repoSlug: string,
-    userToken?: string,
-  ): Promise<GradingResponse> {
-    return this.request<GradingResponse>(
-      `/grade/${encodeURIComponent(orgSlug)}/${encodeURIComponent(repoSlug)}`,
-      userToken,
-    )
+  getGrading(orgSlug: string, repoSlug: string, pat?: string): Promise<GradingResponse> {
+    return this.request(`/grading/${repoPath(orgSlug, repoSlug)}`, { headers: patHeader(pat) })
   }
 
-  getRecommendations(
-    orgSlug: string,
-    repoSlug: string,
-    userToken?: string,
-  ): Promise<RecommendationsResponse> {
-    return this.request<RecommendationsResponse>(
-      `/reccomendations/${encodeURIComponent(orgSlug)}/${encodeURIComponent(repoSlug)}`,
-      userToken,
-    )
+  getRecommendations(orgSlug: string, repoSlug: string, pat?: string): Promise<RecommendationsResponse> {
+    return this.request(`/recommendations/${repoPath(orgSlug, repoSlug)}`, { headers: patHeader(pat) })
   }
 
-  private async request<T,>(
-    path: string,
-    userToken?: string,
-    init: RequestInit = {},
-  ): Promise<T> {
-    const response = await this.fetcher(`${this.baseUrl}${path}`, {
-      ...init,
-      headers: {
-        Accept: "application/json",
-        ...(init.body ? { "Content-Type": "application/json" } : {}),
-        ...(userToken ? { user_token: userToken } : {}),
-        ...init.headers,
-      },
-    })
+  /** One page of the public ranking; sorting and the language filter run on the server. */
+  getRanking(page = 1, sort: RankingSort = "score", language = ""): Promise<GatewayRankingResponse> {
+    const query = new URLSearchParams({ page: String(page), page_size: String(RANKING_PAGE_SIZE), sortby: sort })
+    if (language) query.set("filter", language)
+    return this.request(`/ranking?${query}`)
+  }
 
-    if (!response.ok) {
-      const message = await response.text().catch(() => "")
-      throw new ApiRequestError(
-        message || `API request failed with status ${response.status}`,
-        response.status,
-      )
+  getMyRepositories(sourceCraftPat: string): Promise<MyRepositoriesResponse> {
+    const headers = patHeader(sourceCraftPat)
+    if (!headers.PAT) {
+      return Promise.reject(new ApiRequestError("Введите SourceCraft PAT.", 401))
     }
-    return response.json() as Promise<T>
+    return this.request("/repos", { headers })
+  }
+
+  async loginWithYandex(oauthToken: string): Promise<void> {
+    await this.request("/auth/yandex", {
+      method: "POST",
+      headers: { Authorization: `OAuth ${oauthToken}` },
+    })
+  }
+
+  private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs)
+    try {
+      const response = await this.fetcher(`${this.baseUrl}${path}`, {
+        ...init,
+        signal: controller.signal,
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          ...(init.body ? { "Content-Type": "application/json" } : {}),
+          ...init.headers,
+        },
+      })
+      if (!response.ok) throw new ApiRequestError(statusMessage(response.status), response.status)
+      if (response.status === 204) return undefined as T
+      return (await response.json()) as T
+    } catch (error) {
+      if (controller.signal.aborted) {
+        throw new ApiRequestError("Сервер не ответил вовремя. Попробуйте ещё раз.", 0)
+      }
+      if (error instanceof ApiRequestError) throw error
+      throw new ApiRequestError(
+        "Не удалось получить ответ сервера. Проверьте подключение и повторите запрос.",
+        0,
+      )
+    } finally {
+      clearTimeout(timer)
+    }
   }
 }

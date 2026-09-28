@@ -1,327 +1,301 @@
-import {
-  Badge,
-  Button,
-  Card,
-  Divider,
-  Label,
-  PageHeading,
-  ScoreBar,
-  SectionHeading,
-} from "../components/Shell"
-import {
-  DEMO_ATTENTION_ITEMS,
-  DEMO_RECOMMENDATIONS,
-  DEFAULT_REPOSITORY_ID,
-  DEMO_SCORE_HISTORY,
-  getHealthLabel,
-  getLastActivityLabel,
-} from "../mocks/demoData"
+import { useState } from "react"
 import AnalysisResults from "../components/AnalysisResults"
 import ReportDownloadMenu from "../components/ReportDownloadMenu"
-import type { Recommendation, RepositorySummary } from "../types"
+import { Badge, Button, Card, Label, PageHeading, ScoreBar, SectionHeading } from "../components/Shell"
+import {
+  categoryWeight,
+  formatDateTime,
+  getLastActivityLabel,
+  HEALTHY_SCORE,
+  healthLevel,
+  isPrivateAnalysis,
+  missingCategories,
+  PRIORITY_LABELS,
+  scoredCategories,
+  splitStrengths,
+} from "../metrics"
+import type { Priority, RepositorySummary } from "../types"
+import type { RepositoryAnalysis } from "../useRepositoryAnalysis"
 
-function getTone(score: number): "good" | "warning" | "critical" {
-  if (score >= 85) return "good"
-  if (score >= 60) return "warning"
-  return "critical"
-}
+const PRIORITY_TONES = { high: "critical", medium: "warning", low: "neutral" } as const satisfies Record<Priority, string>
 
-function ScoreHistoryChart() {
-  const chartWidth = 660
-  const chartHeight = 176
-  const minScore = 65
-  const maxScore = 100
-  const points = DEMO_SCORE_HISTORY.map((entry, index) => ({
-    x: 30 + (index / (DEMO_SCORE_HISTORY.length - 1)) * (chartWidth - 60),
-    y:
-      chartHeight -
-      28 -
-      ((entry.score - minScore) / (maxScore - minScore)) * (chartHeight - 52),
-  }))
-  const linePath = points
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
-    .join(" ")
-
+function TextList({ title, items, empty }: { title: string; items: string[]; empty: string }) {
   return (
-    <Card className="history-card">
-      <SectionHeading
-        title="Repo Health Score во времени"
-        description="Последние шесть месяцев"
-      />
-      <div className="history-chart">
-        <svg
-          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-          role="img"
-          aria-label="График изменения Repo Health Score"
-        >
-          {[70, 80, 90, 100].map((score) => {
-            const y =
-              chartHeight -
-              28 -
-              ((score - minScore) / (maxScore - minScore)) * (chartHeight - 52)
-            return (
-              <line
-                key={score}
-                x1="28"
-                x2={chartWidth - 28}
-                y1={y}
-                y2={y}
-                className="chart-gridline"
-              />
-            )
-          })}
-          <path d={linePath} className="chart-line" />
-          {points.map((point, index) => (
-            <circle
-              key={DEMO_SCORE_HISTORY[index].month}
-              cx={point.x}
-              cy={point.y}
-              r="4"
-              className="chart-point"
-            >
-              <title>{`${DEMO_SCORE_HISTORY[index].month}: ${DEMO_SCORE_HISTORY[index].score}`}</title>
-            </circle>
+    <Card className="text-list">
+      <Label>{title}</Label>
+      {items.length > 0 ? (
+        <ul>
+          {items.map((item) => (
+            <li key={item}>{item}</li>
           ))}
-        </svg>
-        <div className="history-chart__labels">
-          {DEMO_SCORE_HISTORY.map((entry) => (
-            <span key={entry.month}>
-              {entry.month}
-              <strong>{entry.score}</strong>
-            </span>
-          ))}
-        </div>
-      </div>
+        </ul>
+      ) : (
+        <p>{empty}</p>
+      )}
     </Card>
   )
 }
 
-interface RepositoryOverviewPageProps {
-  repository: RepositorySummary
-  isAnalysisRunning: boolean
-  analysisRefreshed: boolean
-  analysisStatus?: "PENDING" | "FINISHED" | null
-  recommendations?: Recommendation[]
-  onOpenSecurity: () => void
-  onRunAnalysis: () => void
+function RunNotice({ analysis }: { analysis: RepositoryAnalysis }) {
+  if (analysis.isRunning) {
+    return (
+      <div className="inline-notice inline-notice--progress" role="status">
+        Собираем данные и считаем оценку. Крупный репозиторий может анализироваться несколько минут.
+      </div>
+    )
+  }
+  if (!analysis.rerun) return null
+  const text = analysis.rerun.stillPending
+    ? "Анализ ещё выполняется. Запустите проверку повторно через пару минут."
+    : analysis.rerun.gradeChanged
+      ? "Анализ завершён, оценка обновлена."
+      : "Новых изменений с прошлого анализа нет, оценка актуальна."
+  return (
+    <div className="inline-notice inline-notice--success" role="status">
+      {text}
+    </div>
+  )
 }
 
 export default function RepositoryOverviewPage({
   repository,
-  isAnalysisRunning,
-  analysisRefreshed,
-  analysisStatus,
-  recommendations: loadedRecommendations,
-  onOpenSecurity,
-  onRunAnalysis,
-}: RepositoryOverviewPageProps) {
-  const hasDetailedSample = repository.id === DEFAULT_REPOSITORY_ID
-  const attentionItems = hasDetailedSample ? DEMO_ATTENTION_ITEMS : []
-  const recommendations =
-    loadedRecommendations ?? (hasDetailedSample ? DEMO_RECOMMENDATIONS : [])
+  analysis,
+  onBackToRanking,
+}: {
+  repository: RepositorySummary
+  analysis: RepositoryAnalysis
+  onBackToRanking: () => void
+}) {
+  const isPrivate = isPrivateAnalysis(repository)
+  const summaryKey = `${repository.sourceCraftUuid ?? repository.id}:${isPrivate ? "private" : "public"}`
+  const [summaryState, setSummaryState] = useState({ key: summaryKey, open: false })
+  const summaryOpen = summaryState.key === summaryKey && summaryState.open
+  const level = healthLevel(repository.healthScore)
+  const ai = analysis.ai
+  const fallback = splitStrengths(repository.categoryScores)
+  const strengths = ai?.strengths.length ? ai.strengths : fallback.strengths
+  const weaknesses = ai?.weaknesses.length ? ai.weaknesses : fallback.weaknesses
+  const recommendations = ai?.recommendations.length ? ai.recommendations : (repository.advice ?? [])
+  const missing = missingCategories(repository)
+  const gradedAt = formatDateTime(repository.gradedAt)
+  const modeLabel = isPrivate ? "приватный анализ (все 6 категорий)" : "публичный анализ"
+  const actualWeights = repository.healthScore === null ? [] : scoredCategories(isPrivate, repository.categoryScores)
+  const weights = actualWeights.length > 0 ? actualWeights : scoredCategories(isPrivate)
 
   return (
     <div className="page-stack">
       <PageHeading
-        eyebrow={repository.fullName}
+        eyebrow={
+          repository.webUrl ? (
+            <a href={repository.webUrl} target="_blank" rel="noopener noreferrer">
+              {repository.fullName} ↗
+            </a>
+          ) : (
+            repository.fullName
+          )
+        }
         title={repository.name}
-        description={`${repository.language} · открытый репозиторий · активность ${getLastActivityLabel(repository.lastActivityDaysAgo).toLocaleLowerCase()}`}
+        description={`${repository.language} · ${modeLabel} · активность ${getLastActivityLabel(
+          repository.lastActivityDaysAgo,
+        ).toLocaleLowerCase()}`}
         actions={
           <>
-            <ReportDownloadMenu
-              repository={repository}
-              recommendations={recommendations}
-            />
+            <Button variant="quiet" onClick={onBackToRanking}>
+              К рейтингу
+            </Button>
+            <ReportDownloadMenu repository={repository} recommendations={recommendations} ai={ai} />
             <Button
               variant="primary"
-              onClick={onRunAnalysis}
-              disabled={isAnalysisRunning}
+              onClick={analysis.run}
+              disabled={analysis.isRunning}
+              title="Оценка пересчитывается, если в репозитории была активность после прошлого анализа. Иначе вернётся текущая."
             >
-              {isAnalysisRunning ? "Обновляем…" : "Обновить оценку"}
+              {analysis.isRunning ? "Анализ идёт…" : "Запустить анализ"}
             </Button>
           </>
         }
       />
 
-      {isAnalysisRunning && (
-        <div className="inline-notice inline-notice--progress" role="status">
-          Получаем оценку…
-        </div>
-      )}
-      {analysisRefreshed && (
-        <div className="inline-notice inline-notice--success" role="status">
-          {analysisStatus === "PENDING"
-            ? "Запрос принят. Оценка ещё рассчитывается, обновите данные позже."
-            : "Оценка обновлена из источника данных."}
+      <RunNotice analysis={analysis} />
+      {analysis.error && (
+        <div className="inline-notice inline-notice--error" role="alert">
+          {analysis.error}
         </div>
       )}
 
       <div className="overview-grid">
-        <Card className="health-card">
+        <Card className={`health-card ${repository.healthScore === null ? "health-card--no-data" : ""}`}>
           <div className="health-card__score-block">
             <Label>Repo Health Score</Label>
-            <div className="health-score">
-              {repository.healthScore}
-              <span>/100</span>
+            <div className={`health-score ${repository.healthScore === null ? "health-score--no-data" : ""}`}>
+              {repository.healthScore ?? "Нет данных"}
+              {repository.healthScore !== null && <span>/100</span>}
             </div>
             <div className="health-card__status">
-              <Badge tone={getTone(repository.healthScore)}>
-                {getHealthLabel(repository.healthScore)}
-              </Badge>
-              <span
-                className={`trend ${repository.trend < 0 ? "trend--down" : ""}`}
-              >
-                {repository.trend > 0 ? "+" : ""}
-                {repository.trend} за месяц
-              </span>
+              <Badge tone={level.tone}>{level.label}</Badge>
             </div>
-            <ScoreBar
-              score={repository.healthScore}
-              label={`Repo Health Score: ${repository.healthScore} из 100`}
-            />
-            <p className="muted-copy">
-              Последний анализ:{" "}
-              {analysisRefreshed ? "только что" : "3 часа назад"}
-            </p>
+            {repository.healthScore !== null && (
+              <ScoreBar score={repository.healthScore} label={`Repo Health Score: ${repository.healthScore} из 100`} />
+            )}
+            <p className="muted-copy">Последний анализ: {gradedAt ?? "ещё не выполнялся"}</p>
           </div>
           <div className="health-card__summary">
-            <Label>Краткий разбор</Label>
+            <button
+              type="button"
+              className="eyebrow health-card__summary-toggle"
+              aria-expanded={summaryOpen}
+              aria-controls="ai-summary-content"
+              onClick={() => {
+                const nextOpen = !summaryOpen
+                setSummaryState({ key: summaryKey, open: nextOpen })
+                if (nextOpen) analysis.loadAiSummary()
+              }}
+            >
+              Summary AI
+              <span className="health-card__summary-chevron" aria-hidden="true">▾</span>
+            </button>
             <h2>
-              {repository.healthScore >= 80
-                ? "Проект в хорошем состоянии"
-                : "Есть области для улучшения"}
+              {repository.healthScore === null
+                ? "Оценка пока недоступна"
+                : repository.healthScore >= HEALTHY_SCORE
+                  ? "Проект в хорошем состоянии"
+                  : "Есть области для улучшения"}
             </h2>
-            <p>
-              {repository.id === "awesome-project"
-                ? "Активность проекта и CI/CD выглядят стабильно. Безопасность — главный фактор, который снижает общий результат."
-                : "Оценка собрана по доступным показателям. Откройте категории ниже, чтобы увидеть разбивку."}
-            </p>
-            {repository.id === "awesome-project" && (
-              <div className="potential-score">
-                <span>Возможный результат после исправлений</span>
-                <strong>
-                  {repository.healthScore} <span>→</span> 89
-                </strong>
-                <small>
-                  До +7 баллов после обновления уязвимых зависимостей.
-                </small>
-                <Button variant="quiet" onClick={onOpenSecurity}>
-                  Посмотреть безопасность <span aria-hidden="true">→</span>
-                </Button>
-              </div>
-            )}
+            <div
+              id="ai-summary-content"
+              className="health-card__summary-content"
+              aria-live="polite"
+              aria-busy={analysis.aiLoading}
+              hidden={!summaryOpen}
+            >
+              {summaryOpen && (
+                <>
+                  <p>
+                    {analysis.aiLoading
+                      ? "Готовим AI-сводку…"
+                      : analysis.aiError ??
+                        ai?.summary ??
+                        (ai?.status === "PENDING"
+                          ? "AI-сводка ещё рассчитывается. Попробуйте запросить её позже."
+                          : "AI-сводка пока недоступна. Ниже показаны оценки и рекомендации, рассчитанные по правилам.")}
+                  </p>
+                  {analysis.aiError && (
+                    <button
+                      type="button"
+                      className="button button--quiet health-card__summary-retry"
+                      onClick={analysis.loadAiSummary}
+                    >
+                      Повторить запрос
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </Card>
+      </div>
 
-        <AnalysisResults
-          categories={repository.categoryScores}
-          status={analysisStatus ?? repository.gradeStatus}
-        />
+      <div className="two-column">
+        <TextList title="Сильные стороны" items={strengths} empty="Пока нет категорий с высокой оценкой." />
+        <TextList title="Требует внимания" items={weaknesses} empty="Слабых категорий не найдено." />
       </div>
 
       <section className="section-block">
         <SectionHeading
-          title="Требует внимания"
-          description="Факты и проблемы, на которые стоит посмотреть в первую очередь."
-          action={
-            hasDetailedSample && (
-              <Button variant="quiet" onClick={onOpenSecurity}>
-                Открыть безопасность
-              </Button>
-            )
-          }
+          title="Оценки по категориям"
+          description="Каждая категория оценивается от 0 до 100. Раскройте карточку, чтобы увидеть факты, на которых основана оценка."
         />
-        {attentionItems.length > 0 ? (
-          <Card className="list-card">
-            {attentionItems.map((item, index) => (
-              <div className="attention-item" key={item.id}>
-                {index > 0 && <Divider />}
-                <div className="attention-item__main">
-                  <div className="attention-item__meta">
-                    <Badge tone={item.severity}>
-                      {item.severity === "critical"
-                        ? "Критично"
-                        : "Рекомендация"}
-                    </Badge>
-                    <span>{item.category}</span>
-                  </div>
-                  <strong>{item.title}</strong>
-                  <p>{item.description}</p>
-                </div>
-                <div className="attention-item__impact">
-                  <span>Потенциальный эффект</span>
-                  <strong>+{item.impact}</strong>
-                </div>
-                {item.severity === "critical" && (
-                  <Button variant="secondary" onClick={onOpenSecurity}>
-                    Посмотреть
-                  </Button>
-                )}
-              </div>
-            ))}
-          </Card>
-        ) : (
-          <Card className="empty-note">
-            Детали проблем для этого репозитория пока недоступны.
-          </Card>
-        )}
+        <AnalysisResults categories={repository.categoryScores} status={repository.gradeStatus} isPrivate={isPrivate} />
       </section>
+
+      {missing.length > 0 && (
+        <section className="section-block">
+          <SectionHeading
+            title="Нет данных"
+            description="Эти категории не участвуют в итоговой оценке, а веса остальных пересчитаны. Отсутствие данных не считается плохим результатом."
+          />
+          <Card className="text-list">
+            <ul>
+              {missing.map((item) => (
+                <li key={item.id}>
+                  <strong>{item.label}</strong> — {item.reason}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </section>
+      )}
+
+      <details className="card explanation">
+        <summary>Как рассчитан Repo Health Score</summary>
+        <p>
+          Итог — взвешенное среднее категорий, по которым есть данные.{" "}
+          {actualWeights.length > 0
+            ? "Веса в этой оценке (категории без данных исключены, остальные пересчитаны):"
+            : `Веса в режиме «${modeLabel}»:`}
+        </p>
+        <ul>
+          {weights.map((item) => (
+            <li key={item.id}>
+              {item.label} — {item.weight}%
+            </li>
+          ))}
+        </ul>
+        <p>
+          Если у категории нет данных, она исключается, а веса остальных пересчитываются пропорционально
+          исходным: активность 20, issues 20, безопасность 20, документация 15, CI/CD 15, состояние кода 10.
+          Лайки на оценку не влияют. Пустые коммиты, коммиты ботов и коммиты с датой в будущем отбрасываются.
+          {isPrivate
+            ? " Открытые critical-уязвимости ограничивают итог значением 59, high — значением 79."
+            : " Безопасность и CI/CD оцениваются только в приватном анализе: эти данные SourceCraft отдаёт по токену владельца."}
+        </p>
+      </details>
 
       <section className="section-block">
         <SectionHeading
           title="Рекомендации"
-          description="Действия отсортированы по ожидаемому влиянию на здоровье проекта."
+          description={
+            ai?.recommendations.length
+              ? "Сформированы AI на основе оценок и фактов. Отсортированы по приоритету."
+              : "Сформированы по правилам для метрик ниже здорового порога. Отсортированы по приоритету."
+          }
         />
         {recommendations.length > 0 ? (
           <div className="recommendation-list">
-            {recommendations.map((recommendation, index) => (
-              <Card className="recommendation-card" key={recommendation.id}>
-                <span className="recommendation-card__number">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
-                <div className="recommendation-card__body">
-                  <div className="recommendation-card__title">
-                    <strong>{recommendation.title}</strong>
-                    <Badge
-                      tone={
-                        recommendation.priority === "high"
-                          ? "critical"
-                          : "neutral"
-                      }
-                    >
-                      {recommendation.priority === "high"
-                        ? "Высокий приоритет"
-                        : "Средний приоритет"}
-                    </Badge>
+            {recommendations.map((recommendation, index) => {
+              const weight = recommendation.category
+                ? categoryWeight(recommendation.category, isPrivate, repository.categoryScores)
+                : undefined
+              return (
+                <Card className="recommendation-card" key={recommendation.id}>
+                  <span className="recommendation-card__number">{String(index + 1).padStart(2, "0")}</span>
+                  <div className="recommendation-card__body">
+                    <div className="recommendation-card__title">
+                      <strong>{recommendation.title}</strong>
+                      <Badge tone={PRIORITY_TONES[recommendation.priority]}>
+                        {PRIORITY_LABELS[recommendation.priority]}
+                      </Badge>
+                    </div>
+                    {recommendation.location && (
+                      <span className="recommendation-card__location">Место: {recommendation.location}</span>
+                    )}
+                    <p>{recommendation.description}</p>
+                    {weight !== undefined && (
+                      <span className="recommendation-card__location">
+                        Относится к категории «{recommendation.title}», её вес в итоговой оценке — {weight}%.
+                      </span>
+                    )}
                   </div>
-                  <p>{recommendation.description}</p>
-                </div>
-                <div className="recommendation-card__score">
-                  <span>Score</span>
-                  <strong>
-                    {recommendation.currentScore} →{" "}
-                    {recommendation.projectedScore}
-                  </strong>
-                </div>
-                {recommendation.priority === "high" && (
-                  <Button variant="quiet" onClick={onOpenSecurity}>
-                    Как исправить
-                  </Button>
-                )}
-              </Card>
-            ))}
+                </Card>
+              )
+            })}
           </div>
         ) : (
           <Card className="empty-note">
-            Подробные рекомендации для этого репозитория пока недоступны.
+            {analysis.isRunning ? "Рекомендации появятся после завершения анализа." : "Рекомендаций для этого репозитория нет."}
           </Card>
         )}
       </section>
-
-      {repository.id === DEFAULT_REPOSITORY_ID && <ScoreHistoryChart />}
-      <p className="data-caption">
-        Оценка и рекомендации приходят из подключённого источника данных.
-      </p>
     </div>
   )
 }

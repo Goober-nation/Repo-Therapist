@@ -39,7 +39,7 @@ remains readable with its previous problem-impact rules.
 
 The legacy strict scoring/evidence validator is not in the active Yandex call path.
 One additional model request is allowed for a malformed response, never for semantic
-inconsistency. Kafka transport consumers/producers remain to be implemented.
+inconsistency. Kafka transport is implemented in `src/llm_service/kafka_worker.py`.
 
 From `backend/llm-service`:
 

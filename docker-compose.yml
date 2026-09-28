@@ -92,6 +92,11 @@ services:
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
+      REDIS_ADDRESS: redis:6379
+      AGGREGATOR_GRPC_ADDRESS: localhost:8083
+      RATING_GRPC_ADDRESS: localhost:8086
+      # Gateway requests per client IP per minute (code default 10 is too low for the SPA's polling).
+      RATE_LIMIT: ${RATE_LIMIT:-60}
     # Clones go to /dev/shm first; repository-service retries on disk if a repo outgrows it.
     shm_size: 400m
     restart: unless-stopped
@@ -102,6 +107,8 @@ services:
         condition: service_started
       migrate:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
   llm-service:
     build: backend/llm-service
@@ -116,8 +123,22 @@ services:
       minio:
         condition: service_started
 
+  llm-summary-service:
+    build: backend/llm-service
+    env_file: .env
+    environment:
+      KAFKA_BROKERS: kafka:29092
+    command: ["python", "-m", "llm_service", "--listen-summary"]
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+
   frontend:
-    build: frontend
+    build:
+      context: frontend
+      args:
+        VITE_YANDEX_CLIENT_ID: ${VITE_YANDEX_CLIENT_ID:-}
     ports:
       - "8081:80"
     depends_on:

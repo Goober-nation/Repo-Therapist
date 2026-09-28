@@ -1,10 +1,22 @@
-import type { CategoryScores, MetricResult, RepositorySummary } from "../types"
+import { categoryLabel, PRIORITY_RANK } from "../metrics"
 import type {
+  AiReport,
+  CategoryScores,
+  MetricFact,
+  MetricResult,
+  Priority,
+  Recommendation,
+  RepositorySummary,
+} from "../types"
+import type {
+  AdvicePayload,
+  GatewayRankingEntry,
   GradingResponse,
-  RecommendationItemResponse,
+  MyRepository,
   RecommendationsResponse,
-  SourceCraftRepository,
 } from "./contracts"
+
+const DAY_MS = 86_400_000
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -14,135 +26,235 @@ function optionalText(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined
 }
 
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined
+}
+
+/** A 0–100 score rounded for display; anything else is not a score. */
+function scoreValue(value: unknown): number | null {
+  const score = finiteNumber(value)
+  return score !== undefined && score >= 0 && score <= 100 ? Math.round(score) : null
+}
+
+function daysSince(isoDate?: string): number {
+  const time = isoDate ? new Date(isoDate).getTime() : NaN
+  return Number.isFinite(time) ? Math.max(0, Math.floor((Date.now() - time) / DAY_MS)) : -1
+}
+
+function metricFacts(metrics: unknown): MetricFact[] {
+  if (!Array.isArray(metrics)) return []
+  return metrics.flatMap((metric) => {
+    if (!isRecord(metric) || typeof metric.id !== "string") return []
+    const noData = metric.no_data === true
+    const value = noData ? undefined : finiteNumber(metric.raw_value)
+    const score = noData ? undefined : finiteNumber(metric.score)
+    return [{ id: metric.id, value: value ?? null, score: score !== undefined && score >= 0 && score <= 1 ? score : null }]
+  })
+}
+
 export function normalizeCategoryScores(payload?: unknown): CategoryScores {
   const groups = Array.isArray(payload) ? payload : [payload]
-  const entries = groups.flatMap((group) =>
-    isRecord(group) ? Object.entries(group) : [],
-  )
+  const entries = groups.flatMap((group) => (isRecord(group) ? Object.entries(group) : []))
 
   return Object.fromEntries(
     entries.map(([name, value]) => {
       const details = isRecord(value) ? value : undefined
-      const rawScore = details ? details.score : value
-      const score =
-        typeof rawScore === "number" &&
-        Number.isFinite(rawScore) &&
-        rawScore >= 0 &&
-        rawScore <= 100
-          ? Math.round(rawScore)
-          : null
-      const result: MetricResult = {
-        score,
-        trend:
-          typeof details?.trend === "number" && Number.isFinite(details.trend)
-            ? details.trend
-            : null,
-      }
+      const isNoData = details?.no_data === true || details?.status === "NO_DATA"
+      const rawScore = isNoData ? null : details ? details.score : value
+      const score = scoreValue(rawScore)
+      const result: MetricResult = { score, trend: finiteNumber(details?.trend) ?? null }
       const displayName = optionalText(details?.name)
       const description = optionalText(details?.description)
+      const facts = metricFacts(details?.metrics)
       if (displayName) result.name = displayName
       if (description) result.description = description
+      if (facts.length > 0) result.facts = facts
       return [name, result]
     }),
   )
 }
 
 function categoryPayload(grading?: GradingResponse) {
-  return grading?.category_scores !== undefined
-    ? grading.category_scores
-    : grading?.criteria
+  if (grading?.grade) return grading.grade.category_scores
+  return grading?.category_scores !== undefined ? grading.category_scores : grading?.criteria
 }
 
-function parseCount(value?: string): number {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : 0
+function gradeScore(grading?: GradingResponse): number | null | undefined {
+  const score = grading?.grade?.score !== undefined ? grading.grade.score : grading?.health_score
+  if (grading?.status === "NO_DATA" || (grading?.status === "FINISHED" && score === undefined)) {
+    return null
+  }
+  if (score === null) return null
+  if (finiteNumber(score) === undefined) return undefined
+  return scoreValue(score)
 }
 
-function getLikes(repository: SourceCraftRepository): number {
-  const reactionCounts = repository.rating?.reaction_counts ?? []
-  const likes = reactionCounts.find((reaction) =>
-    ["like", "likes", "upvote", "positive"].includes(
-      reaction.type?.toLocaleLowerCase() ?? "",
-    ),
-  )
-  return parseCount(likes?.count)
+function toPriority(value?: string): Priority {
+  const normalized = value?.toLowerCase()
+  if (normalized === "critical" || normalized === "high") return "high"
+  return normalized === "low" ? "low" : "medium"
 }
 
-export function repositoryFromSourceCraft(
-  repository: SourceCraftRepository,
-  grading?: GradingResponse,
-): RepositorySummary {
-  const categoryScores = normalizeCategoryScores(categoryPayload(grading))
-  const healthScore =
-    typeof grading?.health_score === "number"
-      ? Math.round(grading.health_score)
-      : 0
-  const lastUpdated = repository.last_updated
-  const lastActivityDaysAgo = lastUpdated
-    ? Math.max(
-        0,
-        Math.floor((Date.now() - new Date(lastUpdated).getTime()) / 86_400_000),
-      )
-    : 0
+function byPriority(left: Recommendation, right: Recommendation) {
+  return PRIORITY_RANK[left.priority] - PRIORITY_RANK[right.priority]
+}
 
-  return {
-    id: repository.id,
-    sourceCraftUuid: repository.id,
-    orgSlug: repository.organization.slug,
-    repoSlug: repository.slug,
-    name: repository.name,
-    fullName: `${repository.organization.slug}/${repository.slug}`,
-    language: repository.language?.name ?? "Не указан",
-    defaultBranch: repository.default_branch,
-    visibility: repository.visibility,
-    description: repository.description,
-    webUrl: repository.web_url,
-    lastUpdated,
-    healthScore,
-    trend: 0,
-    likes: getLikes(repository),
-    lastActivityDaysAgo,
-    categoryScores,
-    gradeStatus: grading?.status ?? "PENDING",
-    gradedAt: grading?.graded_at,
-    missingData: normalizeMissingData(grading?.missing_data),
+/** grade-service advice: "[high] Text" → priority + text. */
+export function adviceToRecommendations(advice: AdvicePayload[] | null | undefined): Recommendation[] {
+  if (!Array.isArray(advice)) return []
+  return advice
+    .flatMap((item, index) => {
+      const text = optionalText(item?.text)
+      if (!text) return []
+      const [, tag, body] = /^\s*\[(\w+)\]\s*(.*)$/s.exec(text) ?? [, undefined, text]
+      return [
+        {
+          id: `advice-${index}`,
+          priority: toPriority(tag),
+          title: item.category_id ? categoryLabel(item.category_id) : "Рекомендация",
+          description: body.trim(),
+          ...(item.category_id ? { category: item.category_id } : {}),
+        },
+      ]
+    })
+    .sort(byPriority)
+}
+
+export function repositoryFromRanking(entry: GatewayRankingEntry): RepositorySummary | null {
+  if (
+    (entry.public_score !== undefined && entry.public_score !== null && typeof entry.public_score !== "number") ||
+    !entry.web_url
+  ) {
+    return null
+  }
+  try {
+    const segments = new URL(entry.web_url).pathname.split("/").filter(Boolean)
+    if (segments.length < 2) return null
+    const repoSlug = segments.at(-1)!
+    const orgSlug = segments.at(-2)!
+    return {
+      id: entry.sourcecraft_uuid,
+      sourceCraftUuid: entry.sourcecraft_uuid,
+      orgSlug,
+      repoSlug,
+      name: entry.name || repoSlug,
+      fullName: `${orgSlug}/${repoSlug}`,
+      language: entry.language?.name || "Не указан",
+      ...(finiteNumber(entry.place) !== undefined ? { place: entry.place } : {}),
+      visibility: "public",
+      analysisMode: "public",
+      webUrl: entry.web_url,
+      lastUpdated: entry.last_activity_at,
+      healthScore: scoreValue(entry.public_score),
+      ...(typeof entry.likes === "number" ? { likes: entry.likes } : {}),
+      lastActivityDaysAgo: daysSince(entry.last_activity_at),
+      categoryScores: {},
+      gradeStatus: "FINISHED",
+      missingData: [],
+    }
+  } catch {
+    return null
   }
 }
 
-export function normalizeMissingData(
-  missingData?: Record<string, unknown> | string[],
-): string[] {
+/** A repository from GET /repos, analysed with the owner's token. */
+export function repositoryFromMyRepos(repository: MyRepository): RepositorySummary {
+  const fullName = `${repository.org_slug}/${repository.repo_slug}`
+  return {
+    id: repository.sourcecraft_uuid || fullName,
+    sourceCraftUuid: repository.sourcecraft_uuid,
+    orgSlug: repository.org_slug,
+    repoSlug: repository.repo_slug,
+    name: repository.repo_slug,
+    fullName,
+    language: repository.language?.name || "Не указан",
+    visibility: repository.visibility,
+    analysisMode: "private",
+    webUrl: repository.web_url,
+    lastUpdated: repository.last_activity_at,
+    healthScore: null,
+    lastActivityDaysAgo: daysSince(repository.last_activity_at),
+    categoryScores: {},
+  }
+}
+
+/** A repository known only by its slugs (pasted link, direct URL). */
+export function repositoryStub(orgSlug: string, repoSlug: string, isPrivate: boolean): RepositorySummary {
+  return {
+    id: `sourcecraft:${orgSlug}/${repoSlug}`,
+    orgSlug,
+    repoSlug,
+    name: repoSlug,
+    fullName: `${orgSlug}/${repoSlug}`,
+    language: "Не указан",
+    analysisMode: isPrivate ? "private" : "public",
+    webUrl: `https://sourcecraft.dev/${encodeURIComponent(orgSlug)}/${encodeURIComponent(repoSlug)}`,
+    healthScore: null,
+    lastActivityDaysAgo: -1,
+    categoryScores: {},
+  }
+}
+
+export function normalizeMissingData(missingData?: Record<string, unknown> | string[]): string[] {
   if (Array.isArray(missingData)) return missingData.map(String)
   return Object.entries(missingData ?? {})
     .filter(([, value]) => Boolean(value))
     .map(([key]) => key)
 }
 
-export function recommendationsFromResponse(
-  response: RecommendationsResponse,
-): RecommendationItemResponse[] {
-  return response.recommendations ?? response.reccomendations ?? []
+export function recommendationsFromResponse(response: RecommendationsResponse): Recommendation[] {
+  const items = response.raw_response?.recommendations
+  if (!Array.isArray(items)) return []
+  return items
+    .flatMap((item, index) => {
+      const text = optionalText(item?.text)
+      if (!text) return []
+      const location = item.location ?? item.place
+      return [
+        {
+          id: `ai-${index}`,
+          priority: toPriority(item.priority),
+          title: item.category ? categoryLabel(item.category) : "Рекомендация",
+          description: text,
+          ...(item.category ? { category: item.category } : {}),
+          ...(location ? { location } : {}),
+        },
+      ]
+    })
+    .sort(byPriority)
+}
+
+function textList(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => (typeof item === "string" && item.trim() ? [item.trim()] : []))
+}
+
+export function aiReportFromResponse(response: RecommendationsResponse): AiReport {
+  return {
+    status: response.status,
+    summary: optionalText(response.raw_response?.summary)?.trim(),
+    strengths: textList(response.raw_response?.strengths),
+    weaknesses: textList(response.raw_response?.weaknesses),
+    recommendations: recommendationsFromResponse(response),
+  }
 }
 
 export function mergeGradingIntoRepository(
   repository: RepositorySummary,
   grading: GradingResponse,
 ): RepositorySummary {
-  const healthScore =
-    typeof grading.health_score === "number"
-      ? Math.round(grading.health_score)
-      : repository.healthScore
+  const score = gradeScore(grading)
+  const payload = categoryPayload(grading)
+  const missing = grading.grade?.missing_data ?? grading.missing_data
+  const completed = grading.status === "FINISHED" || grading.status === "NO_DATA"
   return {
     ...repository,
-    healthScore,
+    healthScore: score !== undefined ? score : repository.healthScore,
     categoryScores:
-      categoryPayload(grading) !== undefined || grading.status === "FINISHED"
-        ? normalizeCategoryScores(categoryPayload(grading))
-        : repository.categoryScores,
+      payload !== undefined || completed ? normalizeCategoryScores(payload) : repository.categoryScores,
     gradeStatus: grading.status,
-    gradedAt: grading.graded_at ?? repository.gradedAt,
-    missingData: grading.missing_data
-      ? normalizeMissingData(grading.missing_data)
-      : repository.missingData,
+    gradedAt: grading.grade?.graded_at ?? grading.graded_at ?? repository.gradedAt,
+    missingData: missing ? normalizeMissingData(missing) : repository.missingData,
+    advice: grading.grade ? adviceToRecommendations(grading.grade.advice) : repository.advice,
   }
 }

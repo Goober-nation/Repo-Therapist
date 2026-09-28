@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from "react"
-import { downloadReport } from "../mocks/downloadReport"
-import type { Recommendation, RepositorySummary } from "../types"
+import { downloadReport } from "../reports/downloadReport"
+import type { AiReport, Recommendation, RepositorySummary } from "../types"
 import { Button } from "./Shell"
 
 interface ReportDownloadMenuProps {
   repository: RepositorySummary
   recommendations: Recommendation[]
+  ai?: AiReport
 }
 
 export default function ReportDownloadMenu({
   repository,
   recommendations,
+  ai,
 }: ReportDownloadMenuProps) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -43,8 +45,8 @@ export default function ReportDownloadMenu({
     setError("")
     setBusy(true)
     try {
-      const { downloadPdfReport } = await import("../mocks/pdfReport")
-      await downloadPdfReport(repository, recommendations)
+      const { downloadPdfReport } = await import("../reports/pdfReport")
+      await downloadPdfReport(repository, recommendations, ai)
     } catch (cause) {
       console.error("PDF report download failed", cause)
       setError("Не удалось скачать PDF. Попробуйте ещё раз.")
@@ -72,7 +74,7 @@ export default function ReportDownloadMenu({
             onClick={() => {
               setOpen(false)
               setError("")
-              downloadReport(repository, recommendations)
+              downloadReport(repository, recommendations, ai)
             }}
           >
             Скачать MD
