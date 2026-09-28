@@ -137,7 +137,7 @@ func TestBuildGradingResult_CapsRecommendationsAcrossCategories(t *testing.T) {
 	}}
 	catalog := map[string]string{"a1": "A1", "a2": "A2", "i1": "I1", "i2": "I2", "c1": "C1"}
 
-	result, err := BuildGradingResult(out, cfg, catalog, contracts.VisibilityPublic, time.Now(), DefaultAdviceLimit, noShuffle)
+	result, err := BuildGradingResult(out, cfg, catalog, contracts.VisibilityPublic, time.Now(), 3, noShuffle)
 	if err != nil {
 		t.Fatal(err)
 	}

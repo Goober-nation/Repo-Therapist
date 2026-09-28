@@ -17,20 +17,21 @@ func TestLLMRequestTTL(t *testing.T) {
 }
 
 func TestRegradeSettings(t *testing.T) {
+	t.Setenv("GRADING_REGRADE_INTERVAL", "")
 	t.Setenv("GRADING_REGRADE_ON_START", "")
 	t.Setenv("GRADING_REGRADE_LIMIT", "")
 	g := LoadConfig().Grading
-	if !g.RegradeOnStart || g.RegradeLimit != 0 {
-		t.Errorf("defaults: got on_start=%v limit=%d, want true 0", g.RegradeOnStart, g.RegradeLimit)
+	if g.RegradeOnStart || g.RegradeLimit != 20 || g.RegradeInterval != 72*time.Hour {
+		t.Errorf("defaults: got on_start=%v limit=%d interval=%s, want false 20 72h", g.RegradeOnStart, g.RegradeLimit, g.RegradeInterval)
 	}
-	t.Setenv("GRADING_REGRADE_ON_START", "false")
+	t.Setenv("GRADING_REGRADE_ON_START", "true")
 	t.Setenv("GRADING_REGRADE_LIMIT", "25")
 	g = LoadConfig().Grading
-	if g.RegradeOnStart || g.RegradeLimit != 25 {
-		t.Errorf("override: got on_start=%v limit=%d, want false 25", g.RegradeOnStart, g.RegradeLimit)
+	if !g.RegradeOnStart || g.RegradeLimit != 25 {
+		t.Errorf("override: got on_start=%v limit=%d, want true 25", g.RegradeOnStart, g.RegradeLimit)
 	}
 	t.Setenv("GRADING_REGRADE_LIMIT", "-3")
-	if got := LoadConfig().Grading.RegradeLimit; got != 0 {
-		t.Errorf("negative: got %d, want 0", got)
+	if got := LoadConfig().Grading.RegradeLimit; got != 20 {
+		t.Errorf("negative: got %d, want 20", got)
 	}
 }

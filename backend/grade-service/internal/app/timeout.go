@@ -42,7 +42,7 @@ func DurationEnv(key string, def time.Duration) time.Duration {
 }
 
 // DefaultAdviceLimit is how many recommendations a grading result carries by default.
-const DefaultAdviceLimit = 3
+const DefaultAdviceLimit = 0
 
 // AdviceLimit returns GRADE_ADVICE_LIMIT (a non-negative integer, 0 = send every recommendation)
 // or DefaultAdviceLimit when it is unset or invalid (an invalid value is logged).

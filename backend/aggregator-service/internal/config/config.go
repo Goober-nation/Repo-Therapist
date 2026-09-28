@@ -169,15 +169,15 @@ func LoadConfig() *Config {
 		Grading: GradingConfig{
 			RegradeInterval: getEnvDuration(
 				"GRADING_REGRADE_INTERVAL",
-				24*time.Hour,
+				72*time.Hour,
 			),
 			RegradeOnStart: getEnvBool(
 				"GRADING_REGRADE_ON_START",
-				true,
+				false,
 			),
 			RegradeLimit: getEnvInt(
 				"GRADING_REGRADE_LIMIT",
-				0,
+				20,
 			),
 			LLMRequestTTL: getEnvDuration(
 				"LLM_REQUEST_TTL",
