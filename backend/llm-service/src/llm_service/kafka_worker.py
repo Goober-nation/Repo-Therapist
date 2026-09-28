@@ -7,6 +7,7 @@ import logging
 import os
 from dataclasses import dataclass
 
+from .algorithmic import algorithmic_grade
 from .context import ContextBuildError, prepare_documentation_context
 from .contracts import InvalidEvent, UnsupportedEventVersion
 from .grade_wire import (REQUEST_TOPIC, RESULT_TOPIC, parse_grade_request,
@@ -23,6 +24,7 @@ from .yandex_model import (ModelContentFiltered, ModelDeadlineExceeded, ModelInp
                            YandexModel, YandexModelConfig)
 
 LOG = logging.getLogger(__name__)
+DOCUMENTATION_MODES = ("auto", "llm", "algorithmic")
 
 
 def _env_first(*keys: str, default: str) -> str:
@@ -108,8 +110,50 @@ def _failure(exc: Exception) -> tuple[str, bool, str]:
     return "INTERNAL_ERROR", True, "Внутренняя ошибка LLM-сервиса"
 
 
-def process_documentation_request(raw: bytes, store, model) -> dict | None:
-    """Return success or failure; only uncorrelatable input lacks a result."""
+def documentation_mode() -> str:
+    """LLM_DOCS_MODE: auto (default), llm or algorithmic; typos fail at startup."""
+    mode = os.environ.get("LLM_DOCS_MODE", "auto").strip().lower()
+    if mode not in DOCUMENTATION_MODES:
+        raise ValueError("LLM_DOCS_MODE must be auto, llm or algorithmic")
+    return mode
+
+
+def documentation_model(mode: str):
+    """Build the model for this mode; auto without credentials runs algorithmically."""
+    if mode == "algorithmic":
+        return None
+    try:
+        return YandexModel(YandexModelConfig.from_env())
+    except ValueError:
+        if mode != "auto":
+            raise
+        LOG.warning("Yandex credentials are not set; Documentation is graded algorithmically")
+        return None
+
+
+def grade_documentation(snapshot, context, model, mode: str) -> tuple[dict, bool]:
+    """Return the payload and whether the model produced it.
+
+    In auto mode a model-side failure falls back to the algorithmic grade. Failures
+    to read the repository happen earlier and are never masked by the fallback.
+    """
+    if mode == "algorithmic" or model is None:
+        return algorithmic_grade(snapshot, context), False
+    try:
+        return model.grade(snapshot, context), True
+    except (ModelProviderError, InvalidModelResponse) as exc:
+        if mode != "auto":
+            raise
+        LOG.warning("Documentation model failed (%s); using algorithmic grade",
+                    _failure(exc)[0])
+        return algorithmic_grade(snapshot, context), False
+
+
+def process_documentation_request(raw: bytes, store, model, mode: str = "llm") -> dict | None:
+    """Return success or failure; only uncorrelatable input lacks a result.
+
+    The default ``llm`` keeps model failures visible; the worker reads LLM_DOCS_MODE.
+    """
     try:
         request = parse_grade_request(raw)
     except InvalidEvent:
@@ -120,7 +164,8 @@ def process_documentation_request(raw: bytes, store, model) -> dict | None:
         return build_grade_failure(sourcecraft_uuid, "INVALID_EVENT")
     try:
         snapshot, context = prepare_documentation_context(store, request["s3_prefix"])
-        return build_grade_result(request, model.grade(snapshot, context))
+        payload, llm_used = grade_documentation(snapshot, context, model, mode)
+        return build_grade_result(request, payload, llm_used=llm_used)
     except Exception as exc:
         code, _, _ = _failure(exc)
         LOG.error("Documentation analysis failed: %s; sourcecraft_uuid=%s", code,
@@ -200,9 +245,10 @@ def _serve(config, request_topic, result_topic, handle, *, consumer=None, produc
         consumer.close()
 
 
-def run_worker(config: KafkaConfig, store, model, *, consumer=None, producer=None) -> None:
+def run_worker(config: KafkaConfig, store, model, *, mode: str = "llm", consumer=None,
+               producer=None) -> None:
     _serve(config, config.request_topic, config.result_topic,
-           lambda raw: process_documentation_request(raw, store, model),
+           lambda raw: process_documentation_request(raw, store, model, mode),
            consumer=consumer, producer=producer)
 
 
@@ -215,10 +261,12 @@ def run_summary_worker(config: SummaryKafkaConfig, model, *, consumer=None,
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
+    mode = documentation_mode()
     store = S3Store(S3Config.from_env())
-    model = YandexModel(YandexModelConfig.from_env())
+    model = documentation_model(mode)
+    LOG.info("Documentation mode: %s", mode)
     try:
-        run_worker(KafkaConfig.from_env(), store, model)
+        run_worker(KafkaConfig.from_env(), store, model, mode=mode)
     except KeyboardInterrupt:
         pass
 

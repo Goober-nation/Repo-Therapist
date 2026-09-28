@@ -72,6 +72,10 @@ FALLBACKS = {
     'consistency': 'Сверьте описанные команды, ссылки и настройки с текущими файлами проекта.',
 }
 
+# Always the last advice item when the model did not grade the documentation.
+ALGORITHMIC_NOTICE = ('Документация оценена упрощённо, без LLM: проверено только наличие '
+                      'разделов, их качество не оценивалось.')
+
 
 def render_advice(fact):
     """Return only an improvement recommendation for the Grade service."""

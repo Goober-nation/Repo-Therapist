@@ -97,9 +97,15 @@ def main(argv=None) -> int:
                                   for item in json.loads(context.text)["documents"]]},
                              ensure_ascii=False, indent=2))
             return 0
-        model = YandexModel(YandexModelConfig.from_env())
-        print(f"Подготовлено файлов: {len(snapshot.files)}. Отправляю запрос в модель…", file=sys.stderr)
-        result = model.grade(snapshot, context)
+        from .kafka_worker import documentation_mode, documentation_model, grade_documentation
+        mode = documentation_mode()
+        model = documentation_model(mode)
+        if model is not None:
+            print(f"Подготовлено файлов: {len(snapshot.files)}. Отправляю запрос в модель…",
+                  file=sys.stderr)
+        result, llm_used = grade_documentation(snapshot, context, model, mode)
+        if not llm_used:
+            print("Оценка выполнена алгоритмически, без LLM.", file=sys.stderr)
         print(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False))
         return 0
     except subprocess.CalledProcessError:
