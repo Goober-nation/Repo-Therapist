@@ -2,7 +2,7 @@
 # Starts each Go service with its own env overrides; exits when any of them exits.
 set -uo pipefail
 
-GO_SERVICES="${GO_SERVICES:-sourcecraft-wrapper-service security-wrapper-service repository-service grade-service}"
+GO_SERVICES="${GO_SERVICES:-aggregator-service sourcecraft-wrapper-service security-wrapper-service repository-service grade-service}"
 
 start() {
 	case "$1" in
