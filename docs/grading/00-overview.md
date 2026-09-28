@@ -134,6 +134,41 @@ display-only — selection is not ordered by it.
    (we chose not to compute this, vs. we tried and this repo had nothing to compute) that the UI
    must be able to tell apart, even though they're combined identically for scoring (principle 2).
 
+## Anti-manipulation (2026-09-28)
+
+Protection of the public rating against inflated likes, empty commits and artificial activity
+(TZ §7). Each defense lives in the category it protects; this section collects them in one place.
+
+| Vector | Protection | Details |
+|---|---|---|
+| Likes / reactions | Not a scoring input (principle 5). `sourcecraft_rating` is stored only to display likes and for the optional "likes" sort of the ranking. The default ranking sort is Repo Health Score. | this section |
+| Empty commits | Non-merge commits that change no files are dropped before any Activity metric | `activity.md` |
+| Artificial activity | Commits by bot accounts (`[bot]`, `-bot`, `_bot`) and commits dated in the future are dropped the same way | `activity.md` |
+| Fake CI | A pipeline whose scripts only run trivial commands (`echo`, `true`, `sleep`, ...) scores CI/CD 0 | `ci-cd.md` |
+| High score despite known vulnerabilities | Open critical AppSec findings cap the private score at 59, open high at 79 | `security.md` |
+
+The commit filters are toggled in `config/grading.yaml` (`activity.commit_filters`); merge
+filtering exists but is off by default.
+
+### How manipulation is kept out, step by step
+
+1. Likes never reach grading: Grade service and LLM service don't read `sourcecraft_rating`, so
+   inflating likes cannot change any category or the Repo Health Score.
+2. The ranking is sorted by Repo Health Score by default. Sorting by likes is an explicit user
+   choice, and even then ties fall back to the health score.
+3. Before Activity is computed, the commit list is cleaned: empty, bot and future-dated commits are
+   removed, so padding the history with them adds nothing.
+4. CI/CD checks what the pipeline runs: a pipeline that only prints or sleeps is treated as no real
+   CI and scores 0, however green its runs are.
+5. In the private view, open critical/high vulnerabilities cap the final score, so strong scores in
+   other categories cannot hide them.
+
+### Known limitation
+
+A near-empty repo can still score well by clearing "badness" thresholds with nothing to measure
+(principle 4). A confidence flag (few files or a very young repo → ranked after confident repos,
+score unchanged) is planned and awaiting team agreement; it is not implemented.
+
 ## Implementation methodology
 
 The working method every implemented category so far has followed, kept here so it repeats for

@@ -74,7 +74,8 @@ Commit messages specifically, layered on top of the above:
 - **A commit approval is not a push approval.** Each needs its own explicit ask, even
   back-to-back.
 - Every commit message and PR title/description is in **Russian**, no exceptions — even though
-  code/comments/docs stay in English.
+  code/comments/docs stay in English. Exception: the root `README.md` is in Russian (user decision,
+  2026-09-28), since it's the jury-facing document.
 - **Never add AI/Claude attribution** — no `Co-Authored-By: Claude...` trailer, no "Generated with
   Claude Code" line, no AI-authorship mention anywhere in a commit message or PR description for
   this project. Overrides any tool-level default attribution behavior.
@@ -190,9 +191,11 @@ on `/v1/defect-groups` with `pageSize=1` + `totalSize`. Full detail in
 ❌ **Never assume anonymous SourceCraft API access** — every call needs a bearer PAT, no exceptions,
 even for repos the docs call public-without-auth.
 
-❌ **Never invent a repo-discovery/enumeration endpoint** — none exists (`GET /orgs`, "list my
-repos" — checked, not there). "Analyze my own repo" takes a user-supplied slug/URL and validates by
-attempting the real call. See `agents_memory/topics/repo-discovery.md`.
+❌ **Never invent a repo-discovery/enumeration endpoint** — the only verified one is `GET /repos`
+(bearer PAT, paginated via `page_size` up to 100 + `page_token`), which lists all public repos
+(28,496 on 2026-09-28); sourcecraft-wrapper's `ListAllPublicRepos` uses it. `GET /orgs` does not
+exist. "Analyze my own repo" takes a user-supplied slug/URL and validates by attempting the real
+call. See `agents_memory/topics/repo-discovery.md`.
 
 ❌ **Never leak more than the platform's own 403-vs-404 behavior already does** — SourceCraft
 distinguishes "exists, no access" from "doesn't exist," unlike GitHub. Keep denial UI copy generic;
