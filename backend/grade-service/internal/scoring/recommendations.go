@@ -1,5 +1,10 @@
 package scoring
 
+import (
+	"slices"
+	"strings"
+)
+
 // Recommendation is one deduction-reason -> pre-written-text pairing, generated while scoring —
 // see docs/grading/00-overview.md's public/private split and config/recommendations.yaml for the
 // catalog. Mirrors contracts.Recommendation (grade-service's own copy, kept dependency-free of
@@ -33,6 +38,30 @@ func BuildRecommendations(categories map[string]CategoryResult, categoryIDs []st
 				continue
 			}
 			recs = append(recs, Recommendation{CategoryID: catID, MetricID: m.ID, Text: text})
+		}
+	}
+	return recs
+}
+
+// DocsAdviceMetricID and DocsAdviceSeverity label the LLM service's Documentation advice in the
+// shared pool: its texts carry no metric code or severity of their own (2026-09-29 decision).
+const (
+	DocsAdviceMetricID = "llm_advice"
+	DocsAdviceSeverity = "[medium] "
+)
+
+// DocsRecommendations turns the LLM service's Documentation advice into pool entries, in order.
+// Nothing is added when Documentation isn't in categoryIDs or has no data — advice from a reply
+// that wasn't used for the score would describe a grade the user never sees.
+func DocsRecommendations(categories map[string]CategoryResult, categoryIDs []string, advice []string) []Recommendation {
+	cat, ok := categories["documentation"]
+	if !ok || cat.NoData || !slices.Contains(categoryIDs, "documentation") {
+		return nil
+	}
+	recs := make([]Recommendation, 0, len(advice))
+	for _, text := range advice {
+		if text = strings.TrimSpace(text); text != "" {
+			recs = append(recs, Recommendation{CategoryID: "documentation", MetricID: DocsAdviceMetricID, Text: DocsAdviceSeverity + text})
 		}
 	}
 	return recs

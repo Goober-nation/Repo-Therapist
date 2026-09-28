@@ -34,6 +34,10 @@ var (
 type GradeOutput struct {
 	RepoID     string                            `json:"sourcecraft_uuid"`
 	Categories map[string]scoring.CategoryResult `json:"categories"`
+	// DocsAdvice is the LLM service's Documentation advice (repo.docs.graded), set only when
+	// that reply succeeded. The last item is the "graded without LLM" notice when the grade was
+	// algorithmic; it is forwarded like any other item.
+	DocsAdvice []string `json:"docs_advice,omitempty"`
 }
 
 // CategoryIDs returns the categories graded for a visibility: the private view is a superset
@@ -202,6 +206,7 @@ func BuildGradingResult(out *GradeOutput, cfg *config.Config, catalog map[string
 	}
 
 	pool := scoring.BuildRecommendations(out.Categories, ids, catalog)
+	pool = append(pool, scoring.DocsRecommendations(out.Categories, ids, out.DocsAdvice)...)
 	recsJSON, err := json.Marshal(toContractRecommendations(scoring.PickRandom(pool, adviceLimit, shuffle)))
 	if err != nil {
 		return contracts.GradingResultEvent{}, fmt.Errorf("marshaling recommendations: %w", err)

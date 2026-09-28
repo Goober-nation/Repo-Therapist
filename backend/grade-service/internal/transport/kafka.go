@@ -149,6 +149,9 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 			return publishFailure(ctx, producer, ready, job.visibility, contracts.GradingErrGrading)
 		}
 		out.Categories["documentation"] = scoring.ComputeDocumentation(reply)
+		if docs := out.Categories["documentation"]; !docs.NoData {
+			out.DocsAdvice = reply.Advice
+		}
 		app.PrintResult(out)
 
 		result, err := app.BuildGradingResult(out, cfg, catalog, job.visibility, time.Now(), adviceLimit, rand.Shuffle)

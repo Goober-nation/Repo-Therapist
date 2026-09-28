@@ -131,22 +131,27 @@ def documentation_model(mode: str):
         return None
 
 
-def grade_documentation(snapshot, context, model, mode: str) -> tuple[dict, bool]:
-    """Return the payload and whether the model produced it.
+def _keep(payload: dict, llm_used: bool) -> tuple[dict, bool]:
+    return payload, llm_used
 
-    In auto mode a model-side failure falls back to the algorithmic grade. Failures
+
+def grade_documentation(snapshot, context, model, mode: str, finish=_keep):
+    """Return finish(payload, llm_used), llm_used telling whether the model graded.
+
+    In auto mode any failure of the model path — the call itself or turning its
+    answer into a result via finish — falls back to the algorithmic grade. Failures
     to read the repository happen earlier and are never masked by the fallback.
     """
     if mode == "algorithmic" or model is None:
-        return algorithmic_grade(snapshot, context), False
+        return finish(algorithmic_grade(snapshot, context), False)
     try:
-        return model.grade(snapshot, context), True
-    except (ModelProviderError, InvalidModelResponse) as exc:
+        return finish(model.grade(snapshot, context), True)
+    except Exception as exc:
         if mode != "auto":
             raise
-        LOG.warning("Documentation model failed (%s); using algorithmic grade",
-                    _failure(exc)[0])
-        return algorithmic_grade(snapshot, context), False
+        LOG.warning("Documentation model path failed (%s: %s); using algorithmic grade",
+                    _failure(exc)[0], type(exc).__name__)
+        return finish(algorithmic_grade(snapshot, context), False)
 
 
 def process_documentation_request(raw: bytes, store, model, mode: str = "llm") -> dict | None:
@@ -164,8 +169,9 @@ def process_documentation_request(raw: bytes, store, model, mode: str = "llm") -
         return build_grade_failure(sourcecraft_uuid, "INVALID_EVENT")
     try:
         snapshot, context = prepare_documentation_context(store, request["s3_prefix"])
-        payload, llm_used = grade_documentation(snapshot, context, model, mode)
-        return build_grade_result(request, payload, llm_used=llm_used)
+        return grade_documentation(
+            snapshot, context, model, mode,
+            lambda payload, llm_used: build_grade_result(request, payload, llm_used=llm_used))
     except Exception as exc:
         code, _, _ = _failure(exc)
         LOG.error("Documentation analysis failed: %s; sourcecraft_uuid=%s", code,

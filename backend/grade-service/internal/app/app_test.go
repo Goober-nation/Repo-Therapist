@@ -150,6 +150,41 @@ func TestBuildGradingResult_CapsRecommendationsAcrossCategories(t *testing.T) {
 	}
 }
 
+func TestBuildGradingResult_DocsAdviceJoinsThePool(t *testing.T) {
+	out := &GradeOutput{
+		RepoID: "test-repo",
+		Categories: map[string]scoring.CategoryResult{
+			"activity":      {ID: "activity", Score: 20, Metrics: []scoring.MetricResult{{ID: "a1", Score: 0.2}}},
+			"documentation": {ID: "documentation", Score: 61},
+		},
+		DocsAdvice: []string{"D1", "D2"},
+	}
+	cfg := &config.Config{Categories: map[string]config.CategoryConfig{
+		"activity": {Weight: 0.5}, "documentation": {Weight: 0.5},
+	}}
+	result, err := BuildGradingResult(out, cfg, map[string]string{"a1": "A1"}, contracts.VisibilityPublic, time.Now(), DefaultAdviceLimit, noShuffle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var recs []contracts.Recommendation
+	if err := json.Unmarshal(result.Advice, &recs); err != nil {
+		t.Fatal(err)
+	}
+	want := []contracts.Recommendation{
+		{CategoryID: "activity", MetricID: "a1", Text: "A1"},
+		{CategoryID: "documentation", MetricID: "llm_advice", Text: "[medium] D1"},
+		{CategoryID: "documentation", MetricID: "llm_advice", Text: "[medium] D2"},
+	}
+	if len(recs) != len(want) {
+		t.Fatalf("got %+v, want %+v", recs, want)
+	}
+	for i := range want {
+		if recs[i] != want[i] {
+			t.Errorf("item %d: got %+v, want %+v", i, recs[i], want[i])
+		}
+	}
+}
+
 func TestGradingFailureWireShape(t *testing.T) {
 	raw, err := json.Marshal(GradingFailure("u1", contracts.VisibilityPublic, contracts.GradingErrGrading, time.Unix(0, 0).UTC()))
 	if err != nil {

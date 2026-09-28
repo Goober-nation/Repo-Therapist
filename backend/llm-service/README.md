@@ -134,6 +134,15 @@ PYTHONPATH=src python3 -m llm_service --summary-file request.json
 Optional: `LLM_SUMMARY_KAFKA_GROUP_ID` (default `llm-service-recommendations-v1`),
 `LLM_SUMMARY_REQUEST_TOPIC`, `LLM_SUMMARY_RESULT_TOPIC`.
 
+Documentation grading mode, `LLM_DOCS_MODE`: `auto` (default) grades with the model and falls
+back to the algorithmic grade on any failure of the model path — the call or building its
+result; repository read failures still return an error. `llm` reports every failure,
+`algorithmic` never calls the model.
+
+Documentation advice texts (per deduction code, per-section fallbacks, the algorithmic-grade
+notice) live in `config/advice.yaml`; `LLM_ADVICE_PATH` overrides the path. The catalog is
+validated at startup: every deduction code and section needs text, unknown ones are rejected.
+
 Run the current tests from this directory:
 
 ```bash

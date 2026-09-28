@@ -1,80 +1,81 @@
-"""Deterministic improvement recommendations for the Grade service."""
+"""Deterministic improvement recommendations for the Grade service.
 
-RECOMMENDATIONS = {}
+The texts live in config/advice.yaml (LLM_ADVICE_PATH overrides the path) and are
+loaded once at import, so a missing or incomplete catalog stops the service at startup.
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+import yaml
+
+from .deductions import RULES
+from .grading import GROUPS
+
+# Docker and the documented commands run from backend/llm-service; the source-tree
+# path covers imports from any other working directory.
+_DEFAULT_PATHS = (Path("config/advice.yaml"),
+                  Path(__file__).resolve().parents[2] / "config" / "advice.yaml")
 
 
-def _register(codes, text):
-    for code in codes.split():
-        RECOMMENDATIONS[code] = text
+class AdviceConfigError(ValueError):
+    pass
 
 
-_register('DOC_PURPOSE_MISSING DOC_PURPOSE_UNCLEAR',
-          'Уточните, какую задачу решает проект, для чего его используют и какой результат он даёт.')
-_register('DOC_CAPABILITIES_MISSING DOC_CAPABILITIES_INCOMPLETE',
-          'Перечислите основные возможности проекта и кратко опишите их назначение.')
-_register('DOC_LOCAL_RUN_MISSING DOC_LOCAL_RUN_COMMANDS_INCOMPLETE',
-          'Опишите последовательность команд от подготовки окружения до первого запуска.')
-_register('DOC_LOCAL_RUN_PREREQUISITES_INCOMPLETE',
-          'Укажите необходимые инструменты, их версии и внешние сервисы для запуска.')
-_register('DOC_LOCAL_RUN_DEPENDENCIES_INCOMPLETE',
-          'Добавьте команды установки зависимостей и укажите, из какой папки их выполнять.')
-_register('DOC_LOCAL_RUN_CONFIGURATION_INCOMPLETE',
-          'Опишите обязательные настройки и приведите пример конфигурации без реальных секретов.')
-_register('DOC_LOCAL_RUN_VERIFICATION_INCOMPLETE',
-          'Добавьте ожидаемый вывод, адрес страницы или проверочную команду для подтверждения успешного запуска.')
-_register('DOC_BUILD_INSTRUCTIONS_MISSING DOC_BUILD_INSTRUCTIONS_INCOMPLETE',
-          'Укажите команды сборки, порядок их выполнения и рабочую папку.')
-_register('DOC_BUILD_CONFIGURATION_INCOMPLETE',
-          'Опишите необходимые параметры, профили и переменные окружения для сборки.')
-_register('DOC_BUILD_OUTPUT_UNCLEAR',
-          'Укажите название и расположение результата сборки.')
-_register('DOC_TESTING_INSTRUCTIONS_MISSING DOC_TESTING_COMMANDS_INCOMPLETE',
-          'Добавьте команды запуска тестов и условия их выполнения.')
-_register('DOC_TESTING_ENVIRONMENT_INCOMPLETE',
-          'Опишите подготовку тестовых данных, настроек и необходимых сервисов.')
-_register('DOC_TESTING_SCOPE_UNCLEAR',
-          'Поясните, какие проверки выполняет каждая тестовая команда.')
-_register('DOC_USAGE_EXAMPLE_MISSING DOC_USAGE_EXAMPLE_INCOMPLETE',
-          'Добавьте воспроизводимый пример основного сценария с входными данными и ожидаемым результатом.')
-_register('DOC_USAGE_INPUTS_UNCLEAR',
-          'Опишите обязательные параметры, форматы входных данных и приведите пример.')
-_register('DOC_USAGE_RESULT_UNCLEAR',
-          'Покажите ожидаемый ответ, вывод команды или создаваемый файл.')
-_register('DOC_STRUCTURE_OVERVIEW_MISSING DOC_STRUCTURE_OVERVIEW_INCOMPLETE',
-          'Кратко опишите назначение основных каталогов и компонентов проекта.')
-_register('DOC_NAVIGATION_INCOMPLETE',
-          'Добавьте ссылки на основные инструкции и разделы документации.')
-_register('DOC_REFERENCE_NOT_FOUND DOC_LINK_BROKEN',
-          'Проверьте указанный путь или якорь и обновите ссылку на существующий объект.')
-_register('DOC_COMMAND_INCONSISTENT DOC_SCRIPT_NOT_FOUND',
-          'Сверьте команду с доступными скриптами проекта и исправьте её в инструкции.')
-_register('DOC_CONFIGURATION_INCONSISTENT',
-          'Согласуйте названия и значения настроек в документации с конфигурацией проекта.')
-_register('DOC_COMPONENT_DESCRIPTION_INCONSISTENT',
-          'Обновите описание компонента в соответствии с его текущим назначением.')
-for name, text in {
-    'README': 'Добавьте в README описание проекта и ссылки на основные инструкции.',
-    'LICENSE': 'Укажите выбранные владельцем проекта условия использования в LICENSE.',
-    'CONTRIBUTING': 'Опишите в CONTRIBUTING порядок подготовки и отправки изменений.',
-    'CODEOWNERS': 'Укажите в CODEOWNERS ответственных за основные части проекта.',
-}.items():
-    for suffix in ('MISSING', 'EMPTY'):
-        RECOMMENDATIONS[f'DOC_{name}_{suffix}'] = text
+def _text(value, where):
+    if not isinstance(value, str) or not value.strip():
+        raise AdviceConfigError(f"{where}: expected nonempty text")
+    return value.strip()
 
-FALLBACKS = {
-    'required_files': 'Дополните соответствующий файл документации актуальной информацией.',
-    'purpose': 'Уточните назначение проекта и его основные возможности.',
-    'local_run': 'Дополните инструкцию запуска воспроизводимыми шагами и проверкой результата.',
-    'build': 'Уточните команды, настройки и результат сборки.',
-    'testing': 'Уточните команды тестирования, подготовку окружения и состав проверок.',
-    'usage': 'Дополните пример использования входными данными и ожидаемым результатом.',
-    'structure': 'Уточните назначение компонентов и навигацию по документации.',
-    'consistency': 'Сверьте описанные команды, ссылки и настройки с текущими файлами проекта.',
-}
 
-# Always the last advice item when the model did not grade the documentation.
-ALGORITHMIC_NOTICE = ('Документация оценена упрощённо, без LLM: проверено только наличие '
-                      'разделов, их качество не оценивалось.')
+def advice_path() -> Path:
+    configured = os.environ.get("LLM_ADVICE_PATH", "").strip()
+    if configured:
+        return Path(configured)
+    return next((path for path in _DEFAULT_PATHS if path.is_file()), _DEFAULT_PATHS[0])
+
+
+def load_advice(path: Path) -> tuple[dict, dict, str]:
+    """Return (recommendations by code, fallbacks by section, algorithmic notice)."""
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise AdviceConfigError(f"cannot read advice catalog {path}: {exc}") from exc
+    if not isinstance(data, dict) or set(data) != {"recommendations", "fallbacks",
+                                                   "algorithmic_notice"}:
+        raise AdviceConfigError(
+            f"{path}: expected keys recommendations, fallbacks, algorithmic_notice")
+    if not isinstance(data["recommendations"], list):
+        raise AdviceConfigError(f"{path}: recommendations must be a list")
+    recommendations = {}
+    for index, entry in enumerate(data["recommendations"]):
+        where = f"{path}: recommendations[{index}]"
+        if not isinstance(entry, dict) or set(entry) != {"codes", "text"}:
+            raise AdviceConfigError(f"{where}: expected codes and text")
+        codes = entry["codes"]
+        if not isinstance(codes, list) or not codes:
+            raise AdviceConfigError(f"{where}: codes must be a nonempty list")
+        text = _text(entry["text"], where)
+        for code in codes:
+            if code not in RULES:
+                raise AdviceConfigError(f"{where}: unknown deduction code {code!r}")
+            if code in recommendations:
+                raise AdviceConfigError(f"{where}: duplicate code {code}")
+            recommendations[code] = text
+    missing = sorted(set(RULES) - set(recommendations))
+    if missing:
+        raise AdviceConfigError(f"{path}: no recommendation for {', '.join(missing)}")
+    fallbacks = data["fallbacks"]
+    if not isinstance(fallbacks, dict) or set(fallbacks) != set(GROUPS):
+        raise AdviceConfigError(f"{path}: fallbacks must cover exactly {', '.join(GROUPS)}")
+    fallbacks = {group: _text(fallbacks[group], f"{path}: fallbacks.{group}") for group in GROUPS}
+    return recommendations, fallbacks, _text(data["algorithmic_notice"],
+                                             f"{path}: algorithmic_notice")
+
+
+RECOMMENDATIONS, FALLBACKS, ALGORITHMIC_NOTICE = load_advice(advice_path())
 
 
 def render_advice(fact):

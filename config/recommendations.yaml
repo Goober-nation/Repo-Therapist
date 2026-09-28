@@ -4,36 +4,36 @@
 # before treating as real user-facing copy, not yet calibrated against real repo feedback.
 
 # --- Activity (docs/grading/activity.md) ---
-commits_per_week: "[low] Commit activity is low relative to a healthy pace for this repo. Consider whether ownership or contribution barriers are slowing regular changes."
-days_since_last_activity: "[medium] This repo hasn't been committed to recently. If it's still active, a recent commit (even a small one) would reflect that."
-unique_contributors: "[medium] Few distinct contributors are making commits. Relying on a small group increases risk if any of them become unavailable."
-issue_rate_per_week: "[low] Few issues are being opened relative to a healthy pace. Low issue activity can mean low visibility into real problems, not necessarily a healthy backlog."
-milestones_per_year: "[low] Milestones are created infrequently. Regular milestones help communicate project direction and progress to users and contributors."
-days_since_last_milestone: "[low] It's been a while since the last milestone was closed. A recent milestone helps show the project is progressing toward concrete goals."
-top_contributor_share: "[high] Commits are concentrated in one contributor. This is a bus-factor risk — consider spreading ownership across more people."
+commits_per_week: "[low] Коммитов мало по сравнению со здоровым темпом для этого репозитория. Проверьте, не мешают ли регулярным изменениям вопросы владения кодом или барьеры для участников."
+days_since_last_activity: "[medium] В репозиторий давно не было коммитов. Если проект ещё жив, даже небольшой свежий коммит это покажет."
+unique_contributors: "[medium] Коммиты делает мало разных участников. Зависимость от узкого круга людей повышает риски, если кто-то из них станет недоступен."
+issue_rate_per_week: "[low] Задачи (issues) открываются редко по сравнению со здоровым темпом. Низкая активность в задачах может означать плохую видимость реальных проблем, а не здоровый бэклог."
+milestones_per_year: "[low] Вехи (milestones) создаются редко. Регулярные вехи помогают показывать пользователям и участникам направление и прогресс проекта."
+days_since_last_milestone: "[low] Последняя веха закрыта давно. Недавно закрытая веха показывает, что проект движется к конкретным целям."
+top_contributor_share: "[high] Коммиты сосредоточены у одного участника. Это риск «фактора автобуса» — распределите владение кодом между большим числом людей."
 
 # --- Issues (docs/grading/issues.md) ---
-abandoned_share: "[medium] A large share of open issues haven't been touched in a long time. Triaging or closing stale issues improves backlog health and contributor trust."
-median_closure_days: "[medium] Issues are taking a long time to close on average. Faster triage and resolution improves contributor experience."
-growth_ratio: "[high] Issues are being opened faster than they're being closed. Left unchecked, this grows an unmanageable backlog."
-share_resolved: "[medium] A low share of the issue backlog is getting resolved. Consider dedicating time to closing out older issues."
+abandoned_share: "[medium] Большая доля открытых задач давно не обновлялась. Разбор или закрытие устаревших задач улучшит состояние бэклога и доверие участников."
+median_closure_days: "[medium] Задачи в среднем закрываются долго. Более быстрый разбор и решение задач улучшат опыт участников."
+growth_ratio: "[high] Задачи открываются быстрее, чем закрываются. Без контроля это приведёт к неуправляемому бэклогу."
+share_resolved: "[medium] Решается лишь небольшая доля задач из бэклога. Выделите время на закрытие старых задач."
 
 # --- Code health (docs/grading/code-health.md) ---
-median_marker_age: "[low] TODO/FIXME markers in this codebase tend to sit for a long time before being addressed. Consider periodically reviewing and resolving old markers."
-density_per_kloc: "[medium] This codebase has a high density of TODO/FIXME markers relative to its size. Consider paying down some of this tracked technical debt."
-share_stale_markers: "[low] A large share of TODO/FIXME markers are old relative to what's typical. These may be worth revisiting — an old marker can mean forgotten, not just low-priority."
-worst_file_concentration: "[low] TODO/FIXME markers are heavily concentrated in a single file. That file may be a good candidate for a focused cleanup or refactor."
+median_marker_age: "[low] Маркеры TODO/FIXME в коде подолгу остаются без внимания. Периодически пересматривайте и устраняйте старые маркеры."
+density_per_kloc: "[medium] Плотность маркеров TODO/FIXME относительно размера кода высокая. Стоит погасить часть этого технического долга."
+share_stale_markers: "[low] Большая доля маркеров TODO/FIXME старше типичного. К ним стоит вернуться — старый маркер может означать забытую задачу, а не просто низкий приоритет."
+worst_file_concentration: "[low] Маркеры TODO/FIXME сильно сконцентрированы в одном файле. Этот файл — хороший кандидат для точечной чистки или рефакторинга."
 
 # --- Security (docs/grading/security.md; metric IDs hardcoded in internal/scoring/security.go) ---
-open_critical: "[critical] There are open critical-severity findings. These represent the most urgent security risk and should be prioritized."
-open_high: "[high] There are open high-severity findings. These should be addressed soon after any critical findings."
-open_medium: "[medium] There are open medium-severity findings worth scheduling time to address."
-open_low: "[low] There are open low-severity findings. Not urgent, but worth tracking so they don't accumulate."
-days_since_last_scan: "[high] It's been a while since the last security scan. Running a fresh scan ensures the findings reflect the current state of the code."
+open_critical: "[critical] Есть открытые уязвимости критического уровня. Это самый срочный риск безопасности, их нужно устранить в первую очередь."
+open_high: "[high] Есть открытые уязвимости высокого уровня. Их следует устранить сразу после критических."
+open_medium: "[medium] Есть открытые уязвимости среднего уровня — запланируйте время на их устранение."
+open_low: "[low] Есть открытые уязвимости низкого уровня. Это не срочно, но их стоит отслеживать, чтобы они не накапливались."
+days_since_last_scan: "[high] Последнее сканирование безопасности было давно. Свежее сканирование покажет актуальное состояние кода."
 
 # --- CI/CD (docs/grading/ci-cd.md) ---
-has_ci: "[critical] No CI pipeline was found. Adding a .sourcecraft/ci.yaml that builds and tests every change catches regressions before they reach the main branch."
-ci_success_rate: "[high] A large share of CI runs are failing. Fixing or quarantining the failing checks keeps CI a trustworthy signal instead of noise."
-ci_stability_trend: "[medium] CI has been failing more often recently than before. Look at what changed in the recent failing runs before the failures become normal."
-ci_noop_pipeline: "[high] The CI pipeline only runs placeholder commands (echo, true, sleep...) and never builds or tests the code. Replace them with real build and test steps so CI actually catches regressions."
-ci_median_duration_min: "[low] CI runs take a long time. Caching dependencies or splitting slow jobs shortens the feedback loop for contributors."
+has_ci: "[critical] CI-пайплайн не найден. Добавьте .sourcecraft/ci.yaml, который собирает и тестирует каждое изменение, — так регрессии будут отлавливаться до попадания в основную ветку."
+ci_success_rate: "[high] Большая доля запусков CI завершается ошибкой. Исправьте или изолируйте падающие проверки, чтобы CI оставался надёжным сигналом, а не шумом."
+ci_stability_trend: "[medium] В последнее время CI падает чаще, чем раньше. Разберитесь, что изменилось в недавних упавших запусках, пока падения не стали нормой."
+ci_noop_pipeline: "[high] CI-пайплайн выполняет только команды-заглушки (echo, true, sleep...) и никогда не собирает и не тестирует код. Замените их реальными шагами сборки и тестирования, чтобы CI действительно ловил регрессии."
+ci_median_duration_min: "[low] Запуски CI идут долго. Кэширование зависимостей или разделение медленных задач сократит цикл обратной связи для участников."

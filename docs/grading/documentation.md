@@ -7,13 +7,23 @@
 
 1. Grade service publishes `repo.docs.grade.requested` for the repo and keeps grading the other
    categories while it waits (up to the LLM timeout, 70s by default).
-2. If no reply arrives in time → the whole Documentation section is **no data**.
-3. If the reply has a nonempty `error` (e.g. `CONTENT_FILTER`, `LLM_TIMEOUT`), or `grade` is
-   `null` → the whole Documentation section is **no data**; subgrades and advice are ignored and
-   the error code is logged.
-4. Otherwise the LLM's `grade` (0–100) is taken as the category score unchanged; `subgrades` are
+2. The LLM service reads the repo from S3 and asks the model to grade it. In the default
+   `LLM_DOCS_MODE=auto`, if anything on the model path fails — the call itself (provider down,
+   rate limit, 60s timeout, content filter, malformed answer) or turning the model's answer into
+   a result — the service grades the same repo **algorithmically** instead (section presence only,
+   quality not judged) and replies with that grade: every section found in the docs earns 80% of
+   its points (quality unknown; 50% until 2026-09-29), a missing one earns 0, required files score
+   as usual, and consistency is not graded. The last advice item then says the grade is
+   simplified. `LLM_DOCS_MODE=algorithmic` always does this; `LLM_DOCS_MODE=llm` never does and
+   reports the failure instead. (2026-09-28)
+3. If no reply arrives in time → the whole Documentation section is **no data**.
+4. If the reply has a nonempty `error` or `grade` is `null` → the whole Documentation section is
+   **no data**; subgrades and advice are ignored and the error code is logged. In `auto` mode this
+   only happens when the repo itself couldn't be read (e.g. `S3_PREFIX_NOT_FOUND`), the request
+   was invalid, or the algorithmic grade also failed.
+5. Otherwise the reply's `grade` (0–100) is taken as the category score unchanged; `subgrades` are
    shown as metrics for display only and do not recompute the score.
-5. A no-data Documentation section is dropped from the overall grade and the remaining category
+6. A no-data Documentation section is dropped from the overall grade and the remaining category
    weights are renormalized, the same as any other no-data category.
 
 ## What it measures
@@ -46,8 +56,9 @@ the Kafka contract.
 ## No-data vs. real-zero
 
 - Repo below the minimum-content threshold (`00-overview.md` principle 4) → `NoData`.
-- The LLM call failing or timing out → `NoData` — never a fabricated score. This covers a missing
-  reply and a reply with a nonempty `error` / `grade: null` (2026-09-27).
+- The LLM call failing or timing out → in `auto` mode, the algorithmic grade (a real, measured
+  but simplified score, marked in advice), never a fabricated one (2026-09-28). `NoData` remains
+  for a missing reply and a reply with a nonempty `error` / `grade: null` (2026-09-27).
 - A repo the LLM successfully judges as having *no* README at all is a real, harsh score from the
   LLM — not `NoData`. Same "measured harsh vs. unmeasurable" distinction every other category
   draws, just evaluated by the LLM instead of a formula.

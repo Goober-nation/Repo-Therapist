@@ -57,17 +57,17 @@ def subgrades(payload):
 
 
 class AlgorithmicGradeTests(unittest.TestCase):
-    def test_present_sections_earn_half_and_consistency_is_skipped(self):
+    def test_present_sections_earn_80_percent_and_consistency_is_skipped(self):
         payload = grade({"README.md": GOOD_README, **REQUIRED},
                         extra=["pyproject.toml", "tests/test_app.py", "src/app.py"])
         grades = subgrades(payload)
         self.assertEqual(grades["required_files"], 100)
         for section in ("purpose", "local_run", "testing", "usage", "structure"):
-            self.assertEqual(grades[section], 50, section)
+            self.assertEqual(grades[section], 80, section)
         self.assertIsNone(grades["consistency"])
         self.assertEqual(payload["facts"], [])
-        # 20 required + half of 15 + 20 + 10 + 10 + 3 section points, out of 78.
-        self.assertEqual(payload["grade"], 62.82)
+        # 20 required + 80% of 15 + 20 + 10 + 10 + 3 section points, out of 78.
+        self.assertEqual(payload["grade"], 85.13)
 
     def test_good_documentation_gets_only_the_notice_as_advice(self):
         payload = grade({"README.md": GOOD_README, **REQUIRED},
@@ -79,7 +79,7 @@ class AlgorithmicGradeTests(unittest.TestCase):
         payload = grade({"README.md": "# Demo\n\nA tool.\n", **REQUIRED},
                         extra=["main.go", "main_test.go", "cmd/app/main.go"])
         grades = subgrades(payload)
-        self.assertEqual((grades["required_files"], grades["purpose"]), (100, 50))
+        self.assertEqual((grades["required_files"], grades["purpose"]), (100, 80))
         for section in ("local_run", "build", "testing", "usage"):
             self.assertEqual(grades[section], 0, section)
         codes = {fact["code"] for fact in payload["facts"]}
@@ -99,12 +99,12 @@ class AlgorithmicGradeTests(unittest.TestCase):
         readme = "# Demo\n\nA tool.\n\n## Как начать\n\n```\ndocker compose up\ngo test ./...\n```\n"
         grades = subgrades(grade({"README.md": readme, **REQUIRED},
                                  extra=["main.go", "main_test.go"]))
-        self.assertEqual((grades["local_run"], grades["testing"]), (50, 50))
+        self.assertEqual((grades["local_run"], grades["testing"]), (80, 80))
 
     def test_linked_document_and_file_name_count(self):
         files = {"README.md": "# Demo\n\nA tool. See [setup](docs/setup.md).\n",
                  "docs/setup.md": "Steps for your machine.\n", **REQUIRED}
-        self.assertEqual(subgrades(grade(files))["local_run"], 50)
+        self.assertEqual(subgrades(grade(files))["local_run"], 80)
 
 
 class DocumentationModeTests(unittest.TestCase):
@@ -119,6 +119,26 @@ class DocumentationModeTests(unittest.TestCase):
                 self.assertEqual(event["error"], "")
                 self.assertIsInstance(event["grade"], int)
                 self.assertEqual(event["advice"][-1], ALGORITHMIC_NOTICE)
+
+    def test_auto_falls_back_when_the_model_run_fails_midway(self):
+        class BadPayloadModel(FakeModel):
+            def grade(self, snapshot, context):
+                payload = super().grade(snapshot, context)
+                payload["grade"] = "not a number"
+                return payload
+
+        for model in (BadPayloadModel(), FakeModel(KeyError("checks")), FakeModel(RuntimeError("bug"))):
+            with self.subTest(model=type(model).__name__, error=model.error):
+                event = process_documentation_request(request(), FakeStore(), model, "auto")
+                self.assertEqual(event["error"], "")
+                self.assertIsInstance(event["grade"], int)
+                self.assertEqual(event["advice"][-1], ALGORITHMIC_NOTICE)
+
+    def test_llm_mode_keeps_midway_failures_visible(self):
+        event = process_documentation_request(request(), FakeStore(),
+                                              FakeModel(RuntimeError("bug")), "llm")
+        self.assertEqual(event["error"], "INTERNAL_ERROR")
+        self.assertIsNone(event["grade"])
 
     def test_repository_failures_are_not_masked(self):
         event = process_documentation_request(request(), FakeStore(missing=True),

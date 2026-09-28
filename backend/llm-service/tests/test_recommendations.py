@@ -1,15 +1,42 @@
+import tempfile
 import unittest
 from copy import deepcopy
+from pathlib import Path
 
 from llm_service.deductions import RULES
 from llm_service.grade_wire import build_grade_result, parse_grade_request
-from llm_service.recommendations import FALLBACKS, RECOMMENDATIONS, render_advice
+from llm_service.recommendations import (ALGORITHMIC_NOTICE, FALLBACKS, RECOMMENDATIONS,
+                                         AdviceConfigError, advice_path, load_advice,
+                                         render_advice)
 from test_kafka_worker import FakeModel, request
 
 
 class RecommendationTests(unittest.TestCase):
     def test_catalog_covers_all_known_deficiencies(self):
         self.assertEqual(set(RECOMMENDATIONS), set(RULES))
+
+    def test_catalog_is_read_from_yaml_and_validated(self):
+        self.assertEqual(advice_path().name, 'advice.yaml')
+        good = advice_path().read_text(encoding='utf-8')
+        broken = {
+            'unknown code': good.replace('codes: [DOC_BUILD_OUTPUT_UNCLEAR]',
+                                         'codes: [DOC_BUILD_OUTPUT_UNCLEAR, DOC_NEW]'),
+            'missing code': good.replace('codes: [DOC_BUILD_OUTPUT_UNCLEAR]', 'codes: [DOC_X]'),
+            'missing section': good.replace('  consistency: ', '  other: '),
+            'empty notice': good.replace('algorithmic_notice: "', 'algorithmic_notice: " "#'),
+            'not yaml': 'recommendations: [',
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'advice.yaml'
+            path.write_text(good, encoding='utf-8')
+            self.assertEqual(load_advice(path), (RECOMMENDATIONS, FALLBACKS, ALGORITHMIC_NOTICE))
+            for name, text in broken.items():
+                with self.subTest(name):
+                    path.write_text(text, encoding='utf-8')
+                    with self.assertRaises(AdviceConfigError):
+                        load_advice(path)
+            with self.assertRaises(AdviceConfigError):
+                load_advice(Path(tmp) / 'absent.yaml')
 
     def test_specific_reason_and_template_without_internal_json(self):
         fact = {'subcategory': 'local_run', 'code': 'DOC_LOCAL_RUN_VERIFICATION_INCOMPLETE',

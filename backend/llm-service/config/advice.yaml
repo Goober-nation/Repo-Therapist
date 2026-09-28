@@ -1,0 +1,73 @@
+# Documentation advice catalog for the LLM service (repo.docs.graded `advice`).
+# Loaded once at startup by llm_service.recommendations; path overridable by LLM_ADVICE_PATH.
+# The service refuses to start if a deduction code from deductions.RULES or a documentation
+# section lacks text, or if an entry here names an unknown code or section.
+
+# One text per deduction code; codes sharing a text are listed together.
+recommendations:
+  - codes: [DOC_PURPOSE_MISSING, DOC_PURPOSE_UNCLEAR]
+    text: Уточните, какую задачу решает проект, для чего его используют и какой результат он даёт.
+  - codes: [DOC_CAPABILITIES_MISSING, DOC_CAPABILITIES_INCOMPLETE]
+    text: Перечислите основные возможности проекта и кратко опишите их назначение.
+  - codes: [DOC_LOCAL_RUN_MISSING, DOC_LOCAL_RUN_COMMANDS_INCOMPLETE]
+    text: Опишите последовательность команд от подготовки окружения до первого запуска.
+  - codes: [DOC_LOCAL_RUN_PREREQUISITES_INCOMPLETE]
+    text: Укажите необходимые инструменты, их версии и внешние сервисы для запуска.
+  - codes: [DOC_LOCAL_RUN_DEPENDENCIES_INCOMPLETE]
+    text: Добавьте команды установки зависимостей и укажите, из какой папки их выполнять.
+  - codes: [DOC_LOCAL_RUN_CONFIGURATION_INCOMPLETE]
+    text: Опишите обязательные настройки и приведите пример конфигурации без реальных секретов.
+  - codes: [DOC_LOCAL_RUN_VERIFICATION_INCOMPLETE]
+    text: Добавьте ожидаемый вывод, адрес страницы или проверочную команду для подтверждения успешного запуска.
+  - codes: [DOC_BUILD_INSTRUCTIONS_MISSING, DOC_BUILD_INSTRUCTIONS_INCOMPLETE]
+    text: Укажите команды сборки, порядок их выполнения и рабочую папку.
+  - codes: [DOC_BUILD_CONFIGURATION_INCOMPLETE]
+    text: Опишите необходимые параметры, профили и переменные окружения для сборки.
+  - codes: [DOC_BUILD_OUTPUT_UNCLEAR]
+    text: Укажите название и расположение результата сборки.
+  - codes: [DOC_TESTING_INSTRUCTIONS_MISSING, DOC_TESTING_COMMANDS_INCOMPLETE]
+    text: Добавьте команды запуска тестов и условия их выполнения.
+  - codes: [DOC_TESTING_ENVIRONMENT_INCOMPLETE]
+    text: Опишите подготовку тестовых данных, настроек и необходимых сервисов.
+  - codes: [DOC_TESTING_SCOPE_UNCLEAR]
+    text: Поясните, какие проверки выполняет каждая тестовая команда.
+  - codes: [DOC_USAGE_EXAMPLE_MISSING, DOC_USAGE_EXAMPLE_INCOMPLETE]
+    text: Добавьте воспроизводимый пример основного сценария с входными данными и ожидаемым результатом.
+  - codes: [DOC_USAGE_INPUTS_UNCLEAR]
+    text: Опишите обязательные параметры, форматы входных данных и приведите пример.
+  - codes: [DOC_USAGE_RESULT_UNCLEAR]
+    text: Покажите ожидаемый ответ, вывод команды или создаваемый файл.
+  - codes: [DOC_STRUCTURE_OVERVIEW_MISSING, DOC_STRUCTURE_OVERVIEW_INCOMPLETE]
+    text: Кратко опишите назначение основных каталогов и компонентов проекта.
+  - codes: [DOC_NAVIGATION_INCOMPLETE]
+    text: Добавьте ссылки на основные инструкции и разделы документации.
+  - codes: [DOC_REFERENCE_NOT_FOUND, DOC_LINK_BROKEN]
+    text: Проверьте указанный путь или якорь и обновите ссылку на существующий объект.
+  - codes: [DOC_COMMAND_INCONSISTENT, DOC_SCRIPT_NOT_FOUND]
+    text: Сверьте команду с доступными скриптами проекта и исправьте её в инструкции.
+  - codes: [DOC_CONFIGURATION_INCONSISTENT]
+    text: Согласуйте названия и значения настроек в документации с конфигурацией проекта.
+  - codes: [DOC_COMPONENT_DESCRIPTION_INCONSISTENT]
+    text: Обновите описание компонента в соответствии с его текущим назначением.
+  - codes: [DOC_README_MISSING, DOC_README_EMPTY]
+    text: Добавьте в README описание проекта и ссылки на основные инструкции.
+  - codes: [DOC_LICENSE_MISSING, DOC_LICENSE_EMPTY]
+    text: Укажите выбранные владельцем проекта условия использования в LICENSE.
+  - codes: [DOC_CONTRIBUTING_MISSING, DOC_CONTRIBUTING_EMPTY]
+    text: Опишите в CONTRIBUTING порядок подготовки и отправки изменений.
+  - codes: [DOC_CODEOWNERS_MISSING, DOC_CODEOWNERS_EMPTY]
+    text: Укажите в CODEOWNERS ответственных за основные части проекта.
+
+# Used for an unknown code, and for a reduced section without facts (model grades only).
+fallbacks:
+  required_files: Дополните соответствующий файл документации актуальной информацией.
+  purpose: Уточните назначение проекта и его основные возможности.
+  local_run: Дополните инструкцию запуска воспроизводимыми шагами и проверкой результата.
+  build: Уточните команды, настройки и результат сборки.
+  testing: Уточните команды тестирования, подготовку окружения и состав проверок.
+  usage: Дополните пример использования входными данными и ожидаемым результатом.
+  structure: Уточните назначение компонентов и навигацию по документации.
+  consistency: Сверьте описанные команды, ссылки и настройки с текущими файлами проекта.
+
+# Always the last advice item when the model did not grade the documentation.
+algorithmic_notice: "Документация оценена упрощённо, без LLM"

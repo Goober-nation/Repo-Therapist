@@ -110,3 +110,40 @@ func TestPickRandom(t *testing.T) {
 		t.Errorf("no recs should return none, got %d", len(got))
 	}
 }
+
+func TestDocsRecommendations_ForwardsAdviceInOrderWithLabel(t *testing.T) {
+	ids := []string{"activity", "documentation"}
+	cats := map[string]CategoryResult{"documentation": {ID: "documentation", Score: 61}}
+	advice := []string{"Добавьте команды тестов.", "  ", "Документация оценена упрощённо, без LLM."}
+
+	got := DocsRecommendations(cats, ids, advice)
+	want := []Recommendation{
+		{CategoryID: "documentation", MetricID: "llm_advice", Text: "[medium] Добавьте команды тестов."},
+		{CategoryID: "documentation", MetricID: "llm_advice", Text: "[medium] Документация оценена упрощённо, без LLM."},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("item %d: got %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestDocsRecommendations_NothingWithoutUsableDocumentation(t *testing.T) {
+	advice := []string{"x"}
+	cases := map[string]struct {
+		cats map[string]CategoryResult
+		ids  []string
+	}{
+		"no data":         {map[string]CategoryResult{"documentation": {ID: "documentation", NoData: true}}, []string{"documentation"}},
+		"absent":          {map[string]CategoryResult{}, []string{"documentation"}},
+		"not in the view": {map[string]CategoryResult{"documentation": {ID: "documentation", Score: 50}}, []string{"activity"}},
+	}
+	for name, tc := range cases {
+		if got := DocsRecommendations(tc.cats, tc.ids, advice); len(got) != 0 {
+			t.Errorf("%s: got %v, want none", name, got)
+		}
+	}
+}

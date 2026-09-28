@@ -3,8 +3,8 @@
 Only the presence of documentation sections is checked, never their quality. A
 section counts as present when any readable document has a matching heading, a
 matching file name, or a matching command in code. Doubtful cases count as present.
-A present section earns half of its points, because its quality is unknown; a
-missing one earns zero. Required files keep their usual presence scoring.
+A present section earns 80% of its points (quality unknown, user decision
+2026-09-29); a missing one earns zero. Required files keep their usual presence scoring.
 The result has the same shape as the model path: grade, subcategories, facts.
 """
 
@@ -45,7 +45,7 @@ COMMANDS = {
     "testing": (r"\b(pytest|go test|npm (run )?test|yarn test|pnpm test|cargo test|mvn test|"
                 r"(\./)?gradlew? test|make test|unittest|tox|jest|vitest)\b"),
 }
-PRESENT_SHARE = 0.5
+PRESENT_SHARE = 0.8
 _TREE = re.compile(r"[├└]──")
 _HEADING = re.compile(r"^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$", re.M)
 _FENCE = re.compile(r"(?ms)^\s{0,3}(`{3,}|~{3,})[^\n]*\n(.*?)^\s{0,3}\1\s*$")
@@ -80,7 +80,7 @@ def _found(group: str, documents: dict[str, str]) -> bool:
 
 
 def algorithmic_grade(snapshot: Snapshot, context: ModelContext) -> dict:
-    """Score required files as usual and each section by presence: half points or zero."""
+    """Score required files as usual and each section by presence: 80% of points or zero."""
     documents = _documents(snapshot)
     allowed = allowed_not_applicable_checks(snapshot, context)
     checks = deterministic_checks(snapshot.files, set(snapshot.all_paths))

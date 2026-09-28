@@ -55,7 +55,8 @@ The Aggregator's own topics, as Grade service reads/writes them:
 - `grading.results`: `{sourcecraft_uuid, visibility, score, category_scores, advice,
   missing_data, graded_at, error}`. `visibility` names the grades table the Aggregator writes to.
   `advice` is a list of at most `GRADE_ADVICE_LIMIT` (default 0 = all) recommendations `{category_id, metric_id, text}`, picked at
-  random. `error` is `""` on success. On failure it is a code — `REPO_FETCH_FAILED` (repo.ready
+  random. Documentation's items are the `repo.docs.graded` advice texts, each as
+  `{"documentation", "llm_advice", "[medium] <text>"}`. `error` is `""` on success. On failure it is a code — `REPO_FETCH_FAILED` (repo.ready
   status failed), `GRADING_FAILED`, `RESULT_BUILD_FAILED` — with `score`, `category_scores` and
   `advice` null; the Aggregator then only releases the repo lock. A failure without a
   `sourcecraft_uuid` cannot be correlated and is not published.
