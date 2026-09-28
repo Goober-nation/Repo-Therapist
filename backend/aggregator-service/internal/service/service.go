@@ -38,6 +38,9 @@ type AggregatorService struct {
 	// RegradeLimit caps each public regrade to the top N public repos by SourceCraft rating;
 	// 0 means every listed repo.
 	RegradeLimit int
+	// RegradeListTimeout bounds the full public repo listing, which pages through all of
+	// SourceCraft and outlasts RPCTimeout; 0 falls back to RPCTimeout.
+	RegradeListTimeout time.Duration
 	// LLMRequestTTL overrides DefaultLLMRequestTTL (config LLM_REQUEST_TTL).
 	LLMRequestTTL time.Duration
 
@@ -522,7 +525,12 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 		return nil
 	}
 
-	cont, cancel := context.WithTimeout(withToken(ctx, as.Token), as.RPCTimeout)
+	listTimeout := as.RPCTimeout
+	if as.RegradeListTimeout > 0 {
+		listTimeout = as.RegradeListTimeout
+	}
+
+	cont, cancel := context.WithTimeout(withToken(ctx, as.Token), listTimeout)
 	defer cancel()
 
 	response, err := as.clientRPC.ListAllPublicRepos(

@@ -72,8 +72,10 @@ type GradingConfig struct {
 	RegradeOnStart bool
 	// RegradeLimit caps each public regrade to the top N public repos by SourceCraft rating;
 	// 0 means every listed repo.
-	RegradeLimit  int
-	LLMRequestTTL time.Duration
+	RegradeLimit int
+	// RegradeListTimeout bounds listing every public repo at the start of a regrade.
+	RegradeListTimeout time.Duration
+	LLMRequestTTL      time.Duration
 }
 
 func LoadConfig() *Config {
@@ -178,6 +180,10 @@ func LoadConfig() *Config {
 			RegradeLimit: getEnvInt(
 				"GRADING_REGRADE_LIMIT",
 				20,
+			),
+			RegradeListTimeout: getEnvDuration(
+				"GRADING_REGRADE_LIST_TIMEOUT",
+				2*time.Minute,
 			),
 			LLMRequestTTL: getEnvDuration(
 				"LLM_REQUEST_TTL",

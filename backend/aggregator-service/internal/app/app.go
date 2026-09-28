@@ -83,6 +83,7 @@ func StartApp() {
 		cfg.Token.Token,
 	)
 	aggregatorService.RegradeLimit = cfg.Grading.RegradeLimit
+	aggregatorService.RegradeListTimeout = cfg.Grading.RegradeListTimeout
 	if cfg.Grading.LLMRequestTTL > 0 {
 		aggregatorService.LLMRequestTTL = cfg.Grading.LLMRequestTTL
 	}
