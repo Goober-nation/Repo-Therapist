@@ -42,7 +42,8 @@ class ModelCliTests(unittest.TestCase):
         stdout, stderr = io.StringIO(), io.StringIO()
         with patch("llm_service.__main__.local_snapshot", return_value=SNAPSHOT), \
                 patch.dict("os.environ", {"YANDEX_AI_API_KEY": "test-key",
-                                          "YANDEX_FOLDER_ID": "test-folder"}), \
+                                          "YANDEX_FOLDER_ID": "test-folder",
+                                          "LLM_DOCS_MODE": "llm"}), \
                 patch("llm_service.yandex_model.urlopen", side_effect=[
                     successful_response("not JSON"), successful_response("not JSON")]), \
                 contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
