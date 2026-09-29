@@ -1,5 +1,9 @@
 # Repo Therapist
 
+[![Repo Health](https://repo-therapist.alo.quest/api/badge/lct-hackaton-2026/case-18-repo-health-score-team-95.svg)](https://repo-therapist.alo.quest/repo/lct-hackaton-2026/case-18-repo-health-score-team-95)
+
+<sub>Бейдж показывает `n/a`, пока этот репозиторий имеет видимость `internal`: бейдж и рейтинг учитывают только публичные репозитории.</sub>
+
 Стенд: [repo-therapist.alo.quest](https://repo-therapist.alo.quest)
 
 Сервис оценивает открытые репозитории SourceCraft по шкале 0–100 в шести категориях и объясняет,
@@ -21,6 +25,7 @@
 | Выгрузка отчёта (Markdown / PDF) | ✅ |
 | ★ Защита рейтинга от накрутки | ✅ |
 | ★ AI-summary и рекомендации | ✅ |
+| ★ Публичный API и badge для README | ✅ |
 
 ## Архитектура
 
