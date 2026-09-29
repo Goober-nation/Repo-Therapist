@@ -16,7 +16,7 @@
 | Рейтинг открытых репозиториев | ✅ |
 | Анализ собственного репозитория после входа через Яндекс ID | ✅ |
 | Периодический пересчёт | ✅ |
-| Выгрузка отчёта (Markdown / PDF) | TODO: подтвердить |
+| Выгрузка отчёта (Markdown / PDF) | ✅ |
 | ★ Защита рейтинга от накрутки | ✅ |
 | ★ AI-summary и рекомендации | ✅ |
 
@@ -46,7 +46,8 @@ cp .env.example .env        # заполните SOURCECRAFT_PAT, S3_*, POSTGRES
 docker compose up -d        # Postgres, MinIO, Redis, Kafka, миграции, сервисы, фронтенд
 ```
 
-- Фронтенд: http://localhost:8081
+- Фронтенд: http://localhost:8081 (рейтинг — `/`, анализ — `/repo/<org>/<repo>`,
+  собственные репозитории — `/my`). Подробнее: [frontend/README.md](frontend/README.md).
 - Консоль MinIO: http://localhost:9001
 
 Все настройки описаны в комментариях в [.env.example](.env.example).

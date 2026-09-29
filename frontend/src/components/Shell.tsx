@@ -1,54 +1,32 @@
-import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
+import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react"
+import type { Tone } from "../metrics"
 
-export function Card({
-  children,
-  className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return <section className={`card ${className}`}>{children}</section>;
+export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <section className={`card ${className}`}>{children}</section>
 }
 
 export function Label({ children }: { children: ReactNode }) {
-  return <div className="eyebrow">{children}</div>;
+  return <div className="eyebrow">{children}</div>
 }
 
-export function Badge({
-  children,
-  tone = "neutral",
-}: {
-  children: ReactNode;
-  tone?: "neutral" | "good" | "warning" | "critical";
-}) {
-  return <span className={`badge badge--${tone}`}>{children}</span>;
+export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: Tone }) {
+  return <span className={`badge badge--${tone}`}>{children}</span>
 }
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "quiet";
+  variant?: "primary" | "secondary" | "quiet"
 }
 
-export function Button({
-  children,
-  className = "",
-  variant = "secondary",
-  type = "button",
-  ...props
-}: ButtonProps) {
+export function Button({ children, className = "", variant = "secondary", type = "button", ...props }: ButtonProps) {
   return (
     <button className={`button button--${variant} ${className}`} type={type} {...props}>
       {children}
     </button>
-  );
-}
-
-export function Divider() {
-  return <div className="divider" aria-hidden="true" />;
+  )
 }
 
 export function ScoreBar({ score, label }: { score: number; label?: string }) {
-  const barStyle = { width: `${score}%` } satisfies CSSProperties;
-
+  const barStyle = { width: `${score}%` } satisfies CSSProperties
   return (
     <div
       className="score-bar"
@@ -60,7 +38,7 @@ export function ScoreBar({ score, label }: { score: number; label?: string }) {
     >
       <span className="score-bar__fill" style={barStyle} />
     </div>
-  );
+  )
 }
 
 export function PageHeading({
@@ -69,10 +47,10 @@ export function PageHeading({
   description,
   actions,
 }: {
-  eyebrow?: string;
-  title: string;
-  description?: string;
-  actions?: ReactNode;
+  eyebrow?: ReactNode
+  title: string
+  description?: string
+  actions?: ReactNode
 }) {
   return (
     <div className="page-heading">
@@ -83,7 +61,7 @@ export function PageHeading({
       </div>
       {actions && <div className="page-heading__actions">{actions}</div>}
     </div>
-  );
+  )
 }
 
 export function SectionHeading({
@@ -91,9 +69,9 @@ export function SectionHeading({
   description,
   action,
 }: {
-  title: string;
-  description?: string;
-  action?: ReactNode;
+  title: string
+  description?: string
+  action?: ReactNode
 }) {
   return (
     <div className="section-heading">
@@ -103,5 +81,5 @@ export function SectionHeading({
       </div>
       {action}
     </div>
-  );
+  )
 }

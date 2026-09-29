@@ -9,7 +9,9 @@ RUN go build -o /out/aggregator-service ./backend/aggregator-service/cmd \
  && go build -o /out/security-wrapper-service ./backend/security-wrapper-service/cmd/security-wrapper-service \
  && go build -o /out/repository-service ./backend/repository-service/cmd/repository-service \
  && go build -o /out/grade-service ./backend/grade-service/cmd/grade-service \
- && go build -o /out/grading-request ./backend/grade-service/cmd/grading-request
+ && go build -o /out/rating-service ./backend/rating-service/cmd/rating-service \
+ && go build -o /out/grading-request ./backend/grade-service/cmd/grading-request \
+ && go build -o /out/gateway-service ./backend/gateway-service/cmd
 
 FROM alpine:3.22
 RUN apk add --no-cache bash git ca-certificates \

@@ -538,15 +538,26 @@ func mapRankingEntryResponse(
 	return result
 }
 
+// clientIP identifies the caller for rate limiting. Behind the frontend nginx every request
+// arrives from the proxy's address, which would make the limit global, so X-Real-IP set by
+// nginx is used — but only when the direct peer is a loopback or private address (the proxy),
+// never from a client connecting straight to the gateway.
 func clientIP(
 	r *stdhttp.Request,
 ) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err == nil {
-		return host
+	if err != nil {
+		host = r.RemoteAddr
 	}
 
-	return r.RemoteAddr
+	peer := net.ParseIP(host)
+	if peer != nil && (peer.IsLoopback() || peer.IsPrivate()) {
+		if forwarded := net.ParseIP(strings.TrimSpace(r.Header.Get("X-Real-IP"))); forwarded != nil {
+			return forwarded.String()
+		}
+	}
+
+	return host
 }
 
 func writeJSON(

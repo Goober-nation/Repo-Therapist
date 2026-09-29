@@ -581,63 +581,21 @@ rpc GetReccomendations(GetReccomendationsRequest) returns (GetReccomendationsRes
 
 # Api Gateway
 
-### GET /grade/\{org_slug\}/\{repo_slug\}
+Актуальные HTTP-маршруты (`backend/gateway-service/internal/transport/http/handler.go`).
+Фронтенд ходит к ним через `/api/*` (Vite proxy или nginx). Заголовок `PAT` необязателен:
+с токеном владельца Gateway отдаёт приватную оценку (6 категорий), без него — публичную.
 
-**Headers**:  "user_token": "fdlfdfodkof"
+| Маршрут | Заголовки | Ответ |
+|---|---|---|
+| `POST /auth/yandex` | `Authorization: OAuth <token>` | `{session_id}` + cookie `session_id` |
+| `GET /repos` | `PAT` (обязателен) | `{repositories: [{sourcecraft_uuid, org_slug, repo_slug, web_url, visibility, last_activity_at, rating, language: {name, color}}], next_page_token}` |
+| `GET /grading/{org}/{repo}` | `PAT` (опционален) | `{status, grade: {sourcecraft_uuid, score, category_scores, advice, missing_data, graded_at}}` |
+| `GET /recommendations/{org}/{repo}` | `PAT` (опционален) | `{status, raw_response: {summary, strengths, weaknesses, recommendations: [{priority, category, text}]}, model_used, evaluated_at}` |
+| `GET /ranking?page=&page_size=&sortby=&filter=` | — | `{entries: [{place, sourcecraft_uuid, name, web_url, public_score, likes, language, last_activity_at}], total_count, page, page_size}` |
 
-**Response**
+`status`: `PENDING` (оценка запущена и считается), `FINISHED`, `NO_DATA`. Запрос оценки сам
+запускает её, если оценки нет или в репозитории была активность после прошлого анализа.
 
-```json
-{
-  "repo_slug" : "sdsdd",
-  "health_score" : 56,
-  "category_scores" : [	
-						{
-							"category1": 50,
-						},
-				]
-  "category_data" : {
-			"data1": "string".
-},
-  "missing_data": {
-			"data1": "string".
-},
-  "graded_at" : "timestamp",
-  "status": "FINISHED"
-}
-```
-
-**ИЛИ**
-**Response**
-
-```json
-{
-  "status": "PENDING"
-}
-```
-
-### GET /reccomendations/\{org_slug\}/\{repo_slug\}
-
-**Headers**:  "user_token": "fdlfdfodkof"
-
-**Response**
-
-```json
-{
-	"status" : "PENDING"
-}
-```
-
-**ИЛИ**
-**Response**
-
-```json
-{
-  "status": "FINISHED",
-  "reccomendations": [
-	  {
-	  "subject1" : "dsdsdsdd"
-	  },
-]
-}
-```
+`category_scores` — объект по ID категории: `{id, no_data, score (0–100), metrics: [{id, no_data,
+raw_value, score (0–1)}]}`. `advice` — `[{category_id, metric_id, text}]`, текст начинается с тега
+приоритета `[critical|high|medium|low]` (`config/recommendations.yaml`).

@@ -1,24 +1,14 @@
+import { categoryLabel, categoryWeight, formatMetricValue, metricLabel } from "../metrics"
+import type { CategoryScores, GradeStatus, MetricResult } from "../types"
 import { Card, Label, ScoreBar } from "./Shell"
-import type { CategoryScores, MetricResult } from "../types"
 
-function CriterionCard({
-  name,
-  result,
-}: {
-  name: string
-  result: MetricResult
-}) {
-  const label = result.name ?? name
+function CriterionCard({ id, result, weight }: { id: string; result: MetricResult; weight?: number }) {
+  const label = result.name ?? categoryLabel(id)
   return (
-    <Card className="metric-card">
+    <Card className={`metric-card ${result.score === null ? "metric-card--no-data" : ""}`}>
       <div className="metric-card__topline">
         <Label>{label}</Label>
-        {result.trend !== null && (
-          <span className={`trend ${result.trend < 0 ? "trend--down" : ""}`}>
-            {result.trend > 0 ? "+" : ""}
-            {result.trend}
-          </span>
-        )}
+        {weight !== undefined && <span className="metric-card__weight">вес {weight}%</span>}
       </div>
       {result.score === null ? (
         <p className="metric-card__empty">Нет данных</p>
@@ -29,11 +19,27 @@ function CriterionCard({
         </div>
       )}
       {result.description && <p>{result.description}</p>}
-      {result.score !== null && (
-        <ScoreBar
-          score={result.score}
-          label={`${label}: ${result.score} из 100`}
-        />
+      {result.score !== null && <ScoreBar score={result.score} label={`${label}: ${result.score} из 100`} />}
+      {result.facts && result.facts.length > 0 && (
+        <details className="fact-list">
+          <summary>На чём основана оценка</summary>
+          <dl>
+            {result.facts.map((fact) => (
+              <div key={fact.id}>
+                <dt>{metricLabel(fact.id)}</dt>
+                <dd className={fact.value === null ? "fact-list__empty" : ""}>
+                  {formatMetricValue(fact.id, fact.value)}
+                  {fact.score !== null && (
+                    <span className="fact-list__score" title="Оценка метрики">
+                      {" "}
+                      · {Math.round(fact.score * 100)}/100
+                    </span>
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </details>
       )}
     </Card>
   )
@@ -42,24 +48,24 @@ function CriterionCard({
 export default function AnalysisResults({
   categories,
   status,
+  isPrivate = false,
 }: {
   categories: CategoryScores
-  status?: "PENDING" | "FINISHED" | null
+  status?: GradeStatus | null
+  isPrivate?: boolean
 }) {
   const entries = Object.entries(categories)
   if (entries.length === 0) {
     return (
       <Card className="empty-note">
-        {status === "PENDING"
-          ? "Оценки по категориям ещё рассчитываются."
-          : "Оценки по категориям отсутствуют."}
+        {status === "PENDING" ? "Оценки по категориям ещё рассчитываются." : "Оценки по категориям отсутствуют."}
       </Card>
     )
   }
   return (
     <div className="metric-grid">
-      {entries.map(([name, result]) => (
-        <CriterionCard key={name} name={name} result={result} />
+      {entries.map(([id, result]) => (
+        <CriterionCard key={id} id={id} result={result} weight={categoryWeight(id, isPrivate, categories)} />
       ))}
     </div>
   )

@@ -161,7 +161,6 @@ func mapGetMyReposResponse(
 		NextPageToken: resp.GetNextPageToken(),
 	}, nil
 }
-
 func mapRepository(repo *agg.Repository) (domain.Repo, error) {
 	repoID, err := uuid.Parse(repo.GetId())
 	if err != nil {

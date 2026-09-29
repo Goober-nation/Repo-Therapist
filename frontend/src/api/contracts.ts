@@ -1,105 +1,110 @@
 /**
- * Public contracts from docs/api_docs.md.
+ * Wire formats of the Gateway HTTP API (backend/gateway-service/internal/transport/http).
  *
- * These types intentionally describe the wire format instead of the fields
- * used by the visual components. Mapping happens in `mapper.ts`, so a backend
- * naming change is isolated from the rest of the app.
+ * These types describe what the backend sends, not what the components render.
+ * `mapper.ts` converts them, so a backend naming change stays in one place.
  */
 
-export type GradeStatus = "PENDING" | "FINISHED"
+export type GradeStatus = "PENDING" | "FINISHED" | "NO_DATA"
+
+type WirePriority = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "critical" | "high" | "medium" | "low"
+
+export interface MetricPayload {
+  id?: string
+  no_data?: boolean
+  raw_value?: number
+  score?: number
+}
 
 export interface CategoryScorePayload {
   score?: number | null
+  no_data?: boolean
   name?: string
   description?: string
   trend?: number | null
+  metrics?: MetricPayload[]
 }
 
 export type CategoryScoreValue = number | null | CategoryScorePayload
-export type CategoryScoresPayload = Record<string, CategoryScoreValue> | Array<Record<string, CategoryScoreValue>>
+export type CategoryScoresPayload =
+  | Record<string, CategoryScoreValue>
+  | Array<Record<string, CategoryScoreValue>>
 
-export interface GradingResponse {
-  repo_slug?: string
-  health_score?: number
-  category_scores?: CategoryScoresPayload | null
-  criteria?: CategoryScoresPayload | null
-  category_data?: Record<string, unknown>
-  missing_data?: Record<string, unknown> | string[]
-  graded_at?: string
-  status: GradeStatus
+/** grade-service rule output; `text` starts with a "[priority]" tag from config/recommendations.yaml. */
+export interface AdvicePayload {
+  category_id?: string
+  metric_id?: string
+  text?: string
 }
 
-export interface RecommendationItemResponse {
-  subject1?: string
-  title?: string
-  description?: string
-  priority?: "high" | "medium" | "low"
-  current_score?: number
-  projected_score?: number
+/**
+ * `grade` is what Gateway sends today. The flat fields (`health_score`,
+ * `category_scores`, `criteria`) are the older documented shape that the
+ * mapper still accepts (docs/grading/frontend-results.md).
+ */
+export interface GradingResponse {
+  status: GradeStatus
+  grade?: {
+    score?: number | null
+    category_scores?: CategoryScoresPayload | null
+    advice?: AdvicePayload[] | null
+    missing_data?: string[]
+    graded_at?: string
+  }
+  health_score?: number | null
+  category_scores?: CategoryScoresPayload | null
+  criteria?: CategoryScoresPayload | null
+  missing_data?: Record<string, unknown> | string[]
+  graded_at?: string
 }
 
 export interface RecommendationsResponse {
   status: GradeStatus
-  reccomendations?: RecommendationItemResponse[]
-  recommendations?: RecommendationItemResponse[]
-}
-
-export interface SourceCraftOrganization {
-  id: string
-  slug: string
-}
-
-export interface SourceCraftRepository {
-  id: string
-  name: string
-  default_branch: string
-  organization: SourceCraftOrganization
-  slug: string
-  description?: string
-  visibility: "public" | "internal" | "private"
-  web_url?: string
-  last_updated?: string
-  language?: {
-    name?: string
-    color?: string
-  }
-  counters?: {
-    forks?: string
-    pull_requests?: string
-    issues?: string
-    tags?: string
-    branches?: string
-  }
-  rating?: {
-    value?: number
-    percentile?: number
-    reaction_counts?: Array<{
-      type?: string
-      count?: string
+  raw_response?: {
+    summary?: string
+    strengths?: string[]
+    weaknesses?: string[]
+    recommendations?: Array<{
+      priority?: WirePriority
+      category?: string
+      place?: string
+      location?: string
+      text?: string
     }>
-  }
+  } | null
 }
 
-export interface PublicRepositoriesResponse {
-  repositories: SourceCraftRepository[]
+/** GET /repos (requires the PAT header). */
+export interface MyRepository {
+  sourcecraft_uuid: string
+  org_slug: string
+  repo_slug: string
+  web_url?: string
+  visibility?: "public" | "internal" | "private"
+  last_activity_at?: string
+  rating?: number
+  language?: { name?: string; color?: string }
+}
+
+export interface MyRepositoriesResponse {
+  repositories: MyRepository[]
   next_page_token?: string
 }
 
-export interface StartReportResponse {
-  operationUuid: string
-  status: string
-  done: boolean
-  reportUuid?: string
-  scanUuid?: string
-  format?: string
-  engineType?: string
+export interface GatewayRankingEntry {
+  place: number
+  sourcecraft_uuid: string
+  name: string
+  web_url: string
+  public_score?: number | null
+  likes?: number
+  language?: { name?: string; color?: string }
+  last_activity_at?: string
 }
 
-export interface ReportLinkResponse {
-  reportUuid: string
-  scanUuid: string
-  format?: string
-  engineType?: string
-  createdAt?: number
-  presignedUrl: string
+export interface GatewayRankingResponse {
+  entries: GatewayRankingEntry[]
+  total_count: number
+  page: number
+  page_size: number
 }
