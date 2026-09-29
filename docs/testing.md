@@ -8,7 +8,7 @@ end-to-end checks that need the running stack and are done by hand.
 
 ```bash
 cp .env.example .env   # fill in SOURCECRAFT_PAT with a real token
-docker compose up -d   # Postgres + MinIO + Kafka
+docker compose up -d   # Postgres + S3 (RustFS) + Kafka
 set -a && source .env && set +a
 ```
 
@@ -23,14 +23,18 @@ sourcecraft-wrapper-service running too (`go run ./backend/sourcecraft-wrapper-s
 go run ./backend/repository-service/cmd/repository-service --org=examples --repo=vulnerable-repo
 ```
 
-Check what landed in MinIO (console at `http://localhost:9001`, login from `.env`), or via `mc`:
+Check what landed in S3 (RustFS console at `http://localhost:8055/rustfs/console/index.html`, login
+from `.env`), or via the AWS CLI (the compose service is still named `minio`):
 
 ```bash
-docker run --rm --network <compose-project>_default --entrypoint sh quay.io/minio/mc -c "
-  mc alias set local http://minio:9000 \$S3_ACCESS_KEY \$S3_SECRET_KEY
-  mc ls --recursive local/repo-content/repos/<sourcecraft_uuid>
-"
+docker run --rm --network <compose-project>_default \
+  -e AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY" -e AWS_SECRET_ACCESS_KEY="$S3_SECRET_KEY" -e AWS_DEFAULT_REGION=us-east-1 \
+  amazon/aws-cli --endpoint-url http://minio:9000 s3 ls --recursive s3://repo-content/repos/<sourcecraft_uuid>/
 ```
+
+In the full stack, Grade service deletes `repos/<uuid>/` once the grading result is published,
+and Repository service clears it before each upload. Set `S3_KEEP_REPO_DATA=true` to keep
+exports for inspection.
 
 (`<compose-project>` is the docker-compose project name — usually the directory name; check with
 `docker compose ps` if unsure.)
@@ -113,7 +117,7 @@ gofmt -l backend         # should print nothing
 
 ## Manual-tagged tests
 
-One test needs a live MinIO with data already uploaded (not run by default `go test ./...`):
+One test needs a live S3 (the compose `minio` service) with data already uploaded (not run by default `go test ./...`):
 
 ```bash
 (cd backend/shared && go test -tags=manual ./storage/ -run TestBatchReadManual -v)

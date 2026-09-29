@@ -58,3 +58,18 @@ func AdviceLimit() int {
 	}
 	return n
 }
+
+// KeepRepoData reports whether S3_KEEP_REPO_DATA asks to keep a repo's S3 export after its
+// grading result is published (for debugging). Default false: the export is deleted.
+func KeepRepoData() bool {
+	v := os.Getenv("S3_KEEP_REPO_DATA")
+	if v == "" {
+		return false
+	}
+	keep, err := strconv.ParseBool(v)
+	if err != nil {
+		log.Printf("ignoring invalid S3_KEEP_REPO_DATA=%q, deleting repo data after grading", v)
+		return false
+	}
+	return keep
+}

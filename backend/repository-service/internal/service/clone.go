@@ -104,6 +104,13 @@ func CloneAndUpload(ctx context.Context, org, repo, token string) (*Result, erro
 	}
 
 	keyPrefix := "repos/" + repoID
+	// A previous export may still be there (Grade kept or failed to delete it); clear it so files
+	// removed from the repo since then aren't graded again.
+	if n, err := s3Client.DeletePrefix(ctx, keyPrefix+"/"); err != nil {
+		log.Printf("clearing previous S3 export for %s failed: %v (stale files may remain)", repoID, err)
+	} else if n > 0 {
+		log.Printf("cleared %d stale S3 objects under %s", n, keyPrefix)
+	}
 	log.Printf("uploading tree to s3://%s/%s", envOrDefault("S3_BUCKET", "repo-content"), keyPrefix)
 	fileCount, err := s3Client.UploadDir(ctx, tmpDir, keyPrefix)
 	if err != nil {

@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
       POSTGRES_DB: ${POSTGRES_DB:?set in .env}
     ports:
-      - "5432:5432"
+      - "8051:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -14,25 +14,23 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-  minio:
-    image: quay.io/minio/minio:latest
-    command: server /data --console-address ":9001"
+  minio: # S3 storage; RustFS (MinIO-compatible) since MinIO stopped publishing images
+    image: rustfs/rustfs:1.0.1-preview.11
     environment:
-      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?set in .env}
-      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?set in .env}
-      # Soft cap: MinIO otherwise grows caches to fit available memory. GC works harder near it; never OOM-kills.
-      GOMEMLIMIT: 256MiB
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:?set in .env}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY:?set in .env}
+      RUSTFS_CONSOLE_ENABLE: "true"
     ports:
-      - "9000:9000" # S3 API
-      - "9001:9001" # web console
+      - "8054:9000" # S3 API
+      - "8055:9001" # web console
     volumes:
-      - miniodata:/data
+      - s3data:/data
 
   # Gateway sessions and rate limiting.
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "8052:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -45,9 +43,9 @@ services:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
-      # INTERNAL for containers (kafka:29092), EXTERNAL for the host (localhost:9092).
+      # INTERNAL for containers (kafka:29092), EXTERNAL for the host (localhost:8053).
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:8053
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
@@ -56,7 +54,7 @@ services:
       # Default heap is 1G; a single dev broker with small messages needs far less.
       KAFKA_HEAP_OPTS: "-Xmx256m -Xms256m"
     ports:
-      - "9092:9092"
+      - "8053:9092"
     volumes:
       # The apache/kafka image's log.dirs; anything else leaves data on an anonymous volume lost on recreate.
       - kafkadata:/var/lib/kafka/data
@@ -146,5 +144,5 @@ services:
 
 volumes:
   pgdata:
-  miniodata:
+  s3data:
   kafkadata:

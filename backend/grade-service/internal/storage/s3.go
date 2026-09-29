@@ -122,6 +122,39 @@ func (c *Client) ListKeys(ctx context.Context, prefix string) ([]string, error) 
 	return keys, nil
 }
 
+// DeletePrefix removes every object under prefix (e.g. "repos/<uuid>/") and returns how many
+// were removed. A missing prefix is not an error.
+func (c *Client) DeletePrefix(ctx context.Context, prefix string) (int, error) {
+	objects := c.mc.ListObjects(ctx, c.bucket, minio.ListObjectsOptions{Prefix: prefix, Recursive: true})
+	toRemove := make(chan minio.ObjectInfo)
+	var listErr error
+	listed := 0
+	go func() {
+		defer close(toRemove)
+		for obj := range objects {
+			if obj.Err != nil {
+				listErr = fmt.Errorf("listing objects under %q: %w", prefix, obj.Err)
+				return
+			}
+			listed++
+			toRemove <- obj
+		}
+	}()
+	var removeErr error
+	for rerr := range c.mc.RemoveObjects(ctx, c.bucket, toRemove, minio.RemoveObjectsOptions{}) {
+		if removeErr == nil {
+			removeErr = fmt.Errorf("removing %s: %w", rerr.ObjectName, rerr.Err)
+		}
+	}
+	if listErr != nil {
+		return 0, listErr
+	}
+	if removeErr != nil {
+		return 0, removeErr
+	}
+	return listed, nil
+}
+
 // GetObject fetches a single object's contents by key.
 func (c *Client) GetObject(ctx context.Context, key string) ([]byte, error) {
 	obj, err := c.mc.GetObject(ctx, c.bucket, key, minio.GetObjectOptions{})

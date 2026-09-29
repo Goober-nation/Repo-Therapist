@@ -54,13 +54,7 @@ func CategoryIDs(visibility string) []string {
 // grading skips the private-only categories entirely (no AppSec call, no CI/CD read).
 func Grade(ctx context.Context, repoID string, cfg *config.Config, token, visibility string) (*GradeOutput, error) {
 	private := visibility == contracts.VisibilityPrivate
-	s3Client, err := storage.NewClient(ctx, storage.Config{
-		Endpoint:  EnvOrDefault("S3_ENDPOINT", "localhost:9000"),
-		AccessKey: os.Getenv("S3_ACCESS_KEY"),
-		SecretKey: os.Getenv("S3_SECRET_KEY"),
-		Bucket:    EnvOrDefault("S3_BUCKET", "repo-content"),
-		UseSSL:    false,
-	})
+	s3Client, err := newS3Client(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to S3: %w", err)
 	}
@@ -171,6 +165,26 @@ func Grade(ctx context.Context, repoID string, cfg *config.Config, token, visibi
 	categories["security"] = securityResult
 	categories["ci_cd"] = ciResult
 	return &GradeOutput{RepoID: repoID, Categories: categories}, nil
+}
+
+func newS3Client(ctx context.Context) (*storage.Client, error) {
+	return storage.NewClient(ctx, storage.Config{
+		Endpoint:  EnvOrDefault("S3_ENDPOINT", "localhost:9000"),
+		AccessKey: os.Getenv("S3_ACCESS_KEY"),
+		SecretKey: os.Getenv("S3_SECRET_KEY"),
+		Bucket:    EnvOrDefault("S3_BUCKET", "repo-content"),
+		UseSSL:    false,
+	})
+}
+
+// DeleteRepoData removes the repo's whole S3 export (repos/<repoID>/) once nothing reads it any
+// more, and returns how many objects were removed.
+func DeleteRepoData(ctx context.Context, repoID string) (int, error) {
+	s3Client, err := newS3Client(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("connecting to S3: %w", err)
+	}
+	return s3Client.DeletePrefix(ctx, "repos/"+repoID+"/")
 }
 
 // BuildGradingResult turns a GradeOutput into the Aggregator-facing contracts.GradingResultEvent

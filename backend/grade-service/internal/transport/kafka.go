@@ -112,8 +112,10 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 	docsProducer := kafkaclient.NewProducer(brokers, contracts.TopicDocsGradeRequested)
 	defer docsProducer.Close()
 
+	cleanup := repoDataCleanup(app.KeepRepoData(), app.DeleteRepoData)
+
 	log.Printf("grade-service listening on %s, publishing results to %s", contracts.TopicRepoReady, contracts.TopicGradingResults)
-	return consumer.Run(ctx, func(ctx context.Context, value []byte) error {
+	return consumer.Run(ctx, withRepoDataCleanup(cleanup, func(ctx context.Context, value []byte) error {
 		var ready contracts.RepoReady
 		if err := json.Unmarshal(value, &ready); err != nil {
 			log.Printf("skipping unparseable %s message: %v", contracts.TopicRepoReady, err)
@@ -164,7 +166,50 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 		}
 		log.Printf("published grading result for %s/%s to %s", ready.OrgSlug, ready.RepoSlug, contracts.TopicGradingResults)
 		return nil
-	})
+	}))
+}
+
+// repoDataCleanupTimeout bounds one repo's S3 export deletion.
+const repoDataCleanupTimeout = time.Minute
+
+// repoDataCleanup returns the function that deletes a graded repo's S3 export, or nil when
+// S3_KEEP_REPO_DATA keeps it. A failed delete is only logged: the grade is already published,
+// and Repository service clears the prefix again before its next upload.
+func repoDataCleanup(keep bool, deleteRepoData func(ctx context.Context, repoID string) (int, error)) func(repoID string) {
+	if keep {
+		log.Printf("S3_KEEP_REPO_DATA is set: repo exports stay in S3 after grading")
+		return nil
+	}
+	return func(repoID string) {
+		ctx, cancel := context.WithTimeout(context.Background(), repoDataCleanupTimeout)
+		defer cancel()
+		n, err := deleteRepoData(ctx, repoID)
+		if err != nil {
+			log.Printf("deleting S3 export for %s failed: %v", repoID, err)
+			return
+		}
+		log.Printf("deleted %d S3 objects for %s", n, repoID)
+	}
+}
+
+// withRepoDataCleanup runs cleanup on the repo.ready message's repo once handler has published
+// its result or failure (handler returned nil). Every reader of the export is done by then: Grade
+// read its inputs, and the LLM service replied or timed out. A handler error stops the consumer
+// without committing, so the message is redelivered and its export must stay.
+func withRepoDataCleanup(cleanup func(repoID string), handler func(ctx context.Context, value []byte) error) func(ctx context.Context, value []byte) error {
+	if cleanup == nil {
+		return handler
+	}
+	return func(ctx context.Context, value []byte) error {
+		if err := handler(ctx, value); err != nil {
+			return err
+		}
+		var ready contracts.RepoReady
+		if json.Unmarshal(value, &ready) == nil && ready.SourcecraftUUID != "" {
+			cleanup(ready.SourcecraftUUID)
+		}
+		return nil
+	}
 }
 
 // publishFailure reports a repo that couldn't be graded, so the Aggregator releases its lock. A

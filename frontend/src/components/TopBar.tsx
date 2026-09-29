@@ -68,8 +68,8 @@ export default function TopBar({
         >
           <span className="brand__mark" aria-hidden="true">
             <svg
-              viewBox="0 0 64 44"
-              fill="none"
+              viewBox="0 0 776 960"
+              fill="currentColor"
               stroke="currentColor"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -79,18 +79,27 @@ export default function TopBar({
                 <linearGradient
                   id="repo-health-logo-gradient"
                   gradientUnits="userSpaceOnUse"
-                  x1="5"
-                  y1="6"
-                  x2="59"
-                  y2="38"
+                  x1="126"
+                  y1="135"
+                  x2="640"
+                  y2="868"
                 >
                   <stop stopColor="#e73583" />
                   <stop offset=".5" stopColor="#8b3fe8" />
                   <stop offset="1" stopColor="#ed791c" />
                 </linearGradient>
               </defs>
-              <path d="m21 6-16 16 16 16M43 6l16 16-16 16" strokeWidth="6" />
-              <path d="M19 22h8l5-12 7 24 5-12h5" strokeWidth="4.8" />
+              <g fill="none">
+                <path
+                  d="M523 732H640V135H230Q126 135 126 239V600Q126 680 168 715M126 620Q126 564 230 564H640"
+                  strokeWidth="48"
+                />
+              </g>
+              <path d="M383 468C255 385 238 262 316 250C352 245 374 266 383 290C392 266 414 245 450 250C528 262 511 385 383 468Z" strokeWidth="12" />
+              <path
+                d="M253 674H421Q429 674 429 682V857Q429 868 418 861L343 810Q336 805 329 810L256 861Q245 868 245 857V682Q245 674 253 674Z"
+                stroke="none"
+              />
             </svg>
           </span>
           <span>

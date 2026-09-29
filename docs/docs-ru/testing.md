@@ -8,7 +8,7 @@ Go-тесты тоже есть (`go test ./...` в каждом модуле, �
 
 ```bash
 cp .env.example .env   # впишите в SOURCECRAFT_PAT настоящий токен
-docker compose up -d   # Postgres + MinIO + Kafka
+docker compose up -d   # Postgres + S3 (RustFS) + Kafka
 set -a && source .env && set +a
 ```
 
@@ -23,14 +23,18 @@ set -a && source .env && set +a
 go run ./backend/repository-service/cmd/repository-service --org=examples --repo=vulnerable-repo
 ```
 
-Проверьте, что попало в MinIO (консоль на `http://localhost:9001`, логин из `.env`), или через `mc`:
+Проверьте, что попало в S3 (консоль RustFS на `http://localhost:8055/rustfs/console/index.html`,
+логин из `.env`), или через AWS CLI (сервис в compose по-прежнему называется `minio`):
 
 ```bash
-docker run --rm --network <compose-project>_default --entrypoint sh quay.io/minio/mc -c "
-  mc alias set local http://minio:9000 \$S3_ACCESS_KEY \$S3_SECRET_KEY
-  mc ls --recursive local/repo-content/repos/<sourcecraft_uuid>
-"
+docker run --rm --network <compose-project>_default \
+  -e AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY" -e AWS_SECRET_ACCESS_KEY="$S3_SECRET_KEY" -e AWS_DEFAULT_REGION=us-east-1 \
+  amazon/aws-cli --endpoint-url http://minio:9000 s3 ls --recursive s3://repo-content/repos/<sourcecraft_uuid>/
 ```
+
+В полном стеке Grade service удаляет `repos/<uuid>/` после публикации результата оценки,
+а Repository service очищает его перед каждой загрузкой. Чтобы сохранить выгрузки для
+проверки, задайте `S3_KEEP_REPO_DATA=true`.
 
 (`<compose-project>` — имя проекта docker-compose, обычно имя каталога; если не уверены,
 проверьте через `docker compose ps`.)
@@ -116,7 +120,7 @@ gofmt -l backend         # не должно ничего вывести
 
 ## Тесты с тегом manual
 
-Одному тесту нужен живой MinIO с уже загруженными данными (не запускается обычным `go test ./...`):
+Одному тесту нужен живой S3 (сервис `minio` в compose) с уже загруженными данными (не запускается обычным `go test ./...`):
 
 ```bash
 (cd backend/repository-service && go test -tags=manual ./internal/storage/ -run TestBatchReadManual -v)

@@ -96,8 +96,8 @@ PYTHONPATH=src python3 -m llm_service --listen
 
 Alongside the Yandex settings above, export `S3_ENDPOINT`, `S3_BUCKET`,
 `S3_ACCESS_KEY`, `S3_SECRET_KEY`, and `KAFKA_BROKERS`. For the repository's
-local Docker Compose setup they are `localhost:9000`, `repo-content`, the
-MinIO credentials from the local environment, and `localhost:9092`. Optional
+local Docker Compose setup they are `localhost:8054`, `repo-content`, the
+S3 credentials from the local environment, and `localhost:8053`. Optional
 `S3_USE_SSL=true` switches to HTTPS; optional `LLM_KAFKA_GROUP_ID` overrides
 the default `llm-service-documentation-v1` group. Credentials are required;
 the LLM service never creates buckets or writes S3 objects. Kafka topics must
@@ -106,9 +106,8 @@ exist before starting the consumer; this worker does not provision them.
 Real Yandex calls have returned responses during manual testing. The Kafka
 previous envelope request/result round trip was verified against the local Kafka broker with a
 simulated repository and model. S3 list/get and context preparation were
-verified over HTTP against a local S3-compatible test server. The repository's
-MinIO image could not be pulled from Quay (`401`), so MinIO itself and the full
-Kafka → MinIO → Yandex path remain unverified here. The legacy report envelope
+verified over HTTP against a local S3-compatible test server. Local S3 is now RustFS (the MinIO image can no longer be pulled);
+a full compose grading run read repository data from it successfully. The legacy report envelope
 (`llm.report.*`) is superseded by the summary worker below.
 
 ## Repository summary and recommendations

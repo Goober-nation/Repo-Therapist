@@ -43,12 +43,12 @@ SourceCraft.
 
 ```bash
 cp .env.example .env        # заполните SOURCECRAFT_PAT, S3_*, POSTGRES_*
-docker compose up -d        # Postgres, MinIO, Redis, Kafka, миграции, сервисы, фронтенд
+docker compose up -d        # Postgres, S3 (RustFS), Redis, Kafka, миграции, сервисы, фронтенд
 ```
 
 - Фронтенд: http://localhost:8081 (рейтинг — `/`, анализ — `/repo/<org>/<repo>`,
   собственные репозитории — `/my`). Подробнее: [frontend/README.md](frontend/README.md).
-- Консоль MinIO: http://localhost:9001
+- Консоль S3 (RustFS): http://localhost:8055/rustfs/console/index.html
 
 Все настройки описаны в комментариях в [.env.example](.env.example).
 Ручное сквозное тестирование: [docs/testing.md](docs/testing.md).
@@ -138,7 +138,7 @@ go build ./... && go test ./... && go vet ./...
 
 - Сервисы общаются асинхронно через Kafka; у каждого обработчика (repository, grade, llm) своя
   consumer group.
-- Сервисы-обработчики не хранят состояние: данные репозитория лежат в S3 (MinIO), результаты — в
+- Сервисы-обработчики не хранят состояние: данные репозитория лежат в S3 (RustFS), результаты — в
   Postgres, куда пишет только агрегатор.
 - Таблица `repo_lock` не даёт запустить две оценки одного репозитория одновременно.
 - Клонирование идёт в `/dev/shm`, при нехватке места — на диск; `CLONE_TIMEOUT` и `GRADE_TIMEOUT`

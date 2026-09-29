@@ -107,7 +107,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .brand__mark { display: grid; width: 42px; height: 34px; flex: 0 0 42px; place-items: center; color: #000000; }
 .brand__mark svg { display: block; width: 100%; height: 100%; }
 :root[data-theme="dark"] .brand__mark { color: #ffffff; }
-:root[data-theme="dopamine"] .brand__mark svg { stroke: url(#repo-health-logo-gradient); }
+:root[data-theme="dopamine"] .brand__mark svg { stroke: url(#repo-health-logo-gradient); fill: url(#repo-health-logo-gradient); }
 .brand strong, .brand small, .topbar__user strong, .topbar__user small { display: block; }
 .brand strong { font-size: 14px; letter-spacing: -.02em; }
 .brand small, .topbar__user small { margin-top: 3px; color: var(--muted); font-size: 11px; }
