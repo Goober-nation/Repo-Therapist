@@ -133,6 +133,27 @@ go build ./... && go test ./... && go vet ./...
 - LLM-сервис также формирует summary репозитория, отображаемое на странице.
 - AI не используется для расчёта категорий Активность, Issues, CI/CD, Security и Состояние кода.
 
+## API
+
+HTTP API Gateway доступен по адресу `https://repo-therapist.alo.quest/api/`; через него работает и
+фронтенд. Ключ не нужен: без заголовка `PAT` возвращаются публичные данные, с токеном SourceCraft в
+`PAT` — приватные. Лимиты: 60 запросов в минуту с одного IP и не больше 10 новых оценок за 10 минут
+на весь сервис.
+
+| Запрос | Авторизация | Ответ |
+|---|---|---|
+| `GET /api/ranking?page=&page_size=&sortby=&filter=` | — | страница рейтинга; `sortby`: `score`, `likes`, `last_activity`; `filter` — язык |
+| `GET /api/grading/{org}/{repo}` | `PAT` необязателен | оценка; `202 PENDING` пока идёт анализ, `429` с `Retry-After` при лимите, `502` при прерванной оценке |
+| `GET /api/recommendations/{org}/{repo}` | `PAT` необязателен | AI-сводка, сильные и слабые стороны, рекомендации; `202 PENDING` пока отвечает LLM |
+| `GET /api/repos` | `PAT` обязателен | репозитории владельца токена |
+| `POST /api/auth/yandex` | `Authorization: OAuth <token>` | вход через Яндекс ID, cookie сессии |
+
+```bash
+curl -s "https://repo-therapist.alo.quest/api/grading/likosov-ilia/vidpulse"
+```
+
+Полное описание полей — в разделе «Api Gateway» файла [docs/api_docs.md](docs/api_docs.md).
+
 ## Масштабирование
 
 Система спроектирована с расчётом на горизонтальное масштабирование (сейчас каждый сервис
