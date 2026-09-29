@@ -218,6 +218,14 @@ def publish_terminal(producer, event: dict, *, topic: str = RESULT_TOPIC,
         raise RuntimeError(f"Kafka did not acknowledge result on {topic}")
 
 
+_UNKNOWN_TOPIC_OR_PART = 3  # confluent_kafka.KafkaError.UNKNOWN_TOPIC_OR_PART
+
+
+def _is_unknown_topic(error) -> bool:
+    code = getattr(error, "code", None)
+    return callable(code) and code() == _UNKNOWN_TOPIC_OR_PART
+
+
 def _serve(config, request_topic, result_topic, handle, *, consumer=None, producer=None) -> None:
     """Consume one topic; commit each input only after its result is acknowledged."""
     if consumer is None or producer is None:
@@ -226,7 +234,8 @@ def _serve(config, request_topic, result_topic, handle, *, consumer=None, produc
         if consumer is None:
             consumer = Consumer({"bootstrap.servers": config.brokers, "group.id": config.group_id,
                                  "enable.auto.commit": False, "auto.offset.reset": "earliest",
-                                 "max.poll.interval.ms": 900_000})
+                                 "max.poll.interval.ms": 900_000,
+                                 "allow.auto.create.topics": True})
         if producer is None:
             producer = Producer({"bootstrap.servers": config.brokers,
                                  "enable.idempotence": True, "acks": "all"})
@@ -238,6 +247,10 @@ def _serve(config, request_topic, result_topic, handle, *, consumer=None, produc
             if message is None:
                 continue
             if message.error():
+                if _is_unknown_topic(message.error()):
+                    # Topic is auto-created on the producer's first publish; keep polling.
+                    LOG.warning("Waiting for topic %s to be created", request_topic)
+                    continue
                 raise RuntimeError(f"Kafka consumer error: {message.error()}")
             event = handle(message.value())
             if event is not None:

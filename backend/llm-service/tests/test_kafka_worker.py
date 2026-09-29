@@ -101,7 +101,38 @@ class Producer:
         return 0
 
 
+class UnknownTopicError:
+    def code(self):
+        return 3  # KafkaError.UNKNOWN_TOPIC_OR_PART
+
+
+class UnknownTopicMessage(Message):
+    def error(self):
+        return UnknownTopicError()
+
+
+class MissingTopicConsumer(Consumer):
+    """Reports the topic as missing once, then delivers a normal request."""
+
+    def __init__(self, events):
+        super().__init__(events)
+        self.polls = 0
+
+    def poll(self, timeout):
+        self.polls += 1
+        if self.polls == 1:
+            return UnknownTopicMessage()
+        return super().poll(timeout)
+
+
 class KafkaWorkerTests(unittest.TestCase):
+    def test_missing_topic_is_awaited_not_fatal(self):
+        events = []
+        consumer, producer = MissingTopicConsumer(events), Producer(events)
+        with self.assertRaises(KeyboardInterrupt):
+            run_worker(KafkaConfig(), FakeStore(), FakeModel(), consumer=consumer, producer=producer)
+        self.assertEqual(events, ["produce", "flush", "commit"])
+
     def test_success_result_has_exact_flat_fields(self):
         model = FakeModel()
         event = process_documentation_request(request(), FakeStore(), model)
