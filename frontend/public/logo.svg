@@ -1,10 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-92 0 960 960" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Tab icon: the top bar logo (TopBar.tsx), dark on light browser chrome, white on dark. -->
-  <style>
-    .mark { fill: #17191d; stroke: #17191d; }
-    @media (prefers-color-scheme: dark) { .mark { fill: #ffffff; stroke: #ffffff; } }
-  </style>
-  <g class="mark">
+  <!-- Tab icon only: the top bar logo (TopBar.tsx) on a white tile, so it reads on light and dark tab bars. -->
+  <rect x="-92" y="0" width="960" height="960" rx="200" fill="#ffffff" />
+  <g fill="#17191d" stroke="#17191d">
     <path fill="none" d="M523 732H640V135H230Q126 135 126 239V600Q126 680 168 715M126 620Q126 564 230 564H640" stroke-width="48" />
     <path d="M383 468C255 385 238 262 316 250C352 245 374 266 383 290C392 266 414 245 450 250C528 262 511 385 383 468Z" stroke-width="12" />
     <path stroke="none" d="M253 674H421Q429 674 429 682V857Q429 868 418 861L343 810Q336 805 329 810L256 861Q245 868 245 857V682Q245 674 253 674Z" />
