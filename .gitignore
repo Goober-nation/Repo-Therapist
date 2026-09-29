@@ -94,3 +94,4 @@ build/
 data/
 *.db
 *volume*/
+.claude/

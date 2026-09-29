@@ -1,6 +1,6 @@
 # Repo Therapist
 
-Стенд: [repo-therapist.alo.quest](repo-therapist.alo.quest)
+Стенд: [repo-therapist.alo.quest](https://repo-therapist.alo.quest)
 
 Сервис оценивает открытые репозитории SourceCraft по шкале 0–100 в шести категориях и объясняет,
 из чего сложилась оценка. Он также формирует приоритизированные рекомендации и позволяет
