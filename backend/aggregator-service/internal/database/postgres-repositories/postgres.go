@@ -4,6 +4,7 @@ import (
 	"aggregator-service/internal/domain"
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -12,6 +13,9 @@ import (
 
 type RepoRepository struct {
 	db *pgxpool.Pool
+	// LockTimeout lets AcquireRepositoryLock take over a lock left busy longer than this, e.g.
+	// by a grading whose service died without reporting back; 0 never takes one over.
+	LockTimeout time.Duration
 }
 
 func NewRepoRepository(db *pgxpool.Pool) *RepoRepository {
@@ -585,9 +589,13 @@ func (r *RepoRepository) AcquireRepositoryLock(ctx context.Context, id uuid.UUID
 		SET status = 'busy',
 		    status_updated_at = now()
 		WHERE sourcecraft_uuid = $1
-		  AND status = 'free'
+		  AND (
+		    status = 'free'
+		    OR ($2::float8 > 0 AND status_updated_at < now() - make_interval(secs => $2::float8))
+		  )
 		`,
 		id,
+		r.LockTimeout.Seconds(),
 	)
 	if err != nil {
 		return false, mapRepositoryError(err)

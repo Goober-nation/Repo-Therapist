@@ -122,6 +122,26 @@ func TestUpstreamCodesMapToDomainErrors(t *testing.T) {
 	}
 }
 
+func TestGradingInterruptedIsRecognised(t *testing.T) {
+	aggregator := &fakeAggregator{err: status.Error(codes.Aborted, gradingInterruptedMessage)}
+
+	_, err := newService(aggregator).GetGrading(context.Background(), "ip", "", domain.GetGradingDTO{OrgSlug: "o", RepoSlug: "r"})
+	if !errors.Is(err, domain.ErrGradingInterrupted) {
+		t.Fatalf("err = %v, want ErrGradingInterrupted", err)
+	}
+}
+
+func TestGradingLimitCarriesRetryAfter(t *testing.T) {
+	aggregator := &fakeAggregator{err: status.Error(codes.ResourceExhausted, gradingRateLimitedPrefix+"360")}
+
+	_, err := newService(aggregator).GetGrading(context.Background(), "ip", "", domain.GetGradingDTO{OrgSlug: "o", RepoSlug: "r"})
+
+	var limit domain.GradingLimitError
+	if !errors.As(err, &limit) || limit.RetryAfter != 6*time.Minute || !errors.Is(err, domain.ErrLimitExceeded) {
+		t.Fatalf("err = %v, want GradingLimitError with 6m wait", err)
+	}
+}
+
 func TestRecommendationsPendingPassesThrough(t *testing.T) {
 	aggregator := &fakeAggregator{err: status.Error(codes.FailedPrecondition, "grading is pending")}
 

@@ -61,9 +61,11 @@ LLM-сервис по-прежнему принимает старые `LLM_SUMM
   рекомендаций `{category_id, metric_id, text}`, выбранных случайно. Для документации это тексты
   `advice` из `repo.docs.graded`, каждый как `{"documentation", "llm_advice", "[medium] <текст>"}`. `error` при успехе — `""`.
   При сбое это код — `REPO_FETCH_FAILED` (repo.ready со статусом failed), `GRADING_FAILED`,
-  `RESULT_BUILD_FAILED` — а `score`, `category_scores` и `advice` равны null; Aggregator тогда
-  только снимает блокировку репозитория. Сбой без `sourcecraft_uuid` нельзя сопоставить, и он не
-  публикуется.
+  `GRADING_INTERRUPTED` (grade-service остановлен посреди оценки), `RESULT_BUILD_FAILED` — а
+  `score`, `category_scores` и `advice` равны null; Aggregator тогда снимает блокировку
+  репозитория и один раз сообщает о сбое следующему запросу оценки этого репозитория. Сбой без
+  `sourcecraft_uuid` нельзя сопоставить, и он не публикуется; такую блокировку Aggregator
+  снимает сам, когда она занята дольше `GRADING_LOCK_TIMEOUT` (по умолчанию 20m).
 
 `token` копируется из `grading.requests`. Если он есть, Repository service использует его для
 вызовов обёртки и git clone; если нет — свой `SOURCECRAFT_PAT`. Токен никогда не логируется и

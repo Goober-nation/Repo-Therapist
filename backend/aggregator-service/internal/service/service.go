@@ -43,10 +43,16 @@ type AggregatorService struct {
 	RegradeListTimeout time.Duration
 	// LLMRequestTTL overrides DefaultLLMRequestTTL (config LLM_REQUEST_TTL).
 	LLMRequestTTL time.Duration
+	// GradeLimiter caps new gradings started by users across the service; the scheduled public
+	// regrade is not counted. nil means no limit.
+	GradeLimiter *GradeLimiter
 
 	llmMu       sync.Mutex
 	llmRequests map[string]llmRequest
-	now         func() time.Time
+
+	failureMu       sync.Mutex
+	gradingFailures map[string]time.Time
+	now             func() time.Time
 }
 
 // llmRequest tracks one in-flight LLM request per repo view, keyed by llmKey.
@@ -69,6 +75,7 @@ func NewAggregatorService(reposRepo domain.RepoRepository, gradesRepo domain.Gra
 		Token:            token,
 		LLMRequestTTL:    DefaultLLMRequestTTL,
 		llmRequests:      map[string]llmRequest{},
+		gradingFailures:  map[string]time.Time{},
 		now:              time.Now,
 	}
 }
@@ -141,7 +148,7 @@ func (as *AggregatorService) RequestLLMRecommendations(
 	}
 
 	if err != nil || needsGrading(repo, grade) {
-		return domain.RepoLLMResponse{}, as.requestGrading(ctx, repo, private)
+		return domain.RepoLLMResponse{}, as.requestGrading(ctx, repo, private, true)
 	}
 
 	response, err := as.loadLLMResponse(ctx, repo.SourcecraftUUID, private)
@@ -236,11 +243,27 @@ func (as *AggregatorService) GetGrading(
 		)
 	}
 
-	if err == nil && !needsGrading(repo, grade) {
+	hasGrade := err == nil
+	if hasGrade && !needsGrading(repo, grade) {
 		return &grade, nil
 	}
 
-	return nil, as.requestGrading(ctx, repo, private)
+	// The previous grading failed: say so once instead of silently starting another one.
+	if as.takeGradingFailure(llmKey(repo.SourcecraftUUID, viewVisibility(private))) {
+		if hasGrade {
+			return &grade, nil
+		}
+
+		return nil, domain.ErrGradingInterrupted
+	}
+
+	requestErr := as.requestGrading(ctx, repo, private, true)
+	// Over the grading limit, an outdated grade is still better than none.
+	if hasGrade && errors.Is(requestErr, domain.ErrGradingRateLimited) {
+		return &grade, nil
+	}
+
+	return nil, requestErr
 }
 
 func needsGrading(repo domain.Repo, grade domain.RepoGrade) bool {
@@ -341,7 +364,9 @@ func (as *AggregatorService) loadLLMResponse(ctx context.Context, repoID uuid.UU
 
 // requestGrading takes the repo lock and publishes grading.requests. It returns GradingPending
 // both when it published and when the lock was already taken by a grading in flight.
-func (as *AggregatorService) requestGrading(ctx context.Context, repo domain.Repo, private bool) error {
+// requestGrading starts a grading unless one is already running for repo. Starts by users
+// (userInitiated) count toward GradeLimiter; a request that joins a running grading does not.
+func (as *AggregatorService) requestGrading(ctx context.Context, repo domain.Repo, private bool, userInitiated bool) error {
 	acquired, err := as.ReposRepo.AcquireRepositoryLock(ctx, repo.SourcecraftUUID)
 	if err != nil {
 		return fmt.Errorf(
@@ -353,6 +378,15 @@ func (as *AggregatorService) requestGrading(ctx context.Context, repo domain.Rep
 
 	if !acquired {
 		return domain.GradingPending
+	}
+
+	reservedAt := as.now()
+	if userInitiated {
+		if ok, retryAfter := as.GradeLimiter.Reserve(reservedAt); !ok {
+			_ = as.ReposRepo.ReleaseRepositoryLock(ctx, repo.SourcecraftUUID)
+
+			return domain.RateLimitedError{RetryAfter: retryAfter}
+		}
 	}
 
 	event := domain.GradingRequestedEvent{
@@ -368,6 +402,9 @@ func (as *AggregatorService) requestGrading(ctx context.Context, repo domain.Rep
 
 	if err := as.gradingPublisher.Publish(ctx, event); err != nil {
 		_ = as.ReposRepo.ReleaseRepositoryLock(ctx, repo.SourcecraftUUID)
+		if userInitiated {
+			as.GradeLimiter.Cancel(reservedAt)
+		}
 
 		return fmt.Errorf(
 			"%w: publish grading request: %v",
@@ -457,6 +494,8 @@ func (as *AggregatorService) SaveGradingResult(ctx context.Context,
 	}()
 
 	if errorCode != "" {
+		as.gradingFailed(llmKey(grade.SourcecraftUUID, visibility))
+
 		return fmt.Errorf(
 			"%w: %v",
 			domain.ErrGradingFailed,
@@ -611,7 +650,7 @@ func (as *AggregatorService) regradeRepo(ctx context.Context, pbRepo *client.Rep
 		return nil
 	}
 
-	if err := as.requestGrading(ctx, repo, false); !errors.Is(err, domain.GradingPending) {
+	if err := as.requestGrading(ctx, repo, false, false); !errors.Is(err, domain.GradingPending) {
 		return err
 	}
 
@@ -778,6 +817,39 @@ func (as *AggregatorService) takeLLMFailure(key string) string {
 	delete(as.llmRequests, key)
 
 	return request.failure
+}
+
+// gradingFailureTTL is how long a failed grading waits to be reported before it is forgotten.
+const gradingFailureTTL = 30 * time.Minute
+
+func viewVisibility(private bool) string {
+	if private {
+		return domain.VisibilityPrivate
+	}
+
+	return domain.VisibilityPublic
+}
+
+func (as *AggregatorService) gradingFailed(key string) {
+	as.failureMu.Lock()
+	defer as.failureMu.Unlock()
+
+	as.gradingFailures[key] = as.now()
+}
+
+// takeGradingFailure reports and clears a recent failed grading for key.
+func (as *AggregatorService) takeGradingFailure(key string) bool {
+	as.failureMu.Lock()
+	defer as.failureMu.Unlock()
+
+	failedAt, ok := as.gradingFailures[key]
+	if !ok {
+		return false
+	}
+
+	delete(as.gradingFailures, key)
+
+	return as.now().Sub(failedAt) < gradingFailureTTL
 }
 
 func tokenFromContext(ctx context.Context) string {

@@ -39,6 +39,8 @@ export interface RepositorySummary {
   name: string
   fullName: string
   language: string
+  /** Language color from SourceCraft (a validated hex value), shown as a dot next to the name. */
+  languageColor?: string
   /** Position in the public ranking, as reported by the backend. */
   place?: number
   visibility?: "public" | "internal" | "private"
@@ -66,4 +68,4 @@ export interface AiReport {
   recommendations: Recommendation[]
 }
 
-export type PageId = "ranking" | "my" | "overview"
+export type PageId = "ranking" | "my" | "rules" | "overview"

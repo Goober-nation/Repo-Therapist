@@ -148,7 +148,7 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 		}
 		if err != nil {
 			log.Printf("grading %s/%s failed: %v", ready.OrgSlug, ready.RepoSlug, err)
-			return publishFailure(ctx, producer, ready, job.visibility, contracts.GradingErrGrading)
+			return publishFailure(ctx, producer, ready, job.visibility, gradingErrCode(ctx))
 		}
 		out.Categories["documentation"] = scoring.ComputeDocumentation(reply)
 		if docs := out.Categories["documentation"]; !docs.NoData {
@@ -219,11 +219,35 @@ func publishFailure(ctx context.Context, producer *kafkaclient.Producer, ready c
 		log.Printf("no sourcecraft_uuid for %s/%s: cannot publish %s failure", ready.OrgSlug, ready.RepoSlug, code)
 		return nil
 	}
-	if err := producer.Publish(ctx, ready.SourcecraftUUID, app.GradingFailure(ready.SourcecraftUUID, visibility, code, time.Now())); err != nil {
+	// On shutdown ctx is already cancelled; the failure must still reach the Aggregator so it
+	// releases the repo lock instead of leaving the repo busy.
+	publishCtx, cancel := detachedOnShutdown(ctx)
+	defer cancel()
+	if err := producer.Publish(publishCtx, ready.SourcecraftUUID, app.GradingFailure(ready.SourcecraftUUID, visibility, code, time.Now())); err != nil {
 		return fmt.Errorf("publishing %s failure: %w", contracts.TopicGradingResults, err)
 	}
 	log.Printf("published %s failure for %s/%s to %s", code, ready.OrgSlug, ready.RepoSlug, contracts.TopicGradingResults)
 	return nil
+}
+
+// gradingErrCode tells an interrupted grading (shutdown) apart from one that failed on its own.
+func gradingErrCode(ctx context.Context) string {
+	if ctx.Err() != nil {
+		return contracts.GradingErrInterrupted
+	}
+	return contracts.GradingErrGrading
+}
+
+// shutdownPublishTimeout bounds the last publish made after shutdown was requested.
+const shutdownPublishTimeout = 5 * time.Second
+
+// detachedOnShutdown returns ctx unchanged while it is live. Once it is cancelled (SIGTERM), it
+// returns a short context that ignores the cancellation, so a final result can still be sent.
+func detachedOnShutdown(ctx context.Context) (context.Context, context.CancelFunc) {
+	if ctx.Err() == nil {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(context.WithoutCancel(ctx), shutdownPublishTimeout)
 }
 
 // docsSettings controls the Documentation round trip to the LLM service. enabled is false when

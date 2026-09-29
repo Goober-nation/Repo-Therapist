@@ -236,6 +236,30 @@ func TestUpstreamErrorStatuses(t *testing.T) {
 	}
 }
 
+func TestGradingLimitSetsRetryAfter(t *testing.T) {
+	err := fmt.Errorf("get grading rpc: %w", domain.GradingLimitError{RetryAfter: 90*time.Second + time.Millisecond})
+	rec := serve(t, &fakeService{err: err}, "GET", "/grading/o/r", nil)
+
+	if rec.Code != stdhttp.StatusTooManyRequests {
+		t.Fatalf("status = %d, want 429", rec.Code)
+	}
+	if got := rec.Header().Get("Retry-After"); got != "91" {
+		t.Errorf("Retry-After = %q, want 91", got)
+	}
+	if !strings.Contains(rec.Body.String(), "grading limit reached") {
+		t.Errorf("body = %s", rec.Body.String())
+	}
+}
+
+func TestGradingInterruptedBody(t *testing.T) {
+	err := fmt.Errorf("get grading rpc: %w", domain.ErrGradingInterrupted)
+	rec := serve(t, &fakeService{err: err}, "GET", "/grading/o/r", nil)
+
+	if rec.Code != stdhttp.StatusBadGateway || !strings.Contains(rec.Body.String(), "grading interrupted") {
+		t.Fatalf("status = %d body = %s, want 502 grading interrupted", rec.Code, rec.Body.String())
+	}
+}
+
 func TestOldPostRoutesAreGone(t *testing.T) {
 	for _, target := range []string{"/grading", "/ranking", "/repos"} {
 		rec := serve(t, &fakeService{}, "POST", target, nil)

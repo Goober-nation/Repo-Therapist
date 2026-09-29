@@ -123,8 +123,10 @@ type GradingResultEvent struct {
 
 // Grading failure codes carried in GradingResultEvent.Error.
 const (
-	GradingErrRepoFailed  = "REPO_FETCH_FAILED"
-	GradingErrGrading     = "GRADING_FAILED"
+	GradingErrRepoFailed = "REPO_FETCH_FAILED"
+	GradingErrGrading    = "GRADING_FAILED"
+	// GradingErrInterrupted: grade-service was shut down while grading.
+	GradingErrInterrupted = "GRADING_INTERRUPTED"
 	GradingErrBuildResult = "RESULT_BUILD_FAILED"
 )
 

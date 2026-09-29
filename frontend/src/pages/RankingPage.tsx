@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { RANKING_PAGE_SIZE, type RankingSort } from "../api/client"
-import { Badge, Button, Card, PageHeading } from "../components/Shell"
+import { Badge, Button, Card, LanguageLabel, PageHeading } from "../components/Shell"
 import { formatDateTime, getLastActivityLabel, HEALTHY_SCORE, healthLevel } from "../metrics"
 import type { RepositorySummary } from "../types"
 
@@ -187,7 +187,9 @@ export default function RankingPage({
                       <small>{repository.fullName}</small>
                     )}
                   </span>
-                  <span role="cell">{repository.language}</span>
+                  <span role="cell">
+                    <LanguageLabel name={repository.language} color={repository.languageColor} />
+                  </span>
                   <strong className="table-score" role="cell">
                     {repository.healthScore ?? "Нет данных"}
                   </strong>

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react"
-import { Badge, Button, Card, PageHeading } from "../components/Shell"
+import { Badge, Button, Card, LanguageLabel, PageHeading } from "../components/Shell"
 import { getLastActivityLabel } from "../metrics"
 import type { RepositorySummary } from "../types"
 
@@ -70,8 +70,8 @@ export default function MyRepositoriesPage({
               </Button>
             </div>
             <p className="muted-copy">
-              Токен хранится только в памяти этой вкладки и передаётся Gateway в заголовке запроса. После
-              перезагрузки страницы его нужно ввести снова.
+              Токен сохраняется в этом браузере на один час и передаётся Gateway в заголовке запроса. Потом
+              его нужно ввести снова; кнопка «Сменить токен» удаляет его сразу.
             </p>
           </form>
         </Card>
@@ -103,7 +103,7 @@ export default function MyRepositoriesPage({
                   <div className="repository-cell">
                     <strong>{repository.fullName}</strong>
                     <small>
-                      {repository.language} · активность{" "}
+                      <LanguageLabel name={repository.language} color={repository.languageColor} /> · активность{" "}
                       {getLastActivityLabel(repository.lastActivityDaysAgo).toLocaleLowerCase()}
                     </small>
                   </div>

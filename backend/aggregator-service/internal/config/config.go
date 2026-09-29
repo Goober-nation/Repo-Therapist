@@ -76,6 +76,13 @@ type GradingConfig struct {
 	// RegradeListTimeout bounds listing every public repo at the start of a regrade.
 	RegradeListTimeout time.Duration
 	LLMRequestTTL      time.Duration
+	// RequestLimit caps new gradings started by users within RequestWindow, service-wide;
+	// 0 disables the limit.
+	RequestLimit  int
+	RequestWindow time.Duration
+	// LockTimeout frees a repo lock busy longer than this (a grading that never reported back);
+	// keep it above CLONE_TIMEOUT + GRADE_TIMEOUT. 0 disables it.
+	LockTimeout time.Duration
 }
 
 func LoadConfig() *Config {
@@ -188,6 +195,18 @@ func LoadConfig() *Config {
 			LLMRequestTTL: getEnvDuration(
 				"LLM_REQUEST_TTL",
 				2*time.Minute,
+			),
+			RequestLimit: getEnvInt(
+				"GRADING_REQUEST_LIMIT",
+				10,
+			),
+			RequestWindow: getEnvDuration(
+				"GRADING_REQUEST_WINDOW",
+				10*time.Minute,
+			),
+			LockTimeout: getEnvDuration(
+				"GRADING_LOCK_TIMEOUT",
+				20*time.Minute,
 			),
 		},
 	}

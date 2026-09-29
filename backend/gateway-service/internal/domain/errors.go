@@ -1,6 +1,9 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 var (
 	ErrUserNotFound          = errors.New("user not found")
@@ -22,4 +25,20 @@ var (
 	ErrPending               = errors.New("result is pending")
 	ErrConflict              = errors.New("conflicting request")
 	ErrUnavailable           = errors.New("upstream unavailable")
+	// ErrGradingInterrupted: the last grading of the repo failed or was cut short upstream.
+	ErrGradingInterrupted = errors.New("grading interrupted")
 )
+
+// GradingLimitError is the aggregator's service-wide grading limit: no new grading can start
+// for RetryAfter. It matches ErrLimitExceeded with errors.Is.
+type GradingLimitError struct {
+	RetryAfter time.Duration
+}
+
+func (e GradingLimitError) Error() string {
+	return "grading limit reached"
+}
+
+func (e GradingLimitError) Unwrap() error {
+	return ErrLimitExceeded
+}

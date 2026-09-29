@@ -140,6 +140,7 @@ export function repositoryFromRanking(entry: GatewayRankingEntry): RepositorySum
       name: entry.name || repoSlug,
       fullName: `${orgSlug}/${repoSlug}`,
       language: entry.language?.name || "Не указан",
+      ...languageColor(entry.language),
       ...(finiteNumber(entry.place) !== undefined ? { place: entry.place } : {}),
       visibility: "public",
       analysisMode: "public",
@@ -157,6 +158,12 @@ export function repositoryFromRanking(entry: GatewayRankingEntry): RepositorySum
   }
 }
 
+/** Only a hex color is kept, so a malformed value can never reach a style attribute. */
+function languageColor(language: { name?: string; color?: string } | undefined): { languageColor?: string } {
+  const color = language?.name ? language.color?.trim() : undefined
+  return color && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(color) ? { languageColor: color } : {}
+}
+
 /** A repository from GET /repos, analysed with the owner's token. */
 export function repositoryFromMyRepos(repository: MyRepository): RepositorySummary {
   const fullName = `${repository.org_slug}/${repository.repo_slug}`
@@ -168,6 +175,7 @@ export function repositoryFromMyRepos(repository: MyRepository): RepositorySumma
     name: repository.repo_slug,
     fullName,
     language: repository.language?.name || "Не указан",
+    ...languageColor(repository.language),
     visibility: repository.visibility,
     analysisMode: "private",
     webUrl: repository.web_url,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { ApiRequestError, type HttpRepoHealthApi } from "./api/client"
+import { ApiRequestError, GradingLimitError, type HttpRepoHealthApi } from "./api/client"
 import type { GradingResponse } from "./api/contracts"
 import { aiReportFromResponse } from "./api/mapper"
 import type { AiReport } from "./types"
@@ -40,13 +40,15 @@ export async function pollUntilReady<T extends { status: string }>(
 ): Promise<T> {
   const deadline = Date.now() + POLL_TIMEOUT_MS
   const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-  // A 429 means "slow down", not "failed": wait and ask again until the deadline.
+  // A 429 means "slow down", not "failed": wait and ask again until the deadline. The grading
+  // limit is the exception: its wait is minutes long, so the user is told instead.
   const attempt = async (): Promise<T> => {
     for (;;) {
       try {
         return await load()
       } catch (error) {
-        const limited = error instanceof ApiRequestError && error.status === 429
+        const limited =
+          error instanceof ApiRequestError && error.status === 429 && !(error instanceof GradingLimitError)
         if (!limited || Date.now() + RATE_LIMITED_WAIT_MS > deadline || !isActive()) throw error
         await wait(RATE_LIMITED_WAIT_MS)
       }

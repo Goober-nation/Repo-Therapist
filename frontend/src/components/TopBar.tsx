@@ -7,6 +7,7 @@ const pageTitles: Record<PageId, string> = {
   overview: "Анализ репозитория",
   ranking: "Рейтинг SourceCraft",
   my: "Мои репозитории",
+  rules: "Правила оценки",
 }
 
 export default function TopBar({

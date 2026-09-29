@@ -48,7 +48,10 @@ func RunListen() error {
 
 		log.Printf("received grade request for %s/%s", req.OrgSlug, req.RepoSlug)
 		ready := handleRequest(ctx, req)
-		if err := producer.Publish(ctx, req.OrgSlug+"/"+req.RepoSlug, ready); err != nil {
+		// A clone cut short by shutdown still reports its failure downstream.
+		publishCtx, cancel := detachedOnShutdown(ctx)
+		defer cancel()
+		if err := producer.Publish(publishCtx, req.OrgSlug+"/"+req.RepoSlug, ready); err != nil {
 			return fmt.Errorf("publishing %s: %w", contracts.TopicRepoReady, err)
 		}
 		log.Printf("published %s for %s/%s: status=%s", contracts.TopicRepoReady, req.OrgSlug, req.RepoSlug, ready.Status)
@@ -85,6 +88,18 @@ func handleRequest(ctx context.Context, req contracts.GradeRequested) contracts.
 		MilestoneCount:  res.MilestoneCount,
 		ReadyAt:         time.Now(),
 	}
+}
+
+// shutdownPublishTimeout bounds the last publish made after shutdown was requested.
+const shutdownPublishTimeout = 5 * time.Second
+
+// detachedOnShutdown returns ctx unchanged while it is live. Once it is cancelled (SIGTERM), it
+// returns a short context that ignores the cancellation, so a final result can still be sent.
+func detachedOnShutdown(ctx context.Context) (context.Context, context.CancelFunc) {
+	if ctx.Err() == nil {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(context.WithoutCancel(ctx), shutdownPublishTimeout)
 }
 
 func envOrDefault(key, def string) string {

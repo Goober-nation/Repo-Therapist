@@ -44,6 +44,7 @@
 # react/frontend (covers html + tsconfig per project decision)
 !*.js
 !*.jsx
+!*.mjs
 !*.ts
 !*.tsx
 !*.html

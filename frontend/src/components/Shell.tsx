@@ -49,7 +49,7 @@ export function PageHeading({
 }: {
   eyebrow?: ReactNode
   title: string
-  description?: string
+  description?: ReactNode
   actions?: ReactNode
 }) {
   return (
@@ -81,5 +81,15 @@ export function SectionHeading({
       </div>
       {action}
     </div>
+  )
+}
+
+/** Language name with its SourceCraft color as a small dot, like GitHub's language label. */
+export function LanguageLabel({ name, color }: { name: string; color?: string }) {
+  return (
+    <span className="language-label">
+      {color && <span className="language-label__dot" style={{ backgroundColor: color }} aria-hidden="true" />}
+      {name}
+    </span>
   )
 }

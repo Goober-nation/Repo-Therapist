@@ -6,11 +6,13 @@ import { useCallback, useEffect, useState } from "react"
  *   /my                    the signed-in user's repositories
  *   /repo/:org/:repo       public analysis
  *   /my/:org/:repo         private analysis with the owner's token
+ *   /rules[/:section]      grading rules, one section per category
  * nginx (`try_files … /index.html`) and the Vite dev server serve index.html for all of them.
  */
 export type Route =
   | { page: "ranking" }
   | { page: "my" }
+  | { page: "rules"; section?: string }
   | { page: "repository"; org: string; repo: string; private: boolean }
 
 function decode(segment: string): string | undefined {
@@ -27,12 +29,14 @@ export function parseRoute(pathname: string): Route {
     return { page: "repository", org, repo, private: first === "my" }
   }
   if (first === "my") return { page: "my" }
+  if (first === "rules") return { page: "rules", section: org }
   return { page: "ranking" }
 }
 
 export function routePath(route: Route): string {
   if (route.page === "my") return "/my"
   if (route.page === "ranking") return "/"
+  if (route.page === "rules") return route.section ? `/rules/${encodeURIComponent(route.section)}` : "/rules"
   const prefix = route.private ? "my" : "repo"
   return `/${prefix}/${encodeURIComponent(route.org)}/${encodeURIComponent(route.repo)}`
 }

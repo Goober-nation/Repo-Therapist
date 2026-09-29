@@ -1,6 +1,9 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 var (
 	ErrRepositoryNotFound = errors.New("repository not found")
@@ -33,4 +36,22 @@ var (
 	ErrNoGrade               = errors.New("no grading found")
 	ErrGradeOutdated         = errors.New("grade is outdated")
 	ErrTimeout               = errors.New("wrapper timeout")
+	ErrGradingRateLimited    = errors.New("grading rate limited")
+	// ErrGradingInterrupted: the last grading of this repo failed or was cut short (its result
+	// carried an error code); reported once so the user can start it again.
+	ErrGradingInterrupted = errors.New("grading interrupted")
 )
+
+// RateLimitedError reports that the service-wide grading limit is reached and when a slot frees
+// up. It matches ErrGradingRateLimited with errors.Is.
+type RateLimitedError struct {
+	RetryAfter time.Duration
+}
+
+func (e RateLimitedError) Error() string {
+	return ErrGradingRateLimited.Error()
+}
+
+func (e RateLimitedError) Unwrap() error {
+	return ErrGradingRateLimited
+}

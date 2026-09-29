@@ -15,6 +15,23 @@ export class ApiRequestError extends Error {
   }
 }
 
+/** The service-wide limit on new gradings is reached (Gateway 429 "grading limit reached"). */
+export class GradingLimitError extends ApiRequestError {
+  readonly retryAfterSeconds: number
+
+  constructor(retryAfterSeconds: number) {
+    const minutes = Math.max(1, Math.ceil(retryAfterSeconds / 60))
+    super(`Сервис занят: лимит новых оценок исчерпан. Попробуйте через ${minutes} мин.`, 429)
+    this.name = "GradingLimitError"
+    this.retryAfterSeconds = retryAfterSeconds
+  }
+}
+
+const GRADING_LIMIT_ERROR = "grading limit reached"
+const GRADING_INTERRUPTED_ERROR = "grading interrupted"
+const GRADING_INTERRUPTED_MESSAGE =
+  "Оценка прервана: сервис анализа перезапускался или завершился с ошибкой. Запустите анализ ещё раз."
+
 export interface HttpRepoHealthApiOptions {
   baseUrl?: string
   fetcher?: typeof fetch
@@ -101,6 +118,15 @@ export class HttpRepoHealthApi {
           ...init.headers,
         },
       })
+      if (response.status === 429 || response.status === 502) {
+        const body = (await response.json().catch(() => null)) as { error?: unknown } | null
+        if (body?.error === GRADING_LIMIT_ERROR) {
+          throw new GradingLimitError(Number(response.headers.get("Retry-After")) || 60)
+        }
+        if (body?.error === GRADING_INTERRUPTED_ERROR) {
+          throw new ApiRequestError(GRADING_INTERRUPTED_MESSAGE, response.status)
+        }
+      }
       if (!response.ok) throw new ApiRequestError(statusMessage(response.status), response.status)
       if (response.status === 204) return undefined as T
       return (await response.json()) as T

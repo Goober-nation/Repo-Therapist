@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	stdhttp "net/http"
 	"strconv"
@@ -608,6 +609,11 @@ func writeError(
 		return
 	}
 
+	var limit domain.GradingLimitError
+	if errors.As(err, &limit) {
+		w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(limit.RetryAfter.Seconds()))))
+	}
+
 	writeJSON(
 		w,
 		mapErrorStatus(err),
@@ -656,7 +662,8 @@ func mapErrorStatus(err error) int {
 	case errors.Is(err, domain.ErrTimeout):
 		return stdhttp.StatusGatewayTimeout
 
-	case errors.Is(err, domain.ErrRequestFailed):
+	case errors.Is(err, domain.ErrRequestFailed),
+		errors.Is(err, domain.ErrGradingInterrupted):
 		return stdhttp.StatusBadGateway
 
 	default:
@@ -690,6 +697,12 @@ func publicErrorMessage(err error) string {
 
 	case errors.Is(err, domain.ErrConflict):
 		return "conflict"
+
+	case errors.Is(err, domain.ErrGradingInterrupted):
+		return "grading interrupted"
+
+	case errors.As(err, new(domain.GradingLimitError)):
+		return "grading limit reached"
 
 	case errors.Is(err, domain.ErrLimitExceeded):
 		return "rate limit exceeded"

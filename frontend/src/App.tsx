@@ -9,6 +9,8 @@ import TopBar from "./components/TopBar"
 import MyRepositoriesPage from "./pages/MyRepositoriesPage"
 import RankingPage, { DEFAULT_RANKING_QUERY, type RankingQuery } from "./pages/RankingPage"
 import RepositoryOverviewPage from "./pages/RepositoryOverviewPage"
+import RulesPage from "./pages/RulesPage"
+import { loadPat, patExpiresIn, savePat } from "./patStorage"
 import { parseRepositoryLink, useRoute } from "./route"
 import type { PageId, RepositorySummary } from "./types"
 import { useRepositoryAnalysis } from "./useRepositoryAnalysis"
@@ -45,8 +47,8 @@ export default function App() {
   const [theme, setTheme] = useState(readTheme)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [profile, setProfile] = useState<YandexProfile | null>(loadSavedProfile)
-  // Kept in memory only: never written to storage, gone after a reload.
-  const [pat, setPat] = useState<string>()
+  // Saved in localStorage for one hour (see patStorage), then dropped.
+  const [pat, setPat] = useState<string | undefined>(loadPat)
   const [rankingQuery, setRankingQuery] = useState<RankingQuery>(DEFAULT_RANKING_QUERY)
   const [rankingAttempt, setRankingAttempt] = useState(0)
   const [ranking, setRanking] = useState<RepositoryList & { total: number; loadedKey?: string }>({
@@ -92,6 +94,14 @@ export default function App() {
       active = false
     }
   }, [route.page, rankingKey, ranking.loadedKey, rankingQuery])
+
+  useEffect(() => {
+    savePat(pat)
+    if (!pat) return
+    // Drop the token from memory too once its saved copy expires.
+    const expiry = window.setTimeout(() => setPat(undefined), patExpiresIn() ?? 60 * 60 * 1000)
+    return () => window.clearTimeout(expiry)
+  }, [pat])
 
   useEffect(() => {
     if (!pat) return
@@ -224,11 +234,14 @@ export default function App() {
                 onOpenRepository={(item) => openRepository(item, true)}
               />
             )}
+            {route.page === "rules" && (
+              <RulesPage section={route.section} onSectionChange={(section) => navigate({ page: "rules", section })} />
+            )}
             {route.page === "repository" &&
               (needsToken ? (
                 <Card className="empty-state">
                   <strong>Нужен токен SourceCraft</strong>
-                  <p>Приватный анализ использует ваш токен, а он хранится только до перезагрузки страницы.</p>
+                  <p>Приватный анализ использует ваш токен, он хранится в этом браузере один час.</p>
                   <Button variant="primary" onClick={() => showPage("my")}>
                     Ввести токен
                   </Button>

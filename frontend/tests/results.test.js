@@ -1598,3 +1598,57 @@ test("shown weights always add up to 100", () => {
     }
   }
 })
+
+test("the service-wide grading limit reports the wait in minutes", async () => {
+  const api = new HttpRepoHealthApi({
+    fetcher: async () =>
+      Response.json({ error: "grading limit reached" }, { status: 429, headers: { "Retry-After": "250" } }),
+  })
+
+  await assert.rejects(api.getGrading("org", "repo"), (error) => {
+    assert.equal(error.name, "GradingLimitError")
+    assert.equal(error.status, 429)
+    assert.equal(error.retryAfterSeconds, 250)
+    assert.match(error.message, /через 5 мин/)
+    return true
+  })
+})
+
+test("the per-client rate limit keeps the generic 429 message", async () => {
+  const api = new HttpRepoHealthApi({
+    fetcher: async () => Response.json({ error: "rate limit exceeded" }, { status: 429 }),
+  })
+
+  await assert.rejects(api.getGrading("org", "repo"), (error) => {
+    assert.equal(error.name, "ApiRequestError")
+    assert.match(error.message, /Слишком много запросов/)
+    return true
+  })
+})
+
+test("an interrupted grading asks the user to run the analysis again", async () => {
+  const api = new HttpRepoHealthApi({
+    fetcher: async () => Response.json({ error: "grading interrupted" }, { status: 502 }),
+  })
+
+  await assert.rejects(api.getGrading("org", "repo"), (error) => {
+    assert.equal(error.status, 502)
+    assert.match(error.message, /Оценка прервана/)
+    return true
+  })
+})
+
+test("language color is kept only as a hex value", async () => {
+  const { repositoryFromRanking } = await vite.ssrLoadModule("/src/api/mapper.ts")
+  const entry = (color) => ({
+    place: 1,
+    sourcecraft_uuid: "u",
+    name: "repo",
+    web_url: "https://sourcecraft.dev/org/repo",
+    language: { name: "Go", color },
+  })
+
+  assert.equal(repositoryFromRanking(entry("#00ADD8")).languageColor, "#00ADD8")
+  assert.equal(repositoryFromRanking(entry("red; background: url(x)")).languageColor, undefined)
+  assert.equal(repositoryFromRanking(entry(undefined)).languageColor, undefined)
+})

@@ -24,6 +24,16 @@ const pageLinks: { id: Exclude<PageId, "overview">; label: string; icon: ReactNo
       </>
     ),
   },
+  {
+    id: "rules",
+    label: "Правила оценки",
+    icon: (
+      <>
+        <path d="M4 2h7l3 3v11H4z" />
+        <path d="M7 8h5M7 11h5M7 14h3" />
+      </>
+    ),
+  },
 ]
 
 export default function Sidebar({

@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -48,8 +49,11 @@ func StartApp() {
 
 	log.Println("postgres connected")
 	reposRepo := postgres_repositories.NewRepoRepository(db)
+	reposRepo.LockTimeout = cfg.Grading.LockTimeout
 	gradesRepo := postgres_repositories.NewGradesRepository(db)
 	llmRepo := postgres_repositories.NewLLMRepository(db)
+
+	ensureTopics(ctx, cfg)
 
 	gradingPublisher := kafka.NewGradingPublisher(
 		cfg.Kafka.Brokers,
@@ -84,6 +88,7 @@ func StartApp() {
 	)
 	aggregatorService.RegradeLimit = cfg.Grading.RegradeLimit
 	aggregatorService.RegradeListTimeout = cfg.Grading.RegradeListTimeout
+	aggregatorService.GradeLimiter = service.NewGradeLimiter(cfg.Grading.RequestLimit, cfg.Grading.RequestWindow)
 	if cfg.Grading.LLMRequestTTL > 0 {
 		aggregatorService.LLMRequestTTL = cfg.Grading.LLMRequestTTL
 	}
@@ -172,4 +177,35 @@ func StartApp() {
 		log.Printf("close llm publisher: %v", err)
 	}
 	log.Println("aggregator service stopped")
+}
+
+// ensureTopics provisions the topics the aggregator reads and writes before any consumer joins,
+// retrying while the broker starts up. A failure is logged, not fatal: stored grades are still
+// served over gRPC, and another service may create the topics later.
+func ensureTopics(ctx context.Context, cfg *config.Config) {
+	topics := []string{
+		cfg.Kafka.GradingRequestsTopic,
+		cfg.Kafka.GradingResultsTopic,
+		cfg.Kafka.LLMRequestsTopic,
+		cfg.Kafka.LLMRecommendationsTopic,
+	}
+
+	var err error
+	for attempt := 1; attempt <= 10; attempt++ {
+		attemptCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		err = kafka.EnsureTopics(attemptCtx, cfg.Kafka.Brokers, topics)
+		cancel()
+		if err == nil {
+			log.Printf("kafka topics ready: %v", topics)
+			return
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(3 * time.Second):
+		}
+	}
+
+	log.Printf("ensure kafka topics: %v", err)
 }

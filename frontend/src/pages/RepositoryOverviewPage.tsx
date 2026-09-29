@@ -1,7 +1,7 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import AnalysisResults from "../components/AnalysisResults"
 import ReportDownloadMenu from "../components/ReportDownloadMenu"
-import { Badge, Button, Card, Label, PageHeading, ScoreBar, SectionHeading } from "../components/Shell"
+import { Badge, Button, Card, Label, LanguageLabel, PageHeading, ScoreBar, SectionHeading } from "../components/Shell"
 import {
   categoryWeight,
   formatDateTime,
@@ -57,6 +57,8 @@ function RunNotice({ analysis }: { analysis: RepositoryAnalysis }) {
   )
 }
 
+const ADVICE_PAGE_SIZE = 5
+
 export default function RepositoryOverviewPage({
   repository,
   analysis,
@@ -76,6 +78,17 @@ export default function RepositoryOverviewPage({
   const strengths = ai?.strengths.length ? ai.strengths : fallback.strengths
   const weaknesses = ai?.weaknesses.length ? ai.weaknesses : fallback.weaknesses
   const recommendations = ai?.recommendations.length ? ai.recommendations : (repository.advice ?? [])
+  // Page through the advice client-side; a different advice list starts again on page 1.
+  const adviceKey = recommendations.map((recommendation) => recommendation.id).join("|")
+  const [advicePageState, setAdvicePageState] = useState({ key: adviceKey, page: 1 })
+  const advicePageCount = Math.max(1, Math.ceil(recommendations.length / ADVICE_PAGE_SIZE))
+  const advicePage = advicePageState.key === adviceKey ? Math.min(advicePageState.page, advicePageCount) : 1
+  const adviceOffset = (advicePage - 1) * ADVICE_PAGE_SIZE
+  const adviceSection = useRef<HTMLElement>(null)
+  const showAdvicePage = (page: number) => {
+    setAdvicePageState({ key: adviceKey, page })
+    adviceSection.current?.scrollIntoView({ block: "start" })
+  }
   const missing = missingCategories(repository)
   const gradedAt = formatDateTime(repository.gradedAt)
   const modeLabel = isPrivate ? "приватный анализ (все 6 категорий)" : "публичный анализ"
@@ -95,9 +108,12 @@ export default function RepositoryOverviewPage({
           )
         }
         title={repository.name}
-        description={`${repository.language} · ${modeLabel} · активность ${getLastActivityLabel(
-          repository.lastActivityDaysAgo,
-        ).toLocaleLowerCase()}`}
+        description={
+          <>
+            <LanguageLabel name={repository.language} color={repository.languageColor} /> · {modeLabel} · активность{" "}
+            {getLastActivityLabel(repository.lastActivityDaysAgo).toLocaleLowerCase()}
+          </>
+        }
         actions={
           <>
             <Button variant="quiet" onClick={onBackToRanking}>
@@ -140,9 +156,16 @@ export default function RepositoryOverviewPage({
             <p className="muted-copy">Последний анализ: {gradedAt ?? "ещё не выполнялся"}</p>
           </div>
           <div className="health-card__summary">
+            <h2>
+              {repository.healthScore === null
+                ? "Оценка пока недоступна"
+                : repository.healthScore >= HEALTHY_SCORE
+                  ? "Проект в хорошем состоянии"
+                  : "Есть области для улучшения"}
+            </h2>
             <button
               type="button"
-              className="eyebrow health-card__summary-toggle"
+              className="button ai-summary-button"
               aria-expanded={summaryOpen}
               aria-controls="ai-summary-content"
               onClick={() => {
@@ -151,16 +174,10 @@ export default function RepositoryOverviewPage({
                 if (nextOpen) analysis.loadAiSummary()
               }}
             >
-              Summary AI
-              <span className="health-card__summary-chevron" aria-hidden="true">▾</span>
+              <span className="ai-summary-button__icon" aria-hidden="true">✦</span>
+              {summaryOpen ? "Скрыть AI-сводку" : "Получить AI-сводку"}
+              <span className="ai-summary-button__chevron" aria-hidden="true">▾</span>
             </button>
-            <h2>
-              {repository.healthScore === null
-                ? "Оценка пока недоступна"
-                : repository.healthScore >= HEALTHY_SCORE
-                  ? "Проект в хорошем состоянии"
-                  : "Есть области для улучшения"}
-            </h2>
             <div
               id="ai-summary-content"
               className="health-card__summary-content"
@@ -170,7 +187,12 @@ export default function RepositoryOverviewPage({
             >
               {summaryOpen && (
                 <>
+                  <div className="ai-summary__header">
+                    <span className="ai-summary__header-icon" aria-hidden="true">✦</span>
+                    AI-сводка
+                  </div>
                   <p>
+                    {analysis.aiLoading && <span className="ai-summary-spinner" aria-hidden="true" />}
                     {analysis.aiLoading
                       ? "Готовим AI-сводку…"
                       : analysis.aiError ??
@@ -251,7 +273,7 @@ export default function RepositoryOverviewPage({
         </p>
       </details>
 
-      <section className="section-block">
+      <section className="section-block" ref={adviceSection}>
         <SectionHeading
           title="Рекомендации"
           description={
@@ -262,7 +284,8 @@ export default function RepositoryOverviewPage({
         />
         {recommendations.length > 0 ? (
           <div className="recommendation-list">
-            {recommendations.map((recommendation, index) => {
+            {recommendations.slice(adviceOffset, adviceOffset + ADVICE_PAGE_SIZE).map((recommendation, pageIndex) => {
+              const index = adviceOffset + pageIndex
               const weight = recommendation.category
                 ? categoryWeight(recommendation.category, isPrivate, repository.categoryScores)
                 : undefined
@@ -289,6 +312,23 @@ export default function RepositoryOverviewPage({
                 </Card>
               )
             })}
+            {advicePageCount > 1 && (
+              <nav className="ranking-pagination advice-pagination" aria-label="Страницы рекомендаций">
+                <Button variant="secondary" disabled={advicePage <= 1} onClick={() => showAdvicePage(advicePage - 1)}>
+                  ← Назад
+                </Button>
+                <span>
+                  Страница {advicePage} из {advicePageCount}
+                </span>
+                <Button
+                  variant="secondary"
+                  disabled={advicePage >= advicePageCount}
+                  onClick={() => showAdvicePage(advicePage + 1)}
+                >
+                  Вперёд →
+                </Button>
+              </nav>
+            )}
           </div>
         ) : (
           <Card className="empty-note">

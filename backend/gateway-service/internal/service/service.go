@@ -8,6 +8,7 @@ import (
 	"gateway-service/internal/transport/http"
 	"gateway-service/internal/transport/rpc/gen/agg"
 	"gateway-service/internal/transport/rpc/gen/rank"
+	"strconv"
 	"strings"
 	"time"
 
@@ -85,6 +86,27 @@ func withPAT(ctx context.Context, pat string) context.Context {
 	return metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+pat)
 }
 
+// gradingRateLimitedPrefix mirrors the aggregator's GradingRateLimitedPrefix: its
+// ResourceExhausted message for the service-wide grading limit, followed by the wait in seconds.
+const gradingRateLimitedPrefix = "grading rate limited, retry after seconds: "
+
+// gradingInterruptedMessage mirrors the aggregator's GradingInterruptedMessage (codes.Aborted).
+const gradingInterruptedMessage = "grading interrupted"
+
+func gradingLimit(message string) (domain.GradingLimitError, bool) {
+	rest, ok := strings.CutPrefix(message, gradingRateLimitedPrefix)
+	if !ok {
+		return domain.GradingLimitError{}, false
+	}
+
+	seconds, err := strconv.Atoi(rest)
+	if err != nil || seconds < 0 {
+		return domain.GradingLimitError{}, false
+	}
+
+	return domain.GradingLimitError{RetryAfter: time.Duration(seconds) * time.Second}, true
+}
+
 // rpcError maps an upstream gRPC status to the domain error the HTTP layer understands.
 func rpcError(op string, err error) error {
 	var target error
@@ -104,8 +126,14 @@ func rpcError(op string, err error) error {
 		target = domain.ErrPending
 	case codes.Aborted:
 		target = domain.ErrConflict
+		if status.Convert(err).Message() == gradingInterruptedMessage {
+			target = domain.ErrGradingInterrupted
+		}
 	case codes.ResourceExhausted:
 		target = domain.ErrLimitExceeded
+		if limit, ok := gradingLimit(status.Convert(err).Message()); ok {
+			target = limit
+		}
 	case codes.Unavailable:
 		target = domain.ErrUnavailable
 	default:

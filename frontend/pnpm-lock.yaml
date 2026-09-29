@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      marked:
+        specifier: ^18.0.14
+        version: 18.0.14
       pdfmake:
         specifier: 0.3.11
         version: 0.3.11
@@ -18,12 +21,12 @@ importers:
         specifier: ^19.0.0
         version: 19.2.4(react@19.2.4)
     devDependencies:
-      '@types/pdfmake':
-        specifier: ^0.3.3
-        version: 0.3.3
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.17
+      '@types/pdfmake':
+        specifier: ^0.3.3
+        version: 0.3.3
       '@types/react':
         specifier: ^19.0.0
         version: 19.2.14
@@ -379,6 +382,11 @@ packages:
 
   linebreak@1.1.0:
     resolution: {integrity: sha512-MHp03UImeVhB7XZtjd0E4n6+3xr5Dq/9xI/5FptGk5FrbDR3zagPa2DS6U8ks/3HjbKWG9Q1M2ufOzxV2qLYSQ==}
+
+  marked@18.0.14:
+    resolution: {integrity: sha512-mBHK6FBHuBAlhgRe88w9F0O1AbwwXJUcQibUbC/QcdTbVGAD7aWza+xt3N6oT/jCZx3/OMeS+8rnuiHZcQ9s7A==}
+    engines: {node: '>= 20'}
+    hasBin: true
 
   nanoid@3.3.11:
     resolution: {integrity: sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w==}
@@ -752,6 +760,8 @@ snapshots:
     dependencies:
       base64-js: 0.0.8
       unicode-trie: 2.0.0
+
+  marked@18.0.14: {}
 
   nanoid@3.3.11: {}
 

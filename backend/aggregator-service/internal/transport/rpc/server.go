@@ -5,6 +5,7 @@ import (
 	"aggregator-service/internal/transport/rpc/gen/server"
 	"context"
 	"errors"
+	"math"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -194,10 +195,33 @@ func gradeToProto(grade domain.RepoGrade) *server.RepoGrade {
 	return result
 }
 
+// GradingRateLimitedPrefix starts the ResourceExhausted message for the service-wide grading
+// limit; the number after it is the wait in seconds.
+const GradingRateLimitedPrefix = "grading rate limited, retry after seconds: "
+
+// GradingInterruptedMessage is the Aborted message for a grading that failed or was cut short.
+const GradingInterruptedMessage = "grading interrupted"
+
 func mapError(err error) error {
+	var limited domain.RateLimitedError
+
 	switch {
 	case err == nil:
 		return nil
+	case errors.Is(err, domain.ErrGradingInterrupted):
+		// The gateway recognises this message and reports the failure to the user.
+		return status.Error(
+			codes.Aborted,
+			GradingInterruptedMessage,
+		)
+	case errors.As(err, &limited):
+		// The gateway reads the wait from this message to set Retry-After.
+		return status.Errorf(
+			codes.ResourceExhausted,
+			"%s%d",
+			GradingRateLimitedPrefix,
+			int(math.Ceil(limited.RetryAfter.Seconds())),
+		)
 	case errors.Is(err, domain.ErrTimeout):
 		return status.Error(
 			codes.DeadlineExceeded,

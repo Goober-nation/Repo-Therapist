@@ -54,9 +54,12 @@ The Aggregator's own topics, as Grade service reads/writes them:
   `advice` is a list of at most `GRADE_ADVICE_LIMIT` (default 0 = all) recommendations `{category_id, metric_id, text}`, picked at
   random. Documentation's items are the `repo.docs.graded` advice texts, each as
   `{"documentation", "llm_advice", "[medium] <text>"}`. `error` is `""` on success. On failure it is a code — `REPO_FETCH_FAILED` (repo.ready
-  status failed), `GRADING_FAILED`, `RESULT_BUILD_FAILED` — with `score`, `category_scores` and
-  `advice` null; the Aggregator then only releases the repo lock. A failure without a
-  `sourcecraft_uuid` cannot be correlated and is not published.
+  status failed), `GRADING_FAILED`, `GRADING_INTERRUPTED` (grade-service shut down mid-grading),
+  `RESULT_BUILD_FAILED` — with `score`, `category_scores` and `advice` null; the Aggregator then
+  releases the repo lock and reports the failure once to the next grading request for that repo.
+  A failure without a `sourcecraft_uuid` cannot be correlated and is not published; the
+  Aggregator reclaims such a lock once it has been busy longer than `GRADING_LOCK_TIMEOUT`
+  (default 20m).
 
 `token` is copied from `grading.requests`. When present, Repository service uses it for the
 wrapper calls and the git clone; when absent, it falls back to its own `SOURCECRAFT_PAT`. The
