@@ -54,6 +54,8 @@
 !tsconfig*.json
 !*.config.js
 !*.config.ts
+# static assets served as-is (favicon/logo)
+!frontend/public/**
 frontend/.vite/
 
 # configs generally — kafka, s3, docker, ci, etc. (config files, not database data — see re-ignore
