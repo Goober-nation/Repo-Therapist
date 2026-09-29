@@ -16,6 +16,7 @@ import (
 
 type RatingService interface {
 	GetRanking(ctx context.Context, req domain.RankingRequest) (domain.RankingPage, error)
+	GetPublicScore(ctx context.Context, orgSlug, repoSlug string) (*int16, error)
 }
 
 type Server struct {
@@ -57,6 +58,21 @@ func (s *Server) GetRanking(ctx context.Context, req *pb.GetRankingRequest) (*pb
 		Page:       int32(page.Page),
 		PageSize:   int32(page.PageSize),
 	}, nil
+}
+
+func (s *Server) GetPublicScore(ctx context.Context, req *pb.GetPublicScoreRequest) (*pb.GetPublicScoreResponse, error) {
+	score, err := s.service.GetPublicScore(ctx, req.GetOrgSlug(), req.GetRepoSlug())
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	result := &pb.GetPublicScoreResponse{}
+	if score != nil {
+		value := int32(*score)
+		result.PublicScore = &value
+	}
+
+	return result, nil
 }
 
 func sortFromProto(sortBy pb.SortBy) (domain.SortBy, error) {
@@ -101,12 +117,14 @@ func mapError(err error) error {
 	switch {
 	case errors.Is(err, domain.ErrInvalidArgument):
 		return status.Error(codes.InvalidArgument, err.Error())
+	case errors.Is(err, domain.ErrNotFound):
+		return status.Error(codes.NotFound, "repository not found")
 	case errors.Is(err, context.Canceled):
 		return status.Error(codes.Canceled, "request canceled")
 	case errors.Is(err, context.DeadlineExceeded):
 		return status.Error(codes.DeadlineExceeded, "deadline exceeded")
 	default:
-		log.Printf("get ranking: %v", err)
+		log.Printf("rating rpc: %v", err)
 		return status.Error(codes.Internal, "internal error")
 	}
 }

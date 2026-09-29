@@ -8,6 +8,7 @@ import "google/protobuf/timestamp.proto";
 
 service Rating {
   rpc GetRanking(GetRankingRequest) returns (GetRankingResponse);
+  rpc GetPublicScore(GetPublicScoreRequest) returns (GetPublicScoreResponse);
 }
 
 enum SortBy {
@@ -44,4 +45,13 @@ message GetRankingResponse {
   int32 total_count = 2;
   int32 page = 3;
   int32 page_size = 4;
+}
+
+message GetPublicScoreRequest {
+  string org_slug = 1;
+  string repo_slug = 2;
+}
+
+message GetPublicScoreResponse {
+  optional int32 public_score = 1;
 }

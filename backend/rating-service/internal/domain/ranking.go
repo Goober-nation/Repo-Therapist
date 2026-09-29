@@ -59,4 +59,7 @@ type RankingPage struct {
 type RankingRepository interface {
 	CountRanking(ctx context.Context, language string) (int, error)
 	ListRanking(ctx context.Context, query RankingQuery) ([]RankingRow, error)
+	// GetPublicScore returns the public score of a public repo (nil when not graded yet), or
+	// ErrNotFound when the repo is unknown or not public.
+	GetPublicScore(ctx context.Context, orgSlug, repoSlug string) (*int16, error)
 }

@@ -15,9 +15,14 @@ import (
 )
 
 type fakeService struct {
-	page domain.RankingPage
-	err  error
-	req  *domain.RankingRequest
+	page  domain.RankingPage
+	err   error
+	req   *domain.RankingRequest
+	score *int16
+}
+
+func (f *fakeService) GetPublicScore(ctx context.Context, orgSlug, repoSlug string) (*int16, error) {
+	return f.score, f.err
 }
 
 func (f *fakeService) GetRanking(ctx context.Context, req domain.RankingRequest) (domain.RankingPage, error) {
@@ -165,5 +170,23 @@ func TestInternalErrorDoesNotLeakDetails(t *testing.T) {
 
 	if msg := status.Convert(err).Message(); msg != "internal error" {
 		t.Errorf("message = %q, want generic", msg)
+	}
+}
+
+func TestGetPublicScore(t *testing.T) {
+	score := int16(64)
+	resp, err := NewServer(&fakeService{score: &score}).GetPublicScore(context.Background(), &pb.GetPublicScoreRequest{OrgSlug: "o", RepoSlug: "r"})
+	if err != nil || resp.PublicScore == nil || *resp.PublicScore != 64 {
+		t.Fatalf("resp=%v err=%v", resp, err)
+	}
+
+	resp, err = NewServer(&fakeService{}).GetPublicScore(context.Background(), &pb.GetPublicScoreRequest{OrgSlug: "o", RepoSlug: "r"})
+	if err != nil || resp.PublicScore != nil {
+		t.Fatalf("ungraded: resp=%v err=%v, want unset score", resp, err)
+	}
+
+	_, err = NewServer(&fakeService{err: domain.ErrNotFound}).GetPublicScore(context.Background(), &pb.GetPublicScoreRequest{OrgSlug: "o", RepoSlug: "r"})
+	if status.Code(err) != codes.NotFound {
+		t.Errorf("unknown repo code = %v, want NotFound", status.Code(err))
 	}
 }

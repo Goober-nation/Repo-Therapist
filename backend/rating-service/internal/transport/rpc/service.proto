@@ -10,6 +10,9 @@ service Rating {
   // GetRanking returns one page of the public repositories ranking. Read-only — the rating
   // service never writes to the DB.
   rpc GetRanking(GetRankingRequest) returns (GetRankingResponse);
+  // GetPublicScore returns the stored public score of one public repository, for the README
+  // badge. Read-only: it never starts a grading. NOT_FOUND when the repo is unknown or not public.
+  rpc GetPublicScore(GetPublicScoreRequest) returns (GetPublicScoreResponse);
 }
 
 enum SortBy {
@@ -61,4 +64,14 @@ message GetRankingResponse {
   // Effective page and page_size after defaults were applied.
   int32 page = 3;
   int32 page_size = 4;
+}
+
+message GetPublicScoreRequest {
+  string org_slug = 1;
+  string repo_slug = 2;
+}
+
+message GetPublicScoreResponse {
+  // Unset when the repo has not been graded yet.
+  optional int32 public_score = 1;
 }

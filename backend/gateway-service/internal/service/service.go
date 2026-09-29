@@ -398,6 +398,28 @@ func (s *GatewayService) GetRanking(
 	return mapGetRankingResponse(resp)
 }
 
+// GetPublicScore returns the stored public score of a public repo for the README badge; nil
+// means not graded yet. It never starts a grading and skips the per-IP limit, since READMEs are
+// viewed by many clients and a 429 would show as a broken image.
+func (s *GatewayService) GetPublicScore(
+	ctx context.Context,
+	orgSlug string,
+	repoSlug string,
+) (*int32, error) {
+	rpcCtx, cancel := context.WithTimeout(ctx, s.ratingTimeout)
+	defer cancel()
+
+	resp, err := s.ratingClient.GetPublicScore(
+		rpcCtx,
+		&rank.GetPublicScoreRequest{OrgSlug: orgSlug, RepoSlug: repoSlug},
+	)
+	if err != nil {
+		return nil, rpcError("get public score", err)
+	}
+
+	return resp.PublicScore, nil
+}
+
 func mapRankingSortBy(
 	sortBy domain.RankingSortBy,
 ) rank.SortBy {

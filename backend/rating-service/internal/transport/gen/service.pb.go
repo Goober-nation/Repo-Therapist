@@ -374,6 +374,103 @@ func (x *GetRankingResponse) GetPageSize() int32 {
 	return 0
 }
 
+type GetPublicScoreRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OrgSlug       string                 `protobuf:"bytes,1,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
+	RepoSlug      string                 `protobuf:"bytes,2,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPublicScoreRequest) Reset() {
+	*x = GetPublicScoreRequest{}
+	mi := &file_service_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPublicScoreRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPublicScoreRequest) ProtoMessage() {}
+
+func (x *GetPublicScoreRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPublicScoreRequest.ProtoReflect.Descriptor instead.
+func (*GetPublicScoreRequest) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *GetPublicScoreRequest) GetOrgSlug() string {
+	if x != nil {
+		return x.OrgSlug
+	}
+	return ""
+}
+
+func (x *GetPublicScoreRequest) GetRepoSlug() string {
+	if x != nil {
+		return x.RepoSlug
+	}
+	return ""
+}
+
+type GetPublicScoreResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Unset when the repo has not been graded yet.
+	PublicScore   *int32 `protobuf:"varint,1,opt,name=public_score,json=publicScore,proto3,oneof" json:"public_score,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPublicScoreResponse) Reset() {
+	*x = GetPublicScoreResponse{}
+	mi := &file_service_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPublicScoreResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPublicScoreResponse) ProtoMessage() {}
+
+func (x *GetPublicScoreResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPublicScoreResponse.ProtoReflect.Descriptor instead.
+func (*GetPublicScoreResponse) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetPublicScoreResponse) GetPublicScore() int32 {
+	if x != nil && x.PublicScore != nil {
+		return *x.PublicScore
+	}
+	return 0
+}
+
 var File_service_proto protoreflect.FileDescriptor
 
 const file_service_proto_rawDesc = "" +
@@ -403,14 +500,21 @@ const file_service_proto_rawDesc = "" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
 	"totalCount\x12\x12\n" +
 	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
-	"\tpage_size\x18\x04 \x01(\x05R\bpageSize*I\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"O\n" +
+	"\x15GetPublicScoreRequest\x12\x19\n" +
+	"\borg_slug\x18\x01 \x01(\tR\aorgSlug\x12\x1b\n" +
+	"\trepo_slug\x18\x02 \x01(\tR\brepoSlug\"Q\n" +
+	"\x16GetPublicScoreResponse\x12&\n" +
+	"\fpublic_score\x18\x01 \x01(\x05H\x00R\vpublicScore\x88\x01\x01B\x0f\n" +
+	"\r_public_score*I\n" +
 	"\x06SortBy\x12\x11\n" +
 	"\rSORT_BY_SCORE\x10\x00\x12\x19\n" +
 	"\x15SORT_BY_LAST_ACTIVITY\x10\x01\x12\x11\n" +
-	"\rSORT_BY_LIKES\x10\x022M\n" +
+	"\rSORT_BY_LIKES\x10\x022\x9e\x01\n" +
 	"\x06Rating\x12C\n" +
 	"\n" +
-	"GetRanking\x12\x19.rating.GetRankingRequest\x1a\x1a.rating.GetRankingResponseB*Z(rating-service/internal/transport/gen;pbb\x06proto3"
+	"GetRanking\x12\x19.rating.GetRankingRequest\x1a\x1a.rating.GetRankingResponse\x12O\n" +
+	"\x0eGetPublicScore\x12\x1d.rating.GetPublicScoreRequest\x1a\x1e.rating.GetPublicScoreResponseB*Z(rating-service/internal/transport/gen;pbb\x06proto3"
 
 var (
 	file_service_proto_rawDescOnce sync.Once
@@ -425,24 +529,28 @@ func file_service_proto_rawDescGZIP() []byte {
 }
 
 var file_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_service_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_service_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_service_proto_goTypes = []any{
-	(SortBy)(0),                   // 0: rating.SortBy
-	(*GetRankingRequest)(nil),     // 1: rating.GetRankingRequest
-	(*RankingEntry)(nil),          // 2: rating.RankingEntry
-	(*Language)(nil),              // 3: rating.Language
-	(*GetRankingResponse)(nil),    // 4: rating.GetRankingResponse
-	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
+	(SortBy)(0),                    // 0: rating.SortBy
+	(*GetRankingRequest)(nil),      // 1: rating.GetRankingRequest
+	(*RankingEntry)(nil),           // 2: rating.RankingEntry
+	(*Language)(nil),               // 3: rating.Language
+	(*GetRankingResponse)(nil),     // 4: rating.GetRankingResponse
+	(*GetPublicScoreRequest)(nil),  // 5: rating.GetPublicScoreRequest
+	(*GetPublicScoreResponse)(nil), // 6: rating.GetPublicScoreResponse
+	(*timestamppb.Timestamp)(nil),  // 7: google.protobuf.Timestamp
 }
 var file_service_proto_depIdxs = []int32{
 	0, // 0: rating.GetRankingRequest.sort_by:type_name -> rating.SortBy
 	3, // 1: rating.RankingEntry.language:type_name -> rating.Language
-	5, // 2: rating.RankingEntry.last_activity_at:type_name -> google.protobuf.Timestamp
+	7, // 2: rating.RankingEntry.last_activity_at:type_name -> google.protobuf.Timestamp
 	2, // 3: rating.GetRankingResponse.entries:type_name -> rating.RankingEntry
 	1, // 4: rating.Rating.GetRanking:input_type -> rating.GetRankingRequest
-	4, // 5: rating.Rating.GetRanking:output_type -> rating.GetRankingResponse
-	5, // [5:6] is the sub-list for method output_type
-	4, // [4:5] is the sub-list for method input_type
+	5, // 5: rating.Rating.GetPublicScore:input_type -> rating.GetPublicScoreRequest
+	4, // 6: rating.Rating.GetRanking:output_type -> rating.GetRankingResponse
+	6, // 7: rating.Rating.GetPublicScore:output_type -> rating.GetPublicScoreResponse
+	6, // [6:8] is the sub-list for method output_type
+	4, // [4:6] is the sub-list for method input_type
 	4, // [4:4] is the sub-list for extension type_name
 	4, // [4:4] is the sub-list for extension extendee
 	0, // [0:4] is the sub-list for field type_name
@@ -454,13 +562,14 @@ func file_service_proto_init() {
 		return
 	}
 	file_service_proto_msgTypes[1].OneofWrappers = []any{}
+	file_service_proto_msgTypes[5].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_proto_rawDesc), len(file_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

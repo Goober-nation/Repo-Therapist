@@ -57,6 +57,12 @@ type GatewayService interface {
 		clientIP string,
 		request domain.YandexLoginDTO,
 	) (domain.LoginResponse, error)
+
+	GetPublicScore(
+		ctx context.Context,
+		orgSlug string,
+		repoSlug string,
+	) (*int32, error)
 }
 
 type Handler struct {
@@ -76,6 +82,7 @@ func (h *Handler) Register(mux *stdhttp.ServeMux) {
 	mux.HandleFunc("GET /grading/{org}/{repo}", h.GetGrading)
 	mux.HandleFunc("GET /recommendations/{org}/{repo}", h.RequestLLMRecommendations)
 	mux.HandleFunc("GET /ranking", h.GetRanking)
+	mux.HandleFunc("GET /badge/{org}/{repo}", h.GetBadge)
 }
 
 func (h *Handler) LoginWithYandex(
@@ -719,4 +726,8 @@ func publicErrorMessage(err error) string {
 	default:
 		return "internal server error"
 	}
+}
+
+func isNotFound(err error) bool {
+	return errors.Is(err, domain.ErrNotFound)
 }

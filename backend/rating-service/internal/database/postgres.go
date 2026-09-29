@@ -2,11 +2,13 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"rating-service/internal/domain"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -78,6 +80,28 @@ func (r *RankingRepository) ListRanking(ctx context.Context, q domain.RankingQue
 	}
 
 	return result, nil
+}
+
+func (r *RankingRepository) GetPublicScore(ctx context.Context, orgSlug, repoSlug string) (*int16, error) {
+	var score *int16
+
+	err := r.db.QueryRow(ctx, `
+		SELECT g.score
+		FROM repos r
+		LEFT JOIN repo_grades_public g ON g.sourcecraft_uuid = r.sourcecraft_uuid
+		WHERE r.org_slug = $1 AND r.repo_slug = $2 AND r.visibility = 'public'
+		`,
+		orgSlug,
+		repoSlug,
+	).Scan(&score)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, domain.ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get public score: %w", err)
+	}
+
+	return score, nil
 }
 
 // whereClause returns the shared filter for the count and list queries. Placeholders start at $1.

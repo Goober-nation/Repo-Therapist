@@ -24,6 +24,13 @@ type fakeService struct {
 	oauth    string
 	called   bool
 	gradeOut domain.GetGradingResponse
+	score    *int32
+	badgeFor string
+}
+
+func (f *fakeService) GetPublicScore(ctx context.Context, orgSlug, repoSlug string) (*int32, error) {
+	f.called, f.badgeFor = true, orgSlug+"/"+repoSlug
+	return f.score, f.err
 }
 
 func (f *fakeService) GetMyRepos(ctx context.Context, clientIP, pat string) (domain.GetMyReposDTO, error) {

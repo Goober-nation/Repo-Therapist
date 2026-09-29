@@ -592,6 +592,7 @@ rpc GetReccomendations(GetReccomendationsRequest) returns (GetReccomendationsRes
 | `GET /grading/{org}/{repo}` | `PAT` (опционален) | `{status, grade: {sourcecraft_uuid, score, category_scores, advice, missing_data, graded_at}}` |
 | `GET /recommendations/{org}/{repo}` | `PAT` (опционален) | `{status, raw_response: {summary, strengths, weaknesses, recommendations: [{priority, category, text}]}, model_used, evaluated_at}` |
 | `GET /ranking?page=&page_size=&sortby=&filter=` | — | `{entries: [{place, sourcecraft_uuid, name, web_url, public_score, likes, language, last_activity_at}], total_count, page, page_size}` |
+| `GET /badge/{org}/{repo}.svg` | — | SVG-бейдж с сохранённой публичной оценкой (`image/svg+xml`, `Cache-Control: max-age=300`); оценку не запускает, лимит по IP не применяется; неизвестный или не оценённый репозиторий — серый `n/a` |
 
 `status`: `PENDING` (оценка запущена и считается), `FINISHED`, `NO_DATA`. Запрос оценки сам
 запускает её, если оценки нет или в репозитории была активность после прошлого анализа.

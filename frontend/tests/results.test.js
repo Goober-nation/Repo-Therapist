@@ -1652,3 +1652,12 @@ test("language color is kept only as a hex value", async () => {
   assert.equal(repositoryFromRanking(entry("red; background: url(x)")).languageColor, undefined)
   assert.equal(repositoryFromRanking(entry(undefined)).languageColor, undefined)
 })
+
+test("the README badge snippet links the SVG badge to the repo page", async () => {
+  const { badgeMarkdown } = await vite.ssrLoadModule("/src/components/BadgeSnippet.tsx")
+
+  assert.equal(
+    badgeMarkdown("https://repo-therapist.alo.quest", "org", "my repo"),
+    "[![Repo Health](https://repo-therapist.alo.quest/api/badge/org/my%20repo.svg)](https://repo-therapist.alo.quest/repo/org/my%20repo)",
+  )
+})

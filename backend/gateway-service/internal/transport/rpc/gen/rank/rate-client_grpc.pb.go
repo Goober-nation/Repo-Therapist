@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Rating_GetRanking_FullMethodName = "/rating.Rating/GetRanking"
+	Rating_GetRanking_FullMethodName     = "/rating.Rating/GetRanking"
+	Rating_GetPublicScore_FullMethodName = "/rating.Rating/GetPublicScore"
 )
 
 // RatingClient is the client API for Rating service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type RatingClient interface {
 	GetRanking(ctx context.Context, in *GetRankingRequest, opts ...grpc.CallOption) (*GetRankingResponse, error)
+	GetPublicScore(ctx context.Context, in *GetPublicScoreRequest, opts ...grpc.CallOption) (*GetPublicScoreResponse, error)
 }
 
 type ratingClient struct {
@@ -47,11 +49,22 @@ func (c *ratingClient) GetRanking(ctx context.Context, in *GetRankingRequest, op
 	return out, nil
 }
 
+func (c *ratingClient) GetPublicScore(ctx context.Context, in *GetPublicScoreRequest, opts ...grpc.CallOption) (*GetPublicScoreResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPublicScoreResponse)
+	err := c.cc.Invoke(ctx, Rating_GetPublicScore_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RatingServer is the server API for Rating service.
 // All implementations must embed UnimplementedRatingServer
 // for forward compatibility.
 type RatingServer interface {
 	GetRanking(context.Context, *GetRankingRequest) (*GetRankingResponse, error)
+	GetPublicScore(context.Context, *GetPublicScoreRequest) (*GetPublicScoreResponse, error)
 	mustEmbedUnimplementedRatingServer()
 }
 
@@ -64,6 +77,9 @@ type UnimplementedRatingServer struct{}
 
 func (UnimplementedRatingServer) GetRanking(context.Context, *GetRankingRequest) (*GetRankingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetRanking not implemented")
+}
+func (UnimplementedRatingServer) GetPublicScore(context.Context, *GetPublicScoreRequest) (*GetPublicScoreResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPublicScore not implemented")
 }
 func (UnimplementedRatingServer) mustEmbedUnimplementedRatingServer() {}
 func (UnimplementedRatingServer) testEmbeddedByValue()                {}
@@ -104,6 +120,24 @@ func _Rating_GetRanking_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Rating_GetPublicScore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPublicScoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RatingServer).GetPublicScore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Rating_GetPublicScore_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RatingServer).GetPublicScore(ctx, req.(*GetPublicScoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Rating_ServiceDesc is the grpc.ServiceDesc for Rating service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +148,10 @@ var Rating_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetRanking",
 			Handler:    _Rating_GetRanking_Handler,
+		},
+		{
+			MethodName: "GetPublicScore",
+			Handler:    _Rating_GetPublicScore_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

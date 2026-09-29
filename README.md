@@ -145,6 +145,7 @@ HTTP API Gateway доступен по адресу `https://repo-therapist.alo.
 | `GET /api/ranking?page=&page_size=&sortby=&filter=` | — | страница рейтинга; `sortby`: `score`, `likes`, `last_activity`; `filter` — язык |
 | `GET /api/grading/{org}/{repo}` | `PAT` необязателен | оценка; `202 PENDING` пока идёт анализ, `429` с `Retry-After` при лимите, `502` при прерванной оценке |
 | `GET /api/recommendations/{org}/{repo}` | `PAT` необязателен | AI-сводка, сильные и слабые стороны, рекомендации; `202 PENDING` пока отвечает LLM |
+| `GET /api/badge/{org}/{repo}.svg` | — | SVG-бейдж с публичной оценкой для README; оценку не запускает |
 | `GET /api/repos` | `PAT` обязателен | репозитории владельца токена |
 | `POST /api/auth/yandex` | `Authorization: OAuth <token>` | вход через Яндекс ID, cookie сессии |
 

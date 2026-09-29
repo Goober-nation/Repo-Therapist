@@ -1,5 +1,6 @@
 import { useRef, useState } from "react"
 import AnalysisResults from "../components/AnalysisResults"
+import BadgeSnippet from "../components/BadgeSnippet"
 import ReportDownloadMenu from "../components/ReportDownloadMenu"
 import { Badge, Button, Card, Label, LanguageLabel, PageHeading, ScoreBar, SectionHeading } from "../components/Shell"
 import {
@@ -336,6 +337,10 @@ export default function RepositoryOverviewPage({
           </Card>
         )}
       </section>
+
+      {!isPrivate && repository.orgSlug && repository.repoSlug && (
+        <BadgeSnippet org={repository.orgSlug} repo={repository.repoSlug} />
+      )}
     </div>
   )
 }

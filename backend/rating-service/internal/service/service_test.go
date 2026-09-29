@@ -16,6 +16,15 @@ type fakeRepo struct {
 
 	countLanguage string
 	listQuery     *domain.RankingQuery
+
+	score    *int16
+	scoreErr error
+	scoreFor string
+}
+
+func (f *fakeRepo) GetPublicScore(ctx context.Context, orgSlug, repoSlug string) (*int16, error) {
+	f.scoreFor = orgSlug + "/" + repoSlug
+	return f.score, f.scoreErr
 }
 
 func (f *fakeRepo) CountRanking(ctx context.Context, language string) (int, error) {
@@ -146,5 +155,19 @@ func TestGetRankingRepositoryErrors(t *testing.T) {
 
 	if _, err := NewRatingService(&fakeRepo{total: 5, listErr: boom}).GetRanking(context.Background(), domain.RankingRequest{SortBy: domain.SortByScore}); !errors.Is(err, boom) {
 		t.Errorf("list error = %v, want %v", err, boom)
+	}
+}
+
+func TestGetPublicScoreTrimsAndValidates(t *testing.T) {
+	score := int16(87)
+	repo := &fakeRepo{score: &score}
+
+	got, err := NewRatingService(repo).GetPublicScore(context.Background(), " org ", "repo ")
+	if err != nil || got == nil || *got != 87 || repo.scoreFor != "org/repo" {
+		t.Fatalf("got=%v err=%v for=%q", got, err, repo.scoreFor)
+	}
+
+	if _, err := NewRatingService(repo).GetPublicScore(context.Background(), "org", " "); !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Errorf("empty repo slug err = %v, want ErrInvalidArgument", err)
 	}
 }
