@@ -1,89 +1,95 @@
-# Security (20%, private)
+# Безопасность (20%, приватная)
 
-**Status: implemented** (2026-09-22). Last updated 2026-09-22.
+**Статус: реализовано** (2026-09-22). Последнее обновление 2026-09-27.
 
-## What it measures
+## Что измеряется
 
-Real AppSec SourceCraft findings only, per TZ §3.1's explicit warning against faking security
-data. Open critical/high/medium/low defect-group counts, days since the latest scan.
+Только реальные находки AppSec SourceCraft — согласно явному предупреждению ТЗ §3.1 не
+подделывать данные безопасности. Количество открытых групп дефектов уровней critical/high/medium/
+low и число дней с последнего сканирования.
 
-## How it's calculated, in plain words
+## Как считается, простыми словами
 
-1. Grade-service asks security-wrapper-service, "what does AppSec know about this repo?",
-   handing over the user's own SourceCraft login token so the wrapper can ask on their behalf.
-2. If the repo has never been scanned, the whole category is "no data" — we never guess or
-   pretend it's a 0.
-3. If it has been scanned, we get back: how many open critical/high/medium/low security findings,
-   and how many days since the last scan.
-4. Each of those five numbers is placed on a line between "healthy" (e.g. 0 open criticals) and
-   "critical" (e.g. 5+ open criticals) — closer to healthy scores near 1, closer to critical
-   scores near 0.
-5. The five scores are combined into one 0-100 category score by weighted average (open critical
-   count matters most).
-6. Separately, open findings cap the **overall** private score: any open critical → at most 59;
-   otherwise any open high → at most 79. A score already below the cap is unchanged. No scan means
-   no cap. The public view has no Security, so it's never capped.
+1. Grade-service спрашивает security-wrapper-service: «что AppSec знает об этом репозитории?»,
+   передавая токен SourceCraft пользователя, чтобы обёртка запрашивала данные от его имени.
+2. Если репозиторий ни разу не сканировался, вся категория получает «нет данных» — мы никогда не
+   угадываем и не выдаём это за 0.
+3. Если сканирование было, мы получаем: сколько открыто находок critical/high/medium/low и
+   сколько дней прошло с последнего сканирования.
+4. Каждое из этих пяти чисел ставится на шкалу между «здоровым» (например, 0 открытых critical)
+   и «критическим» (например, 5+ открытых critical) значением — ближе к здоровому даёт оценку
+   около 1, ближе к критическому — около 0.
+5. Пять оценок объединяются в одну оценку категории 0–100 взвешенным средним (больше всего весит
+   число открытых critical).
+6. Отдельно открытые находки ограничивают **общую** приватную оценку: есть открытая critical →
+   не выше 59; иначе есть открытая high → не выше 79. Оценка, уже ниже потолка, не меняется. Нет
+   сканирования — нет потолка. В публичном виде безопасности нет, поэтому он не ограничивается.
 
-### Overall-score cap (2026-09-27)
+### Потолок общей оценки (2026-09-27)
 
-Without it, a repo with a leaked secret or a critical vulnerability could still score in the 80s
-if every other category were strong — Security is only 20% of the weighted average. The cap is
-applied in `BuildGradingResult` (`internal/app`) after categories are combined, using
-`scoring.SecurityCap`, which reads the `open_critical`/`open_high` raw counts. AppSec secrets
-arrive as severity-rated findings, so a critical secret triggers the 59 cap like any critical.
+Без него репозиторий с утёкшим секретом или критической уязвимостью мог бы получить 80+ баллов,
+если остальные категории сильные: безопасность — лишь 20% взвешенного среднего. Потолок
+применяется в `BuildGradingResult` (`internal/app`) после объединения категорий с помощью
+`scoring.SecurityCap`, который читает сырые счётчики `open_critical`/`open_high`. Секреты AppSec
+приходят как находки с уровнем важности, поэтому критический секрет включает потолок 59, как и
+любая критическая находка.
 
-## Data source
+## Источник данных
 
-gRPC call to security-wrapper-service's `GetAppsecResult(git_repo)` — Grade service dials it
-directly (`backend/grade-service/internal/appsecwrapper`), forwarding the caller's SourceCraft PAT
-(`SOURCECRAFT_PAT` env) as `authorization` metadata. The wrapper itself calls the real AppSec API
-(`https://appsec.sourcecraft.tech`) — latest scan lookup, then per-severity **OPEN** defect-group
-counts via `/v1/defect-groups` filtered by `severity`+`status=OPEN` (never the raw `int32`
-status/severity fields: `DefectGroupDto` returns them as bare ints with no documented mapping to
-the `DefectGroupStatus`/`Severity` string enums, so the string-enum filters are used instead).
+gRPC-вызов `GetAppsecResult(git_repo)` в security-wrapper-service — Grade service подключается к
+нему напрямую (`backend/grade-service/internal/appsecwrapper`), пересылая PAT SourceCraft
+вызывающего (переменная `SOURCECRAFT_PAT`) в метаданных `authorization`. Сама обёртка обращается
+к реальному AppSec API (`https://appsec.sourcecraft.tech`): поиск последнего сканирования, затем
+количество **OPEN** групп дефектов по уровням через `/v1/defect-groups` с фильтрами
+`severity`+`status=OPEN` (никогда не по сырым полям status/severity типа `int32`: `DefectGroupDto`
+возвращает их как голые числа без документированного соответствия строковым перечислениям
+`DefectGroupStatus`/`Severity`, поэтому используются фильтры со строковыми значениями).
 
-## Metrics
+## Метрики
 
-Snapshot input (one gRPC call, already aggregated) — doesn't go through the
-source/aggregation-config engine the event-stream categories use; weights/thresholds are
-hardcoded in `internal/scoring/security.go`, only the category's own weight/status is
-config-driven (`config/grading.yaml`).
+Снимок на входе (один gRPC-вызов, данные уже агрегированы) — не проходит через движок
+источников/агрегации, который используют категории на потоках событий; веса и пороги зашиты в
+`internal/scoring/security.go`, из конфигурации (`config/grading.yaml`) берутся только вес и
+статус самой категории.
 
-| Metric | Direction | Critical | Healthy | Weight | Source | Aggregation |
+| Метрика | Направление | Критично | Здорово | Вес | Источник | Агрегация |
 |---|---|---|---|---|---|---|
-| Open critical count | − | 5 | 0 | 0.35 | AppSec gRPC | n/a — snapshot |
-| Open high count | − | 15 | 0 | 0.25 | AppSec gRPC | n/a — snapshot |
-| Open medium count | − | 40 | 0 | 0.15 | AppSec gRPC | n/a — snapshot |
-| Open low count | − | 80 | 0 | 0.10 | AppSec gRPC | n/a — snapshot |
-| Days since last scan | − | 90 | 0 | 0.15 | AppSec gRPC | n/a — snapshot |
+| Открытые critical | − | 5 | 0 | 0.35 | AppSec gRPC | н/п — снимок |
+| Открытые high | − | 15 | 0 | 0.25 | AppSec gRPC | н/п — снимок |
+| Открытые medium | − | 40 | 0 | 0.15 | AppSec gRPC | н/п — снимок |
+| Открытые low | − | 80 | 0 | 0.10 | AppSec gRPC | н/п — снимок |
+| Дней с последнего сканирования | − | 90 | 0 | 0.15 | AppSec gRPC | н/п — снимок |
 
-All five thresholds are first-guess placeholders, not yet validated against a real population of
-repos (same caveat Activity's `provisional: true` flags carry).
+Все пять порогов — первые прикидки, ещё не проверенные на реальной выборке репозиториев (та же
+оговорка, что у флагов `provisional: true` в «Активности»).
 
-## No-data vs. real-zero
+## Нет данных vs. настоящий ноль
 
-- `HasScan=false` (repo has never been scanned) → **whole category** is `NoData` — never a
-  fabricated 0. This is the dominant no-data case for Security, not a per-metric edge case.
-- A scan that ran and found 0 open critical/high/medium/low is a real, good, measured score — not
-  `NoData`.
-- Any wrapper/dial/gRPC-call failure (network, timeout, wrapper down) → logged, degrades to
-  `NoData` — a transport failure must never be reported the same as "clean scan."
+- `HasScan=false` (репозиторий ни разу не сканировался) → **вся категория** `NoData`, никогда не
+  выдуманный 0. Это основной случай отсутствия данных для безопасности, а не пограничный случай
+  отдельной метрики.
+- Сканирование, которое прошло и нашло 0 открытых critical/high/medium/low, — настоящая, хорошая,
+  измеренная оценка, а не `NoData`.
+- Любой сбой обёртки/подключения/gRPC-вызова (сеть, таймаут, обёртка недоступна) → пишется в лог
+  и деградирует до `NoData` — транспортный сбой никогда не должен выглядеть как «чистое
+  сканирование».
 
-## Known limitations
+## Известные ограничения
 
-- **Access gate is public/private, not ownership** (confirmed by organizers 2026-09-21): public
-  repos get AppSec with no extra setup; private repos need an opt-in "Security Add-on" connected
-  for that specific repo — owning/adminning the repo does **not** unlock it on its own (verified
-  live: our own private repo 403'd everywhere on `appsec.sourcecraft.tech` until flipped public).
-  Practical effect: the TZ's "analyze my own repo" flow will legitimately hit "Нет данных" for
-  Security on a private repo without the add-on connected — expected platform behavior, not a
-  bug. Test matrix (2026-09-21): own private repo without add-on → 403; someone else's public
-  repo (`examples/vulnerable-repo`) → 403; own repo flipped public → 200. Organizers confirmed public
-  repos need no extra setup, private ones need the Security Add-on.
-- Report bytes (SARIF, for human-readable defect summaries) are parsed in-memory and discarded,
-  never persisted to S3 — matches the "parse then discard" DB design decision.
+- **Доступ определяется публичностью репозитория, а не владением** (подтверждено организаторами
+  2026-09-21): публичные репозитории получают AppSec без дополнительной настройки; для приватных
+  нужен подключённый для конкретного репозитория «Security Add-on» — владение или права
+  администратора сами по себе доступ **не** открывают (проверено вживую: наш приватный
+  репозиторий получал 403 везде на `appsec.sourcecraft.tech`, пока его не сделали публичным).
+  Практически: сценарий ТЗ «проанализировать свой репозиторий» для приватного репозитория без
+  add-on закономерно покажет «Нет данных» по безопасности — это ожидаемое поведение платформы, а
+  не баг. Матрица проверки (2026-09-21): свой приватный без add-on → 403; чужой публичный
+  (`examples/vulnerable-repo`) → 403; свой, сделанный публичным → 200. Организаторы подтвердили:
+  публичным репозиториям настройка не нужна, приватным нужен Security Add-on.
+- Байты отчётов (SARIF, для читаемых сводок дефектов) разбираются в памяти и отбрасываются,
+  никогда не сохраняются в S3 — в соответствии с решением по БД «разобрать и выбросить».
 
-## Open questions
+## Открытые вопросы
 
-- Whether to surface "connect the Security Add-on" as an explicit UI call-to-action for the
-  private-repo no-data case, vs. a silent no-data card — product decision, not yet made.
+- Показывать ли в UI явный призыв «подключите Security Add-on» для приватного репозитория без
+  данных или просто карточку «нет данных» — продуктовое решение, ещё не принято.

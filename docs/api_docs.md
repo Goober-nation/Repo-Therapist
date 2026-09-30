@@ -1,7 +1,25 @@
-# Враппер для сурскрафта
+> **Проверка актуальности (по коду, 2026-09-28).** Это ранний черновик API; реальные контракты
+> с тех пор изменились. Источник истины — `.proto`-файлы сервисов и
+> `backend/gateway-service/internal/transport/http/handler.go`. Расхождения:
+>
+> - **Обёртка SourceCraft** (`sourcecraft-wrapper-service/internal/transport/rpc/service.proto`,
+>   сервис `CodeHealth`): `GetRepoIdByOrgRepoSlug` не существует — вместо него
+>   `GetRepositoryBySlugs` и `GetRepoIDBySlugs`; `GetGitUrl` → `GetGitURL`;
+>   `GetCiCdRuns` → `GetCiCDRuns`; добавлен `GetMyRepos`.
+> - **Обёртка AppSec** (`security-wrapper-service`, сервис `SecurityWrapper`): `StartReport`,
+>   `GetReportStatus` и `GetReportLink` не существуют; единственный RPC — `GetAppsecResult`.
+> - **Агрегатор** (`aggregator-service/internal/transport/rpc/server.proto`): RPC — `GetMyRepos`,
+>   `GetGrading`, `RequestLLMRecommendations` (не `GetReccomendations`).
+> - **API Gateway**: реальные маршруты — `POST /auth/yandex`, `GET /repos`,
+>   `GET /grading/{org}/{repo}` (не `/grade/...`), `GET /recommendations/{org}/{repo}`,
+>   `GET /ranking`. PAT передаётся заголовком `PAT` (не `user_token`).
+> - JSON-примеры ниже местами синтаксически некорректны (пропущенные запятые, точки вместо
+>   запятых) — это эскизы формы, а не точные схемы.
+
+# Обёртка SourceCraft
 
 rpc GetRepoIdByOrgRepoSlug(ByOrgRepoSlugRequest) returns (ByOrgRepoSlugResponse)
-**Request**
+**Запрос**
 
 ```json
 	{
@@ -10,7 +28,7 @@ rpc GetRepoIdByOrgRepoSlug(ByOrgRepoSlugRequest) returns (ByOrgRepoSlugResponse)
 	}
 ```
 
-**Response**
+**Ответ**
 
 ```json
 	{
@@ -82,7 +100,7 @@ rpc GetRepoIdByOrgRepoSlug(ByOrgRepoSlugRequest) returns (ByOrgRepoSlugResponse)
 ```
 
 rpc GetGitUrl(GetGitUrlRequest) returns (GetGitUrlResponse)
-**Request**
+**Запрос**
 
 ```json
 	{
@@ -90,7 +108,7 @@ rpc GetGitUrl(GetGitUrlRequest) returns (GetGitUrlResponse)
 	}
 ```
 
-**Response**
+**Ответ**
 
 ```json
 	{
@@ -101,7 +119,7 @@ rpc GetGitUrl(GetGitUrlRequest) returns (GetGitUrlResponse)
 
 rpc GetCiCdRuns(GetCiCdDataRequest) returns (GetCiCdRunsResponse)
 
-**Request**
+**Запрос**
 
 ```json
 	{
@@ -109,7 +127,7 @@ rpc GetCiCdRuns(GetCiCdDataRequest) returns (GetCiCdRunsResponse)
 	}
 ```
 
-**Response**
+**Ответ**
 
 ```json
 {
@@ -234,7 +252,7 @@ rpc GetCiCdRuns(GetCiCdDataRequest) returns (GetCiCdRunsResponse)
 ```
 
 rpc GetIssues(GetIssuesRequest) returns (GetIssuesResponse);
-**Request**
+**Запрос**
 
 ```json
 	{
@@ -242,7 +260,7 @@ rpc GetIssues(GetIssuesRequest) returns (GetIssuesResponse);
 	}
 ```
 
-**Response**
+**Ответ**
 
 ```json
 {
@@ -311,7 +329,7 @@ rpc GetIssues(GetIssuesRequest) returns (GetIssuesResponse);
 
 rpc GetMilestones(GetMilestonesRequest) returns (GetMilestonesResponse);
 
-**Request**
+**Запрос**
 
 ```json
 	{
@@ -319,7 +337,7 @@ rpc GetMilestones(GetMilestonesRequest) returns (GetMilestonesResponse);
 	}
 ```
 
-**Response**
+**Ответ**
 
 ```json
 {
@@ -349,7 +367,7 @@ rpc GetMilestones(GetMilestonesRequest) returns (GetMilestonesResponse);
 ```
 
 rpc ListAllPublicRepos(GetPublicReposRequest) returns (GetPublicReposResponse);
-**Response**
+**Ответ**
 
 ```json
 {
@@ -425,11 +443,11 @@ rpc ListAllPublicRepos(GetPublicReposRequest) returns (GetPublicReposResponse);
 }
 ```
 
-# 2\. Враппер для аппсека
+# 2\. Обёртка AppSec
 
 rpc StartReport(StartReportRequest) returns (StartReportResponse);
 
-**Request**
+**Запрос**
 
 ```json
 	{
@@ -437,7 +455,7 @@ rpc StartReport(StartReportRequest) returns (StartReportResponse);
 	}
 ```
 
-**Response**
+**Ответ**
 
 ```json
 {
@@ -453,7 +471,7 @@ rpc StartReport(StartReportRequest) returns (StartReportResponse);
 
 rpc GetReportStatus(GetReportStatusRequest) returns (GetReportStatusResponse);
 
-**Request**
+**Запрос**
 
 ```json
 	{
@@ -462,7 +480,7 @@ rpc GetReportStatus(GetReportStatusRequest) returns (GetReportStatusResponse);
 	}
 ```
 
-**Response**
+**Ответ**
 
 ```json
 {
@@ -478,7 +496,7 @@ rpc GetReportStatus(GetReportStatusRequest) returns (GetReportStatusResponse);
 
 rpc GetReportLink(GetReportLinkRequest) returns (GetReportLinkResponse);
 
-**Request**
+**Запрос**
 
 ```json
 	{
@@ -487,7 +505,7 @@ rpc GetReportLink(GetReportLinkRequest) returns (GetReportLinkResponse);
 	}
 ```
 
-**Response**
+**Ответ**
 
 ```json
 {
@@ -500,11 +518,11 @@ rpc GetReportLink(GetReportLinkRequest) returns (GetReportLinkResponse);
 }
 ```
 
-# Аггрегатор
+# Агрегатор
 
 rpc GetGrading(GetGradingRequest) returns (GetGradingResponse);
 
-**Request**
+**Запрос**
 
 ```json
 	{
@@ -514,7 +532,7 @@ rpc GetGrading(GetGradingRequest) returns (GetGradingResponse);
 	}
 ```
 
-**Response**
+**Ответ**
 
 ```json
 {
@@ -537,7 +555,7 @@ rpc GetGrading(GetGradingRequest) returns (GetGradingResponse);
 ```
 
 **ИЛИ**
-**Response**
+**Ответ**
 
 ```json
 {
@@ -547,7 +565,7 @@ rpc GetGrading(GetGradingRequest) returns (GetGradingResponse);
 
 rpc GetReccomendations(GetReccomendationsRequest) returns (GetReccomendationsResponse);
 
-**Request**
+**Запрос**
 
 ```json
 	{
@@ -557,7 +575,7 @@ rpc GetReccomendations(GetReccomendationsRequest) returns (GetReccomendationsRes
 	}
 ```
 
-**Response**
+**Ответ**
 
 ```json
 {
@@ -566,7 +584,7 @@ rpc GetReccomendations(GetReccomendationsRequest) returns (GetReccomendationsRes
 ```
 
 **ИЛИ**
-**Response**
+**Ответ**
 
 ```json
 {

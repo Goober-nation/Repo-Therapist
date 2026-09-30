@@ -1,124 +1,130 @@
-# Issues (20%, public)
+# Задачи (20%, публичная)
 
-**Status: implemented.** Last updated 2026-09-25.
+**Статус: реализовано.** Последнее обновление 2026-09-28.
 
-## What it measures
+## Что измеряется
 
-How well the project triages and closes work items: abandonment across the whole open-issue
-backlog (not just recent issues), closure throughput, resolution rate. Time-to-first-response is
-a decided non-goal, not a pending gap — see Known limitations. Median closure time is the
-closure-related signal this category tracks instead; it doesn't stand in for first-response,
-it's a separate question the metric set was scoped to answer from the start.
+Насколько хорошо проект разбирает и закрывает задачи: заброшенность всего бэклога открытых задач
+(а не только недавних), пропускная способность закрытия, доля решённых. Время до первого ответа —
+сознательно исключено, а не временный пробел (см. «Известные ограничения»). Вместо него категория
+отслеживает медианное время закрытия; оно не заменяет первый ответ, а отвечает на отдельный
+вопрос, под который набор метрик задумывался с самого начала.
 
-## How it's calculated, in plain words
+## Как считается, простыми словами
 
-1. Repository-service asks SourceCraft for the repo's issues and saves them as one entry per
-   issue (created date, last-touched date, status) in S3.
-2. **Abandoned share**: of every issue that's currently open — however old — what fraction
-   haven't been touched in 60+ days.
-3. **Growth ratio** and **share resolved**: count, independently, how many issues were *opened*
-   in the last 6 months and how many were *closed* in the last 6 months (regardless of when the
-   closed ones were originally opened). Growth ratio is opened÷closed; share resolved is
-   closed÷(closed + everything still currently open).
-4. **Median closure time**: of issues created in the last 6 months that got closed, the middle
-   value of how long that took.
-5. Below 5 relevant issues for a given number, it's "not enough data" instead of a guess — the
-   relevant population differs per metric, see Metrics table.
-6. Each scored number is placed on a line between a "healthy" value and a "critical" value —
-   close to healthy scores near 1, close to critical scores near 0.
-7. The four scores combine into one 0-100 category score by weighted average. A "no data" metric
-   is dropped and the others' weights stretch to fill the gap — never treated as a 0.
+1. Repository-service запрашивает у SourceCraft задачи репозитория и сохраняет их в S3 по одной
+   записи на задачу (дата создания, дата последнего изменения, статус).
+2. **Доля заброшенных**: среди всех открытых сейчас задач (любого возраста) — какая доля не
+   менялась 60+ дней.
+3. **Коэффициент роста** и **доля решённых**: независимо считается, сколько задач *открыто* за
+   последние 6 месяцев и сколько *закрыто* за последние 6 месяцев (независимо от того, когда
+   закрытые были открыты). Коэффициент роста = открыто ÷ закрыто; доля решённых =
+   закрыто ÷ (закрыто + всё, что сейчас открыто).
+4. **Медианное время закрытия**: среди задач, созданных за последние 6 месяцев и закрытых, —
+   медиана времени до закрытия.
+5. Если для конкретного показателя релевантных задач меньше 5, это «недостаточно данных», а не
+   догадка; релевантная совокупность у каждой метрики своя, см. таблицу метрик.
+6. Каждое число ставится на шкалу между «здоровым» и «критическим» значением — ближе к здоровому
+   даёт оценку около 1, ближе к критическому — около 0.
+7. Четыре оценки объединяются в одну оценку категории 0–100 взвешенным средним. Метрика без
+   данных исключается, а веса остальных растягиваются, чтобы заполнить пробел; как 0 она никогда
+   не считается.
 
-**Median closure time, worked through (thresholds from 2026-09-28):** a median of 2 days or less
-scores 1 (full), 14 days or more scores 0, and in between the score falls in a straight line —
-e.g. 8 days → (14 − 8) / (14 − 2) = 0.5.
+**Медианное время закрытия на примере (пороги от 2026-09-28):** медиана 2 дня и меньше даёт 1
+(максимум), 14 дней и больше — 0, между ними оценка падает линейно — например, 8 дней →
+(14 − 8) / (14 − 2) = 0.5.
 
-## Data source
+## Источник данных
 
-S3 `_meta/issues.json` (same export Activity reads). The export is capped at `SOURCECRAFT_MAX_PAGES` pages (default
-50 of 100 issues), see `activity.md`. `resolved` is judged by `status_type`
-(`completed`/`cancelled`) — the fixed 5-value SourceCraft backend lifecycle enum
-(`initial|in_progress|paused|completed|cancelled`, confirmed from the live Swagger spec) — never
-the per-repo customizable `status` slug/name, which isn't safe to match across repos/orgs.
+S3 `_meta/issues.json` (та же выгрузка, что читает «Активность»). Выгрузка ограничена
+`SOURCECRAFT_MAX_PAGES` страницами (по умолчанию 50 по 100 задач), см. `activity.md`. «Решена»
+определяется по `status_type` (`completed`/`cancelled`) — фиксированному перечислению жизненного
+цикла SourceCraft из 5 значений (`initial|in_progress|paused|completed|cancelled`, подтверждено по
+живой Swagger-спецификации), и никогда не по настраиваемому в каждом репозитории `status`
+(slug/имя), который нельзя надёжно сопоставлять между репозиториями/организациями.
 
-## Metrics
+## Метрики
 
-Event-stream shaped, same engine Activity uses (`ComputeCategory`/`eventsForSource`), config in
-`config/grading.yaml` under `categories.issues`. All thresholds `provisional: true` — first-guess
-values, not calibrated against a repo population.
+Структура потока событий, тот же движок, что у «Активности» (`ComputeCategory`/`eventsForSource`),
+конфигурация в `config/grading.yaml` в `categories.issues`. Все пороги `provisional: true` —
+первые прикидки, не откалиброванные на выборке репозиториев (кроме `median_closure_days`, см.
+ниже).
 
-| Metric | Direction | Critical | Healthy | Weight | `min_sample_size` population |
+| Метрика | Направление | Критично | Здорово | Вес | Совокупность для `min_sample_size` |
 |---|---|---|---|---|---|
-| Abandoned share (all open issues, untouched 60d) | − | 0.5 | 0.05 | 0.30 | currently-open issue count |
-| Median closure days (created-and-closed cohort) | − | 14 | 2 | 0.25 | resolved-in-cohort count |
-| Growth ratio (opened-in-window ÷ closed-in-window, floored at 1) | − | 5 | 1 | 0.20 | opened + closed in window |
-| Share resolved (closed-in-window ÷ (open-now + closed-in-window)) | + | 0.3 | 0.9 | 0.25 | open-now + closed-in-window |
+| Доля заброшенных (все открытые, без изменений 60 дн.) | − | 0.5 | 0.05 | 0.30 | число открытых сейчас задач |
+| Медиана дней до закрытия (когорта созданных и закрытых) | − | 14 | 2 | 0.25 | число решённых в когорте |
+| Коэффициент роста (открыто в окне ÷ закрыто в окне, знаменатель не меньше 1) | − | 5 | 1 | 0.20 | открытые + закрытые в окне |
+| Доля решённых (закрыто в окне ÷ (открыто сейчас + закрыто в окне)) | + | 0.3 | 0.9 | 0.25 | открытые сейчас + закрытые в окне |
 
-## No-data vs. real-zero
+## Нет данных vs. настоящий ноль
 
-- Below `min_sample_size: 5` in a metric's own population (see table) → `NoData` for that
-  metric — a ratio/median over a handful of events swings too far on one issue's fate to be
-  defensible (TZ §13.2, устойчивость методики). Same pattern as Activity's `top_contributor_share`.
-- A repo with enough issues where, say, 0% are abandoned is a real, good, measured 0% — not
-  `NoData`.
-- `growth_ratio`'s "floored at 1" (denominator only) is separate from the sample-size floor: a
-  repo with real opens and zero closes gets a real harsh ratio, not a fabricated no-data.
-- `share_resolved`'s denominator needs no dedup — "currently open" and "currently resolved" are
-  mutually exclusive by construction.
+- Меньше `min_sample_size: 5` в собственной совокупности метрики (см. таблицу) → `NoData` для
+  этой метрики: отношение/медиана по горстке событий слишком сильно зависит от судьбы одной
+  задачи, чтобы быть обоснованной (ТЗ §13.2, устойчивость методики). Тот же подход, что у
+  `top_contributor_share` в «Активности».
+- Репозиторий с достаточным числом задач, где, скажем, заброшено 0%, получает настоящие, хорошие,
+  измеренные 0%, а не `NoData`.
+- «Не меньше 1» у `growth_ratio` (только для знаменателя) не связано с порогом размера выборки:
+  репозиторий с реальными открытиями и нулём закрытий получает настоящий жёсткий коэффициент, а не
+  выдуманное «нет данных».
+- Знаменателю `share_resolved` не нужна дедупликация — «открыта сейчас» и «решена сейчас» по
+  построению взаимоисключающие.
 
-## Known limitations
+## Известные ограничения
 
-- **Median closure time is a proxy** (`updated_at - created_at`), not a real close-event
-  timestamp — the wrapper exposes no first-comment/close-event timeline separate from
-  `updated_at`.
-- **Time to first response is out of scope, decided 2026-09-25** — `updated_at` conflates first
-  response, later discussion, relabeling, and closure into one timestamp, so it can't be used as
-  a proxy, and no other data source exists. Not planned; would need
-  sourcecraft-wrapper-service to expose a real issue comment/event timeline before this is
-  revisited at all.
-- `paused` (`status_type`) counts as unresolved/open everywhere here, same as
-  `initial`/`in_progress`.
-- Issues carry their own visibility flag independent of the repo's — a public repo can contain
-  private issues a viewer-tier PAT never sees, undercounting these metrics for repos that use
-  that feature. (SourceCraft: issue visibility is binary `public | private` and non-members only
-  see public issues.)
-- `growth_ratio`/`share_resolved` are a simplification: most real dashboards (CHAOSS, GitHub
-  Pulse, OSSInsight) track backlog size as a time series rather than a windowed ratio, since a
-  ratio can't distinguish "small and volatile" from "enormous and stable." Defensible for a
-  single 0-100 sub-score, not the field's primary pattern.
+- **Медианное время закрытия — приближение** (`updated_at - created_at`), а не реальная метка
+  события закрытия: обёртка не отдаёт отдельную от `updated_at` ленту первых комментариев/событий
+  закрытия.
+- **Время до первого ответа вне рамок, решено 2026-09-25** — `updated_at` сливает в одну метку
+  первый ответ, последующее обсуждение, смену меток и закрытие, поэтому его нельзя использовать как
+  приближение, а других источников данных нет. Не планируется; чтобы вообще вернуться к этому,
+  sourcecraft-wrapper-service должен отдавать настоящую ленту комментариев/событий задачи.
+- `paused` (`status_type`) везде здесь считается нерешённой/открытой, как и `initial`/`in_progress`.
+- У задач есть собственный флаг видимости, независимый от репозитория: публичный репозиторий может
+  содержать приватные задачи, которых PAT с правами просмотра никогда не увидит, — для
+  репозиториев, использующих эту возможность, метрики занижаются. (SourceCraft: видимость задачи
+  двоичная `public | private`, не участники видят только публичные задачи.)
+- `growth_ratio`/`share_resolved` — упрощение: большинство реальных дашбордов (CHAOSS, GitHub
+  Pulse, OSSInsight) отслеживают размер бэклога как временной ряд, а не отношение за окно,
+  поскольку отношение не отличает «маленький и нестабильный» от «огромный и стабильный». Годится
+  для одной подоценки 0–100, но это не основной подход в отрасли.
 
-## Open questions
+## Открытые вопросы
 
-- Threshold calibration against a real repo population — done for `median_closure_days` only
-  (2026-09-28, below); the other three are still first-guess values.
-- A supplementary raw backlog-size trend (open-issue count, window start vs. end) — the most
-  consistent finding from research was that the field prefers this over a bare ratio; not built.
+- Калибровка порогов на реальной выборке репозиториев — выполнена только для
+  `median_closure_days` (2026-09-28, ниже); остальные три — всё ещё первые прикидки.
+- Дополнительный сырой тренд размера бэклога (число открытых задач в начале и в конце окна) —
+  исследование последовательнее всего показало, что в отрасли его предпочитают голому отношению;
+  не реализовано.
 
-## Design history (compressed)
+## История решений (кратко)
 
-**`median_closure_days` recalibrated, 2026-09-28** (was critical 60 / healthy 21). All 21 real
-SourceCraft repos with enough resolved issues (11 test repos + 10 drawn at random from
-`docs/candidate-repos.json`) scored a perfect 1 — SourceCraft team projects close issues in
-0.01-13.9 days (median 1.24, p90 8.9), far below the ~30-day open-source average the old bounds
-were based on. New bounds 14 / 2: 12 repos full, 9 graded in between, none at 0. Strict
-percentiles (p90 / p25 = 9d / 0.5d) were rejected: they would call a 9-day median "critical" and
-most reward same-day closes, some of which look like tracker bookkeeping rather than work.
-Still `provisional: true` — n is small and SourceCraft-specific.
+**`median_closure_days` перекалиброван, 2026-09-28** (было critical 60 / healthy 21). Все 21
+реальный репозиторий SourceCraft с достаточным числом решённых задач (11 тестовых + 10 случайных
+из `docs/candidate-repos.json`) получали идеальную 1 — командные проекты SourceCraft закрывают
+задачи за 0.01–13.9 дня (медиана 1.24, p90 8.9), намного быстрее ~30-дневного среднего по open
+source, на котором основывались старые границы. Новые границы 14 / 2: 12 репозиториев на
+максимуме, 9 в промежутке, ни одного на 0. Строгие перцентили (p90 / p25 = 9 дн. / 0.5 дн.)
+отвергнуты: они назвали бы медиану в 9 дней «критической» и сильнее всего награждали бы закрытие в
+тот же день, часть которого похожа на учётные операции в трекере, а не на работу. По-прежнему
+`provisional: true` — выборка мала и специфична для SourceCraft.
 
-Originally windowed every metric by issue *creation* date. Two rounds of correction, both
+Изначально каждая метрика бралась в окне по дате *создания* задачи. Два раунда исправлений, оба
 2026-09-22:
-1. **No sample-size floor** — `dqdkfa/libmdbx` with 3 windowed issues produced a confident
-   68.9/100. Added `min_sample_size: 5`.
-2. **Creation-date windowing hid real abandonment** — an issue opened 2 years ago and never
-   touched since aged out of any creation-window and was invisible to `abandoned_share`. A
-   ~20-source research pass (CHAOSS, GitHub's `actions/stale`/`probot/stale`, OpenSSF Scorecard,
-   MSR literature) confirmed every mature framework measures staleness over the whole open-issue
-   population by last-activity date, never by creation date — redesigned `abandoned_share`
-   accordingly, decoupled `growth_ratio`/`share_resolved`'s opened/closed counts, loosened
-   `median_closure_days`' healthy bound (7d→21d) against the ~30d empirical real-world average.
-   `median_closure_days` itself was left creation-windowed — that specific pattern (CHAOSS's
-   cohort-based Issue Resolution Duration) is the field's standard for closure-time specifically.
-   Confirmed on real data: `dqdkfa/libmdbx` has 7 currently-open issues stale 143-2197 days, 6 of
-   which were created outside the old 180-day window — exactly the case the redesign fixes.
-`libmdbx`'s `abandoned_share`, `growth_ratio`, and `share_resolved` were independently
-recomputed from a fresh, separate API fetch (not through this codebase) and matched exactly.
+1. **Не было порога размера выборки** — `dqdkfa/libmdbx` с 3 задачами в окне получал уверенные
+   68.9/100. Добавлен `min_sample_size: 5`.
+2. **Окно по дате создания скрывало реальную заброшенность** — задача, открытая 2 года назад и с
+   тех пор не тронутая, выпадала из любого окна по созданию и была невидима для
+   `abandoned_share`. Исследование примерно 20 источников (CHAOSS, `actions/stale`/`probot/stale`
+   на GitHub, OpenSSF Scorecard, литература MSR) подтвердило, что все зрелые фреймворки измеряют
+   устаревание по всей совокупности открытых задач по дате последней активности, а не по дате
+   создания. `abandoned_share` переработан соответственно, счётчики открытых/закрытых в
+   `growth_ratio`/`share_resolved` развязаны, здоровая граница `median_closure_days` ослаблена
+   (7 дн. → 21 дн.) с учётом эмпирического среднего ~30 дней. Сам `median_closure_days` остался в
+   окне по созданию — именно такой подход (когортная Issue Resolution Duration из CHAOSS) является
+   отраслевым стандартом для времени закрытия. Подтверждено на реальных данных: у `dqdkfa/libmdbx`
+   7 открытых задач без изменений 143–2197 дней, 6 из них созданы вне старого 180-дневного окна —
+   ровно тот случай, который исправляет переработка.
+`abandoned_share`, `growth_ratio` и `share_resolved` для `libmdbx` были независимо пересчитаны по
+отдельной свежей выборке из API (не через этот код) и совпали в точности.

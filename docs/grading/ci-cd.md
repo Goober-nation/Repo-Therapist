@@ -1,62 +1,68 @@
-# CI/CD (15%, private only)
+# CI/CD (15%, только приватная)
 
-**Status: implemented 2026-09-26.** Verified against 5 real mock repos (`docs/ci-mock-repos.json`)
-both through the scoring code directly and through the full repository-service → S3 →
-grade-service pipeline.
+**Статус: реализовано 2026-09-26.** Проверено на 5 реальных тестовых репозиториях
+(`docs/ci-mock-repos.json`) как напрямую через код подсчёта, так и через полный конвейер
+repository-service → S3 → grade-service.
 
-## What it measures
+## Что измеряется
 
-Whether the repo has CI at all, how often its runs pass, whether that's getting better or worse,
-and how long a run takes.
+Есть ли в репозитории CI вообще, как часто запуски проходят, становится ли лучше или хуже и
+сколько длится запуск.
 
-## How it's calculated, in plain words
+## Как считается, простыми словами
 
-1. Repository-service checks the cloned repo for a CI config file (`.sourcecraft/ci.yaml`, the only
-   location SourceCraft's CI/CD reference documents).
-2. It asks sourcecraft-wrapper for the repo's CI runs using the caller's token. It keeps runs
-   created in the last 180 days, newest first, at most 25. If the runs can't be read (the token
-   doesn't own the repo), it records that instead.
-3. Both results are saved to S3 as `_meta/ci-runs.json`.
-4. Grade-service decides whether there is anything to grade:
-   - runs couldn't be read → **no data** for the whole category;
-   - no config file **and** zero runs → **score 0** (hard gate: the repo has no CI);
-   - config file only runs placeholder commands → **score 0** (no-op pipeline, see below);
-   - config file but zero runs → **no data** (CI is set up but was never seen running).
-5. Otherwise it keeps only finished runs (passed or failed) and computes three numbers: the share
-   that passed; the pass share of the newer half minus the older half; the median run time in
-   minutes.
-6. Each number is placed on a line between a "healthy" and a "critical" value — close to healthy
-   scores near 1, close to critical near 0.
-7. The three scores combine into one 0-100 score by weighted average (50% / 30% / 20%). A metric
-   without enough runs is "no data", dropped, and the others' weights stretch to fill the gap.
-8. That score is multiplied by 0.4 + 0.6 × (success-rate score). A pipeline that never passes keeps
-   at most 40% of its score (so at most 20), one that passes ≥90% of the time keeps all of it. If
-   success rate is "no data", nothing is multiplied.
+1. Repository-service ищет в клонированном репозитории файл конфигурации CI (`.sourcecraft/ci.yaml`
+   — единственное место, описанное в справке SourceCraft по CI/CD).
+2. Он запрашивает у sourcecraft-wrapper запуски CI репозитория с токеном вызывающего. Сохраняются
+   запуски, созданные за последние 180 дней, от новых к старым, не более 25. Если запуски
+   прочитать нельзя (токен не владеет репозиторием), это и записывается.
+3. Оба результата сохраняются в S3 как `_meta/ci-runs.json`.
+4. Grade-service решает, есть ли что оценивать:
+   - запуски прочитать не удалось → **нет данных** для всей категории;
+   - нет файла конфигурации **и** ноль запусков → **оценка 0** (жёсткий гейт: в репозитории нет CI);
+   - файл конфигурации запускает только команды-заглушки → **оценка 0** (пустой пайплайн, см. ниже);
+   - файл конфигурации есть, но запусков ноль → **нет данных** (CI настроен, но запуски не видны).
+5. Иначе остаются только завершённые запуски (успешные или упавшие) и вычисляются три числа: доля
+   успешных; доля успешных в более новой половине минус в более старой; медианная длительность
+   запуска в минутах.
+6. Каждое число ставится на шкалу между «здоровым» и «критическим» значением — ближе к здоровому
+   даёт около 1, ближе к критическому — около 0.
+7. Три оценки объединяются в одну оценку 0–100 взвешенным средним (50% / 30% / 20%). Метрика с
+   недостаточным числом запусков получает «нет данных», исключается, а веса остальных
+   растягиваются.
+8. Эта оценка умножается на 0.4 + 0.6 × (оценка доли успешных). Пайплайн, который никогда не
+   проходит, сохраняет не более 40% своей оценки (т. е. максимум 20), а проходящий ≥90% времени —
+   всю. Если у доли успешных «нет данных», умножение не выполняется.
 
-### No-op pipeline check (anti-gaming, 2026-09-27)
+### Проверка пустого пайплайна (защита от накрутки, 2026-09-27)
 
-A pipeline that only runs `echo "tests passed"` always goes green and would score as perfect CI.
-Grade-service reads `.sourcecraft/ci.yaml` from the repo files in S3 and checks it:
+Пайплайн, который выполняет только `echo "tests passed"`, всегда зелёный и получил бы оценку
+идеального CI. Grade-service читает `.sourcecraft/ci.yaml` из файлов репозитория в S3 и проверяет
+его:
 
-1. The file is laid out workflows → tasks → cubes. A cube either runs `script` lines or a ready-made
-   image.
-2. Every script line is split on `;`, `&&`, `||`. A command is "trivial" if it's one of `echo`,
-   `printf`, `true`, `:`, `exit` (no status or `0`), `sleep`, `ls`, `pwd`, `cat`, `date`,
-   `whoami`, `env`, `printenv`, `uname`, `hostname`. Blank lines and `#` comments are trivial too.
-3. The pipeline is a no-op only if there is at least one cube and **every** cube's script is all
-   trivial commands.
-4. Any doubt means no verdict and normal scoring: the file can't be parsed or read, a task has no
-   cubes, a cube has no script (an image we can't inspect), or any command is non-trivial.
-5. A no-op pipeline gets CI/CD **score 0** with a single `ci_noop_pipeline` metric (score 0, weight
-   0) in `category_scores`, which also brings its recommendation (`config/recommendations.yaml`).
-   This applies only when runs are readable, i.e. where CI/CD is graded at all.
+1. Файл устроен как workflows → tasks → cubes. Куб либо выполняет строки `script`, либо готовый
+   образ.
+2. Каждая строка скрипта делится по `;`, `&&`, `||`. Команда «тривиальна», если это одна из
+   `echo`, `printf`, `true`, `:`, `exit` (без кода или с `0`), `sleep`, `ls`, `pwd`, `cat`,
+   `date`, `whoami`, `env`, `printenv`, `uname`, `hostname`. Пустые строки и комментарии `#` тоже
+   тривиальны.
+3. Пайплайн считается пустым, только если в нём есть хотя бы один куб и скрипт **каждого** куба
+   состоит только из тривиальных команд.
+4. Любое сомнение — вердикта нет, обычный подсчёт: файл нельзя разобрать или прочитать, у задачи
+   нет кубов, у куба нет скрипта (образ, который нельзя проверить) или хоть одна команда
+   нетривиальна.
+5. Пустой пайплайн получает **оценку CI/CD 0** с единственной метрикой `ci_noop_pipeline`
+   (оценка 0, вес 0) в `category_scores`, которая также приносит свою рекомендацию
+   (`config/recommendations.yaml`). Это применяется только когда запуски читаются, т. е. там, где
+   CI/CD вообще оценивается.
 
-Deliberately file-only: run duration keeps its normal scoring and isn't used to detect fakes, so
-there's no time floor that could penalise a tiny but real project.
+Намеренно проверяется только файл: длительность запуска оценивается как обычно и не используется
+для поиска подделок, поэтому нет нижнего порога времени, который мог бы наказать маленький, но
+настоящий проект.
 
-## Data source
+## Источник данных
 
-`_meta/ci-runs.json`, written by repository-service (`internal/cidata`):
+`_meta/ci-runs.json`, который пишет repository-service (`internal/cidata`):
 
 ```json
 {
@@ -67,82 +73,87 @@ there's no time floor that could penalise a tiny but real project.
 }
 ```
 
-- Runs come from the existing wrapper RPC `GetCiCDRuns` → `GET /repos/id:{id}/cicd/runs`. That
-  endpoint only answers for a token with owner access (403 `listCIFlux` otherwise, re-verified
-  2026-09-26 on `imbok/uims-portal`). The wrapper currently reports that 403 as a generic gRPC
-  `Internal`, so "denied" and "fetch failed" look the same — both become `runs_available: false`,
-  which is correct for grading either way.
-- Includes push-, PR- and schedule-triggered runs alike.
-- SourceCraft reports a queued run (`prepared`) with `started_at`/`finished_at` of
-  `1970-01-01T00:00:00Z`; repository-service blanks those so they can't be read as real times.
+- Запуски берутся через существующий RPC обёртки `GetCiCDRuns` → `GET /repos/id:{id}/cicd/runs`.
+  Этот эндпоинт отвечает только токену с правами владельца (иначе 403 `listCIFlux`, перепроверено
+  2026-09-26 на `imbok/uims-portal`). Сейчас обёртка отдаёт этот 403 как общий gRPC `Internal`,
+  так что «доступ запрещён» и «ошибка загрузки» выглядят одинаково — оба превращаются в
+  `runs_available: false`, что для оценивания в любом случае корректно.
+- Учитываются запуски по push, PR и расписанию.
+- Для запуска в очереди (`prepared`) SourceCraft отдаёт `started_at`/`finished_at` равными
+  `1970-01-01T00:00:00Z`; repository-service обнуляет их, чтобы они не читались как реальное время.
 
-## Metrics
+## Метрики
 
-All thresholds are provisional (first guesses; the mock repos only exercise the extremes).
+Все пороги предварительные (первые прикидки; тестовые репозитории проверяют только крайние
+случаи).
 
-| Metric | Direction | Critical | Healthy | Weight | Min runs | Aggregation |
+| Метрика | Направление | Критично | Здорово | Вес | Мин. запусков | Агрегация |
 |---|---|---|---|---|---|---|
-| `has_ci` | gate | — | — | 0 (gate only) | — | `ci_has_ci`: config file or any run exists |
+| `has_ci` | гейт | — | — | 0 (только гейт) | — | `ci_has_ci`: есть файл конфигурации или хоть один запуск |
 | `ci_success_rate` | + | 0.5 | 0.9 | 0.5 | 3 | `ci_success_rate` |
-| `ci_stability_trend` | + | -0.3 | 0 | 0.3 | 6 | `ci_stability_trend`: newer-half minus older-half pass share, -1..1 |
+| `ci_stability_trend` | + | -0.3 | 0 | 0.3 | 6 | `ci_stability_trend`: доля успешных в новой половине минус в старой, -1..1 |
 | `ci_median_duration_min` | − | 30 | 5 | 0.2 | 3 | `ci_median_duration_min` |
 
-Run status handling (`Run.Status` enum from the Swagger spec):
-- pass: `success`
-- fail: `failed`, `timeout`
-- ignored: `canceled`, `skipped`, `awaiting_approval`, `rejected` (say nothing about whether the
-  code passed), `created`, `prepared`, `processing` (not finished)
+Обработка статусов запусков (перечисление `Run.Status` из Swagger-спецификации):
+- успех: `success`
+- провал: `failed`, `timeout`
+- игнорируются: `canceled`, `skipped`, `awaiting_approval`, `rejected` (ничего не говорят о том,
+  прошёл ли код), `created`, `prepared`, `processing` (не завершены)
 
-**Success multiplier** (`ciSuccessMultiplier` in `cicd.go`, floor `0.4`): final = weighted ×
-(0.4 + 0.6·s), s = `ci_success_rate`'s 0-1 score. Chosen over raising success rate's weight, which
-would have made trend and duration nearly irrelevant: with the multiplier they still move the score
-proportionally at every success level.
+**Множитель успешности** (`ciSuccessMultiplier` в `cicd.go`, нижняя граница `ciSuccessFloor = 0.4`):
+итог = взвешенная оценка × (0.4 + 0.6·s), s — оценка 0–1 метрики `ci_success_rate`. Выбран вместо
+увеличения веса доли успешных, которое сделало бы тренд и длительность почти неважными: с
+множителем они по-прежнему пропорционально влияют на оценку при любом уровне успешности.
 
-With an odd number of finished runs, the middle one is left out of the trend so both halves are
-equal size. Duration only counts runs that have both timestamps.
+При нечётном числе завершённых запусков средний не учитывается в тренде, чтобы половины были
+равны. Длительность учитывает только запуски с обеими метками времени.
 
-## No-data vs. real-zero
+## Нет данных vs. настоящий ноль
 
-- **Token doesn't own the repo** → whole category no-data (decided 2026-09-26). Private grade is
-  renormalized over the other private categories.
-- **No config and zero readable runs** → real 0 via the `has_ci` gate. This is the one case the
-  gate formula's "zero the whole category" side effect is applied (in `ComputeCICD`).
-- **Config but zero runs** → no-data, not 0.
-- **Runs exist but no config** (config deleted or moved) → scored normally; `has_ci` passes.
-- Too few finished runs for every metric's floor → no-data.
+- **Токен не владеет репозиторием** → вся категория без данных (решено 2026-09-26). Приватная
+  оценка перенормируется по остальным приватным категориям.
+- **Нет конфигурации и ноль читаемых запусков** → настоящий 0 через гейт `has_ci`. Это
+  единственный случай, когда применяется побочный эффект формулы гейта «обнулить всю категорию»
+  (в `ComputeCICD`).
+- **Конфигурация есть, запусков ноль** → нет данных, не 0.
+- **Запуски есть, конфигурации нет** (файл удалён или перемещён) → обычный подсчёт; `has_ci`
+  проходит.
+- Завершённых запусков меньше порога каждой метрики → нет данных.
 
-## Mock repos and tests
+## Тестовые репозитории и тесты
 
-- Fixture tests: `backend/grade-service/internal/scoring/testdata/ci/*.json` +
-  `cicd_test.go` — 14 scenarios, pinned to the real `config/grading.yaml` thresholds.
-- Real repos: `docs/ci-mock-repos.json` (green 100, red 20, flaky 8, dormant no-data, none 0),
-  created by `scripts/mock-repos/create-all.sh`, checked by `cicd_live_test.go`
-  (`-tags live`). See `docs/testing.md`.
+- Тесты на фикстурах: `backend/grade-service/internal/scoring/testdata/ci/*.json` +
+  `cicd_test.go` — 14 сценариев, привязанных к реальным порогам из `config/grading.yaml`.
+- Реальные репозитории: `docs/ci-mock-repos.json` (green 100, red 20, flaky 8, dormant — нет
+  данных, none 0), создаются `scripts/mock-repos/create-all.sh`, проверяются `cicd_live_test.go`
+  (`-tags live`). См. `docs/testing.md`.
 
-## Known limitations
+## Известные ограничения
 
-- Only the wrapper's first page of runs is read (it doesn't pass a page size or follow page
-  tokens). The page held all 8 runs of every mock repo; if SourceCraft's default page is smaller
-  than 25, busy repos get fewer runs than the cap.
-- The 180-day window is by `created_at`, applied in repository-service, so the export reflects
-  export time, not grading time.
-- Only `.sourcecraft/ci.yaml` counts as a config file.
+- Читается только первая страница запусков обёртки (она не передаёт размер страницы и не ходит по
+  токенам страниц). На странице помещались все 8 запусков каждого тестового репозитория; если
+  страница SourceCraft по умолчанию меньше 25, загруженные репозитории получат меньше запусков,
+  чем лимит.
+- Окно 180 дней считается по `created_at` в repository-service, поэтому выгрузка отражает момент
+  выгрузки, а не оценивания.
+- Файлом конфигурации считается только `.sourcecraft/ci.yaml`.
 
-## Open questions
+## Открытые вопросы
 
-- How to grade "config but never ran" and "no CI at all" — raised for the team. Current behavior: no-data and 0 respectively.
-- The ownership check is implicit (403 → no-data). An explicit "caller controls this repo" rule at
-  the Aggregator is still not designed.
+- Как оценивать «конфигурация есть, но не запускалась» и «CI нет вообще» — вопрос вынесен на
+  команду. Текущее поведение: нет данных и 0 соответственно.
+- Проверка владения неявная (403 → нет данных). Явное правило «вызывающий управляет этим
+  репозиторием» на стороне Aggregator ещё не спроектировано.
 
-## Design history (compressed)
+## История решений (кратко)
 
-- 2026-09-22 plan: viewer-tier `GET /pulls/{slug}/merge-checks` per PR (the only CI signal a
-  non-owner token can read), with "0 PRs → no-data" and no duration available. Dropped
-  2026-09-26: CI/CD is private-only anyway, `cicd/runs` with an owner token gives full run history
-  including durations, and the wrapper already had the RPC. PR coverage was dropped with it (the
-  wrapper has no PR listing), replaced by median duration.
-- 2026-09-26: an always-red but stable, fast pipeline scored 50 (trend and duration perfect).
-  Fixed with the success multiplier (red → 20, flaky → 8); moderate pipelines drop too (80% pass:
-  76 → 65), accepted as the cost of keeping trend/duration meaningful.
-- 2026-09-26: the clone-side config check was added so a repo with no PRs/runs can still be told
-  apart ("has CI, never ran" vs. "no CI").
+- План от 2026-09-22: `GET /pulls/{slug}/merge-checks` с правами просмотра для каждого PR
+  (единственный сигнал CI, доступный токену не-владельца), «0 PR → нет данных», длительность
+  недоступна. Отменён 2026-09-26: CI/CD и так только приватная, `cicd/runs` с токеном владельца
+  даёт полную историю запусков с длительностями, а у обёртки уже был RPC. Покрытие PR ушло вместе с
+  ним (у обёртки нет списка PR) и заменено медианной длительностью.
+- 2026-09-26: всегда красный, но стабильный и быстрый пайплайн получал 50 (тренд и длительность
+  идеальны). Исправлено множителем успешности (red → 20, flaky → 8); умеренные пайплайны тоже
+  проседают (80% успешных: 76 → 65) — принято как цена осмысленности тренда и длительности.
+- 2026-09-26: добавлена проверка конфигурации на стороне клона, чтобы репозиторий без PR/запусков
+  всё равно можно было различить («CI есть, но не запускался» vs. «CI нет»).

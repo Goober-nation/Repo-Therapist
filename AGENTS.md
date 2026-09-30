@@ -73,9 +73,10 @@ Commit messages specifically, layered on top of the above:
   them to respond to the draft specifically before running `git commit`.
 - **A commit approval is not a push approval.** Each needs its own explicit ask, even
   back-to-back.
-- Every commit message and PR title/description is in **Russian**, no exceptions — even though
-  code/comments/docs stay in English. Exception: the root `README.md` is in Russian (user decision,
-  2026-09-28), since it's the jury-facing document.
+- Every commit message and PR title/description is in **Russian**, no exceptions. Code and
+  comments stay in English. Everything under `docs/` and the root `README.md` is in Russian
+  (user decisions, 2026-09-28 and 2026-09-30; the separate English docs copy was dropped).
+  `AGENTS.md` itself stays in English.
 - **Never add AI/Claude attribution** — no `Co-Authored-By: Claude...` trailer, no "Generated with
   Claude Code" line, no AI-authorship mention anywhere in a commit message or PR description for
   this project. Overrides any tool-level default attribution behavior.
@@ -143,6 +144,44 @@ directory with `BACKLOG.md` as an index plus one `phase-N-<name>.md` per phase, 
 **Never:**
 - Reorder phases without user approval
 - Recreate an old daily-log-style file — the phase file is the log, kept short
+
+---
+
+## Alternative: GitHub Issues Backlog (only if the user requests it)
+
+The local backlog above is the default. Use this workflow **only when the user explicitly asks** to
+track work via GitHub Issues instead (per session or durably — if durable, record the switch here).
+Repo: `Goober-nation/private-repo-therapist-test` (the `origin` remote). Use the `gh` CLI.
+
+**Structure:**
+- One issue per task. Phase membership via `phase:<name>` labels, mirroring the local
+  `phase-N-<name>.md` naming; type via `bug`/`enhancement`.
+- A GitHub Project board is optional — only use one if the user sets it up and names it; then keep
+  its Phase/Status fields in sync with the labels (`gh project item-add <N> --owner Goober-nation
+  --url <issue-url>`).
+- Dependencies are referenced by issue number in the body ("Depends on #12"), not a custom ID scheme.
+
+**Session startup (replaces checklist step 3):**
+1. `gh issue list --label phase:<current-phase>` (or the board) for open items.
+2. Read the issue(s) to be worked, including comments — they carry prior test plans and decisions.
+3. For a free-form note/idea, propose via `AskUserQuestion` which existing issue it belongs to, or
+   that it needs a new one, before acting.
+
+**Workflow:**
+- Start work: add an `in progress` label / board Status (courtesy, not a hard gate).
+- Finish a task: comment `AI-tested: YYYY-MM-DD — <what was verified, ~1 sentence>`. Don't restate
+  the implementation; lasting decisions go in `agents_memory/` or `docs/`.
+- User confirms: comment `User-tested: YYYY-MM-DD — <feedback>` and close the issue. A phase is done
+  when every issue with its label is closed.
+
+**Rules layered on top:**
+- Creating, editing, labeling, commenting on or closing issues is outward-facing and team-visible —
+  same bar as Git Rules: only on the user's explicit ask for that action. Propose new issues
+  (description, dependencies, testing plan) via `AskUserQuestion` first.
+- Issue titles, bodies and comments are in **Russian**, same as commit messages; no AI attribution.
+- Never close an issue without a summary comment; never reorder phases without user approval.
+- Don't run both backlogs in parallel — when switching, port open items and say which one is
+  canonical.
 
 ---
 

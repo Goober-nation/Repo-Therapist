@@ -1,78 +1,74 @@
-# Documentation (15%, public)
+# Документация (15%, публичная)
 
-**Status: implemented** — contract is `repo.docs.grade.requested` → `repo.docs.graded`
-(`docs/kafka-contracts.md`). Last updated 2026-09-29.
+**Статус: реализовано** — контракт `repo.docs.grade.requested` → `repo.docs.graded`
+(`docs/kafka-contracts.md`). Последнее обновление 2026-09-29.
 
-## How the grade is calculated (step by step)
+## Как вычисляется оценка (по шагам)
 
-1. Grade service publishes `repo.docs.grade.requested` for the repo and keeps grading the other
-   categories while it waits (up to the LLM timeout, 70s by default).
-2. The LLM service reads the repo from S3 and asks the model to grade it. In the default
-   `LLM_DOCS_MODE=auto`, if anything on the model path fails — the call itself (provider down,
-   rate limit, 60s timeout, content filter, malformed answer) or turning the model's answer into
-   a result — the service grades the same repo **algorithmically** instead (section presence only,
-   quality not judged) and replies with that grade: every section found in the docs earns 80% of
-   its points (quality unknown), a missing one earns 0, required files score
-   as usual, and consistency is not graded. The service adds a notice that this simplified method
-   was used; the grade service may reorder or limit the recommendations. `LLM_DOCS_MODE=algorithmic`
-   always uses this method; `LLM_DOCS_MODE=llm` never falls back and reports the failure instead.
-   (2026-09-29)
-3. If no reply arrives in time → the whole Documentation section is **no data**.
-4. If the reply has a nonempty `error` or `grade` is `null` → the whole Documentation section is
-   **no data**; subgrades and advice are ignored and the error code is logged. In `auto` mode this
-   only happens when the repo itself couldn't be read (e.g. `S3_PREFIX_NOT_FOUND`), the request
-   was invalid, or the algorithmic grade also failed.
-5. Otherwise the reply's `grade` (0–100) is taken as the category score unchanged; `subgrades` are
-   shown as metrics for display only and do not recompute the score.
-6. A no-data Documentation section is dropped from the overall grade and the remaining category
-   weights are renormalized, the same as any other no-data category.
+1. Grade service публикует `repo.docs.grade.requested` для репозитория и продолжает оценивать
+   остальные категории, пока ждёт ответа (не дольше таймаута LLM, по умолчанию 70 с).
+2. LLM-сервис читает репозиторий из S3 и просит модель его оценить. В режиме по умолчанию
+   `LLM_DOCS_MODE=auto`, если на пути модели что-то сломалось — сам вызов (провайдер недоступен,
+   лимит запросов, таймаут 60 с, фильтр содержимого, ответ неверного формата) или превращение
+   ответа модели в результат, — сервис оценивает тот же репозиторий **алгоритмически**
+   (только наличие разделов, без оценки качества) и отправляет эту оценку: каждый найденный раздел
+   получает 80% своих баллов (качество неизвестно), отсутствующий — 0, обязательные файлы
+   оцениваются как обычно, согласованность не оценивается. Сервис добавляет пометку, что
+   использован упрощённый метод; grade service может переупорядочить или ограничить рекомендации.
+   `LLM_DOCS_MODE=algorithmic` всегда использует этот метод, `LLM_DOCS_MODE=llm` никогда не
+   переключается на него и сообщает об ошибке. (2026-09-29)
+3. Если ответ не пришёл вовремя → весь раздел «Документация» получает **нет данных**.
+4. Если в ответе непустое поле `error` или `grade` равен `null` → весь раздел «Документация»
+   получает **нет данных**; subgrades и advice игнорируются, код ошибки пишется в лог. В режиме
+   `auto` это бывает, только если не удалось прочитать сам репозиторий (например,
+   `S3_PREFIX_NOT_FOUND`), запрос некорректен или сбоит и алгоритмическая оценка.
+5. Иначе `grade` из ответа (0–100) без изменений берётся как оценка категории; `subgrades`
+   показываются как метрики только для отображения и не пересчитывают оценку.
+6. Раздел «Документация» без данных исключается из общей оценки, а веса остальных категорий
+   перенормируются — так же, как для любой другой категории без данных.
 
-## What it measures
+## Что измеряется
 
-Documentation quality and best-practice hygiene: README existence and *quality* (not just
-presence), LICENSE, local-run instructions, build/test instructions, project structure,
-CONTRIBUTING, CODEOWNERS.
+Качество документации и соблюдение лучших практик: наличие README и его *качество* (а не только
+наличие), LICENSE, инструкции по локальному запуску, инструкции по сборке/тестированию, структура
+проекта, CONTRIBUTING, CODEOWNERS.
 
-## Data source
+## Источник данных
 
-**Primary path: LLM judgment, with deterministic fallback.** Grade service ships repo documentation
-already present in S3 (README, CONTRIBUTING, CODEOWNERS, detected build/local-run/test instructions,
-directory structure) to the LLM service over Kafka and gets a score and assessment back. The model
-judges quality; the fallback only checks whether sections are present. Rationale: TZ §3.1's
-Documentation criteria include quality judgments ("is the README actually useful"), which presence
-checks cannot make well, and the LLM service already exists in the architecture for this call.
+**Основной путь — оценка LLM, запасной — детерминированный.** Grade service передаёт LLM-сервису через Kafka ссылку на содержимое репозитория, уже лежащее в S3, и
+получает обратно оценку. LLM-сервис сам выбирает фрагменты документации (README, CONTRIBUTING,
+CODEOWNERS, инструкции по сборке/запуску/тестам, структура каталогов). Модель оценивает качество;
+запасной путь проверяет только наличие разделов. Обоснование: критерии документации из ТЗ §3.1
+включают суждения о качестве («действительно ли README полезен»), которые проверки наличия
+делают плохо, и LLM-сервис уже есть в архитектуре именно для таких вызовов.
 
-**Confirmed against the TZ PDF directly (§3.1, 2026-09-22): no external documentation-site
-crawling is required or implied.** Every listed criterion is a repo-internal artifact obtainable
-from the repo tree already uploaded to S3 by repository-service (`UploadDir`) — nothing new to
-fetch, the LLM only ever needs content already in hand.
+**Проверено напрямую по PDF ТЗ (§3.1, 2026-09-22): обход внешних сайтов документации не требуется
+и не подразумевается.** Каждый перечисленный критерий — артефакт внутри репозитория, доступный из
+дерева, которое repository-service уже загрузил в S3 (`UploadDir`); ничего дополнительно скачивать
+не нужно.
 
-## Metrics
+## Метрики
 
-Not applicable in the usual table form — the LLM path returns one category judgment rather than a
-set of independently weighted numeric metrics; the fallback checks section presence. The reply
-carries one `grade` (0–100), used as the category score, plus `subgrades` and `advice`
-(`repo.docs.graded` in `docs/kafka-contracts.md`).
+Обычная таблица неприменима: итоговая оценка категории — это `grade`, который возвращает
+LLM-сервис. Внутри LLM-сервис считает её по взвешенным проверкам рубрики (см.
+[`../documentation-grading.md`](../documentation-grading.md)) и отдаёт по Kafka `subgrades` —
+целочисленные проценты по разделам рубрики. Grade service показывает их только как метрики и не
+пересчитывает по ним оценку.
 
-## No-data vs. real-zero
+## Нет данных vs. настоящий ноль
 
-- There is no minimum-content gate: `00-overview.md` principle 4 is parked, so a near-empty repo
-  is still graded (see the known limitation there).
-- If the model path fails or times out in `auto` mode, the service uses the algorithmic grade: a
-  real, simplified score, with the fallback noted in advice. `NoData` is returned for a missing
-  reply or a reply with a nonempty `error` / `grade: null`; in `auto` mode, this means the repo
-  could not be read, the request was invalid, or the algorithmic fallback also failed.
-- A repo the LLM successfully judges as having *no* README at all is a real, harsh score from the
-  LLM — not `NoData`. Same "measured harsh vs. unmeasurable" distinction every other category
-  draws, just evaluated by the LLM instead of a formula.
+- Порога минимального содержимого нет: принцип 4 в `00-overview.md` отложен, поэтому почти
+  пустой репозиторий всё равно оценивается (см. известное ограничение там).
+- Если путь модели сбоит или истекает таймаут в режиме `auto`, сервис использует алгоритмическую
+  оценку: настоящую, упрощённую, с пометкой в рекомендациях. `NoData` возвращается при
+  отсутствии ответа или ответе с непустым `error` / `grade: null`; в режиме `auto` это значит, что
+  не удалось прочитать репозиторий, запрос некорректен или сбоила и алгоритмическая оценка.
+- Если LLM успешно установила, что README вообще *нет*, это настоящая, жёсткая оценка от LLM, а не
+  `NoData`. Та же граница «измерено и плохо» vs. «невозможно измерить», что и в остальных
+  категориях, только оценивает LLM, а не формула.
 
-## Known limitations
+## Известные ограничения
 
-- Original v1-baseline plan (deterministic presence/heuristic checks, no LLM) is superseded, kept
-  nowhere but this note for provenance — do not resurrect it without discussing with the user
-  first, per `AGENTS.md`'s grading-system rule.
-
-## Open questions
-
-- None about the contract: it is fixed in `docs/kafka-contracts.md` (`repo.docs.grade.requested`
-  → `repo.docs.graded`), and the LLM returns a single `grade` taken as the category score.
+- Изначальный план v1 (детерминированные проверки наличия/эвристики без LLM) отменён и сохранён
+  только в этой заметке для истории — не возвращайте его без обсуждения с пользователем, согласно
+  правилу `AGENTS.md` о системе оценивания.

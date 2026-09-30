@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from .algorithmic import algorithmic_grade
 from .context import ContextBuildError, prepare_documentation_context
-from .contracts import InvalidEvent, UnsupportedEventVersion
+from .contracts import InvalidEvent
 from .grade_wire import (REQUEST_TOPIC, RESULT_TOPIC, parse_grade_request,
                          request_uuid_if_valid, build_grade_result, build_grade_failure)
 from .model_response import InvalidModelResponse
@@ -81,8 +81,6 @@ class SummaryKafkaConfig:
 
 
 def _failure(exc: Exception) -> tuple[str, bool, str]:
-    if isinstance(exc, UnsupportedEventVersion):
-        return "UNSUPPORTED_EVENT_VERSION", False, "Версия запроса не поддерживается"
     if isinstance(exc, InvalidEvent):
         return "INVALID_EVENT", False, "Некорректный запрос на оценку документации"
     if isinstance(exc, SnapshotError):

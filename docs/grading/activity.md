@@ -1,126 +1,130 @@
-# Activity (20%, public)
+# Активность (20%, публичная)
 
-**Status: implemented** (2026-09-19). Last updated 2026-09-22.
+**Статус: реализовано** (2026-09-19). Последнее обновление 2026-09-28.
 
-## What it measures
+## Что измеряется
 
-How alive the project actually is right now: commit cadence, recency, contributor spread,
-issue/milestone cadence, and bus-factor concentration. Purely behavioral signal — never
-popularity (design principle 5 in `00-overview.md`).
+Насколько проект жив прямо сейчас: частота коммитов, их свежесть, разнообразие авторов, частота
+задач/вех и концентрация вклада («фактор автобуса»). Только поведенческий сигнал — никогда не
+популярность (принцип 5 в `00-overview.md`).
 
-## How it's calculated, in plain words
+## Как считается, простыми словами
 
-1. Repository-service clones the repo and asks SourceCraft for its issues and milestones, saving
-   each as one entry per event (commit, issue, milestone) with a timestamp, in S3.
-2. Before counting anything, grade-service drops commits that don't reflect real work — each rule
-   toggled in `config/grading.yaml`'s `activity.commit_filters` (defaults in brackets):
-   - authored in the future — a wrong clock or a forged date [on];
-   - empty — a non-merge commit that changed no files [on];
-   - by a bot — author name or email name part ends in `[bot]`, `-bot` or `_bot` [on];
-   - merges — commits with two or more parents [off: turning it on shifts every repo's counts].
-3. Grade-service turns the remaining commits, issues and milestones into seven numbers: how often commits happen, how long since the
-   last one, how many different people are committing, how often issues/milestones show up, how
-   long since the last milestone, and how concentrated commits are in one person.
-4. Each number gets placed on a line between a "healthy" value and a "critical" value — close to
-   healthy scores near 1, close to critical scores near 0.
-5. If a metric's underlying data couldn't be fetched at all, or (for top-contributor share) there
-   were too few commits to compute a meaningful share, that metric is dropped — "no data," not a
-   fabricated 0.
-6. The seven scores are combined into one 0-100 category score by weighted average, stretching
-   remaining weights to fill any dropped metric's gap.
+1. Repository-service клонирует репозиторий и запрашивает у SourceCraft задачи и вехи, сохраняя в
+   S3 по одной записи на событие (коммит, задача, веха) с меткой времени.
+2. Прежде чем что-то считать, grade-service отбрасывает коммиты, не отражающие реальную работу;
+   каждое правило включается в `activity.commit_filters` в `config/grading.yaml` (значения по
+   умолчанию в скобках):
+   - датированные будущим — неверные часы или подделанная дата [вкл.];
+   - пустые — не-merge коммит, не изменивший ни одного файла [вкл.];
+   - от ботов — имя автора или имя в email оканчивается на `[bot]`, `-bot` или `_bot` [вкл.];
+   - merge-коммиты — с двумя и более родителями [выкл.: включение сдвинет счётчики всех
+     репозиториев].
+3. Grade-service превращает оставшиеся коммиты, задачи и вехи в семь чисел: как часто делаются
+   коммиты, сколько прошло с последнего, сколько разных людей коммитят, как часто появляются
+   задачи/вехи, сколько прошло с последней вехи и насколько коммиты сосредоточены у одного
+   человека.
+4. Каждое число ставится на шкалу между «здоровым» и «критическим» значением — ближе к здоровому
+   даёт оценку около 1, ближе к критическому — около 0.
+5. Если исходные данные метрики вообще не удалось получить или (для доли главного автора) коммитов
+   слишком мало для осмысленной доли, метрика исключается — «нет данных», а не выдуманный 0.
+6. Семь оценок объединяются в одну оценку категории 0–100 взвешенным средним; веса оставшихся
+   метрик растягиваются, чтобы заполнить место исключённых.
 
-## Data source
+## Источник данных
 
-S3 `_meta/commits.json`, `_meta/issues.json`, `_meta/milestones.json` — written by
-repository-service (`backend/repository-service/internal/service/clone.go`) from a real git clone
-(commits) and sourcecraft-wrapper-service RPCs (issues, milestones). Each export is a full
-per-event list with timestamps, never a pre-aggregated count (see `00-overview.md`'s time-decay
-note for why that matters).
+S3 `_meta/commits.json`, `_meta/issues.json`, `_meta/milestones.json` — их пишет
+repository-service (`backend/repository-service/internal/service/clone.go`) из реального git-клона
+(коммиты) и RPC-вызовов sourcecraft-wrapper-service (задачи, вехи). Каждая выгрузка — полный
+список событий с метками времени, а не заранее агрегированное число (почему это важно — см.
+заметку о затухании со временем в `00-overview.md`).
 
-Issue and milestone exports are capped by sourcecraft-wrapper-service's `SOURCECRAFT_MAX_PAGES`
-(default 50 pages of 100, i.e. 5000 items). A repo above the cap is scored on its first 5000;
-raising it changes scores for such repos only. Commits come from git and are not capped.
+Выгрузки задач и вех ограничены `SOURCECRAFT_MAX_PAGES` в sourcecraft-wrapper-service (по
+умолчанию 50 страниц по 100, т. е. 5000 элементов). Репозиторий сверх лимита оценивается по
+первым 5000; увеличение лимита меняет оценки только таких репозиториев. Коммиты берутся из git и
+не ограничиваются.
 
-### Commit filters (2026-09-27)
+### Фильтры коммитов (2026-09-27)
 
-`commits.json` carries each commit's `parents` (from `git log %P`): `[]` for a root commit, two or
-more for a merge. `git log --numstat` lists no files for merge commits, so parents are what tells a
-merge apart from an empty commit. Exports written before this field existed have no `parents`;
-for those the empty-commit filter keeps every commit rather than risk dropping merges. Filtering
-happens once, before any commits.json-sourced metric (`ComputeCategory` → `FilterCommits`).
+`commits.json` содержит у каждого коммита `parents` (из `git log %P`): `[]` для корневого коммита,
+два и более для merge. `git log --numstat` не перечисляет файлы для merge-коммитов, поэтому именно
+родители отличают merge от пустого коммита. В выгрузках, записанных до появления этого поля,
+`parents` нет; для них фильтр пустых коммитов оставляет все коммиты, чтобы не рисковать
+отбрасыванием merge. Фильтрация выполняется один раз, до любой метрики на основе commits.json
+(`ComputeCategory` → `FilterCommits`).
 
-## Metrics
+## Метрики
 
-| Metric | Direction | Critical | Healthy* | Weight | Source | Aggregation |
+| Метрика | Направление | Критично | Здорово* | Вес | Источник | Агрегация |
 |---|---|---|---|---|---|---|
-| Commits/week | + | 0.5 | 5 | 0.25 | commits.json | `rate_per_week` |
-| Days since last activity | − | 40 | 3 | 0.20 | commits.json | `days_since_last_event` |
-| Unique contributors | + | 1 | 5 | 0.15 | commits.json | `unique_count(author_email)` |
-| Issue rate/week | + | 0.1 | 2 | 0.15 | issues.json | `rate_per_week` |
-| Milestones/year | + | 0 | 3 | 0.05 | milestones.json | `rate_per_year` |
-| Days since last milestone | − | 180 | 30 | 0.10 | milestones.json | `days_since_last_event` |
-| Top-contributor share | − | 1.0 | 0.5 | 0.10 | commits.json | `max_share(author_email)` |
+| Коммитов в неделю | + | 0.5 | 5 | 0.25 | commits.json | `rate_per_week` |
+| Дней с последней активности | − | 40 | 3 | 0.20 | commits.json | `days_since_last_event` |
+| Уникальных авторов | + | 1 | 5 | 0.15 | commits.json | `unique_count(author_email)` |
+| Задач в неделю | + | 0.1 | 2 | 0.15 | issues.json | `rate_per_week` |
+| Вех в год | + | 0 | 3 | 0.05 | milestones.json | `rate_per_year` |
+| Дней с последней вехи | − | 180 | 30 | 0.10 | milestones.json | `days_since_last_event` |
+| Доля главного автора | − | 1.0 | 0.5 | 0.10 | commits.json | `max_share(author_email)` |
 
-*= marked `provisional: true` in `config/grading.yaml` — first-guess placeholders, not yet
-validated against real repos.
+*= помечено `provisional: true` в `config/grading.yaml` — первые прикидки, ещё не проверенные на
+реальных репозиториях.
 
-## No-data vs. real-zero
+## Нет данных vs. настоящий ноль
 
-- A source (`commits.json`/`issues.json`/`milestones.json`) that failed to fetch → every metric
-  sourced from it is `NoData` for every one of its metrics.
-- A source that fetched fine but is genuinely empty (e.g. a repo with zero milestones) → its
-  rate-type metrics compute a real, valid zero — not `NoData`.
-- **Top-contributor share** has its own floor: fewer than 2 commits in the window is
-  statistically meaningless (a "share" of 1 commit is undefined, not just harsh) → `NoData`. A
-  genuine 100% concentration with ≥2 commits (one person, many commits) still scores as real
-  bus-factor risk — explicitly *not* excluded, rejected as a stricter rule during design.
+- Источник (`commits.json`/`issues.json`/`milestones.json`), который не удалось получить → все
+  метрики на его основе получают `NoData`.
+- Источник, полученный успешно, но действительно пустой (например, репозиторий без вех) →
+  метрики-частоты на нём дают настоящий, корректный ноль, а не `NoData`.
+- У **доли главного автора** свой порог: меньше 2 коммитов в окне статистически бессмысленно
+  («доля» от 1 коммита не определена, а не просто жёсткая) → `NoData`. Настоящая 100%-ная
+  концентрация при ≥2 коммитах (один человек, много коммитов) всё равно оценивается как реальный
+  риск «фактора автобуса» — это сознательно *не* исключается, более строгое правило было отвергнуто
+  при проектировании.
 
-## Known limitations
+## Известные ограничения
 
-- All `healthy`/`critical` thresholds are provisional — first guesses, not validated against a
-  real population of repos yet.
-- "MR rate/week" in the original source draft had a prose/table contradiction (per-month vs.
-  per-week) — resolved to per-week, matching the table.
-- SourceCraft's API returns Go's zero-value time (`"0001-01-01T00:00:00Z"`) for a milestone with
-  no deadline set, rather than omitting the field or returning null. `milestonesToEvents` treats
-  this sentinel (or an empty string) as unset and falls back to `created_at`
-  (`isUnsetDeadline` in `internal/scoring/activity.go`) — without it, `days_since_last_milestone`
-  silently computes from a ~2025-year-old fake deadline instead of the real date.
+- Все пороги `healthy`/`critical` предварительные — первые прикидки, пока не проверенные на
+  реальной выборке репозиториев.
+- В исходном черновике у «MR в неделю» было противоречие текста и таблицы (в месяц vs. в неделю)
+  — решено в пользу «в неделю», как в таблице.
+- API SourceCraft для вехи без установленного дедлайна возвращает нулевое время Go
+  (`"0001-01-01T00:00:00Z"`), а не пропускает поле и не возвращает null. `milestonesToEvents`
+  считает это значение (или пустую строку) неустановленным и берёт `created_at`
+  (`isUnsetDeadline` в `internal/scoring/activity.go`) — иначе `days_since_last_milestone` молча
+  считался бы от фальшивого дедлайна двухтысячелетней давности вместо реальной даты.
 
-## Open questions
+## История решений (кратко)
 
-- No automated unit tests yet for `internal/scoring` — same gap for every category.
-
-## Design history (compressed)
-
-- **Releases dropped, 2026-09-25.** `_meta/releases.json` was fetched but never found populated
-  on any real repo tested — releases appear to be a largely-unused SourceCraft feature distinct
-  from git tags, and it was never wired into any metric. repository-service no longer fetches it.
-- **`net_lines_per_week` dropped, 2026-09-25.** Net lines changed per week conflated too many
-  unrelated real events (a steady contributor pace, a single big refactor, a vendored-dependency
-  bump, a revert) under one number, and its healthy band had no activity floor — a repo with
-  **zero commits in the window** scored identically to one with healthy, balanced activity (both
-  clamp to score 1 inside `[-2, 10]`). Caught reviewing `yapb/yapb`'s real result: a fully dormant
-  repo got this metric's maximum score purely from having nothing happen. At 0.05 weight it wasn't
-  pulling enough independent signal to justify fixing over dropping — `commits_per_week` and
-  `days_since_last_activity` (0.20 weight each) already correctly punish zero/low activity, so the
-  category lost no real coverage by removing it.
-- **Its 0.05 weight moved to `commits_per_week` (0.20 -> 0.25), 2026-09-26.** Dropping the metric
-  left the category's weights summing to 0.95, which the config validator rejects at startup.
-- **`issue_rate_per_week`/`milestones_per_year` recalibrated, 2026-09-25.** Real data across 20
-  diverse repos — including large orgs like
-  gravity-ui/datalens/postgres forks — found median and p75 exactly 0 for both metrics, max 0.117
-  and 4 respectively. The old thresholds (`critical: 0.2/1`, `healthy: 2/6`) meant essentially no
-  real repo ever cleared critical, zero discrimination. Not evidence 20 real repos are badly run —
-  reads as SourceCraft's issue/milestone features being lightly adopted platform-wide. New:
-  `issue_rate_per_week` critical `0.02`/healthy `0.15`; `milestones_per_year` critical `0`/healthy
-  `3` — both still `provisional: true`, now at least anchored to the real observed range instead
-  of an arbitrary guess nothing could reach.
-- **`issue_rate_per_week` recalibrated again, 2026-09-28** (was critical 0.02 / healthy 0.15). The
-  09-25 population was mostly repos that don't use issues, so the bounds sat so low that any repo
-  that does maxed out: 27 of 29 issue-using SourceCraft repos (11 test repos + 18 random from
-  `docs/candidate-repos.json`) scored a perfect 1. Their rates: min 0, p10 0.34, median 1.0,
-  p75 2.7, max 14.9 per week. New bounds 0.1 / 2: 9 full, 18 in between, 2 at 0 (no new issues in
-  the window). Step by step: count issues opened in the last 180 days, divide by the weeks in that
-  window; 2+ per week scores 1, 0.1 or less scores 0, straight line in between (e.g. 1.05/week →
-  0.5). Still `provisional: true`.
+- **Релизы исключены, 2026-09-25.** `_meta/releases.json` загружался, но ни на одном проверенном
+  реальном репозитории не оказался заполненным — релизы, похоже, почти не используемая функция
+  SourceCraft, отдельная от git-тегов, и они так и не были подключены ни к одной метрике.
+  repository-service больше их не загружает.
+- **`net_lines_per_week` исключена, 2026-09-25.** Чистое число изменённых строк в неделю смешивало
+  в одно число слишком много несвязанных реальных событий (ровный темп автора, один большой
+  рефакторинг, обновление вендоренной зависимости, откат), и её здоровый диапазон не имел нижней
+  границы активности: репозиторий с **нулём коммитов в окне** получал ту же оценку, что и
+  репозиторий со здоровой, сбалансированной активностью (оба упираются в оценку 1 внутри
+  `[-2, 10]`). Обнаружено при разборе реального результата `yapb/yapb`: полностью спящий
+  репозиторий получил максимум по этой метрике просто потому, что ничего не происходило. С весом
+  0.05 она давала слишком мало независимого сигнала, чтобы чинить её, а не удалять —
+  `commits_per_week` и `days_since_last_activity` (по 0.20) уже правильно наказывают нулевую/низкую
+  активность, так что категория ничего не потеряла.
+- **Её вес 0.05 перенесён в `commits_per_week` (0.20 → 0.25), 2026-09-26.** После удаления метрики
+  сумма весов категории стала 0.95, а валидатор конфигурации отвергает это при запуске.
+- **`issue_rate_per_week`/`milestones_per_year` перекалиброваны, 2026-09-25.** Реальные данные
+  по 20 разным репозиториям — включая крупные организации вроде форков gravity-ui/datalens/postgres
+  — показали медиану и p75 ровно 0 для обеих метрик, максимум 0.117 и 4 соответственно. Со старыми
+  порогами (`critical: 0.2/1`, `healthy: 2/6`) практически ни один реальный репозиторий не
+  выходил за критический уровень — никакого различения. Это не доказательство, что 20 реальных
+  репозиториев плохо ведутся, — скорее функции задач/вех SourceCraft мало используются на всей
+  платформе. Новые значения: `issue_rate_per_week` critical `0.02`/healthy `0.15`;
+  `milestones_per_year` critical `0`/healthy `3` — обе по-прежнему `provisional: true`, но теперь
+  хотя бы привязаны к реально наблюдаемому диапазону, а не к произвольной недостижимой догадке.
+- **`issue_rate_per_week` снова перекалиброван, 2026-09-28** (было critical 0.02 / healthy 0.15).
+  Выборка от 09-25 состояла в основном из репозиториев, не использующих задачи, поэтому границы
+  стояли так низко, что любой использующий их репозиторий получал максимум: 27 из 29 репозиториев
+  SourceCraft с задачами (11 тестовых + 18 случайных из `docs/candidate-repos.json`) получили
+  идеальную 1. Их частоты: мин. 0, p10 0.34, медиана 1.0, p75 2.7, макс. 14.9 в неделю. Новые
+  границы 0.1 / 2: 9 на максимуме, 18 в промежутке, 2 на 0 (новых задач в окне не было). По шагам:
+  посчитать задачи, открытые за последние 180 дней, разделить на число недель в окне; 2+ в неделю
+  дают 1, 0.1 и меньше — 0, между ними линейно (например, 1.05 в неделю → 0.5). По-прежнему
+  `provisional: true`.

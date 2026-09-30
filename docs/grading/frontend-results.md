@@ -1,16 +1,15 @@
-# Dynamic category results in the frontend
+# Динамические результаты категорий во фронтенде
 
-The results component accepts any category names and any number of categories. The backend
-still computes the grades using the existing category formulas and weights. This change only
-affects how received grades are validated and displayed; the frontend does not recompute the
-overall health score.
+Компонент результатов принимает любые названия категорий и любое их количество. Бэкенд
+по-прежнему вычисляет оценки по существующим формулам и весам категорий. Это изменение касается
+только проверки и отображения полученных оценок; фронтенд не пересчитывает общий health score.
 
-## Supported input
+## Поддерживаемый ввод
 
-`category_scores` accepts a dictionary or the documented array of dictionaries. Values can
-be numbers, `null`, or objects with `score` and optional `name`, `description`, and `trend`.
-`criteria` is accepted as an alternative container; if both are supplied, `category_scores`
-takes precedence, including when it is empty or `null`.
+`category_scores` принимает словарь или документированный массив словарей. Значения могут быть
+числами, `null` или объектами с `score` и необязательными `name`, `description` и `trend`.
+`criteria` принимается как альтернативный контейнер; если переданы оба, приоритет у
+`category_scores`, даже если он пустой или `null`.
 
 ```json
 {
@@ -24,37 +23,39 @@ takes precedence, including when it is empty or `null`.
 }
 ```
 
-The keys are preserved exactly. No category allowlist is applied. Objects can supply a
-display `name`; otherwise the Russian label for a known category ID (`activity`, `issues`,
-`documentation`, `code_health`, `security`, `ci_cd`, see `src/metrics.ts`) or the key itself is
-displayed. An object's `metrics` array (`{id, no_data, raw_value}` from grade-service) is shown
-as the facts behind the score; shares (0–1) are shown in percent. Other fields are ignored.
+Ключи сохраняются в точности. Белый список категорий не применяется. Объект может задать
+отображаемое `name`; иначе показывается русское название известного ID категории (`activity`,
+`issues`, `documentation`, `code_health`, `security`, `ci_cd`, см. `src/metrics.ts`) или сам ключ.
+Массив `metrics` объекта (`{id, no_data, raw_value}` из grade-service) показывается как факты,
+стоящие за оценкой; доли (0–1) показываются в процентах. Остальные поля игнорируются.
 
-## How a category reaches the screen
+## Как категория попадает на экран
 
-1. The backend calculates its score using that category's formula.
-2. The frontend reads each category entry from the supplied container.
-3. A finite number from 0 through 100 is rounded for display, as before. Zero is valid.
-4. A missing, null, nonnumeric or out-of-range score displays `Нет данных`, without a score bar.
-5. The component creates one card per category, using its name and optional description.
-   The Markdown export uses the same names and scores.
+1. Бэкенд вычисляет оценку по формуле этой категории.
+2. Фронтенд читает каждую запись категории из переданного контейнера.
+3. Конечное число от 0 до 100 округляется для отображения, как и раньше. Ноль — допустимое значение.
+4. Отсутствующая, null, нечисловая или выходящая за диапазон оценка отображается как `Нет данных`,
+   без полосы оценки.
+5. Компонент создаёт одну карточку на категорию с её названием и необязательным описанием.
+   Экспорт в Markdown использует те же названия и оценки.
 
-There are no fabricated zero scores for absent categories. A completed response replaces the
-previous set of categories, including clearing it when no categories are supplied. A pending
-response without a category container retains the previous results; an explicitly empty
-container clears them. In the array form, the last entry wins for a repeated key.
+Для отсутствующих категорий не выдумываются нулевые оценки. Завершённый ответ заменяет предыдущий
+набор категорий, в том числе очищает его, если категории не переданы. Ответ в состоянии ожидания
+без контейнера категорий сохраняет предыдущие результаты; явно пустой контейнер их очищает. В форме
+массива при повторе ключа побеждает последняя запись.
 
-Categories without data are listed under «Нет данных» with a reason: in a public analysis
-Security and CI/CD are always listed as owner-only; otherwise the reason is that the source
-returned nothing. `grade.missing_data` from the backend is authoritative for that list.
+Категории без данных перечисляются в блоке «Нет данных» с причиной: в публичном анализе Security и
+CI/CD всегда указаны как доступные только владельцу; иначе причина — источник ничего не вернул.
+`grade.missing_data` из бэкенда — главный источник для этого списка.
 
-The public ranking has no category scores (Gateway returns only `public_score`). It is paged
-on the server (`GET /ranking`, 100 per page): sorting and the language filter are server-side,
-while text search and the minimum-score filter narrow the loaded page only and say so. A missing
-overall score does not match a positive minimum-score filter.
+В публичном рейтинге нет оценок по категориям (Gateway возвращает только `public_score`). Он
+постраничный на сервере (`GET /ranking`, 100 на страницу): сортировка и фильтр по языку работают
+на сервере, а текстовый поиск и фильтр минимальной оценки сужают только загруженную страницу и
+сообщают об этом. Отсутствующая общая оценка не проходит фильтр с положительным минимумом.
 
-## Verification
+## Проверка
 
-From `frontend`, run `corepack pnpm run check` (type check, tests, build). The tests cover
-mapping, full-page rendering, Markdown and PDF export, category additions/removals, malformed
-values, metric facts, missing data, pending/completed transitions and polling.
+Из каталога `frontend` выполните `corepack pnpm run check` (проверка типов, тесты, сборка). Тесты
+покрывают сопоставление, отрисовку всей страницы, экспорт в Markdown и PDF, добавление/удаление
+категорий, некорректные значения, факты метрик, отсутствующие данные, переходы из ожидания в
+завершение и опрос.

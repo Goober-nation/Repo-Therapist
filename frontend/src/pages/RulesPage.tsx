@@ -2,7 +2,7 @@ import { Marked } from "marked"
 import { useMemo } from "react"
 import { Card, PageHeading } from "../components/Shell"
 
-/** Grading docs copied from docs/docs-ru/grading by scripts/sync-rules.mjs. */
+/** Grading docs copied from docs/grading by scripts/sync-rules.mjs. */
 const files = import.meta.glob("../rules/*.md", { query: "?raw", import: "default", eager: true }) as Record<
   string,
   string

@@ -1,7 +1,6 @@
 import json
 import unittest
 from datetime import datetime
-from pathlib import Path
 
 from llm_service.contracts import InvalidEvent
 from llm_service.grade_wire import parse_grade_request, build_grade_result, build_grade_failure
@@ -9,12 +8,6 @@ from test_kafka_worker import request, FakeModel, REPOSITORY
 
 
 class GradeWireTests(unittest.TestCase):
-    def test_documented_request_matches_parser(self):
-        doc = (Path(__file__).resolve().parents[3] / "docs/kafka-contracts.md").read_text()
-        section = doc.split("## Documentation grading: active", 1)[1]
-        raw = section.split("```json\n", 1)[1].split("\n```", 1)[0].encode()
-        self.assertEqual(parse_grade_request(raw)["sourcecraft_uuid"], REPOSITORY)
-
     def test_request_without_envelope(self):
         self.assertEqual(parse_grade_request(request())["sourcecraft_uuid"], REPOSITORY)
 

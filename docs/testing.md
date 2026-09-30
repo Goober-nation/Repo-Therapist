@@ -1,30 +1,30 @@
-# Manual testing
+# Ручное тестирование
 
-Automated tests live next to the code: `go test ./...` for the Go services,
-`pytest` in `backend/llm-service`, `pnpm test` in `frontend`. This file covers the
-end-to-end checks that need the running stack and are done by hand.
+Как проверить всё вручную — в соответствии с тем, что уже реально проверено. Автоматические
+Go-тесты тоже есть (`go test ./...` в каждом модуле, см. ниже), но сквозной поток проверяется
+руками.
 
-## Setup
+## Подготовка
 
 ```bash
-cp .env.example .env   # fill in SOURCECRAFT_PAT with a real token
+cp .env.example .env   # впишите в SOURCECRAFT_PAT настоящий токен
 docker compose up -d   # Postgres + S3 (RustFS) + Kafka
 set -a && source .env && set +a
 ```
 
-## 1. Repository service alone (one-shot)
+## 1. Только Repository service (разовый запуск)
 
-Clones a repo, uploads its tree + git history + issues/milestones to S3. Needs
-sourcecraft-wrapper-service running too (`go run ./backend/sourcecraft-wrapper-service/cmd`,
-`SOURCECRAFT_URL=https://api.sourcecraft.tech`) — repository-service talks to it via
-`SC_WRAPPER_ADDR` (defaults to `localhost:8083`).
+Клонирует репозиторий, загружает в S3 его дерево, историю git и задачи/вехи. Нужен также
+запущенный sourcecraft-wrapper-service (`go run ./backend/sourcecraft-wrapper-service/cmd`,
+`SOURCECRAFT_URL=https://api.sourcecraft.tech`) — repository-service обращается к нему по
+`SC_WRAPPER_ADDR` (по умолчанию `localhost:8083`).
 
 ```bash
 go run ./backend/repository-service/cmd/repository-service --org=examples --repo=vulnerable-repo
 ```
 
-Check what landed in S3 (RustFS console at `http://localhost:8055/rustfs/console/index.html`, login
-from `.env`), or via the AWS CLI (the compose service is still named `minio`):
+Проверьте, что попало в S3 (консоль RustFS на `http://localhost:8055/rustfs/console/index.html`,
+логин из `.env`), или через AWS CLI (сервис в compose по-прежнему называется `minio`):
 
 ```bash
 docker run --rm --network <compose-project>_default \
@@ -32,122 +32,126 @@ docker run --rm --network <compose-project>_default \
   amazon/aws-cli --endpoint-url http://minio:9000 s3 ls --recursive s3://repo-content/repos/<sourcecraft_uuid>/
 ```
 
-In the full stack, Grade service deletes `repos/<uuid>/` once the grading result is published,
-and Repository service clears it before each upload. Set `S3_KEEP_REPO_DATA=true` to keep
-exports for inspection.
+В полном стеке Grade service удаляет `repos/<uuid>/` после публикации результата оценки,
+а Repository service очищает его перед каждой загрузкой. Чтобы сохранить выгрузки для
+проверки, задайте `S3_KEEP_REPO_DATA=true`.
 
-(`<compose-project>` is the docker-compose project name — usually the directory name; check with
-`docker compose ps` if unsure.)
+(`<compose-project>` — имя проекта docker-compose, обычно имя каталога; если не уверены,
+проверьте через `docker compose ps`.)
 
-## 2. Grade service alone (one-shot)
+## 2. Только Grade service (разовый запуск)
 
-Reads a repo's S3 exports (from step 1) and computes the Activity score.
+Читает выгрузки репозитория из S3 (из шага 1) и вычисляет оценки категорий.
 
 ```bash
 go run ./backend/grade-service/cmd/grade-service --repo-id=<sourcecraft_uuid>
 ```
 
-Prints the full score breakdown as JSON — each metric's raw value, score, weight, and whether it
-was no-data.
+Печатает полную разбивку оценки в JSON — для каждой метрики сырое значение, оценку, вес и признак
+отсутствия данных.
 
-## 3. Full async flow via Kafka
+## 3. Полный асинхронный поток через Kafka
 
-Start both services in listen mode (separate terminals, or backgrounded):
+Запустите оба сервиса в режиме прослушивания (в отдельных терминалах или в фоне):
 
 ```bash
 go run ./backend/repository-service/cmd/repository-service --listen
 go run ./backend/grade-service/cmd/grade-service --listen
 ```
 
-Then trigger a grade from a third terminal. This publishes `grading.requests` exactly like the
-Aggregator does and prints the `grading.results` message for that repo:
+Затем запустите оценку из третьего терминала. Команда публикует `grading.requests` точно так же,
+как Aggregator, и печатает сообщение `grading.results` для этого репозитория:
 
 ```bash
 go run ./backend/grade-service/cmd/grading-request --org=examples --repo=vulnerable-repo
 ```
 
-`grading.results` carries only the repo's UUID, so `grading-request` first waits for the
-`repo.ready` message for this org/repo (which has the UUID), then for the result with that UUID
-and visibility. Messages for other requests are skipped, so a late result from an earlier request
-is never printed as this one's. It exits non-zero right away if the clone failed (`repo.ready`
-status `failed`) or the result has an `error`; otherwise it gives up after `--wait` (default 10m,
-covering the default clone limit).
+`grading.results` содержит только UUID репозитория, поэтому `grading-request` сначала ждёт
+сообщение `repo.ready` для этой организации/репозитория (в нём есть UUID), а затем результат с
+этим UUID и видимостью. Сообщения других запросов пропускаются, так что запоздавший результат
+предыдущего запроса никогда не будет напечатан как текущий. Команда сразу завершается с ненулевым
+кодом, если клонирование не удалось (`repo.ready` со статусом `failed`) или в результате есть
+`error`; иначе сдаётся по истечении `--wait` (по умолчанию 10m, покрывает стандартный лимит
+клонирования).
 
-Watch the two listener terminals: Repository service logs the clone/upload and publishes
-`repo.ready`; Grade service logs the grading and publishes the result.
+Следите за двумя терминалами-слушателями: Repository service логирует клонирование/загрузку и
+публикует `repo.ready`; Grade service логирует оценивание и публикует результат.
 
-**Note**: if testing `--listen` processes via `go run ... &` in a shell script, `kill <pid>` won't
-stop the actual compiled binary (`go run`'s signal handling doesn't propagate to its child) — build
-first and run the binary directly, or use `pkill -f <binary-name>`, if you need to script
-start/stop.
+**Примечание**: если вы тестируете процессы `--listen` через `go run ... &` в shell-скрипте,
+`kill <pid>` не остановит сам скомпилированный бинарник (обработка сигналов `go run` не
+передаётся дочернему процессу) — сначала соберите бинарник и запускайте его напрямую, или
+используйте `pkill -f <binary-name>`, если нужно скриптовать запуск/остановку.
 
-## 4. Batch: all candidate repos
+## 4. Пакетно: все репозитории-кандидаты
 
-`scripts/grade-candidates.sh` runs step 3 for every repo in `docs/candidate-repos.json` with
-`passes_full_criteria=true`, one at a time:
+`scripts/grade-candidates.sh` выполняет шаг 3 по очереди для каждого репозитория из
+`docs/candidate-repos.json` с `passes_full_criteria=true`:
 
-1. If the dockerized `go-services` is running, it's stopped (it bundles older builds of the same
-   services and would take the batch's messages) and started again when the script exits, including
-   on Ctrl-C.
-2. Only the infra containers are started (postgres, kafka, minio, migrate); the three services are
-   built from the current code and run locally.
-3. Each repo is requested with `--wait=15m`; arguments to the script go to `grading-request` and
-   override that (e.g. `--wait=20m`).
-4. Repos that got no result are retried once at the end, then a summary prints how many were
-   graded, how many recovered on retry, and which still failed.
+1. Если запущен контейнер `go-services`, он останавливается (в нём более старые сборки тех же
+   сервисов, и он перехватывал бы сообщения пакета) и снова запускается при выходе из скрипта, в
+   том числе по Ctrl-C.
+2. Запускаются только инфраструктурные контейнеры (postgres, kafka, minio, migrate); три сервиса
+   собираются из текущего кода и запускаются локально.
+3. Каждый репозиторий запрашивается с `--wait=15m`; аргументы скрипта передаются в
+   `grading-request` и переопределяют это значение (например, `--wait=20m`).
+4. Репозитории без результата в конце перезапрашиваются один раз, затем печатается сводка: сколько
+   оценено, сколько восстановилось при повторе и какие так и не удались.
 
-Documentation needs the LLM service; for a batch without it: `LLM_ENABLED=false scripts/grade-candidates.sh`.
+Для документации нужен LLM-сервис; для пакета без него: `LLM_ENABLED=false scripts/grade-candidates.sh`.
 
-**Time limits** (stability over speed, 2026-09-27): repository-service gives each repo
-`CLONE_TIMEOUT` (default 10m) for clone + export + upload, grade-service `GRADE_TIMEOUT`
-(default 4m) for grading. Each consumer handles one message at a time, so a repo that uses its full
-limit holds up the ones queued behind it. Transient SourceCraft/AppSec errors are retried inside
-the wrappers (`HTTP_RETRY_ATTEMPTS`, `HTTP_RETRY_WAIT_SECONDS`).
+**Лимиты времени** (стабильность важнее скорости, 2026-09-27): repository-service даёт каждому
+репозиторию `CLONE_TIMEOUT` (по умолчанию 10m) на клонирование + выгрузку + загрузку,
+grade-service — `GRADE_TIMEOUT` (по умолчанию 4m) на оценивание. Каждый потребитель обрабатывает
+по одному сообщению, поэтому репозиторий, исчерпавший весь лимит, задерживает стоящие за ним в
+очереди. Временные ошибки SourceCraft/AppSec повторяются внутри обёрток
+(`HTTP_RETRY_ATTEMPTS`, `HTTP_RETRY_WAIT_SECONDS`).
 
-## Build/lint checks
+## Проверки сборки/линтера
 
-Each backend service is its own Go module (linked via the root `go.work`), so run these per module:
+Каждый Go-сервис бэкенда — отдельный модуль (связаны через корневой `go.work`), поэтому запускайте
+проверки по модулям:
 
 ```bash
-for d in backend/shared backend/grade-service backend/repository-service backend/security-wrapper-service; do
+for d in backend/grade-service backend/repository-service backend/security-wrapper-service backend/sourcecraft-wrapper-service backend/aggregator-service backend/gateway-service backend/rating-service; do
   (cd "$d" && go build ./... && go vet ./...)
 done
-gofmt -l backend         # should print nothing
+gofmt -l backend         # не должно ничего вывести
 ```
 
-## Manual-tagged tests
+## Тесты с тегом manual
 
-One test needs a live S3 (the compose `minio` service) with data already uploaded (not run by default `go test ./...`):
+Одному тесту нужен живой S3 (сервис `minio` в compose) с уже загруженными данными (не запускается обычным `go test ./...`):
 
 ```bash
-(cd backend/shared && go test -tags=manual ./storage/ -run TestBatchReadManual -v)
+(cd backend/repository-service && go test -tags=manual ./internal/storage/ -run TestBatchReadManual -v)
 ```
 
-## CI/CD mock repos
+## Тестовые репозитории для CI/CD
 
-Five public repos under `timoxa102928` with known CI histories — see `docs/ci-mock-repos.json`
-for IDs and expected scores. Needs a PAT that owns that org (`cicd/runs` is owner-only).
+Пять публичных репозиториев в `timoxa102928` с известной историей CI — идентификаторы и ожидаемые
+оценки см. в `docs/ci-mock-repos.json`. Нужен PAT владельца этой организации (`cicd/runs`
+доступен только владельцу).
 
-Offline fixture tests (part of plain `go test ./...`):
+Офлайн-тесты на фикстурах (входят в обычный `go test ./...`):
 
 ```bash
 (cd backend/grade-service && go test ./internal/scoring/ -run CICD -v)
 ```
 
-Live check against the real API (scoring only, reads runs straight from REST):
+Живая проверка против реального API (только подсчёт, запуски читаются напрямую через REST):
 
 ```bash
 (cd backend/grade-service && go test -tags live ./internal/scoring/ -run LiveMockRepos -v)
 ```
 
-Full pipeline for one repo (sourcecraft-wrapper-service must be running):
+Полный конвейер для одного репозитория (должен быть запущен sourcecraft-wrapper-service):
 
 ```bash
 go run ./backend/repository-service/cmd/repository-service --org=timoxa102928 --repo=ci-mock-flaky
 go run ./backend/grade-service/cmd/grade-service --repo-id=01a0dd5d-d258-7af2-9b1b-b2346d6d29b6 | jq .categories.ci_cd
 ```
 
-Recreating the repos: `scripts/mock-repos/create-all.sh` (skips repos that already have content;
-`--force` re-pushes and appends new runs, which changes expected scores). Newly pushed runs queue
-on SourceCraft for a few minutes — the live test fails fast while any run is still
-`prepared`/`processing`.
+Пересоздание репозиториев: `scripts/mock-repos/create-all.sh` (пропускает репозитории, в которых
+уже есть содержимое; `--force` пушит заново и добавляет новые запуски, что меняет ожидаемые
+оценки). Свежие запуски несколько минут стоят в очереди SourceCraft — живой тест быстро падает,
+пока хоть один запуск ещё в состоянии `prepared`/`processing`.

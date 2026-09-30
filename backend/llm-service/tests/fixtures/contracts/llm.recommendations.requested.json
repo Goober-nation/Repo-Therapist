@@ -1,0 +1,15 @@
+{
+  "visibility": "private",
+  "sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
+  "org_slug": "examples",
+  "repo_slug": "demo",
+  "grade": {
+    "score": 64,
+    "category_scores": {"security": 40, "activity": 90, "documentation": 70,
+                        "ci_cd": null, "issues": 80, "code_health": 55},
+    "advice": ["Обновите уязвимые зависимости."],
+    "missing_data": ["ci_cd"],
+    "graded_at": "2026-09-27T11:59:00Z"
+  },
+  "requested_at": "2026-09-27T12:00:00+03:00"
+}

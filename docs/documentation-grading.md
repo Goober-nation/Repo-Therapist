@@ -1,55 +1,60 @@
-# Documentation grading method (`documentation-grading-v1`)
+# Методика оценки документации (`documentation-grading-v1`)
 
-> Active method (2026-09-26): budget-limited sampled documentation review.
-> The service selects up to eight relevant excerpts (30 lines and 3000 UTF-8 bytes
-> per excerpt). Existing weights and eight section grades apply as estimates
-> from the selected material. Findings must not claim that omitted text was
-> inspected or absent; sampling alone is not a deficiency.
+> Активный метод (2026-09-26): выборочный просмотр документации с ограниченным бюджетом.
+> Сервис выбирает до восьми релевантных фрагментов (не более 30 строк и 3000 байт UTF-8
+> на фрагмент). Существующие веса и оценки восьми разделов применяются как оценки по
+> выбранному материалу. Выводы не должны утверждать, что пропущенный текст был проверен
+> или отсутствует; сама выборочность недостатком не считается.
 
 
-> Current active output: `documentation.analysis.completed` v2 contains only `grade`,
-> eight `subcategories`, and a flat `facts` list. Internal checks/components and
-> numeric deduction impacts are not transmitted. The active model path checks format
-> only; strict evidence/impact rules below describe the legacy validator and scoring
-> guidance, not acceptance requirements for the current Yandex response. See
-> [Kafka contract](kafka-contracts.md) and [active model output](llm-model-output.md).
+> Внутренний результат модели содержит только `grade`, восемь `subcategories` и плоский список
+> `facts`; по Kafka передаётся `repo.docs.graded`. Внутренние проверки/компоненты и числовые вычеты не
+> передаются. Активный путь модели проверяет только формат; строгие правила доказательств и
+> влияния ниже описывают устаревший валидатор и рекомендации по подсчёту, а не требования к
+> приёму текущего ответа Yandex. См. [контракт Kafka](kafka-contracts.md) и
+> [вывод активной модели](llm-model-output.md).
+>
+> **Примечание (проверено по коду, 2026-09-28).** Рубрика (группы, проверки, максимумы
+> и компоненты) совпадает с `backend/llm-service/src/llm_service/grading.py`. По Kafka сейчас
+> передаётся `repo.docs.graded` (`grade`, `subgrades`, `advice`). Статусы `CALCULATED`/`CALCULATED_PARTIAL`, `coverage` в
+> процентах, группировка вычетов в «проблемы» и групповые коды относятся к устаревшему пути
+> (`grading.py`); групповые коды в коде не реализованы.
 
-This document defines the reproducible 0–100 method owned by LLM service for the
-`documentation` category. Kafka transport is defined in `docs/kafka-contracts.md`.
+Документ определяет воспроизводимую методику 0–100, которой владеет LLM-сервис для категории
+`documentation`. Транспорт Kafka описан в `docs/kafka-contracts.md`.
 
-The method combines deterministic repository checks with semantic checks. The model assigns only
-integer points and machine-readable deductions. It does not write explanations or recommendations
-during grading; those are generated later by the report workflow.
+Методика сочетает детерминированные проверки репозитория со смысловыми. Модель выставляет только
+целые баллы и машиночитаемые вычеты. Во время оценивания она не пишет пояснений и рекомендаций;
+рекомендации строятся детерминированно по кодам вычетов.
 
-## Score composition
+## Состав оценки
 
-| Group | Checks | Maximum |
+| Группа | Проверки | Максимум |
 |---|---|---:|
-| Required files | README, LICENSE, CONTRIBUTING, CODEOWNERS | 20 |
-| Purpose and overview | Purpose, capabilities | 15 |
-| Local setup and run | Prerequisites, dependencies, configuration, execution, verification | 20 |
-| Build | Commands, configuration, output | 10 |
-| Testing | Commands, environment, scope | 10 |
-| Usage examples | Primary example, inputs, expected result | 10 |
-| Structure and navigation | Repository overview, documentation navigation | 5 |
-| Consistency | References, commands, description | 10 |
-| **Total** |  | **100** |
+| Обязательные файлы | README, LICENSE, CONTRIBUTING, CODEOWNERS | 20 |
+| Назначение и обзор | Назначение, возможности | 15 |
+| Локальная настройка и запуск | Предпосылки, зависимости, конфигурация, запуск, проверка | 20 |
+| Сборка | Команды, конфигурация, результат | 10 |
+| Тестирование | Команды, окружение, охват | 10 |
+| Примеры использования | Основной пример, входные данные, ожидаемый результат | 10 |
+| Структура и навигация | Обзор репозитория, навигация по документации | 5 |
+| Согласованность | Ссылки, команды, описание | 10 |
+| **Итого** |  | **100** |
 
-## Check outcomes and normalization
+## Исходы проверок и нормировка
 
-Every check has one outcome:
+У каждой проверки один исход:
 
-- `EVALUATED`: the check was performed; `points_awarded` is an integer from zero through
-  `max_points`;
-- `NOT_APPLICABLE`: the check is not relevant to this repository;
-- `NO_DATA`: the check is relevant, but the available snapshot or context cannot support a reliable
-  decision.
+- `EVALUATED`: проверка выполнена; `points_awarded` — целое от нуля до `max_points`;
+- `NOT_APPLICABLE`: проверка не относится к этому репозиторию;
+- `NO_DATA`: проверка относится к репозиторию, но доступный снимок или контекст не позволяет
+  принять надёжное решение.
 
-Missing expected documentation is an evaluated zero, not `NO_DATA`. For example, a missing README
-or absent local-run instruction loses points. A repository with no separate build process may mark
-Build checks `NOT_APPLICABLE` without losing points.
+Отсутствие ожидаемой документации — оценённый ноль, а не `NO_DATA`. Например, отсутствующий
+README или отсутствие инструкции по локальному запуску теряют баллы. Репозиторий без отдельного
+процесса сборки может пометить проверки сборки `NOT_APPLICABLE` без потери баллов.
 
-The service calculates:
+Сервис вычисляет:
 
 ```text
 applicable_max = sum(max_points where outcome != NOT_APPLICABLE)
@@ -60,78 +65,80 @@ coverage = evaluated_max / applicable_max * 100
 score    = earned / evaluated_max * 100
 ```
 
-The score is rounded to two decimal places. Missing data never counts as zero and never reduces the
-score. A result is `CALCULATED` when all applicable points were evaluated and
-`CALCULATED_PARTIAL` otherwise. Both statuses carry a numeric score. If no applicable check can be
-evaluated, the workflow fails instead of fabricating a number.
+Оценка округляется до двух знаков после запятой. Отсутствие данных никогда не считается нулём и
+никогда не снижает оценку. Результат `CALCULATED`, если оценены все применимые баллы, и
+`CALCULATED_PARTIAL` иначе. Оба статуса несут числовую оценку. Если ни одну применимую проверку
+оценить нельзя, процесс завершается ошибкой, а не выдумывает число.
 
-## Deterministic checks (20 points)
+## Детерминированные проверки (20 баллов)
 
-| `check_id` | Maximum | Pass condition | Missing / empty codes |
+| `check_id` | Максимум | Условие прохождения | Коды отсутствия / пустоты |
 |---|---:|---|---|
-| `readme.exists` | 5 | A non-empty root README exists | `DOC_README_MISSING`, `DOC_README_EMPTY` |
-| `license.exists` | 5 | A non-empty root license file exists | `DOC_LICENSE_MISSING`, `DOC_LICENSE_EMPTY` |
-| `contributing.exists` | 5 | A non-empty contribution guide exists | `DOC_CONTRIBUTING_MISSING`, `DOC_CONTRIBUTING_EMPTY` |
-| `codeowners.exists` | 5 | A non-empty CODEOWNERS file exists | `DOC_CODEOWNERS_MISSING`, `DOC_CODEOWNERS_EMPTY` |
+| `readme.exists` | 5 | Есть непустой README в корне | `DOC_README_MISSING`, `DOC_README_EMPTY` |
+| `license.exists` | 5 | Есть непустой файл лицензии в корне | `DOC_LICENSE_MISSING`, `DOC_LICENSE_EMPTY` |
+| `contributing.exists` | 5 | Есть непустое руководство для участников | `DOC_CONTRIBUTING_MISSING`, `DOC_CONTRIBUTING_EMPTY` |
+| `codeowners.exists` | 5 | Есть непустой файл CODEOWNERS | `DOC_CODEOWNERS_MISSING`, `DOC_CODEOWNERS_EMPTY` |
 
-Each check awards either zero or five points. Filename matching is case-insensitive. Accepted
-locations and names are:
+Каждая проверка даёт либо ноль, либо пять баллов. Имена файлов сравниваются без учёта регистра.
+Допустимые места и имена:
 
-- README: repository root; `README`, `README.md`, `README.rst`, or `README.adoc`;
-- license: repository root; `LICENSE`, `LICENSE.md`, `LICENSE.txt`, `LICENCE`, and matching
-  extension variants;
-- contribution guide: repository root, `.github/`, or `docs/`; filename `CONTRIBUTING` with an
-  optional common documentation extension;
-- CODEOWNERS: repository root, `.github/`, or `docs/`; filename `CODEOWNERS`.
+- README: корень репозитория; `README`, `README.md`, `README.rst` или `README.adoc`;
+- лицензия: корень репозитория; `LICENSE`, `LICENSE.md`, `LICENSE.txt`, `LICENCE` и
+  соответствующие варианты расширений;
+- руководство для участников: корень репозитория, `.github/` или `docs/`; имя `CONTRIBUTING` с
+  необязательным распространённым расширением документации;
+- CODEOWNERS: корень репозитория, `.github/` или `docs/`; имя `CODEOWNERS`.
 
-A file containing only whitespace, comments, or a title is empty for this method. Missing or empty
-README and LICENSE deductions have minimum severity `HIGH`; CONTRIBUTING and CODEOWNERS have
-minimum severity `LOW`.
+Файл, содержащий только пробелы, комментарии или заголовок, для этой методики считается пустым.
+Вычеты за отсутствующие или пустые README и LICENSE имеют минимальную важность `HIGH`;
+CONTRIBUTING и CODEOWNERS — `LOW`.
 
-## Semantic and hybrid checks (80 points)
+## Смысловые и гибридные проверки (80 баллов)
 
-The model may award any integer from zero through the listed maximum. Prompts provide anchored
-rubrics for every integer; application code validates the bounds and recomputes the final score.
+Модель может выставить любое целое от нуля до указанного максимума. Промпты дают привязанные
+рубрики для каждого целого значения; код приложения проверяет границы и пересчитывает итоговую
+оценку.
 
-The model scores smaller components rather than inventing a check total. Service code sums the
-component points. Unless a component has a more specific rule below, these anchors apply:
+Модель оценивает более мелкие компоненты, а не придумывает итог проверки. Код сервиса суммирует
+баллы компонентов. Если ниже для компонента нет более конкретного правила, действуют такие
+привязки:
 
-| Component maximum | Anchors |
+| Максимум компонента | Привязки |
 |---:|---|
-| 1 | `0` absent or unusable; `1` present and sufficient, or demonstrably not required |
-| 2 | `0` absent; `1` partial or ambiguous; `2` clear and sufficient |
-| 3 | `0` absent; `1` fragmentary; `2` usable with material gaps; `3` complete |
-| 4 | `0` absent; `1` minimal; `2` partial; `3` covers most primary cases; `4` complete |
+| 1 | `0` отсутствует или непригодно; `1` есть и достаточно, либо заведомо не требуется |
+| 2 | `0` отсутствует; `1` частично или неоднозначно; `2` ясно и достаточно |
+| 3 | `0` отсутствует; `1` фрагментарно; `2` пригодно, но с существенными пробелами; `3` полно |
+| 4 | `0` отсутствует; `1` минимально; `2` частично; `3` покрывает большинство основных случаев; `4` полно |
 
-The allowed component IDs below are part of `documentation-grading-v1`.
+Допустимые ID компонентов ниже входят в `documentation-grading-v1`.
 
-### Purpose and overview (15 points)
+### Назначение и обзор (15 баллов)
 
-| `check_id` | Maximum | Requirement |
+| `check_id` | Максимум | Требование |
 |---|---:|---|
-| `purpose.summary` | 8 | The documentation makes clear what the project is, which problem it solves, and what result it provides. |
-| `purpose.capabilities` | 7 | The main functions or capabilities are described. |
+| `purpose.summary` | 8 | Из документации ясно, что это за проект, какую проблему он решает и какой результат даёт. |
+| `purpose.capabilities` | 7 | Описаны основные функции или возможности. |
 
-| Check | Scoring components |
+| Проверка | Компоненты оценки |
 |---|---|
 | `purpose.summary` | `project_identity` 0–1; `problem_statement` 0–2; `solution_role` 0–2; `expected_outcome` 0–2; `summary_clarity` 0–1 |
 | `purpose.capabilities` | `capability_coverage` 0–4; `capability_clarity` 0–3 |
 
-Codes: `DOC_PURPOSE_MISSING`, `DOC_PURPOSE_UNCLEAR`, `DOC_CAPABILITIES_MISSING`, and
-`DOC_CAPABILITIES_INCOMPLETE`. Describing a target audience is useful context but is not scored.
-Accuracy against the repository is scored only under Consistency.
+Коды: `DOC_PURPOSE_MISSING`, `DOC_PURPOSE_UNCLEAR`, `DOC_CAPABILITIES_MISSING` и
+`DOC_CAPABILITIES_INCOMPLETE`. Описание целевой аудитории — полезный контекст, но не оценивается.
+Соответствие репозиторию оценивается только в разделе «Согласованность».
 
-### Local setup and run (20 points)
+### Локальная настройка и запуск (20 баллов)
 
-| `check_id` | Maximum | Requirement |
+| `check_id` | Максимум | Требование |
 |---|---:|---|
-| `local_run.prerequisites` | 3 | Required tools, platforms, and relevant versions are stated. |
-| `local_run.dependencies` | 4 | Dependency installation is described. |
-| `local_run.configuration` | 4 | Required configuration, environment variables, and secret placeholders are described. |
-| `local_run.execution` | 6 | A complete sequence of launch or first-use commands is provided. |
-| `local_run.verification` | 3 | The reader can recognize a successful launch or setup. |
+| `local_run.prerequisites` | 3 | Указаны необходимые инструменты, платформы и нужные версии. |
+| `local_run.dependencies` | 4 | Описана установка зависимостей. |
+| `local_run.configuration` | 4 | Описаны необходимая конфигурация, переменные окружения и заглушки для секретов. |
+| `local_run.execution` | 6 | Приведена полная последовательность команд запуска или первого использования. |
+| `local_run.verification` | 3 | Читатель может понять, что запуск или настройка прошли успешно. |
 
-| Check | Scoring components |
+| Проверка | Компоненты оценки |
 |---|---|
 | `local_run.prerequisites` | `required_tools` 0–1; `required_versions` 0–1; `external_requirements` 0–1 |
 | `local_run.dependencies` | `installation_command` 0–2; `installation_context` 0–1; `dependency_variants` 0–1 |
@@ -139,187 +146,186 @@ Accuracy against the repository is scored only under Consistency.
 | `local_run.execution` | `execution_commands` 0–3; `execution_sequence` 0–2; `runtime_entrypoint` 0–1 |
 | `local_run.verification` | `success_indicator` 0–2; `smoke_check` 0–1 |
 
-Codes: `DOC_LOCAL_RUN_MISSING`, `DOC_LOCAL_RUN_PREREQUISITES_INCOMPLETE`,
+Коды: `DOC_LOCAL_RUN_MISSING`, `DOC_LOCAL_RUN_PREREQUISITES_INCOMPLETE`,
 `DOC_LOCAL_RUN_DEPENDENCIES_INCOMPLETE`, `DOC_LOCAL_RUN_CONFIGURATION_INCOMPLETE`,
-`DOC_LOCAL_RUN_COMMANDS_INCOMPLETE`, and `DOC_LOCAL_RUN_VERIFICATION_INCOMPLETE`.
+`DOC_LOCAL_RUN_COMMANDS_INCOMPLETE` и `DOC_LOCAL_RUN_VERIFICATION_INCOMPLETE`.
 
-The runnable path depends on repository type: service launch, library installation and first use,
-CLI invocation, infrastructure validation/application, or local documentation rendering. A
-requirement that the repository demonstrably does not need receives full points rather than a
-fabricated deduction.
+Путь запуска зависит от типа репозитория: запуск сервиса, установка библиотеки и первое
+использование, вызов CLI, проверка/применение инфраструктуры или локальная сборка документации.
+Требование, которое репозиторию заведомо не нужно, получает полные баллы, а не выдуманный вычет.
 
-### Build (10 points)
+### Сборка (10 баллов)
 
-| `check_id` | Maximum | Requirement |
+| `check_id` | Максимум | Требование |
 |---|---:|---|
-| `build.commands` | 6 | Exact build commands and their order are documented. |
-| `build.configuration` | 2 | Required targets, profiles, flags, or build variables are documented. |
-| `build.output` | 2 | The resulting artifact and its location are clear. |
+| `build.commands` | 6 | Задокументированы точные команды сборки и их порядок. |
+| `build.configuration` | 2 | Задокументированы необходимые цели, профили, флаги или переменные сборки. |
+| `build.output` | 2 | Понятно, какой артефакт получается и где он находится. |
 
-| Check | Scoring components |
+| Проверка | Компоненты оценки |
 |---|---|
 | `build.commands` | `primary_command` 0–3; `build_sequence` 0–2; `required_targets` 0–1 |
 | `build.configuration` | `build_parameters` 0–1; `build_profiles` 0–1 |
 | `build.output` | `artifact_identity` 0–1; `artifact_location` 0–1 |
 
-Codes: `DOC_BUILD_INSTRUCTIONS_MISSING`, `DOC_BUILD_INSTRUCTIONS_INCOMPLETE`,
-`DOC_BUILD_CONFIGURATION_INCOMPLETE`, and `DOC_BUILD_OUTPUT_UNCLEAR`.
+Коды: `DOC_BUILD_INSTRUCTIONS_MISSING`, `DOC_BUILD_INSTRUCTIONS_INCOMPLETE`,
+`DOC_BUILD_CONFIGURATION_INCOMPLETE` и `DOC_BUILD_OUTPUT_UNCLEAR`.
 
-Ordinary code first detects whether the repository has a distinct build process. If none exists,
-all Build checks are `NOT_APPLICABLE`. A detected but undocumented build process is evaluated at
-zero where appropriate.
+Обычный код сначала определяет, есть ли у репозитория отдельный процесс сборки. Если нет, все
+проверки сборки — `NOT_APPLICABLE`. Обнаруженный, но не задокументированный процесс сборки
+оценивается нулём там, где это уместно.
 
-### Testing (10 points)
+### Тестирование (10 баллов)
 
-| `check_id` | Maximum | Requirement |
+| `check_id` | Максимум | Требование |
 |---|---:|---|
-| `testing.commands` | 5 | Exact test commands are documented. |
-| `testing.environment` | 3 | Required services, variables, fixtures, and setup are documented. |
-| `testing.scope` | 2 | The available test groups and the scope of commands are clear. |
+| `testing.commands` | 5 | Задокументированы точные команды тестирования. |
+| `testing.environment` | 3 | Задокументированы необходимые сервисы, переменные, фикстуры и настройка. |
+| `testing.scope` | 2 | Понятны доступные группы тестов и охват команд. |
 
-| Check | Scoring components |
+| Проверка | Компоненты оценки |
 |---|---|
 | `testing.commands` | `primary_test_command` 0–3; `command_context` 0–1; `test_variants` 0–1 |
 | `testing.environment` | `test_services` 0–1; `test_configuration` 0–1; `test_fixtures` 0–1 |
 | `testing.scope` | `test_types` 0–1; `command_scope` 0–1 |
 
-Codes: `DOC_TESTING_INSTRUCTIONS_MISSING`, `DOC_TESTING_COMMANDS_INCOMPLETE`,
-`DOC_TESTING_ENVIRONMENT_INCOMPLETE`, and `DOC_TESTING_SCOPE_UNCLEAR`.
+Коды: `DOC_TESTING_INSTRUCTIONS_MISSING`, `DOC_TESTING_COMMANDS_INCOMPLETE`,
+`DOC_TESTING_ENVIRONMENT_INCOMPLETE` и `DOC_TESTING_SCOPE_UNCLEAR`.
 
-Ordinary code detects test files, framework configuration, scripts, and CI test stages. If no test
-suite exists, these checks are `NOT_APPLICABLE`; the absence of tests belongs to Code Health or
-CI/CD, not Documentation.
+Обычный код обнаруживает тестовые файлы, конфигурацию фреймворков, скрипты и этапы тестов в CI.
+Если набора тестов нет, эти проверки — `NOT_APPLICABLE`; отсутствие тестов относится к «Здоровью
+кода» или CI/CD, а не к документации.
 
-### Usage examples (10 points)
+### Примеры использования (10 баллов)
 
-| `check_id` | Maximum | Requirement |
+| `check_id` | Максимум | Требование |
 |---|---:|---|
-| `usage.primary_example` | 5 | A practical example covers the primary usage scenario. |
-| `usage.inputs` | 3 | Required inputs, parameters, or user actions are described. |
-| `usage.expected_result` | 2 | The expected output or observable result is shown or explained. |
+| `usage.primary_example` | 5 | Практический пример покрывает основной сценарий использования. |
+| `usage.inputs` | 3 | Описаны необходимые входные данные, параметры или действия пользователя. |
+| `usage.expected_result` | 2 | Показан или объяснён ожидаемый вывод или наблюдаемый результат. |
 
-| Check | Scoring components |
+| Проверка | Компоненты оценки |
 |---|---|
 | `usage.primary_example` | `executable_example` 0–3; `primary_scenario` 0–1; `usage_context` 0–1 |
 | `usage.inputs` | `required_inputs` 0–2; `input_format` 0–1 |
 | `usage.expected_result` | `result_form` 0–1; `result_example` 0–1 |
 
-Codes: `DOC_USAGE_EXAMPLE_MISSING`, `DOC_USAGE_EXAMPLE_INCOMPLETE`,
-`DOC_USAGE_INPUTS_UNCLEAR`, and `DOC_USAGE_RESULT_UNCLEAR`.
+Коды: `DOC_USAGE_EXAMPLE_MISSING`, `DOC_USAGE_EXAMPLE_INCOMPLETE`, `DOC_USAGE_INPUTS_UNCLEAR` и
+`DOC_USAGE_RESULT_UNCLEAR`.
 
-Local setup answers how to start or attach the project; Usage answers what to do with it afterwards.
-The existence and completeness of an example are scored here. Whether its claims match the
-repository is scored only under Consistency.
+Локальная настройка отвечает на вопрос, как запустить или подключить проект; использование — что
+с ним делать дальше. Здесь оцениваются наличие и полнота примера. Соответствие его утверждений
+репозиторию оценивается только в «Согласованности».
 
-### Structure and navigation (5 points)
+### Структура и навигация (5 баллов)
 
-| `check_id` | Maximum | Requirement |
+| `check_id` | Максимум | Требование |
 |---|---:|---|
-| `structure.overview` | 3 | The roles of meaningful directories, modules, packages, or services are explained. |
-| `structure.navigation` | 2 | Readers can reach important sections and supporting documents from the primary documentation. |
+| `structure.overview` | 3 | Объяснены роли значимых каталогов, модулей, пакетов или сервисов. |
+| `structure.navigation` | 2 | Из основной документации можно добраться до важных разделов и вспомогательных документов. |
 
-| Check | Scoring components |
+| Проверка | Компоненты оценки |
 |---|---|
 | `structure.overview` | `component_map` 0–2; `component_roles` 0–1 |
 | `structure.navigation` | `important_documents` 0–1; `section_navigation` 0–1 |
 
-Codes: `DOC_STRUCTURE_OVERVIEW_MISSING`, `DOC_STRUCTURE_OVERVIEW_INCOMPLETE`, and
+Коды: `DOC_STRUCTURE_OVERVIEW_MISSING`, `DOC_STRUCTURE_OVERVIEW_INCOMPLETE` и
 `DOC_NAVIGATION_INCOMPLETE`.
 
-An overview is `NOT_APPLICABLE` for a small, self-evident repository. Navigation is
-`NOT_APPLICABLE` for short, self-contained documentation. Broken targets are scored under
-Consistency instead of being deducted twice.
+Обзор — `NOT_APPLICABLE` для небольшого самоочевидного репозитория. Навигация — `NOT_APPLICABLE`
+для короткой самодостаточной документации. Битые цели оцениваются в «Согласованности», а не
+вычитаются дважды.
 
-### Consistency (10 points)
+### Согласованность (10 баллов)
 
-| `check_id` | Type | Maximum | Requirement |
+| `check_id` | Тип | Максимум | Требование |
 |---|---|---:|---|
-| `consistency.references` | `HYBRID` | 3 | Referenced files, directories, and internal links exist. |
-| `consistency.commands` | `HYBRID` | 4 | Documented commands, scripts, parameters, and configuration match repository manifests. |
-| `consistency.description` | `HYBRID` | 3 | Described components and capabilities match repository content. |
+| `consistency.references` | `HYBRID` | 3 | Упомянутые файлы, каталоги и внутренние ссылки существуют. |
+| `consistency.commands` | `HYBRID` | 4 | Задокументированные команды, скрипты, параметры и конфигурация соответствуют манифестам репозитория. |
+| `consistency.description` | `HYBRID` | 3 | Описанные компоненты и возможности соответствуют содержимому репозитория. |
 
-| Check | Scoring components |
+| Проверка | Компоненты оценки |
 |---|---|
 | `consistency.references` | `file_targets` 0–2; `link_targets` 0–1 |
 | `consistency.commands` | `command_targets` 0–2; `command_parameters` 0–1; `configuration_references` 0–1 |
 | `consistency.description` | `described_components` 0–1; `described_capabilities` 0–1; `described_technologies` 0–1 |
 
-Codes: `DOC_REFERENCE_NOT_FOUND`, `DOC_LINK_BROKEN`, `DOC_COMMAND_INCONSISTENT`,
-`DOC_SCRIPT_NOT_FOUND`, `DOC_CONFIGURATION_INCONSISTENT`,
-and `DOC_COMPONENT_DESCRIPTION_INCONSISTENT`.
+Коды: `DOC_REFERENCE_NOT_FOUND`, `DOC_LINK_BROKEN`, `DOC_COMMAND_INCONSISTENT`,
+`DOC_SCRIPT_NOT_FOUND`, `DOC_CONFIGURATION_INCONSISTENT` и
+`DOC_COMPONENT_DESCRIPTION_INCONSISTENT`.
 
-The model extracts claims and ordinary code verifies them against the immutable snapshot. The
-service never executes untrusted repository commands. If there is no substantive documentation to
-cross-check, these checks are `NOT_APPLICABLE`; absence was already scored by the relevant checks.
+Модель извлекает утверждения, а обычный код сверяет их с неизменяемым снимком. Сервис никогда не
+выполняет недоверенные команды из репозитория. Если нет содержательной документации для сверки,
+эти проверки — `NOT_APPLICABLE`; отсутствие уже оценено соответствующими проверками.
 
-## Deductions, evidence, and problems
+## Вычеты, доказательства и проблемы
 
-Every evaluated check satisfies:
+Каждая оценённая проверка удовлетворяет:
 
 ```text
 sum(deduction.raw_points_lost) = max_points - points_awarded
 ```
 
-Each deduction contains a stable `deduction_id`, a registered `code`, integer `raw_points_lost`,
-code-specific typed `facts`, and validated evidence. It contains no user-facing title, reason, or
-recommendation. The code registry and exact facts/evidence schemas are defined in
-[`documentation-codes.md`](documentation-codes.md).
+Каждый вычет содержит стабильный `deduction_id`, зарегистрированный `code`, целое
+`raw_points_lost`, типизированные для кода `facts` и проверенные доказательства. Заголовка,
+причины или рекомендации для пользователя в нём нет. Реестр кодов и точные схемы фактов и
+доказательств определены в [`documentation-codes.md`](documentation-codes.md).
 
-Normal code groups deductions by a shared root cause. Every deduction maps to exactly one problem
-and can never be omitted or counted twice. Grouping never crosses unrelated semantic sections.
-Repeated evidence is deduplicated. A grouped problem may use a registered group code, such as
-`DOC_LOCAL_RUN_INCOMPLETE`, while preserving all original deduction IDs. Other registered group
-codes are `DOC_BUILD_INCOMPLETE`, `DOC_TESTING_INCOMPLETE`, `DOC_USAGE_INCOMPLETE`,
-`DOC_STRUCTURE_INCOMPLETE`, and `DOC_DOCUMENTATION_OUTDATED`. The normalized impact is:
+Обычный код группирует вычеты по общей первопричине. Каждый вычет относится ровно к одной
+проблеме и не может быть пропущен или посчитан дважды. Группировка не пересекает несвязанные
+смысловые разделы. Повторяющиеся доказательства дедуплицируются. Сгруппированная проблема может
+использовать зарегистрированный групповой код, например `DOC_LOCAL_RUN_INCOMPLETE`, сохраняя все
+исходные ID вычетов. Другие зарегистрированные групповые коды: `DOC_BUILD_INCOMPLETE`,
+`DOC_TESTING_INCOMPLETE`, `DOC_USAGE_INCOMPLETE`, `DOC_STRUCTURE_INCOMPLETE` и
+`DOC_DOCUMENTATION_OUTDATED`. Нормированное влияние:
 
 ```text
 category_points_lost = sum(raw_points_lost) / evaluated_max * 100
 ```
 
-Impacts are rounded to two decimals; the final problem receives any rounding remainder so that all
-problem impacts sum exactly to `100 - score`.
+Влияние округляется до двух знаков; последняя проблема получает остаток округления, чтобы сумма
+влияний всех проблем была ровно `100 - score`.
 
-Problem severity is computed after grouping from the problem's normalized impact:
+Важность проблемы вычисляется после группировки по её нормированному влиянию:
 
-| `category_points_lost` | Impact severity |
+| `category_points_lost` | Важность по влиянию |
 |---:|---|
-| up to and including 10 | `LOW` |
-| greater than 10 and up to 25 | `MEDIUM` |
-| greater than 25 and up to 50 | `HIGH` |
-| greater than 50 | `CRITICAL` |
+| до 10 включительно | `LOW` |
+| больше 10 и до 25 | `MEDIUM` |
+| больше 25 и до 50 | `HIGH` |
+| больше 50 | `CRITICAL` |
 
-The final severity is the higher of impact severity and the code's configured minimum severity.
-Related missing purpose, local-run, and usage material may be represented by
-`DOC_DOCUMENTATION_MISSING` when the repository has practically no user documentation; underlying
-checks and deductions remain available for a complete audit trail.
+Итоговая важность — большая из важности по влиянию и настроенной минимальной важности кода.
+Связанные отсутствующие материалы о назначении, локальном запуске и использовании могут быть
+представлены как `DOC_DOCUMENTATION_MISSING`, если у репозитория практически нет пользовательской
+документации; исходные проверки и вычеты остаются доступны для полного аудита.
 
-## Missing data and control cases
+## Отсутствие данных и контрольные случаи
 
-Missing-data checks do not create scoring problems. They are reported through coverage, warnings,
-and the final report's missing-data section.
+Проверки без данных не создают проблем в оценке. Они отражаются через покрытие, предупреждения и
+раздел отсутствующих данных итогового отчёта.
 
-Expected control cases:
+Ожидаемые контрольные случаи:
 
-| Scenario | Expected behavior |
+| Сценарий | Ожидаемое поведение |
 |---|---|
-| All applicable checks pass | `CALCULATED`, score 100, no problems |
-| No distinct build or tests | Those checks are `NOT_APPLICABLE`; remaining points are renormalized |
-| Applicable checks total 80, earned points total 72 | Score 90 |
-| Applicable points total 100, evaluated points total 65, earned points total 52 | `CALCULATED_PARTIAL`, coverage 65%, score 80 |
-| Expected README or local-run instructions are absent | Evaluated zero and a scoring deduction, never `NO_DATA` |
-| Snapshot identity or integrity cannot be verified | Failed workflow; no fabricated completed result |
+| Все применимые проверки пройдены | `CALCULATED`, оценка 100, проблем нет |
+| Нет отдельной сборки или тестов | Эти проверки `NOT_APPLICABLE`; оставшиеся баллы перенормируются |
+| Применимых баллов 80, набрано 72 | Оценка 90 |
+| Применимых баллов 100, оценено 65, набрано 52 | `CALCULATED_PARTIAL`, покрытие 65%, оценка 80 |
+| Ожидаемые README или инструкции по локальному запуску отсутствуют | Оценённый ноль и вычет, никогда не `NO_DATA` |
+| Идентичность или целостность снимка нельзя проверить | Процесс завершается ошибкой; выдуманного завершённого результата нет |
 
 
-Sampling refinement (2026-09-26): the selector prioritizes individual rubric checks,
-reserves README introduction, and follows up to eight existing repository-local
-README document links (one hop; inline and reference links). External links are
-never fetched. Excerpts have a shared 24000-byte content budget; the entire JSON
-context is capped at 32000 bytes. Candidate scanning remains bounded separately.
-Each model check is marked `sampled` or `not_reviewed` in the internal context.
-An unreviewed check contributes neither earned nor maximum points and cannot
-produce deficiency facts. The total is 100 * earned / evaluated maximum. A section
-with no evaluated checks has `grade: null`; this now means either not applicable
-or not reviewed. No estimated score is substituted for omitted material. This
-supersedes earlier wording that required all section grades to be estimated.
-The Kafka object shape is unchanged; consumers must display null as unavailable,
-not as zero. Deterministic required-file checks retain their existing rules.
+Уточнение выборки (2026-09-26): селектор отдаёт приоритет отдельным проверкам рубрики,
+резервирует место под введение README и переходит максимум по восьми существующим локальным
+ссылкам из README на документы (один переход; встроенные и ссылки-сноски). Внешние ссылки никогда
+не загружаются. У фрагментов общий бюджет содержимого 24000 байт; весь JSON-контекст ограничен
+32000 байт. Сканирование кандидатов ограничено отдельно. Каждая проверка модели во внутреннем
+контексте помечается `sampled` или `not_reviewed`. Непросмотренная проверка не добавляет ни
+набранных, ни максимальных баллов и не может порождать факты о недостатках. Итог =
+100 * набрано / максимум по оценённым проверкам. У раздела без оценённых проверок `grade: null`;
+теперь это значит «неприменимо» или «не просмотрено». Оценка для пропущенного материала не
+подставляется. Это заменяет прежнюю формулировку, требовавшую оценивать все разделы.
+Потребители должны показывать null как «недоступно», а не как ноль. Детерминированные проверки
+обязательных файлов сохраняют прежние правила.

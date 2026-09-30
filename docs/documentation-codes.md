@@ -1,17 +1,23 @@
-# Documentation deduction registry (`documentation-grading-v1`)
+# Реестр вычетов документации (`documentation-grading-v1`)
 
-> Current active output: `documentation.analysis.completed` v2 contains only `grade`,
-> eight `subcategories`, and a flat `facts` list. Internal checks/components and
-> numeric deduction impacts are not transmitted. The active model path checks format
-> only; strict evidence/impact rules below describe the legacy validator and scoring
-> guidance, not acceptance requirements for the current Yandex response. See
-> [Kafka contract](kafka-contracts.md) and [active model output](llm-model-output.md).
+> Внутренний результат модели содержит только `grade`, восемь `subcategories` и плоский список
+> `facts`; по Kafka передаётся `repo.docs.graded`. Внутренние проверки/компоненты и числовые вычеты не
+> передаются. Активный путь модели проверяет только формат; строгие правила доказательств и
+> влияния ниже описывают устаревший валидатор и рекомендации по подсчёту, а не требования к
+> приёму текущего ответа Yandex. См. [контракт Kafka](kafka-contracts.md) и
+> [вывод активной модели](llm-model-output.md).
+>
+> **Примечание (проверено по коду, 2026-09-28).** По Kafka сейчас реально передаётся
+> `repo.docs.graded` с `{sourcecraft_uuid, grade, subgrades, advice, evaluated_at}`, где `advice`
+> — рекомендации на русском, построенные по этим кодам (`recommendations.py`). Все коды проверок
+> из таблиц ниже присутствуют в коде LLM-сервиса; **групповые коды из последнего раздела в коде
+> не реализованы**.
 
-This registry defines the machine-readable deductions emitted by LLM service. A grading response
-contains no user-facing titles, explanations, or recommendations. Unknown codes, fact fields, enum
-values, or evidence variants are invalid.
+Реестр определяет машиночитаемые вычеты, которые выдаёт LLM-сервис. Ответ оценивания не содержит
+заголовков, пояснений или рекомендаций для пользователя. Неизвестные коды, поля фактов, значения
+перечислений или варианты доказательств недопустимы.
 
-## Common deduction shape
+## Общая форма вычета
 
 ```json
 {
@@ -25,147 +31,151 @@ values, or evidence variants are invalid.
 }
 ```
 
-- `deduction_id` is stable and unique within the result;
-- `raw_points_lost` is a positive integer;
-- `facts` follows the registered schema and rejects additional properties;
-- `missing_aspects` and `unclear_aspects` contain only component IDs registered for the source
-  check in `docs/documentation-grading.md`;
-- detector facts (`detected_*`) come from ordinary code, not free-form model output. The model
-  response omits them; the service inserts verified values after parsing the response;
-- at least one validated evidence item is required.
+- `deduction_id` стабилен и уникален в пределах результата;
+- `raw_points_lost` — положительное целое;
+- `facts` следует зарегистрированной схеме и отвергает дополнительные свойства;
+- `missing_aspects` и `unclear_aspects` содержат только ID компонентов, зарегистрированные для
+  исходной проверки в `docs/documentation-grading.md`;
+- факты детекторов (`detected_*`) получаются обычным кодом, а не свободным выводом модели. Ответ
+  модели их не содержит; сервис вставляет проверенные значения после разбора ответа;
+- требуется хотя бы одно проверенное доказательство.
 
-## Evidence variants
+## Варианты доказательств
 
-| Type | Required fields | Use |
+| Тип | Обязательные поля | Применение |
 |---|---|---|
-| `file_content` | `path`, `start_line`, `end_line`, `quote` | Exact positive or contradictory text |
-| `file_exists` | `path` | Presence of a repository artifact |
-| `file_missing` | `path` | Absence proven against the complete manifest |
-| `document_review` | `paths`, `context_sha256` | Absence of semantic content in fully reviewed documents |
+| `file_content` | `path`, `start_line`, `end_line`, `quote` | Точный подтверждающий или противоречащий текст |
+| `file_exists` | `path` | Наличие артефакта в репозитории |
+| `file_missing` | `path` | Отсутствие, доказанное по полному манифесту |
+| `document_review` | `paths`, `context_sha256` | Отсутствие смыслового содержания в полностью просмотренных документах |
 
-`document_review.paths` must be non-empty. Every path must exist in the manifest and must have been
-included completely in the context identified by `context_sha256`. It is the required evidence for
-claims such as “the purpose is not documented”; `file_missing` cannot prove absence of a section in
-an existing document.
+`document_review.paths` не может быть пустым. Каждый путь должен быть в манифесте и полностью
+входить в контекст, идентифицируемый `context_sha256`. Это обязательное доказательство для
+утверждений вроде «назначение не описано»; `file_missing` не может доказать отсутствие раздела в
+существующем документе.
 
-If the complete repository listing contains no selected user documentation, a code whose facts
-require `reviewed_paths` may instead set `reviewed_paths: []` and use `file_missing` for `README.md`.
-This exception does not apply when any user documentation was included completely in the model
-context; then `document_review` is required. A nonexistent file is never marked as reviewed.
+Если в полном списке файлов репозитория нет выбранной пользовательской документации, код, факты
+которого требуют `reviewed_paths`, может вместо этого указать `reviewed_paths: []` и использовать
+`file_missing` для `README.md`. Исключение не действует, если какая-либо пользовательская
+документация полностью вошла в контекст модели; тогда требуется `document_review`. Несуществующий
+файл никогда не помечается как просмотренный.
 
-## File checks
+## Проверки файлов
 
-| Code | Allowed check | Required facts | Evidence | Minimum severity |
+| Код | Допустимая проверка | Обязательные факты | Доказательство | Минимальная важность |
 |---|---|---|---|---|
 | `DOC_README_MISSING` | `readme.exists` | `searched_paths` | `file_missing` | `HIGH` |
-| `DOC_README_EMPTY` | `readme.exists` | `path`, `empty_reason` | `file_content` or `file_exists` | `HIGH` |
+| `DOC_README_EMPTY` | `readme.exists` | `path`, `empty_reason` | `file_content` или `file_exists` | `HIGH` |
 | `DOC_LICENSE_MISSING` | `license.exists` | `searched_paths` | `file_missing` | `HIGH` |
-| `DOC_LICENSE_EMPTY` | `license.exists` | `path`, `empty_reason` | `file_content` or `file_exists` | `HIGH` |
+| `DOC_LICENSE_EMPTY` | `license.exists` | `path`, `empty_reason` | `file_content` или `file_exists` | `HIGH` |
 | `DOC_CONTRIBUTING_MISSING` | `contributing.exists` | `searched_paths` | `file_missing` | `LOW` |
-| `DOC_CONTRIBUTING_EMPTY` | `contributing.exists` | `path`, `empty_reason` | `file_content` or `file_exists` | `LOW` |
+| `DOC_CONTRIBUTING_EMPTY` | `contributing.exists` | `path`, `empty_reason` | `file_content` или `file_exists` | `LOW` |
 | `DOC_CODEOWNERS_MISSING` | `codeowners.exists` | `searched_paths` | `file_missing` | `LOW` |
-| `DOC_CODEOWNERS_EMPTY` | `codeowners.exists` | `path`, `empty_reason` | `file_content` or `file_exists` | `LOW` |
+| `DOC_CODEOWNERS_EMPTY` | `codeowners.exists` | `path`, `empty_reason` | `file_content` или `file_exists` | `LOW` |
 
-`empty_reason` is one of `EMPTY`, `WHITESPACE_ONLY`, `COMMENTS_ONLY`, or `TITLE_ONLY`.
+`empty_reason` — одно из `EMPTY`, `WHITESPACE_ONLY`, `COMMENTS_ONLY` или `TITLE_ONLY`.
 
-## Purpose and capabilities
+## Назначение и возможности
 
-| Code | Allowed check | Required facts | Evidence | Minimum severity |
+| Код | Допустимая проверка | Обязательные факты | Доказательство | Минимальная важность |
 |---|---|---|---|---|
 | `DOC_PURPOSE_MISSING` | `purpose.summary` | `missing_aspects`, `reviewed_paths` | `document_review` | `LOW` |
-| `DOC_PURPOSE_UNCLEAR` | `purpose.summary` | `unclear_aspects` | `file_content`; optional `document_review` | `LOW` |
+| `DOC_PURPOSE_UNCLEAR` | `purpose.summary` | `unclear_aspects` | `file_content`; необязательно `document_review` | `LOW` |
 | `DOC_CAPABILITIES_MISSING` | `purpose.capabilities` | `coverage_level=NONE`, `documented_capability_count=0`, `reviewed_paths` | `document_review` | `LOW` |
 | `DOC_CAPABILITIES_INCOMPLETE` | `purpose.capabilities` | `coverage_level`, `documented_capability_count` | `file_content`, `document_review` | `LOW` |
 
-Incomplete `coverage_level` is one of `MINIMAL`, `PARTIAL`, or `MOST`.
+Неполный `coverage_level` — одно из `MINIMAL`, `PARTIAL` или `MOST`.
 
-## Local setup and run
+## Локальная настройка и запуск
 
-| Code | Allowed checks | Required facts | Evidence | Minimum severity |
+| Код | Допустимые проверки | Обязательные факты | Доказательство | Минимальная важность |
 |---|---|---|---|---|
-| `DOC_LOCAL_RUN_MISSING` | any `local_run.*` | `missing_checks`, `reviewed_paths` | `document_review` | `LOW` |
-| `DOC_LOCAL_RUN_PREREQUISITES_INCOMPLETE` | `local_run.prerequisites` | `missing_aspects`, optional `detected_requirements` | documentation plus detector evidence | `LOW` |
-| `DOC_LOCAL_RUN_DEPENDENCIES_INCOMPLETE` | `local_run.dependencies` | `missing_aspects`, optional `detected_package_managers` | documentation plus manifest evidence | `LOW` |
-| `DOC_LOCAL_RUN_CONFIGURATION_INCOMPLETE` | `local_run.configuration` | `missing_aspects`, optional `detected_configuration` | documentation plus configuration evidence | `LOW` |
-| `DOC_LOCAL_RUN_COMMANDS_INCOMPLETE` | `local_run.execution` | `missing_aspects`, `documented_command_count`, optional `detected_entrypoints` | documentation plus entrypoint evidence | `LOW` |
-| `DOC_LOCAL_RUN_VERIFICATION_INCOMPLETE` | `local_run.verification` | `missing_aspects`, `documented_verification_count` | `file_content` or `document_review` | `LOW` |
+| `DOC_LOCAL_RUN_MISSING` | любая `local_run.*` | `missing_checks`, `reviewed_paths` | `document_review` | `LOW` |
+| `DOC_LOCAL_RUN_PREREQUISITES_INCOMPLETE` | `local_run.prerequisites` | `missing_aspects`, необязательно `detected_requirements` | документация плюс доказательство детектора | `LOW` |
+| `DOC_LOCAL_RUN_DEPENDENCIES_INCOMPLETE` | `local_run.dependencies` | `missing_aspects`, необязательно `detected_package_managers` | документация плюс доказательство из манифеста | `LOW` |
+| `DOC_LOCAL_RUN_CONFIGURATION_INCOMPLETE` | `local_run.configuration` | `missing_aspects`, необязательно `detected_configuration` | документация плюс доказательство конфигурации | `LOW` |
+| `DOC_LOCAL_RUN_COMMANDS_INCOMPLETE` | `local_run.execution` | `missing_aspects`, `documented_command_count`, необязательно `detected_entrypoints` | документация плюс доказательство точки входа | `LOW` |
+| `DOC_LOCAL_RUN_VERIFICATION_INCOMPLETE` | `local_run.verification` | `missing_aspects`, `documented_verification_count` | `file_content` или `document_review` | `LOW` |
 
-`missing_checks` uses `prerequisites`, `dependencies`, `configuration`, `execution`, and
-`verification`. Detector entries use a controlled `kind`, stable identifier, and source path. Secret
-values are never included; environment-variable names are allowed.
+`missing_checks` использует `prerequisites`, `dependencies`, `configuration`, `execution` и
+`verification`. Записи детекторов содержат контролируемый `kind`, стабильный идентификатор и путь
+к источнику. Значения секретов никогда не включаются; имена переменных окружения допустимы.
 
-## Build
+## Сборка
 
-| Code | Allowed check | Required facts | Evidence | Minimum severity |
+| Код | Допустимая проверка | Обязательные факты | Доказательство | Минимальная важность |
 |---|---|---|---|---|
-| `DOC_BUILD_INSTRUCTIONS_MISSING` | `build.commands` | `detected_build_systems`, `reviewed_paths` | build artifact plus `document_review` | `LOW` |
-| `DOC_BUILD_INSTRUCTIONS_INCOMPLETE` | `build.commands` | `missing_aspects`, `documented_command_count`, `detected_build_systems` | documentation plus build evidence | `LOW` |
-| `DOC_BUILD_CONFIGURATION_INCOMPLETE` | `build.configuration` | `missing_aspects`, optional `detected_configuration` | documentation plus build evidence | `LOW` |
-| `DOC_BUILD_OUTPUT_UNCLEAR` | `build.output` | `missing_aspects`, optional `detected_artifacts` | documentation plus build evidence | `LOW` |
+| `DOC_BUILD_INSTRUCTIONS_MISSING` | `build.commands` | `detected_build_systems`, `reviewed_paths` | артефакт сборки плюс `document_review` | `LOW` |
+| `DOC_BUILD_INSTRUCTIONS_INCOMPLETE` | `build.commands` | `missing_aspects`, `documented_command_count`, `detected_build_systems` | документация плюс доказательство сборки | `LOW` |
+| `DOC_BUILD_CONFIGURATION_INCOMPLETE` | `build.configuration` | `missing_aspects`, необязательно `detected_configuration` | документация плюс доказательство сборки | `LOW` |
+| `DOC_BUILD_OUTPUT_UNCLEAR` | `build.output` | `missing_aspects`, необязательно `detected_artifacts` | документация плюс доказательство сборки | `LOW` |
 
-Artifact kinds are `binary`, `container_image`, `package`, `archive`, `frontend_bundle`,
-`generated_documentation`, or `other`.
+Виды артефактов: `binary`, `container_image`, `package`, `archive`, `frontend_bundle`,
+`generated_documentation` или `other`.
 
-## Testing
+## Тестирование
 
-| Code | Allowed check | Required facts | Evidence | Minimum severity |
+| Код | Допустимая проверка | Обязательные факты | Доказательство | Минимальная важность |
 |---|---|---|---|---|
-| `DOC_TESTING_INSTRUCTIONS_MISSING` | `testing.commands` | `detected_test_types`, `detected_test_commands`, `reviewed_paths` | test artifact plus `document_review` | `LOW` |
-| `DOC_TESTING_COMMANDS_INCOMPLETE` | `testing.commands` | `missing_aspects`, `documented_command_count`, `detected_test_types` | documentation plus test evidence | `LOW` |
-| `DOC_TESTING_ENVIRONMENT_INCOMPLETE` | `testing.environment` | `missing_aspects`, optional `detected_requirements` | documentation plus test configuration | `LOW` |
-| `DOC_TESTING_SCOPE_UNCLEAR` | `testing.scope` | `missing_aspects`, `detected_test_types` | documentation plus test evidence | `LOW` |
+| `DOC_TESTING_INSTRUCTIONS_MISSING` | `testing.commands` | `detected_test_types`, `detected_test_commands`, `reviewed_paths` | тестовый артефакт плюс `document_review` | `LOW` |
+| `DOC_TESTING_COMMANDS_INCOMPLETE` | `testing.commands` | `missing_aspects`, `documented_command_count`, `detected_test_types` | документация плюс доказательство тестов | `LOW` |
+| `DOC_TESTING_ENVIRONMENT_INCOMPLETE` | `testing.environment` | `missing_aspects`, необязательно `detected_requirements` | документация плюс конфигурация тестов | `LOW` |
+| `DOC_TESTING_SCOPE_UNCLEAR` | `testing.scope` | `missing_aspects`, `detected_test_types` | документация плюс доказательство тестов | `LOW` |
 
-Test types are `unit`, `integration`, `end_to_end`, `contract`, `smoke`, `performance`, or `other`.
-`detected_test_commands` may be an empty list when test files exist but no explicit command was
-found in selected manifests or CI configuration. An empty list does not mean no command exists
-anywhere in the repository.
+Типы тестов: `unit`, `integration`, `end_to_end`, `contract`, `smoke`, `performance` или `other`.
+`detected_test_commands` может быть пустым списком, если тестовые файлы есть, но явная команда не
+найдена в выбранных манифестах или конфигурации CI. Пустой список не означает, что команды нет
+нигде в репозитории.
 
-## Usage
+## Использование
 
-| Code | Allowed check | Required facts | Evidence | Minimum severity |
+| Код | Допустимая проверка | Обязательные факты | Доказательство | Минимальная важность |
 |---|---|---|---|---|
-| `DOC_USAGE_EXAMPLE_MISSING` | `usage.primary_example` | `detected_interfaces`, `reviewed_paths` | interface evidence plus `document_review` | `LOW` |
+| `DOC_USAGE_EXAMPLE_MISSING` | `usage.primary_example` | `detected_interfaces`, `reviewed_paths` | доказательство интерфейса плюс `document_review` | `LOW` |
 | `DOC_USAGE_EXAMPLE_INCOMPLETE` | `usage.primary_example` | `missing_aspects`, `example_type` | `file_content` | `LOW` |
-| `DOC_USAGE_INPUTS_UNCLEAR` | `usage.inputs` | `missing_aspects`, optional `detected_required_input_count` | documentation plus interface evidence | `LOW` |
-| `DOC_USAGE_RESULT_UNCLEAR` | `usage.expected_result` | `missing_aspects`, optional `detected_result_kind` | documentation plus interface evidence | `LOW` |
+| `DOC_USAGE_INPUTS_UNCLEAR` | `usage.inputs` | `missing_aspects`, необязательно `detected_required_input_count` | документация плюс доказательство интерфейса | `LOW` |
+| `DOC_USAGE_RESULT_UNCLEAR` | `usage.expected_result` | `missing_aspects`, необязательно `detected_result_kind` | документация плюс доказательство интерфейса | `LOW` |
 
-Interface and example kinds are controlled enums covering HTTP APIs, libraries, CLIs, user
-interfaces, infrastructure, templates, documentation, and `other`.
-Their values are `http_api`, `library`, `cli`, `user_interface`, `infrastructure`, `template`,
-`documentation`, and `other`.
+Виды интерфейсов и примеров — закрытые перечисления, охватывающие HTTP API, библиотеки, CLI,
+пользовательские интерфейсы, инфраструктуру, шаблоны, документацию и `other`. Значения:
+`http_api`, `library`, `cli`, `user_interface`, `infrastructure`, `template`, `documentation` и
+`other`.
 
-## Structure and navigation
+## Структура и навигация
 
-| Code | Allowed check | Required facts | Evidence | Minimum severity |
+| Код | Допустимая проверка | Обязательные факты | Доказательство | Минимальная важность |
 |---|---|---|---|---|
-| `DOC_STRUCTURE_OVERVIEW_MISSING` | `structure.overview` | `detected_components`, `reviewed_paths` | component evidence plus `document_review` | `LOW` |
-| `DOC_STRUCTURE_OVERVIEW_INCOMPLETE` | `structure.overview` | `missing_aspects`, `documented_component_count`, `detected_component_count` | documentation plus component evidence | `LOW` |
-| `DOC_NAVIGATION_INCOMPLETE` | `structure.navigation` | `missing_aspects`, optional `unlinked_documents` | documentation and file evidence | `LOW` |
+| `DOC_STRUCTURE_OVERVIEW_MISSING` | `structure.overview` | `detected_components`, `reviewed_paths` | доказательство компонентов плюс `document_review` | `LOW` |
+| `DOC_STRUCTURE_OVERVIEW_INCOMPLETE` | `structure.overview` | `missing_aspects`, `documented_component_count`, `detected_component_count` | документация плюс доказательство компонентов | `LOW` |
+| `DOC_NAVIGATION_INCOMPLETE` | `structure.navigation` | `missing_aspects`, необязательно `unlinked_documents` | документация и доказательство файлов | `LOW` |
 
-## Consistency
+## Согласованность
 
-| Code | Allowed check | Required facts | Evidence | Minimum severity |
+| Код | Допустимая проверка | Обязательные факты | Доказательство | Минимальная важность |
 |---|---|---|---|---|
 | `DOC_REFERENCE_NOT_FOUND` | `consistency.references` | `reference_kind`, `source_path`, `referenced_target` | `file_content`, `file_missing` | `LOW` |
-| `DOC_LINK_BROKEN` | `consistency.references` | `link_kind`, `source_path`, `target`, optional `anchor` | source and target evidence | `LOW` |
-| `DOC_COMMAND_INCONSISTENT` | `consistency.commands` | `documented_command`, `mismatch_kind` | documentation plus manifest evidence | `LOW` |
-| `DOC_SCRIPT_NOT_FOUND` | `consistency.commands` | `documented_command`, `missing_script`, `manifest_path` | documentation and full scripts section | `LOW` |
-| `DOC_CONFIGURATION_INCONSISTENT` | `consistency.commands` | `configuration_kind`, `documented_identifier`, `detected_identifiers` | documentation plus configuration evidence | `LOW` |
-| `DOC_COMPONENT_DESCRIPTION_INCONSISTENT` | `consistency.description` | `claim_kind`, `documented_identifier`, `mismatch_kind` | claim plus repository evidence | `LOW` |
+| `DOC_LINK_BROKEN` | `consistency.references` | `link_kind`, `source_path`, `target`, необязательно `anchor` | доказательства источника и цели | `LOW` |
+| `DOC_COMMAND_INCONSISTENT` | `consistency.commands` | `documented_command`, `mismatch_kind` | документация плюс доказательство из манифеста | `LOW` |
+| `DOC_SCRIPT_NOT_FOUND` | `consistency.commands` | `documented_command`, `missing_script`, `manifest_path` | документация и полный раздел scripts | `LOW` |
+| `DOC_CONFIGURATION_INCONSISTENT` | `consistency.commands` | `configuration_kind`, `documented_identifier`, `detected_identifiers` | документация плюс доказательство конфигурации | `LOW` |
+| `DOC_COMPONENT_DESCRIPTION_INCONSISTENT` | `consistency.description` | `claim_kind`, `documented_identifier`, `mismatch_kind` | утверждение плюс доказательство из репозитория | `LOW` |
 
-External HTTP links are not checked in v1; network availability must not affect a repository score.
+Внешние HTTP-ссылки в v1 не проверяются; доступность сети не должна влиять на оценку репозитория.
 
-Other v1 fact enums are closed: `reference_kind` is `file`, `directory`, `script`,
-`configuration`, or `other`; `link_kind` is `file`, `directory`, or `anchor`;
-`mismatch_kind` is `missing`, `wrong_target`, `wrong_parameter`, `wrong_value`, or `other`;
-`configuration_kind` is `environment_variable`, `config_file`, `flag`, or `other`;
-`claim_kind` is `component`, `capability`, or `technology`; `detected_result_kind` is
-`text`, `json`, `file`, `http_response`, `user_interface`, or `other`.
+Остальные перечисления фактов v1 закрыты: `reference_kind` — `file`, `directory`, `script`,
+`configuration` или `other`; `link_kind` — `file`, `directory` или `anchor`; `mismatch_kind` —
+`missing`, `wrong_target`, `wrong_parameter`, `wrong_value` или `other`; `configuration_kind` —
+`environment_variable`, `config_file`, `flag` или `other`; `claim_kind` — `component`,
+`capability` или `technology`; `detected_result_kind` — `text`, `json`, `file`, `http_response`,
+`user_interface` или `other`.
 
-## Group problem codes
+## Групповые коды проблем
 
-Service code may replace several related deduction codes with one problem code while preserving all
-source deduction IDs and their evidence:
+> **Не реализовано** (проверено по коду 2026-09-28): ни один из кодов ниже не встречается в
+> `backend/llm-service/src`. Раздел описывает задуманное поведение.
+
+Код сервиса может заменить несколько связанных кодов вычетов одним кодом проблемы, сохранив все
+исходные ID вычетов и их доказательства:
 
 - `DOC_DOCUMENTATION_MISSING`;
 - `DOC_LOCAL_RUN_INCOMPLETE`;
@@ -175,6 +185,7 @@ source deduction IDs and their evidence:
 - `DOC_STRUCTURE_INCOMPLETE`;
 - `DOC_DOCUMENTATION_OUTDATED`.
 
-Group codes never create additional point loss. Their `category_points_lost` is the normalized sum
-of source deductions. `DOC_DOCUMENTATION_OUTDATED` uses `mismatch_count` and `affected_areas`;
-other group codes use `affected_checks` and the union of registered `missing_aspects`.
+Групповые коды никогда не создают дополнительной потери баллов. Их `category_points_lost` —
+нормированная сумма исходных вычетов. `DOC_DOCUMENTATION_OUTDATED` использует `mismatch_count` и
+`affected_areas`; остальные групповые коды — `affected_checks` и объединение зарегистрированных
+`missing_aspects`.

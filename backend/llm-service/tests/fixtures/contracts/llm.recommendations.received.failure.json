@@ -1,0 +1,8 @@
+{
+  "sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
+  "raw_response": null,
+  "model_used": "aliceai-llm",
+  "evaluated_at": "2026-09-27T12:00:08Z",
+  "visibility": "private",
+  "error": "LLM_TIMEOUT"
+}

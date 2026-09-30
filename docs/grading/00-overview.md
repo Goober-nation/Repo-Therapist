@@ -1,233 +1,242 @@
-# Repo Health Score — grading overview (v1)
+# Repo Health Score — обзор оценивания (v1)
 
-Team-shared methodology for computing the 6-category Repo Health Score. Supersedes the original
-draft. Written against
-the case TZ (`yandex_docs/8. Yandex Cloud.pdf`, §3.1, §3.2, §13.2), whose hard requirements shaped
-every design choice below: the score must be **reproducible, explainable, fact-grounded, and must
-distinguish "bad" from "no data"** — judges explicitly test *behavior* on control scenarios, not
-agreement with a reference number.
+Общая для команды методика вычисления Repo Health Score по 6 категориям. Заменяет исходный
+черновик. Написана по ТЗ кейса (`8. Yandex Cloud.pdf` в корне репозитория, §3.1, §3.2, §13.2),
+жёсткие требования которого определили каждое решение ниже: оценка должна быть
+**воспроизводимой, объяснимой, основанной на фактах и отличать «плохо» от «нет данных»** — жюри
+явно проверяет *поведение* на контрольных сценариях, а не совпадение с эталонным числом.
 
-Per-category detail (what it measures, **a simple-worded step-by-step walkthrough of how the
-grade is calculated**, data source, metrics, no-data rules, limitations, open questions) lives
-one file per category in this directory, all following the same template — `activity.md`,
-`security.md`, `issues.md`, `code-health.md`, `ci-cd.md`, `documentation.md`. This file holds
-only what's cross-cutting, so it isn't duplicated six times.
+Подробности по категориям (что измеряется, **простое пошаговое объяснение, как вычисляется
+оценка**, источник данных, метрики, правила отсутствия данных, ограничения, открытые вопросы)
+лежат по одному файлу на категорию в этом каталоге, все по одному шаблону — `activity.md`,
+`security.md`, `issues.md`, `code-health.md`, `ci-cd.md`, `documentation.md`. Этот файл содержит
+только общее, чтобы не дублировать его шесть раз.
 
-**Per `AGENTS.md`: any change to the grading system has to be discussed with the user and
-reflected here before/alongside the code change — not committed as a drive-by — and every
-category file must include the plain-language walkthrough section, kept in sync with the code.**
+**Согласно `AGENTS.md`: любое изменение системы оценивания нужно обсудить с пользователем и
+отразить здесь до или вместе с изменением кода — а не коммитить мимоходом, — и каждый файл
+категории должен содержать раздел с простым пошаговым объяснением, синхронизированный с кодом.**
 
-## Category weights
+## Веса категорий
 
-Started from the TZ's example weights (§3.2); re-weighted 2026-09-27 (see below):
+Исходно взяты примерные веса из ТЗ (§3.2); перевзвешены 2026-09-27 (см. ниже):
 
-| Category | Weight | Public? | Status |
+| Категория | Вес | Публичная? | Статус |
 |---|---|---|---|
-| Activity | 20% (was 15%) | yes | **implemented** |
-| Issues | 20% (was 15%) | yes | **implemented** |
-| Security | 20% | no | **implemented** |
-| Documentation | 15% | yes | **implemented** (LLM service) |
-| CI/CD | 15% | no | **implemented** |
-| Code health / tech debt | 10% (was 20%) | yes | **implemented** |
+| Активность | 20% (было 15%) | да | **реализовано** |
+| Задачи | 20% (было 15%) | да | **реализовано** |
+| Безопасность | 20% | нет | **реализовано** |
+| Документация | 15% | да | **реализовано** (LLM-сервис) |
+| CI/CD | 15% | нет | **реализовано** |
+| Здоровье кода / техдолг | 10% (было 20%) | да | **реализовано** |
 
-**Public score** = Activity + Documentation + Issues + Code health (65%, renormalized to /100):
-Activity and Issues ≈31% each, Documentation ≈23%, Code health ≈15%.
-**Private score** = all six, already summing to 100% directly.
+**Публичная оценка** = Активность + Документация + Задачи + Здоровье кода (65%, перенормировано
+к /100): Активность и Задачи ≈31% каждая, Документация ≈23%, Здоровье кода ≈15%.
+**Приватная оценка** = все шесть, их веса уже в сумме дают 100%.
 
-**Re-weighting (2026-09-27).** A batch of 11 real public repos showed Code health scoring 100 for
-8 of them: with fewer than 5 TODO/FIXME markers three of its four metrics are "no data", so marker
-density alone — zero markers → perfect — decided the category, which then carried up to 40% of a
-no-LLM public score. Code health was halved to 10% and the freed 10% split between Activity (the
-category that actually separated those repos) and Issues. Step by step:
+**Перевзвешивание (2026-09-27).** Пакет из 11 реальных публичных репозиториев показал, что
+«Здоровье кода» дало 100 у 8 из них: при менее чем 5 маркерах TODO/FIXME три из четырёх её метрик
+получают «нет данных», поэтому категорию решала одна плотность маркеров (ноль маркеров →
+идеально), а сама категория весила до 40% публичной оценки без LLM. Вес «Здоровья кода» уменьшен
+вдвое до 10%, освободившиеся 10% поделены между «Активностью» (категорией, которая реально
+различала эти репозитории) и «Задачами». По шагам:
 
-1. Each category is scored 0-100 exactly as before; nothing inside a category changed.
-2. The overall score is the weighted average of the categories that have data, with the new
-   weights: Activity 20, Issues 20, Security 20, Documentation 15, CI/CD 15, Code health 10.
-3. Categories without data are dropped and the rest re-weighted, as always — so in the public view
-   Code health counts ≈15% instead of ≈31%.
+1. Каждая категория оценивается 0–100 точно так же, как раньше; внутри категорий ничего не
+   изменилось.
+2. Общая оценка — взвешенное среднее категорий, по которым есть данные, с новыми весами:
+   Активность 20, Задачи 20, Безопасность 20, Документация 15, CI/CD 15, Здоровье кода 10.
+3. Категории без данных, как всегда, исключаются, а остальные перевзвешиваются — поэтому в
+   публичном виде «Здоровье кода» весит ≈15% вместо ≈31%.
 
-Security and CI/CD are private-only, not a TZ requirement — but the TZ explicitly permits excluding
-a category "if the reason and impact on score are explained" (§3.2), so this is a documented,
-justified exclusion, not a silent one. The two categories' reasons differ — see each one's own
-file: Security is genuinely platform-access-gated; CI/CD's private-only status started as a product
-decision, and its current data source (`cicd/runs`) is also owner-token-only.
+Безопасность и CI/CD — только приватные, ТЗ этого не требует, но ТЗ явно разрешает исключить
+категорию, «если объяснены причина и влияние на оценку» (§3.2), так что это задокументированное
+и обоснованное исключение, а не скрытое. Причины у двух категорий разные — см. их файлы:
+безопасность действительно ограничена доступом платформы; приватность CI/CD начиналась как
+продуктовое решение, а её текущий источник данных (`cicd/runs`) тоже доступен только токену
+владельца.
 
-## Public vs. private grading and recommendations (2026-09-26)
+## Публичное и приватное оценивание, рекомендации (2026-09-26)
 
-Each grading job is **either** public **or** private, never both:
+Каждая задача оценивания **либо** публичная, **либо** приватная, но не обе сразу:
 
-- The request carries a user token → **private**: all six categories, graded with the user's
-  token.
-- No token → **public**: only the four public categories, graded with the service's own token.
-  Security and CI/CD are not computed at all (no AppSec call, no CI/CD read).
-- A non-public repo requested without a token can't be graded and the request is dropped.
+- В запросе есть токен пользователя → **приватная**: все шесть категорий, оцениваются с токеном
+  пользователя.
+- Токена нет → **публичная**: только четыре публичные категории, оцениваются с собственным
+  токеном сервиса. Безопасность и CI/CD вообще не вычисляются (нет вызова AppSec, нет чтения
+  CI/CD).
+- Непубличный репозиторий, запрошенный без токена, оценить нельзя, и запрос отбрасывается.
 
-The result (`grading.results`) says which one it is in `visibility` and fills only that side;
-`missing_data` lists only that view's categories, so a public result never reports Security or
-CI/CD as missing.
+Результат (`grading.results`) указывает вид в `visibility` и заполняет только эту сторону;
+`missing_data` перечисляет только категории этого вида, поэтому публичный результат никогда не
+сообщает безопасность или CI/CD как отсутствующие.
 
-**Recommendations**: every graded category's recommendations (one per metric scoring below
-healthy, see `config/recommendations.yaml`) go into one pool, and **N are picked at random**
-(all of them if there are N or fewer). N is `GRADE_ADVICE_LIMIT` (default `0` = send all).
-Each text starts with a severity label (`[critical]`, `[high]`, `[medium]`, `[low]`); it is
-display-only — selection is not ordered by it.
-Documentation's advice comes from the LLM service (`repo.docs.graded` `advice`) and joins the same
-pool, one entry per text: `category_id: "documentation"`, `metric_id: "llm_advice"`, text prefixed
-with `[medium]` (the texts carry no severity of their own). Only a Documentation reply that was
-used for the score contributes. When the grade was algorithmic, its last item is the "graded
-without LLM" notice, forwarded like the rest (2026-09-29).
+**Рекомендации**: рекомендации всех оценённых категорий (по одной на каждую метрику с оценкой
+ниже здоровой, см. `config/recommendations.yaml`) собираются в один пул, и из него **случайно
+выбираются N** (все, если их N или меньше). N задаётся `GRADE_ADVICE_LIMIT` (по умолчанию `0` —
+отправлять все). Каждый текст начинается с метки важности (`[critical]`, `[high]`, `[medium]`,
+`[low]`); она только для отображения — выбор по ней не упорядочивается.
+Рекомендации по документации приходят от LLM-сервиса (`advice` в `repo.docs.graded`) и попадают в
+тот же пул, по одной записи на текст: `category_id: "documentation"`, `metric_id: "llm_advice"`,
+текст с префиксом `[medium]` (своей важности у текстов нет). Учитывается только ответ по
+документации, использованный в оценке. Если оценка алгоритмическая, последний элемент — пометка
+«оценено без LLM», она передаётся как остальные (2026-09-29).
 
-### How a result is put together, step by step
+### Как собирается результат, по шагам
 
-1. The request arrives. Token present → private, otherwise public.
-2. The repo is cloned and its data exported (with the user's token for private jobs).
-3. The categories for that visibility are scored: public = Activity, Documentation, Issues,
-   Code health; private = those plus Security and CI/CD.
-4. The overall score is the weighted average of those categories; categories with no data are
-   dropped and the rest re-weighted. In the private view, open Security findings then cap it:
-   open critical → at most 59, open high → at most 79 (see `security.md`).
-5. Every category's recommendations — including the LLM service's Documentation advice — are
-   collected into one list, and `GRADE_ADVICE_LIMIT`
-   (default 0 = all) are drawn at random.
-6. The result is sent with `visibility` set and only that side (score, category scores,
-   recommendations) filled; `missing_data` names that view's categories that had no data.
+1. Приходит запрос. Есть токен → приватный, иначе публичный.
+2. Репозиторий клонируется, его данные выгружаются (для приватных задач — с токеном
+   пользователя).
+3. Оцениваются категории для этого вида: публичный = Активность, Документация, Задачи, Здоровье
+   кода; приватный = они же плюс Безопасность и CI/CD.
+4. Общая оценка — взвешенное среднее этих категорий; категории без данных исключаются, остальные
+   перевзвешиваются. В приватном виде затем открытые находки безопасности ограничивают её:
+   открытая critical → не выше 59, открытая high → не выше 79 (см. `security.md`).
+5. Рекомендации всех категорий, включая рекомендации LLM-сервиса по документации, собираются в
+   один список, из него случайно берутся
+   `GRADE_ADVICE_LIMIT` штук (по умолчанию 0 = все).
+6. Результат отправляется с заполненным `visibility` и только этой стороной (оценка, оценки
+   категорий, рекомендации); `missing_data` называет категории этого вида без данных.
 
-## Design principles
+## Принципы
 
-1. **One scoring formula, everywhere** — replaces the original draft's mix of a log-shaped formula
-   (whose sign convention was ambiguous/backwards for most of its own metrics) and a two-branch
-   linear formula:
+1. **Одна формула оценки везде** — заменяет смесь из исходного черновика: логарифмической формулы
+   (у которой знак был двусмысленным или перевёрнутым для большинства её же метрик) и
+   двухветочной линейной:
    ```
    score = clamp((x - critical) / (healthy - critical), 0, 1)
    ```
-   Works for "higher is better" and "higher is worse" alike, purely by which of `critical`/`healthy`
-   is numerically larger — no separate sign branches, and trivially explainable in the UI ("your
-   value sits X% of the way from critical to healthy").
-2. **Missing/disabled metrics renormalize weights, never auto-zero.** A metric that's `not_calculated`
-   (deliberately turned off) and a metric that's `calculated` but has no data for this particular repo
-   are treated identically at combine-time: dropped, and the remaining metrics' weights renormalized
-   to sum to 1 within the category. If every metric in a category is unavailable, the category itself
-   reports "Нет данных" and is dropped one level up, with the same renormalization applied to
-   categories. This directly satisfies TZ §11 rule 5 and is a judged criterion (§13.2).
-3. **The clamped score is lossy by design — the raw value never is.** Two repos with wildly different
-   severity (2 vs 40 open critical vulnerabilities) both clamp to score 0, which is correct for
-   *aggregation* (an unbounded contribution would let one metric dominate — exactly what TZ §13.2's
-   "устойчивость методики" criterion checks against) but wrong for *recommendations*, which need
-   that severity difference. Every formula/aggregation output is `{raw_value, score}`; recommendation
-   generation reads `raw_value`, never the clamped score.
-4. **Empty/trivial repos must not accidentally score well.** A near-empty repo trivially clears most
-   "badness" thresholds (zero TODOs, zero abandoned issues, zero everything) and could look
-   artificially healthy. Repos below a minimum content threshold (or `is_empty=true`) short-circuit
-   to "Недостаточно данных" rather than a score. Not something either source doc called out — a real
-   gaming vector caught during design, not after.
-   **Parked as of 2026-09-25**: still aspirational, not implemented as a hard gate anywhere —
-   explicit decision (during Code health's implementation) that every repo should be gradeable
-   regardless of size, since a hard gate blocks grading small-but-real repos entirely. The gaming
-   concern this principle names is real and unaddressed; the intended replacement is a future,
-   separate "repo grade trust/confidence factor" (weights the score's reliability rather than
-   refusing to compute one) — not designed yet. Code health's per-metric floors (`min_sample_size`) are a
-   narrower, already-implemented version of the same underlying concern, scoped to individual
-   metrics rather than the whole repo.
-5. **Popularity is never a scoring input**, anywhere — matches TZ §11 rule 9 ("Repo Health Score
-   должен иметь большее значение для рейтинга, чем популярность проекта") directly.
-6. **Metric config is layered — source, aggregation, formula — each independently swappable.**
-   `source` says which S3 `_meta/*.json` file feeds the metric; `aggregation` says how raw
-   timestamped events become one number; `formula` says how that number maps to a 0–1 score. This
-   is what makes `config/grading.yaml` extensible without rewrites — see "Future: time-decay" below
-   for why this specific split matters, not just modularity for its own sake.
-7. **`status: calculated` / `not_calculated`** is a per-metric *and* per-category config-time toggle,
-   kept deliberately separate from runtime "no data for this repo" — the two are different facts
-   (we chose not to compute this, vs. we tried and this repo had nothing to compute) that the UI
-   must be able to tell apart, even though they're combined identically for scoring (principle 2).
+   Работает и для «больше — лучше», и для «больше — хуже» просто в зависимости от того, какое из
+   `critical`/`healthy` численно больше, — без отдельных веток по знаку, и тривиально объясняется
+   в UI («ваше значение находится на X% пути от критического к здоровому»).
+2. **Отсутствующие/выключенные метрики перенормируют веса и никогда не обнуляются
+   автоматически.** Метрика `not_calculated` (намеренно выключенная) и метрика `calculated`, для
+   которой у конкретного репозитория нет данных, при объединении обрабатываются одинаково:
+   исключаются, а веса оставшихся перенормируются до суммы 1 внутри категории. Если недоступны все
+   метрики категории, сама категория сообщает «Нет данных» и исключается уровнем выше с той же
+   перенормировкой по категориям. Это прямо выполняет правило 5 из §11 ТЗ и является оцениваемым
+   критерием (§13.2).
+3. **Ограниченная оценка намеренно теряет информацию, сырое значение — никогда.** Два репозитория
+   с очень разной тяжестью (2 и 40 открытых критических уязвимостей) оба упираются в оценку 0, что
+   правильно для *агрегации* (неограниченный вклад позволил бы одной метрике доминировать — ровно
+   то, против чего проверяет критерий «устойчивость методики» из §13.2 ТЗ), но неправильно для
+   *рекомендаций*, которым эта разница нужна. Каждый результат формулы/агрегации —
+   `{raw_value, score}`; генерация рекомендаций читает `raw_value`, а не ограниченную оценку.
+4. **Пустые/тривиальные репозитории не должны случайно получать хорошую оценку.** Почти пустой
+   репозиторий тривиально проходит большинство порогов «плохости» (ноль TODO, ноль заброшенных
+   задач, ноль всего) и может выглядеть искусственно здоровым. Репозитории ниже порога
+   минимального содержимого (или с `is_empty=true`) должны сразу получать «Недостаточно данных»
+   вместо оценки. Ни один исходный документ этого не отмечал — реальный способ накрутки, пойманный
+   при проектировании, а не после.
+   **Отложено с 2026-09-25**: остаётся целью и нигде не реализовано как жёсткий гейт — явное
+   решение (при реализации «Здоровья кода»), что любой репозиторий должен оцениваться независимо
+   от размера, поскольку жёсткий гейт полностью блокирует оценку маленьких, но настоящих
+   репозиториев. Названная проблема накрутки реальна и не решена; предполагаемая замена — будущий
+   отдельный «коэффициент доверия к оценке» (взвешивает надёжность оценки вместо отказа её
+   вычислять) — ещё не спроектирован. Пороги отдельных метрик (`min_sample_size`) — более узкая,
+   уже реализованная версия той же заботы, на уровне метрик, а не всего репозитория.
+5. **Популярность никогда не участвует в оценке** — это прямо соответствует правилу 9 из §11 ТЗ
+   («Repo Health Score должен иметь большее значение для рейтинга, чем популярность проекта»).
+6. **Конфигурация метрик разбита на слои — источник, агрегация, формула — каждый заменяется
+   независимо.** `source` указывает, какой файл S3 `_meta/*.json` питает метрику; `aggregation` —
+   как сырые события с метками времени превращаются в одно число; `formula` — как это число
+   отображается в оценку 0–1. Благодаря этому `config/grading.yaml` расширяется без переписывания
+   — почему именно это разделение важно, а не просто модульность ради модульности, см. «Будущее:
+   затухание со временем» ниже.
+7. **`status: calculated` / `not_calculated`** — переключатель на этапе конфигурации для каждой
+   метрики *и* каждой категории, намеренно отделённый от «нет данных для этого репозитория» во
+   время выполнения: это разные факты (мы решили это не считать vs. мы попытались, но у
+   репозитория нечего считать), которые UI должен различать, хотя при подсчёте они объединяются
+   одинаково (принцип 2).
 
-## Anti-manipulation (2026-09-28)
+## Защита от накрутки (2026-09-28)
 
-Protection of the public rating against inflated likes, empty commits and artificial activity
-(TZ §7). Each defense lives in the category it protects; this section collects them in one place.
+Защита публичного рейтинга от накрутки лайков, пустых коммитов и искусственной активности (ТЗ
+§7). Каждая защита живёт в категории, которую защищает; здесь они собраны в одном месте.
 
-| Vector | Protection | Details |
+| Способ накрутки | Защита | Подробности |
 |---|---|---|
-| Likes / reactions | Not a scoring input (principle 5). `sourcecraft_rating` is stored only to display likes and for the optional "likes" sort of the ranking. The default ranking sort is Repo Health Score. | this section |
-| Empty commits | Non-merge commits that change no files are dropped before any Activity metric | `activity.md` |
-| Artificial activity | Commits by bot accounts (`[bot]`, `-bot`, `_bot`) and commits dated in the future are dropped the same way | `activity.md` |
-| Fake CI | A pipeline whose scripts only run trivial commands (`echo`, `true`, `sleep`, ...) scores CI/CD 0 | `ci-cd.md` |
-| High score despite known vulnerabilities | Open critical AppSec findings cap the private score at 59, open high at 79 | `security.md` |
+| Лайки / реакции | Не участвуют в оценке (принцип 5). `sourcecraft_rating` хранится только для показа лайков и необязательной сортировки рейтинга «по лайкам». По умолчанию рейтинг сортируется по Repo Health Score. | этот раздел |
+| Пустые коммиты | Не-merge коммиты, не изменившие файлов, отбрасываются до любой метрики «Активности» | `activity.md` |
+| Искусственная активность | Так же отбрасываются коммиты от ботов (`[bot]`, `-bot`, `_bot`) и коммиты, датированные будущим | `activity.md` |
+| Поддельный CI | Пайплайн, скрипты которого выполняют только тривиальные команды (`echo`, `true`, `sleep`, ...), получает CI/CD 0 | `ci-cd.md` |
+| Высокая оценка при известных уязвимостях | Открытые critical-находки AppSec ограничивают приватную оценку 59, открытые high — 79 | `security.md` |
 
-The commit filters are toggled in `config/grading.yaml` (`activity.commit_filters`); merge
-filtering exists but is off by default.
+Фильтры коммитов включаются в `config/grading.yaml` (`activity.commit_filters`); фильтр merge
+существует, но по умолчанию выключен.
 
-### How manipulation is kept out, step by step
+### Как исключается накрутка, по шагам
 
-1. Likes never reach grading: Grade service and LLM service don't read `sourcecraft_rating`, so
-   inflating likes cannot change any category or the Repo Health Score.
-2. The ranking is sorted by Repo Health Score by default. Sorting by likes is an explicit user
-   choice, and even then ties fall back to the health score.
-3. Before Activity is computed, the commit list is cleaned: empty, bot and future-dated commits are
-   removed, so padding the history with them adds nothing.
-4. CI/CD checks what the pipeline runs: a pipeline that only prints or sleeps is treated as no real
-   CI and scores 0, however green its runs are.
-5. In the private view, open critical/high vulnerabilities cap the final score, so strong scores in
-   other categories cannot hide them.
+1. Лайки не доходят до оценивания: Grade service и LLM-сервис не читают `sourcecraft_rating`,
+   поэтому накрутка лайков не может изменить ни одну категорию и Repo Health Score.
+2. Рейтинг по умолчанию сортируется по Repo Health Score. Сортировка по лайкам — явный выбор
+   пользователя, и даже тогда при равенстве решает оценка здоровья.
+3. Перед вычислением «Активности» список коммитов очищается: пустые, ботовые и датированные
+   будущим коммиты удаляются, так что забивать ими историю бесполезно.
+4. CI/CD проверяет, что именно выполняет пайплайн: пайплайн, который только печатает или спит,
+   считается отсутствием настоящего CI и получает 0, какими бы зелёными ни были его запуски.
+5. В приватном виде открытые critical/high уязвимости ограничивают итоговую оценку, так что
+   сильные оценки других категорий не могут их скрыть.
 
-### Known limitation
+### Известное ограничение
 
-A near-empty repo can still score well by clearing "badness" thresholds with nothing to measure
-(principle 4). A confidence flag (few files or a very young repo → ranked after confident repos,
-score unchanged) is planned and awaiting team agreement; it is not implemented.
+Почти пустой репозиторий всё ещё может получить хорошую оценку, проходя пороги «плохости» за
+отсутствием того, что измерять (принцип 4). Флаг доверия (мало файлов или очень молодой
+репозиторий → ранжируется после надёжных, оценка не меняется) запланирован и ждёт согласования
+команды; не реализован.
 
-## Implementation methodology
+## Методика реализации
 
-The working method every implemented category so far has followed, kept here so it repeats for
-Code health/CI/CD/Documentation rather than being reinvented per category:
+Рабочий метод, которому следовала каждая реализованная категория; записан здесь, чтобы он
+повторялся, а не изобретался заново для каждой категории:
 
-1. **Before writing code: read the existing state, then propose a plan and get it confirmed.**
-   Read the TZ section the category maps to and the relevant platform-API research already
-   recorded — never start from a blank assumption
-   about what data is available. Lay out the concrete plan (data source, metric list, no-data
-   rule per metric) and get it confirmed before writing implementation code, not after.
-2. **Implementation is checked against this doc's own principles, not just "does it compile."**
-   Every metric gets an explicit no-data-vs-real-zero rule (principle 2/4) before it's considered
-   done — a metric with no stated floor is treated as unfinished, not just unpolished.
-3. **Testing has two independent layers, both required — neither substitutes for the other:**
-   - *Synthetic, targeted cases* — small hand-constructed inputs built to exercise one specific
-     behavior (a sample-size floor tripping, a specific edge case a fix is meant to catch) and
-     checked against a hand-computed expected result. Fast, precise, good for proving a specific
-     fix does what it claims.
-   - *Live, end-to-end runs against real repos* — the actual services (repository-service,
-     grade-service, any wrapper involved) run against real SourceCraft data, not mocks. Chosen to
-     cover a range of shapes (near-empty, small, large; healthy and neglected) rather than one
-     convenient example.
-4. **Real-repo results get independently cross-checked, not just trusted.** At least one
-   real-repo result is recomputed by hand from a fresh, separate fetch of the same raw data
-   (outside the codebase being tested — e.g. a standalone script hitting the platform API
-   directly) and compared number-for-number against the code's own output. A result is not
-   "verified" until it matches an independently-derived number, not just until the pipeline runs
-   without erroring.
-5. **When a design choice can't be settled from the TZ or first principles alone, look outward
-   before guessing.** For choices with real prior art (what counts as a "stale" issue, how a
-   metric should be windowed, what threshold values are defensible) a research pass over
-   external, real-world sources (established frameworks, tooling defaults, relevant literature)
-   is run and its findings are what change the design — not a from-scratch guess presented as if
-   it were informed. Every threshold adopted this way is still marked `provisional: true`: an
-   externally-sourced starting point, not a substitute for calibration against this project's own
-   repo population.
-6. **Self-review is part of the process, not a one-time gate.** Coming back to already-shipped
-   work and asking "is this actually defensible" — not just "does it run" — is expected to
-   surface real problems (a missing sample-size floor, a windowing choice that quietly hides the
-   exact cases a metric exists to catch). When it does, the fix, its reasoning, and what
-   triggered it are recorded in the category's own file (this directory), not just fixed silently.
+1. **Прежде чем писать код: изучить текущее состояние, затем предложить план и получить
+   подтверждение.** Прочитать раздел ТЗ, к которому относится категория, и уже записанные
+   исследования API платформы — никогда не начинать с пустого предположения о том, какие данные
+   доступны. Изложить конкретный план (источник данных, список метрик, правило отсутствия данных
+   для каждой метрики) и получить подтверждение до написания кода, а не после.
+2. **Реализация проверяется на соответствие принципам этого документа, а не только на
+   «компилируется ли».** Каждая метрика получает явное правило «нет данных vs. настоящий ноль»
+   (принципы 2/4), прежде чем считаться готовой — метрика без указанного порога считается
+   незаконченной, а не просто неотполированной.
+3. **У тестирования два независимых слоя, оба обязательны — ни один не заменяет другой:**
+   - *Синтетические точечные случаи* — небольшие вручную составленные входные данные, проверяющие
+     одно конкретное поведение (срабатывание порога размера выборки, конкретный крайний случай,
+     который должно поймать исправление), сверяемые с вручную посчитанным ожидаемым результатом.
+     Быстро, точно, хорошо доказывает, что конкретное исправление делает заявленное.
+   - *Живые сквозные прогоны на реальных репозиториях* — настоящие сервисы (repository-service,
+     grade-service, задействованные обёртки) на реальных данных SourceCraft, а не на моках.
+     Подбираются так, чтобы покрыть разные формы (почти пустой, маленький, большой; здоровый и
+     заброшенный), а не один удобный пример.
+4. **Результаты на реальных репозиториях независимо перепроверяются, а не принимаются на
+   веру.** Хотя бы один такой результат пересчитывается вручную по свежей отдельной выборке тех же
+   сырых данных (вне проверяемого кода — например, отдельным скриптом, обращающимся к API
+   платформы напрямую) и сравнивается число в число с выводом кода. Результат не считается
+   «проверенным», пока не совпадёт с независимо полученным числом, — недостаточно того, что
+   конвейер отработал без ошибок.
+5. **Когда решение нельзя принять только по ТЗ или из первых принципов, сначала посмотреть
+   наружу, а не угадывать.** Для решений с реальным опытом отрасли (что считать «устаревшей»
+   задачей, как брать окно для метрики, какие пороги обоснованы) проводится исследование внешних
+   реальных источников (устоявшиеся фреймворки, значения по умолчанию инструментов, литература),
+   и именно его выводы меняют дизайн — а не догадка, выдаваемая за обоснованную. Каждый порог,
+   принятый так, всё равно помечается `provisional: true`: это внешняя отправная точка, а не
+   замена калибровки на собственной выборке репозиториев проекта.
+6. **Самопроверка — часть процесса, а не разовый шлюз.** Возвращаться к уже выпущенной работе и
+   спрашивать «действительно ли это обоснованно», а не только «работает ли», — ожидаемо выявляет
+   реальные проблемы (отсутствующий порог выборки, выбор окна, незаметно скрывающий именно те
+   случаи, ради которых метрика существует). Когда это происходит, исправление, его обоснование и
+   причина записываются в файл категории (в этом каталоге), а не исправляются молча.
 
-## Future: time-decay (not implemented now, deliberately schema-ready)
+## Будущее: затухание со временем (сейчас не реализовано, схема к нему готова)
 
-A flat time window (e.g. "commits in the last 180 days") has a hard cliff: a commit on day 179
-counts fully, day 181 counts zero — the score can jump purely because time passed, not because the
-repo changed. Exponential decay (weighting each event by `exp(-age/half_life)`) removes that
-artifact. This is a real improvement, not implemented in v1 because it needs real half-life values
-to validate against, which we don't have yet — shipping an untuned decay curve is worse than a
-documented flat window.
+У плоского окна (например, «коммиты за последние 180 дней») есть резкий обрыв: коммит на 179-й
+день учитывается полностью, на 181-й — никак, и оценка может скачком измениться просто от течения
+времени, а не от изменений в репозитории. Экспоненциальное затухание (вес каждого события
+`exp(-age/half_life)`) убирает этот артефакт. Это реальное улучшение, не реализованное в v1,
+потому что для проверки нужны реальные значения периода полураспада, которых у нас пока нет, — а
+выпускать ненастроенную кривую затухания хуже, чем задокументированное плоское окно.
 
-What v1 does to avoid this becoming tech debt: every `_meta/*.json` export
-(`commits.json`, `issues.json`, `milestones.json`) stores full per-event timestamps, never a
-pre-aggregated count — so switching an `aggregation.type` from `rate_per_week` to a future
-`exp_decay_rate` is a change inside one Go function, not a data re-export. The trap this avoids is
-building any future category's export as a pre-bucketed aggregate instead of an event list.
+Что делает v1, чтобы это не стало техдолгом: каждая выгрузка `_meta/*.json` (`commits.json`,
+`issues.json`, `milestones.json`) хранит полные метки времени по событиям, а не заранее
+агрегированное число, — поэтому переход `aggregation.type` с `rate_per_week` на будущий
+`exp_decay_rate` — это изменение внутри одной Go-функции, а не повторная выгрузка данных.
+Ловушка, которой это позволяет избежать, — построить выгрузку будущей категории как заранее
+разбитый на корзины агрегат вместо списка событий.

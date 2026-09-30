@@ -75,7 +75,7 @@ The key is
 unreviewed/inapplicable sections. `advice` contains only Russian improvement recommendations selected deterministically
 by deficiency code (or section fallback). Reasons, file references and raw evidence
 are not sent in this field. No additional model call is made. Internal local CLI output retains `subcategories` and `facts`.
-See [the active contract](../../docs/kafka-contracts.md#documentation-grading-active-grade--llm-contract).
+See [the active contract](../../docs/kafka-contracts.md#оценка-документации-активный-контракт-grade--llm).
 On success `error` is empty. On evaluation failure `error` contains a short code,
 `grade` is null, `subgrades` is empty, and `advice` is empty. The worker continues
 with later requests. The input offset is committed only after Kafka acknowledges
@@ -114,7 +114,7 @@ a full compose grading run read repository data from it successfully. The legacy
 
 The summary worker consumes `llm.recommendations.requested` from the Aggregator and
 publishes `llm.recommendations.received`; see
-[the contract](../../docs/kafka-contracts.md#repository-summary-and-recommendations-active-aggregator--llm-contract-2026-09-27).
+[the contract](../../docs/kafka-contracts.md#сводка-и-рекомендации-по-репозиторию-активный-контракт-aggregator--llm-2026-09-27).
 Input is the final grade only (overall score, category scores, recommendations, missing
 data); repository files are not read. The model writes a Russian `summary` and up to eight
 recommendation texts. Code derives `strengths`, `weaknesses` and each recommendation's

@@ -1,47 +1,48 @@
-# LLM Documentation result
+# Результат LLM-оценки документации
 
-> Active method (2026-09-26): budget-limited sampled documentation review.
-> The service selects up to eight relevant excerpts (30 lines and 3000 UTF-8 bytes
-> per excerpt). Existing weights and eight section grades apply as estimates
-> from the selected material. Findings must not claim that omitted text was
-> inspected or absent; sampling alone is not a deficiency.
+> Активный метод (2026-09-26): выборочный просмотр документации с ограниченным бюджетом.
+> Сервис выбирает до восьми релевантных фрагментов (не более 30 строк и 3000 байт UTF-8
+> на фрагмент). Существующие веса и оценки восьми разделов применяются как оценки по
+> выбранному материалу. Выводы не должны утверждать, что пропущенный текст был проверен
+> или отсутствует; сама выборочность недостатком не считается.
 
 
-The active Python Yandex path checks JSON structure, IDs, types and score ranges only.
-It does not reject model claims for mismatched deduction arithmetic, evidence quotes,
-line numbers, context hashes or applicability. This remains the user-approved behavior.
+Активный путь Python + Yandex проверяет только структуру JSON, идентификаторы, типы и диапазоны
+оценок. Он не отклоняет утверждения модели из-за несходящейся арифметики вычетов, цитат-
+доказательств, номеров строк, хэшей контекста или применимости. Это одобренное пользователем
+поведение.
 
-`YandexModel.grade(snapshot, context)` and the local CLI now return exactly the same
-three-field payload sent in `documentation.analysis.completed` v2:
+`YandexModel.grade(snapshot, context)` и локальный CLI возвращают одинаковый компактный объект
+из трёх полей:
 
-- `grade`: overall Documentation score, 0–100.
-- `subcategories`: eight `{id, grade}` objects; a wholly inapplicable group has `grade: null`.
-- `facts`: flat list of `{id, subcategory, code, facts, evidence}` objects. Fact details
-  are objects; evidence is an array and can be empty. No advice or numeric penalties.
+- `grade`: общая оценка документации, 0–100.
+- `subcategories`: восемь объектов `{id, grade}`; у полностью неприменимой или не просмотренной
+  группы `grade: null`.
+- `facts`: плоский список объектов `{id, subcategory, code, facts, evidence}`. Детали факта —
+  объекты; evidence — массив, может быть пустым. Никаких рекомендаций и числовых штрафов.
 
-The format-only model response still contains the 21 semantic/hybrid checks used by the
-scoring implementation. Python adds four objective file checks and calculates the weighted
-overall score and section scores from `points_awarded`. These internal records and their
-component values are not exported in the completed Kafka payload or CLI output.
-All deduction facts are projected without semantic filtering or fabricated score impacts.
-Fact IDs are deterministic within a result (`DOC-0001`, etc.) and must be preserved on retry.
+> **Примечание (проверено по коду, 2026-09-28).** Этот компактный объект — внутренний
+> результат модели и вывод CLI. По Kafka он в таком виде больше не передаётся: активный путь —
+> топики `repo.docs.grade.requested` → `repo.docs.graded`, где `grade_wire.build_grade_result`
+> превращает его в `{sourcecraft_uuid, grade, subgrades, advice, evaluated_at}` (`subgrades` —
+> целые проценты, `advice` — рекомендации на русском). Kafka-воркер уже реализован
+> (`python -m llm_service --listen`).
 
-`documentation_result.documentation_payload` handles projection.
-`contracts.validate_documentation_payload` checks the wire shape.
-`contracts.build_documentation_completed(request, payload)` creates the v2 Kafka envelope,
-copying request/analysis/repository/scope/commit correlation. It does not publish to a broker.
-`parse_documentation_result` validates the serialized completed event.
+Ответ модели, проверяемый только по формату, по-прежнему содержит 21 семантическую/гибридную
+проверку, используемую при подсчёте. Python добавляет четыре объективные проверки файлов и
+вычисляет взвешенную общую оценку и оценки разделов из `points_awarded`. Эти внутренние записи и
+их составляющие не экспортируются ни в Kafka, ни в вывод CLI. Все факты о вычетах проецируются
+без семантической фильтрации и без выдуманного влияния на оценку. Идентификаторы фактов
+детерминированы в пределах результата (`DOC-0001` и т. д.) и должны сохраняться при повторе.
 
-Report request v2 includes this unchanged payload as `documentation` (or null on an
-unavailable category); `problems` describes the other five categories. Reports reference
-Documentation fact IDs via `source_type: documentation_fact`. Legacy report request v1
-remains readable with its previous problem-impact rules.
+Проекцией занимается `documentation_result.documentation_payload`.
+`contracts.validate_documentation_payload` проверяет форму объекта.
 
-The legacy strict scoring/evidence validator is not in the active Yandex call path.
-One additional model request is allowed for a malformed response, never for semantic
-inconsistency. Kafka transport is implemented in `src/llm_service/kafka_worker.py`.
+Устаревший строгий валидатор оценок/доказательств не входит в активный путь вызова Yandex.
+Разрешён один дополнительный запрос к модели при некорректном по формату ответе, но никогда — при
+семантической несогласованности. Бюджет времени на оценку — 60 секунд.
 
-From `backend/llm-service`:
+Из каталога `backend/llm-service`:
 
 ```bash
 PYTHONPATH=src python3 -m llm_service --repo ../..
@@ -49,21 +50,21 @@ PYTHONPATH=src python3 -m llm_service --repo ../.. --dry-run
 PYTHONPATH=src python3 -m unittest discover -s tests -q
 ```
 
-The normal command prints the compact payload as JSON to stdout and progress/errors to
-stderr. Dry-run prepares context without network or credentials. Live generation uses
-`YANDEX_AI_API_KEY`, `YANDEX_FOLDER_ID`, and optional `YANDEX_AI_MODEL` from the environment.
+Обычная команда печатает компактный объект в JSON в stdout, а ход работы и ошибки — в stderr.
+Dry-run готовит контекст без сети и учётных данных. Для реальной генерации нужны переменные
+окружения `YANDEX_AI_API_KEY`, `YANDEX_FOLDER_ID` и необязательная `YANDEX_AI_MODEL`
+(по умолчанию `aliceai-llm`).
 
 
-Sampling refinement (2026-09-26): the selector prioritizes individual rubric checks,
-reserves README introduction, and follows up to eight existing repository-local
-README document links (one hop; inline and reference links). External links are
-never fetched. Excerpts have a shared 24000-byte content budget; the entire JSON
-context is capped at 32000 bytes. Candidate scanning remains bounded separately.
-Each model check is marked `sampled` or `not_reviewed` in the internal context.
-An unreviewed check contributes neither earned nor maximum points and cannot
-produce deficiency facts. The total is 100 * earned / evaluated maximum. A section
-with no evaluated checks has `grade: null`; this now means either not applicable
-or not reviewed. No estimated score is substituted for omitted material. This
-supersedes earlier wording that required all section grades to be estimated.
-The Kafka object shape is unchanged; consumers must display null as unavailable,
-not as zero. Deterministic required-file checks retain their existing rules.
+Уточнение выборки (2026-09-26): селектор отдаёт приоритет отдельным проверкам рубрики,
+резервирует место под введение README и переходит максимум по восьми существующим локальным
+ссылкам из README на документы (один переход; встроенные и ссылки-сноски). Внешние ссылки никогда
+не загружаются. У фрагментов общий бюджет содержимого 24000 байт; весь JSON-контекст ограничен
+32000 байт. Сканирование кандидатов ограничено отдельно. Каждая проверка модели во внутреннем
+контексте помечается `sampled` или `not_reviewed`. Непросмотренная проверка не добавляет ни
+набранных, ни максимальных баллов и не может порождать факты о недостатках. Итог =
+100 * набрано / максимум по оценённым проверкам. У раздела без оценённых проверок `grade: null`;
+теперь это значит «неприменимо» или «не просмотрено». Оценка для пропущенного материала не
+подставляется. Это заменяет прежнюю формулировку, требовавшую оценивать все разделы.
+Потребители должны показывать null как «недоступно», а не как ноль. Детерминированные проверки
+обязательных файлов сохраняют прежние правила.
