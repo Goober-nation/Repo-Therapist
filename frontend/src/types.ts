@@ -63,8 +63,6 @@ export interface RepositorySummary {
 export interface AiReport {
   status?: GradeStatus
   summary?: string
-  strengths: string[]
-  weaknesses: string[]
   recommendations: Recommendation[]
 }
 

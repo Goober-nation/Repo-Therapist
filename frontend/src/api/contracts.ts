@@ -62,8 +62,6 @@ export interface RecommendationsResponse {
   status: GradeStatus
   raw_response?: {
     summary?: string
-    strengths?: string[]
-    weaknesses?: string[]
     recommendations?: Array<{
       priority?: WirePriority
       category?: string

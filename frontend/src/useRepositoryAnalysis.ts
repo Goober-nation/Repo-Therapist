@@ -32,7 +32,7 @@ interface State {
   rerun?: RepositoryAnalysis["rerun"]
 }
 
-const NO_AI: AiReport = { strengths: [], weaknesses: [], recommendations: [] }
+const NO_AI: AiReport = { recommendations: [] }
 
 export async function pollUntilReady<T extends { status: string }>(
   load: () => Promise<T>,

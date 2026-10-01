@@ -54,18 +54,16 @@ const (
 )
 
 // RepoReady is published once Repository service has finished (successfully or not) — consumed
-// by Grade service, which pulls from S3 and scores on StatusReady, logs and skips on StatusFailed.
+// by Grade service, which pulls from S3 and scores on StatusReady, reports a failure on
+// StatusFailed. SourcecraftUUID is set on a failure once the repo id was resolved; without it the
+// failure cannot reach the Aggregator.
 type RepoReady struct {
-	OrgSlug         string    `json:"org_slug"`
-	RepoSlug        string    `json:"repo_slug"`
-	SourcecraftUUID string    `json:"sourcecraft_uuid,omitempty"`
-	S3Prefix        string    `json:"s3_prefix,omitempty"`
-	Status          string    `json:"status"` // StatusReady | StatusFailed
-	Error           string    `json:"error,omitempty"`
-	CommitCount     int       `json:"commit_count,omitempty"`
-	IssueCount      int       `json:"issue_count,omitempty"`
-	MilestoneCount  int       `json:"milestone_count,omitempty"`
-	ReadyAt         time.Time `json:"ready_at"`
+	OrgSlug         string `json:"org_slug"`
+	RepoSlug        string `json:"repo_slug"`
+	SourcecraftUUID string `json:"sourcecraft_uuid,omitempty"`
+	S3Prefix        string `json:"s3_prefix,omitempty"`
+	Status          string `json:"status"` // StatusReady | StatusFailed
+	Error           string `json:"error,omitempty"`
 }
 
 // The Aggregator's real contract (see agents_memory/topics/aggregator-integration.md) — separate
@@ -106,8 +104,8 @@ type Recommendation struct {
 
 // GradingResultEvent is published once grading finishes — consumed by the Aggregator, which
 // writes it to the repo_grades_* table matching Visibility and releases the repo_lock. Score is
-// nil only when every category in that view is NoData. Advice holds at most GRADE_ADVICE_LIMIT (default 0 = all) Recommendations,
-// picked at random from all of that view's categories. MissingData names the view's categories
+// nil only when every category in that view is NoData. Advice holds every Recommendation of that
+// view's categories, in category order. MissingData names the view's categories
 // that are NoData/not_calculated. A nonempty Error means grading failed: Score, CategoryScores and
 // Advice are null and the Aggregator only releases the lock.
 type GradingResultEvent struct {

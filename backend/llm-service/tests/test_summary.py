@@ -133,15 +133,6 @@ class SummaryResponseTests(unittest.TestCase):
         self.assertEqual(priority("activity", 74), "MEDIUM")
         self.assertEqual(priority("activity", 75), "LOW")
 
-    def test_code_lists_every_scored_category_once(self):
-        result = parse_summary_response(answer(), self.scores)
-        self.assertEqual(result["strengths"],
-                         ["Активность проекта: 90/100", "Issues: 80/100"])
-        self.assertEqual(result["weaknesses"],
-                         ["Безопасность (Security): 40/100",
-                          "Состояние кода и технический долг: 55/100",
-                          "Документация: 70/100"])
-
     def test_strips_stray_edge_punctuation(self):
         raw = answer(summary=". Итог 64/100.  ",
                      recommendations=[{"category": "issues", "text": "— Закройте старые issues;"}])

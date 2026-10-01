@@ -75,9 +75,7 @@ export default function RepositoryOverviewPage({
   const summaryOpen = summaryState.key === summaryKey && summaryState.open
   const level = healthLevel(repository.healthScore)
   const ai = analysis.ai
-  const fallback = splitStrengths(repository.categoryScores)
-  const strengths = ai?.strengths.length ? ai.strengths : fallback.strengths
-  const weaknesses = ai?.weaknesses.length ? ai.weaknesses : fallback.weaknesses
+  const { strengths, weaknesses } = splitStrengths(repository.categoryScores)
   const recommendations = ai?.recommendations.length ? ai.recommendations : (repository.advice ?? [])
   // Page through the advice client-side; a different advice list starts again on page 1.
   const adviceKey = recommendations.map((recommendation) => recommendation.id).join("|")

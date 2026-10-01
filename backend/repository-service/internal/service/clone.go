@@ -36,8 +36,16 @@ type Result struct {
 
 // CloneAndUpload is the shared entry point for both the one-shot CLI path and the Kafka listen
 // loop (via transport.handleRequest). token is the caller's SourceCraft PAT; empty falls back to
-// the service's own SOURCECRAFT_PAT.
-func CloneAndUpload(ctx context.Context, org, repo, token string) (*Result, error) {
+// the service's own SOURCECRAFT_PAT. A failure after the repo id is resolved still returns a
+// Result carrying SourcecraftUUID, so the failure can be correlated downstream.
+func CloneAndUpload(ctx context.Context, org, repo, token string) (res *Result, err error) {
+	var knownID string
+	defer func() {
+		if err != nil && knownID != "" {
+			res = &Result{SourcecraftUUID: knownID}
+		}
+	}()
+
 	pat, err := resolvePAT(token)
 	if err != nil {
 		return nil, err
@@ -54,6 +62,7 @@ func CloneAndUpload(ctx context.Context, org, repo, token string) (*Result, erro
 	if err != nil {
 		return nil, fmt.Errorf("resolving repo id: %w", err)
 	}
+	knownID = repoID
 	gitURLs, err := scClient.GetGitURL(ctx, repoID)
 	if err != nil {
 		return nil, fmt.Errorf("fetching git url: %w", err)

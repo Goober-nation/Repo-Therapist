@@ -117,8 +117,8 @@ publishes `llm.recommendations.received`; see
 [the contract](../../docs/kafka-contracts.md#сводка-и-рекомендации-по-репозиторию-активный-контракт-aggregator--llm-2026-09-27).
 Input is the final grade only (overall score, category scores, recommendations, missing
 data); repository files are not read. The model writes a Russian `summary` and up to eight
-recommendation texts. Code derives `strengths`, `weaknesses` and each recommendation's
-`priority` from the scores. Output format and category IDs are validated; the wording is not. Public requests never expose Security or
+recommendation texts. Code derives each recommendation's `priority` from the
+scores. Output format and category IDs are validated; the wording is not. Public requests never expose Security or
 CI/CD to the model. One format retry fits in a 60-second budget; failures produce
 `raw_response: null` and an error code.
 

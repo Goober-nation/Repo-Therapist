@@ -151,7 +151,7 @@ directory with `BACKLOG.md` as an index plus one `phase-N-<name>.md` per phase, 
 
 The local backlog above is the default. Use this workflow **only when the user explicitly asks** to
 track work via GitHub Issues instead (per session or durably — if durable, record the switch here).
-Repo: `Goober-nation/private-repo-therapist-test` (the `origin` remote). Use the `gh` CLI.
+Repo: `Goober-nation/private-repo-therapist` (the `origin` remote). Use the `gh` CLI.
 
 **Structure:**
 - One issue per task. Phase membership via `phase:<name>` labels, mirroring the local

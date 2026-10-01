@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,7 +26,7 @@ func TestBuildGradingResult_RoundsNotTruncates(t *testing.T) {
 		"activity": {Weight: 1.0},
 	}}
 
-	result, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPublic, time.Now(), DefaultAdviceLimit, noShuffle)
+	result, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPublic, time.Now())
 	if err != nil {
 		t.Fatalf("BuildGradingResult: %v", err)
 	}
@@ -57,7 +58,7 @@ func TestBuildGradingResult_AbsentCategoriesStayAbsent(t *testing.T) {
 		"code_health": {Weight: 0.20}, "security": {Weight: 0.20}, "ci_cd": {Weight: 0.15},
 	}}
 
-	result, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPrivate, time.Now(), DefaultAdviceLimit, noShuffle)
+	result, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPrivate, time.Now())
 	if err != nil {
 		t.Fatalf("BuildGradingResult: %v", err)
 	}
@@ -89,8 +90,6 @@ func TestBuildGradingResult_AbsentCategoriesStayAbsent(t *testing.T) {
 	}
 }
 
-func noShuffle(int, func(i, j int)) {}
-
 func TestBuildGradingResult_FillsOnlyItsVisibility(t *testing.T) {
 	out := &GradeOutput{
 		RepoID: "test-repo",
@@ -100,7 +99,7 @@ func TestBuildGradingResult_FillsOnlyItsVisibility(t *testing.T) {
 	}
 	cfg := &config.Config{Categories: map[string]config.CategoryConfig{"activity": {Weight: 1.0}}}
 
-	pub, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPublic, time.Now(), DefaultAdviceLimit, noShuffle)
+	pub, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPublic, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +112,7 @@ func TestBuildGradingResult_FillsOnlyItsVisibility(t *testing.T) {
 		}
 	}
 
-	priv, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPrivate, time.Now(), DefaultAdviceLimit, noShuffle)
+	priv, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPrivate, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +121,7 @@ func TestBuildGradingResult_FillsOnlyItsVisibility(t *testing.T) {
 	}
 }
 
-func TestBuildGradingResult_CapsRecommendationsAcrossCategories(t *testing.T) {
+func TestBuildGradingResult_SendsEveryRecommendationInCategoryOrder(t *testing.T) {
 	low := func(id string) scoring.MetricResult { return scoring.MetricResult{ID: id, Score: 0.2} }
 	out := &GradeOutput{
 		RepoID: "test-repo",
@@ -137,7 +136,7 @@ func TestBuildGradingResult_CapsRecommendationsAcrossCategories(t *testing.T) {
 	}}
 	catalog := map[string]string{"a1": "A1", "a2": "A2", "i1": "I1", "i2": "I2", "c1": "C1"}
 
-	result, err := BuildGradingResult(out, cfg, catalog, contracts.VisibilityPublic, time.Now(), 3, noShuffle)
+	result, err := BuildGradingResult(out, cfg, catalog, contracts.VisibilityPublic, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,8 +144,12 @@ func TestBuildGradingResult_CapsRecommendationsAcrossCategories(t *testing.T) {
 	if err := json.Unmarshal(result.Advice, &recs); err != nil {
 		t.Fatal(err)
 	}
-	if len(recs) != 3 {
-		t.Fatalf("got %d recommendations from a pool of 5, want 3", len(recs))
+	var got []string
+	for _, r := range recs {
+		got = append(got, r.Text)
+	}
+	if strings.Join(got, ",") != "A1,A2,I1,I2,C1" {
+		t.Fatalf("recommendations = %v, want all 5 in category order", got)
 	}
 }
 
@@ -162,7 +165,7 @@ func TestBuildGradingResult_DocsAdviceJoinsThePool(t *testing.T) {
 	cfg := &config.Config{Categories: map[string]config.CategoryConfig{
 		"activity": {Weight: 0.5}, "documentation": {Weight: 0.5},
 	}}
-	result, err := BuildGradingResult(out, cfg, map[string]string{"a1": "A1"}, contracts.VisibilityPublic, time.Now(), DefaultAdviceLimit, noShuffle)
+	result, err := BuildGradingResult(out, cfg, map[string]string{"a1": "A1"}, contracts.VisibilityPublic, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +240,7 @@ func TestBuildGradingResult_SecurityCap(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			out := &GradeOutput{RepoID: "r", Categories: tc.categories}
-			result, err := BuildGradingResult(out, cfg, map[string]string{}, tc.visibility, time.Now(), DefaultAdviceLimit, noShuffle)
+			result, err := BuildGradingResult(out, cfg, map[string]string{}, tc.visibility, time.Now())
 			if err != nil {
 				t.Fatal(err)
 			}

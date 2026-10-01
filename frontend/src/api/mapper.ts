@@ -232,17 +232,10 @@ export function recommendationsFromResponse(response: RecommendationsResponse): 
     .sort(byPriority)
 }
 
-function textList(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  return value.flatMap((item) => (typeof item === "string" && item.trim() ? [item.trim()] : []))
-}
-
 export function aiReportFromResponse(response: RecommendationsResponse): AiReport {
   return {
     status: response.status,
     summary: optionalText(response.raw_response?.summary)?.trim(),
-    strengths: textList(response.raw_response?.strengths),
-    weaknesses: textList(response.raw_response?.weaknesses),
     recommendations: recommendationsFromResponse(response),
   }
 }

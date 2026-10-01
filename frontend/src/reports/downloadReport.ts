@@ -14,7 +14,7 @@ import type { AiReport, Recommendation, RepositorySummary } from "../types"
 
 /** Everything a report shows, shared by the Markdown and PDF exports. */
 export function reportContent(repository: RepositorySummary, recommendations: Recommendation[], ai?: AiReport) {
-  const fallback = splitStrengths(repository.categoryScores)
+  const { strengths, weaknesses } = splitStrengths(repository.categoryScores)
   return {
     title: `Repo Therapist: отчёт о здоровье ${repository.fullName}`,
     link: repository.webUrl,
@@ -24,8 +24,8 @@ export function reportContent(repository: RepositorySummary, recommendations: Re
     level: healthLevel(repository.healthScore).label,
     activity: getLastActivityLabel(repository.lastActivityDaysAgo),
     summary: ai?.summary,
-    strengths: ai?.strengths.length ? ai.strengths : fallback.strengths,
-    weaknesses: ai?.weaknesses.length ? ai.weaknesses : fallback.weaknesses,
+    strengths,
+    weaknesses,
     categories: Object.entries(repository.categoryScores).map(([id, result]) => ({
       name: result.name ?? categoryLabel(id),
       score: result.score === null ? "Нет данных" : `${result.score}/100`,

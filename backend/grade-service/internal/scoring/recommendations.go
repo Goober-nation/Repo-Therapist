@@ -67,18 +67,6 @@ func DocsRecommendations(categories map[string]CategoryResult, categoryIDs []str
 	return recs
 }
 
-// PickRandom returns up to n recommendations chosen uniformly at random from recs (all of them,
-// in random order, when there are n or fewer, or when n is 0). shuffle is rand.Shuffle in production; tests pass
-// a deterministic one. recs itself is not modified.
-func PickRandom(recs []Recommendation, n int, shuffle func(n int, swap func(i, j int))) []Recommendation {
-	picked := append([]Recommendation(nil), recs...)
-	shuffle(len(picked), func(i, j int) { picked[i], picked[j] = picked[j], picked[i] })
-	if n > 0 && len(picked) > n {
-		picked = picked[:n]
-	}
-	return picked
-}
-
 // CombineCategories is combineWeighted (the same NoData-drop-and-renormalize logic every category
 // already uses internally for its own metrics) applied one level up, across categories — the
 // public/private score split is structurally identical to a category combining its metrics, so it

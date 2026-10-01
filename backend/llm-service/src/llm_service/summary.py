@@ -1,8 +1,8 @@
 """Russian repository summary and prioritized recommendations from final grades.
 
 The model sees only the Aggregator's final scores, recommendations and missing-data
-list. It writes the summary and recommendation texts; strengths, weaknesses and
-priorities are derived from the scores by code, so they are complete and reproducible.
+list. It writes the summary and recommendation texts; priorities are derived from the
+scores by code, so they are reproducible.
 The local validator checks model output format only.
 """
 
@@ -28,8 +28,8 @@ DEFAULT_STRENGTH_THRESHOLD = 75
 
 
 def strength_threshold_from_env() -> int:
-    """LLM_STRENGTH_THRESHOLD (integer 0-100): scores at or above it are strengths, below
-    it weaknesses; it also sets the MEDIUM/LOW priority boundary. Invalid values fall back."""
+    """LLM_STRENGTH_THRESHOLD (integer 0-100): the MEDIUM/LOW priority boundary (and Security's
+    HIGH boundary). Invalid values fall back."""
     value = os.environ.get("LLM_STRENGTH_THRESHOLD", "").strip()
     if not value:
         return DEFAULT_STRENGTH_THRESHOLD
@@ -68,19 +68,6 @@ def priority(category, score):
     if score < 50 or category == "security" and score < STRENGTH_THRESHOLD:
         return "HIGH"
     return "MEDIUM" if score < STRENGTH_THRESHOLD else "LOW"
-
-
-def _label(category, score):
-    return f"{CATEGORY_NAMES.get(category, category)}: {score}/100"
-
-
-def strengths_and_weaknesses(scores):
-    """Every scored category is listed exactly once; no-data categories never are."""
-    ranked = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
-    strengths = [_label(name, score) for name, score in ranked if score >= STRENGTH_THRESHOLD]
-    weaknesses = [_label(name, score) for name, score in reversed(ranked)
-                  if score < STRENGTH_THRESHOLD]
-    return strengths, weaknesses
 
 
 def _schema(categories):
@@ -195,9 +182,7 @@ def parse_summary_response(raw, scores):
     # Priority first, then the weaker category; stable within one category.
     recommendations.sort(key=lambda item: (PRIORITIES.index(item["priority"]),
                                            scores[item["category"]]))
-    strengths, weaknesses = strengths_and_weaknesses(scores)
     return {"summary": _text(body["summary"], "summary", LIMITS["summary"]),
-            "strengths": strengths, "weaknesses": weaknesses,
             "recommendations": recommendations}
 
 

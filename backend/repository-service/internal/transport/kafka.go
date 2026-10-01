@@ -66,16 +66,20 @@ func handleRequest(ctx context.Context, req contracts.GradeRequested) contracts.
 	cloneCtx, cancel := context.WithTimeout(ctx, service.CloneTimeout())
 	defer cancel()
 
-	res, err := service.CloneAndUpload(cloneCtx, req.OrgSlug, req.RepoSlug, req.Token)
+	res, err := cloneAndUpload(cloneCtx, req.OrgSlug, req.RepoSlug, req.Token)
 	if err != nil {
 		log.Printf("clone/upload failed for %s/%s: %v", req.OrgSlug, req.RepoSlug, err)
-		return contracts.RepoReady{
+		failed := contracts.RepoReady{
 			OrgSlug:  req.OrgSlug,
 			RepoSlug: req.RepoSlug,
 			Status:   contracts.StatusFailed,
 			Error:    err.Error(),
-			ReadyAt:  time.Now(),
 		}
+		// Set once the repo id was resolved; Grade needs it to report the failure to the Aggregator.
+		if res != nil {
+			failed.SourcecraftUUID = res.SourcecraftUUID
+		}
+		return failed
 	}
 	return contracts.RepoReady{
 		OrgSlug:         req.OrgSlug,
@@ -83,12 +87,11 @@ func handleRequest(ctx context.Context, req contracts.GradeRequested) contracts.
 		SourcecraftUUID: res.SourcecraftUUID,
 		S3Prefix:        res.S3Prefix,
 		Status:          contracts.StatusReady,
-		CommitCount:     res.CommitCount,
-		IssueCount:      res.IssueCount,
-		MilestoneCount:  res.MilestoneCount,
-		ReadyAt:         time.Now(),
 	}
 }
+
+// cloneAndUpload is service.CloneAndUpload, replaceable in tests.
+var cloneAndUpload = service.CloneAndUpload
 
 // shutdownPublishTimeout bounds the last publish made after shutdown was requested.
 const shutdownPublishTimeout = 5 * time.Second

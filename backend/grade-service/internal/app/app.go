@@ -188,12 +188,12 @@ func DeleteRepoData(ctx context.Context, repoID string) (int, error) {
 }
 
 // BuildGradingResult turns a GradeOutput into the Aggregator-facing contracts.GradingResultEvent
-// for one visibility: that side's score, category scores, up to adviceLimit random
-// recommendations (0 = all of them, see AdviceLimit) and missing_data; the other side stays null. catalog is the recommendation
+// for one visibility: that side's score, category scores, every recommendation (in category
+// order, Documentation last) and missing_data; the other side stays null. catalog is the recommendation
 // text lookup (config.LoadRecommendations); an empty catalog just means every metric that would
 // otherwise get a recommendation is silently skipped (see scoring.BuildRecommendations), not an
-// error. shuffle is rand.Shuffle in production.
-func BuildGradingResult(out *GradeOutput, cfg *config.Config, catalog map[string]string, visibility string, now time.Time, adviceLimit int, shuffle func(n int, swap func(i, j int))) (contracts.GradingResultEvent, error) {
+// error.
+func BuildGradingResult(out *GradeOutput, cfg *config.Config, catalog map[string]string, visibility string, now time.Time) (contracts.GradingResultEvent, error) {
 	weights := make(map[string]float64, len(cfg.Categories))
 	for id, cat := range cfg.Categories {
 		weights[id] = cat.Weight
@@ -221,7 +221,7 @@ func BuildGradingResult(out *GradeOutput, cfg *config.Config, catalog map[string
 
 	pool := scoring.BuildRecommendations(out.Categories, ids, catalog)
 	pool = append(pool, scoring.DocsRecommendations(out.Categories, ids, out.DocsAdvice)...)
-	recsJSON, err := json.Marshal(toContractRecommendations(scoring.PickRandom(pool, adviceLimit, shuffle)))
+	recsJSON, err := json.Marshal(toContractRecommendations(pool))
 	if err != nil {
 		return contracts.GradingResultEvent{}, fmt.Errorf("marshaling recommendations: %w", err)
 	}

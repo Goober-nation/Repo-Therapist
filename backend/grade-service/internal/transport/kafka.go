@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand/v2"
+
 	"os/signal"
 	"syscall"
 	"time"
@@ -38,8 +38,6 @@ func RunListen(configPath string) error {
 		return fmt.Errorf("loading recommendations catalog: %w", err)
 	}
 
-	adviceLimit := app.AdviceLimit()
-
 	brokers := []string{app.EnvOrDefault("KAFKA_BROKERS", "localhost:9092")}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -59,7 +57,7 @@ func RunListen(configPath string) error {
 	docs := newDocsSettings(cfg)
 	errCh := make(chan error, 3)
 	go func() { errCh <- runGradingRequestsRelay(ctx, brokers, jobs) }()
-	go func() { errCh <- runRepoReadyGrader(ctx, brokers, cfg, catalog, adviceLimit, jobs, docs) }()
+	go func() { errCh <- runRepoReadyGrader(ctx, brokers, cfg, catalog, jobs, docs) }()
 	go func() { errCh <- runDocsGradedConsumer(ctx, brokers, docs.waiters) }()
 
 	firstErr := <-errCh
@@ -104,7 +102,7 @@ func runGradingRequestsRelay(ctx context.Context, brokers []string, jobs *jobSto
 // runRepoReadyGrader consumes repo.ready, grades each ready repo, and publishes the result to
 // grading.results for the Aggregator. Failed/skipped repos are logged, not silently dropped, but
 // don't kill the loop — one repo's failure shouldn't stop grading for every other repo.
-func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Config, catalog map[string]string, adviceLimit int, jobs *jobStore, docs docsSettings) error {
+func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Config, catalog map[string]string, jobs *jobStore, docs docsSettings) error {
 	consumer := kafkaclient.NewConsumer(brokers, contracts.TopicRepoReady, "grade-service")
 	defer consumer.Close()
 	producer := kafkaclient.NewProducer(brokers, contracts.TopicGradingResults)
@@ -156,7 +154,7 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 		}
 		app.PrintResult(out)
 
-		result, err := app.BuildGradingResult(out, cfg, catalog, job.visibility, time.Now(), adviceLimit, rand.Shuffle)
+		result, err := app.BuildGradingResult(out, cfg, catalog, job.visibility, time.Now())
 		if err != nil {
 			log.Printf("building grading result for %s/%s failed: %v", ready.OrgSlug, ready.RepoSlug, err)
 			return publishFailure(ctx, producer, ready, job.visibility, contracts.GradingErrBuildResult)

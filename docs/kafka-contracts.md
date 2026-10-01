@@ -52,8 +52,8 @@ LLM-сервис по-прежнему принимает старые `LLM_SUMM
   приватное оценивание; без токена — публичное. Непубличный `visibility` без токена отбрасывается.
 - `grading.results`: `{sourcecraft_uuid, visibility, score, category_scores, advice,
   missing_data, graded_at, error}`. `visibility` называет таблицу оценок, в которую пишет
-  Aggregator. `advice` — список не более чем из `GRADE_ADVICE_LIMIT` (по умолчанию 0 = все)
-  рекомендаций `{category_id, metric_id, text}`, выбранных случайно. Для документации это тексты
+  Aggregator. `advice` — все рекомендации `{category_id, metric_id, text}` по порядку
+  категорий. Для документации это тексты
   `advice` из `repo.docs.graded`, каждый как `{"documentation", "llm_advice", "[medium] <текст>"}`. `error` при успехе — `""`.
   При сбое это код — `REPO_FETCH_FAILED` (repo.ready со статусом failed), `GRADING_FAILED`,
   `GRADING_INTERRUPTED` (grade-service остановлен посреди оценки), `RESULT_BUILD_FAILED` — а
@@ -79,17 +79,15 @@ wrapper.
   "repo_slug": "vulnerable-repo",
   "sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
   "s3_prefix": "repos/019b2102-fa21-7ab7-8ce1-116af406fb5e",
-  "status": "ready",
-  "commit_count": 3,
-  "issue_count": 2,
-  "milestone_count": 0,
-  "ready_at": "2026-09-19T23:49:15+03:00"
+  "status": "ready"
 }
 ```
 
-`status` — `"ready"` или `"failed"`; при сбое `error` содержит сообщение, а поля счётчиков
-опускаются (они `omitempty`, поэтому нулевые счётчики тоже не передаются). Grade service
-логирует и пропускает сообщения `"failed"`, не пытаясь их оценить.
+`status` — `"ready"` или `"failed"`; при сбое `error` содержит сообщение, а `s3_prefix`
+опускается. `sourcecraft_uuid` передаётся и при сбое, если репозиторий успел определиться;
+тогда Grade service публикует `REPO_FETCH_FAILED` в `grading.results`, и Aggregator сразу
+снимает блокировку. Без `sourcecraft_uuid` сбой только логируется, блокировка снимается по
+`GRADING_LOCK_TIMEOUT`.
 
 Go-типы: `internal/contracts/repo_grading.go`. Проверено сквозным прогоном (2026-09-19): ручной
 запуск → Repository service → `repo.ready` → Grade service → напечатанная оценка «Активности»,
@@ -231,8 +229,6 @@ LLM → Aggregator, топик `llm.recommendations.received` (Go `LLMRecommenda
   "sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
   "raw_response": {
     "summary": "Репозиторий получил 64 балла из 100. …",
-    "strengths": ["Активность проекта: 90/100", "Issues: 80/100"],
-    "weaknesses": ["Безопасность (Security): 40/100", "Документация: 70/100"],
     "recommendations": [
       {"priority": "HIGH", "category": "security", "text": "Обновите уязвимые зависимости."}
     ]
@@ -244,21 +240,18 @@ LLM → Aggregator, топик `llm.recommendations.received` (Go `LLMRecommenda
 }
 ```
 
-Правила `raw_response`. Модель пишет только `summary` и тексты рекомендаций; всё остальное код
-выводит из оценок запроса, поэтому оно полно и воспроизводимо:
+Правила `raw_response`. Модель пишет только `summary` и тексты рекомендаций; приоритеты задаёт
+код по оценкам запроса. Сильные и слабые стороны сюда не входят — фронтенд считает их сам по
+оценкам категорий.
 
 - `summary` (модель): непустой текст на русском, не более 1500 символов.
-- `strengths`, `weaknesses` (код): каждая категория с числовой оценкой, видимая для этого
-  `visibility`, появляется ровно один раз как `"<название>: <оценка>/100"` — оценка 75 и выше в
-  `strengths` (сначала наибольшие), ниже 75 в `weaknesses` (сначала наименьшие). Категории без
-  данных не появляются никогда. Любой список может быть пустым.
 - `recommendations`: до 8 объектов `{priority, category, text}`. Модель пишет `text` (не более
   600 символов) и выбирает `category` — всегда категорию с числовой оценкой, видимую для этого
   `visibility`. `priority` задаёт код по оценке этой категории: `HIGH` ниже 50 или безопасность
   ниже 75; `MEDIUM` ниже 75; иначе `LOW`. Сортировка по приоритету, затем по более слабой
   категории. Модель просят дать хотя бы одну рекомендацию на каждую слабую категорию; это не
   проверяется принудительно.
-- Граница 75 выше (strengths/weaknesses, `MEDIUM`/`LOW` и `HIGH` для безопасности) —
+- Граница 75 выше (`MEDIUM`/`LOW` и `HIGH` для безопасности) —
   `LLM_STRENGTH_THRESHOLD` (целое 0–100, по умолчанию 75); граница 50 для `HIGH` фиксирована.
 - Лишние маркеры списков и пунктуация по краям текста модели обрезаются. Формулировки не
   проверяются. Модели предписано использовать только данные запроса, не выдумывать цифры и факты

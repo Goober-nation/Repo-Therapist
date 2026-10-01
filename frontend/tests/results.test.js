@@ -840,7 +840,7 @@ test("overview explains a pending AI summary and falls back to rule-based advice
     analysis: {
       ...idleAnalysis,
 
-      ai: { status: "PENDING", strengths: [], weaknesses: [], recommendations: [] },
+      ai: { status: "PENDING", recommendations: [] },
     },
 
     onBackToRanking() {},
@@ -938,18 +938,10 @@ test("Markdown export uses the recommendations currently shown on the page", () 
   const withAi = buildReport(repository, [], {
     summary: "Сводка.",
 
-    strengths: ["Сильно"],
-
-    weaknesses: ["Слабо"],
-
     recommendations: [],
   })
 
   assert.match(withAi, /## Summary AI\n\nСводка\./)
-
-  assert.match(withAi, /## Сильные стороны\n- Сильно/)
-
-  assert.match(withAi, /## Требует внимания\n- Слабо/)
 })
 
 test("the documented array shape and object shape produce the same categories", () => {
@@ -1286,16 +1278,12 @@ test("AI recommendations are titled by category and sorted by priority", () => {
     status: "FINISHED",
 
     raw_response: {
-      strengths: ["Активность: 91/100", 5],
-
       recommendations: [
         { priority: "LOW", category: "documentation", text: "Опишите запуск." },
         { priority: "HIGH", category: "security", text: "Обновите пакет." },
       ],
     },
   })
-
-  assert.deepEqual(report.strengths, ["Активность: 91/100"])
 
   assert.deepEqual(
     report.recommendations.map((item) => [item.priority, item.title]),

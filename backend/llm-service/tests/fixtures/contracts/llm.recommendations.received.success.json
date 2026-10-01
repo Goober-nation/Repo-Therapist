@@ -2,8 +2,6 @@
   "sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
   "raw_response": {
     "summary": "Репозиторий получил 64 балла из 100.",
-    "strengths": ["Активность проекта: 90/100", "Issues: 80/100"],
-    "weaknesses": ["Безопасность (Security): 40/100", "Документация: 70/100"],
     "recommendations": [
       {"priority": "HIGH", "category": "security", "text": "Обновите уязвимые зависимости."}
     ]

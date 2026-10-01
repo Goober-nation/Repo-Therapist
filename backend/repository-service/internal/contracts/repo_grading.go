@@ -47,16 +47,14 @@ const (
 )
 
 // RepoReady is published once Repository service has finished (successfully or not) — consumed
-// by Grade service, which pulls from S3 and scores on StatusReady, logs and skips on StatusFailed.
+// by Grade service, which pulls from S3 and scores on StatusReady, reports a failure on
+// StatusFailed. SourcecraftUUID is set on a failure once the repo id was resolved; without it the
+// failure cannot reach the Aggregator.
 type RepoReady struct {
-	OrgSlug         string    `json:"org_slug"`
-	RepoSlug        string    `json:"repo_slug"`
-	SourcecraftUUID string    `json:"sourcecraft_uuid,omitempty"`
-	S3Prefix        string    `json:"s3_prefix,omitempty"`
-	Status          string    `json:"status"` // StatusReady | StatusFailed
-	Error           string    `json:"error,omitempty"`
-	CommitCount     int       `json:"commit_count,omitempty"`
-	IssueCount      int       `json:"issue_count,omitempty"`
-	MilestoneCount  int       `json:"milestone_count,omitempty"`
-	ReadyAt         time.Time `json:"ready_at"`
+	OrgSlug         string `json:"org_slug"`
+	RepoSlug        string `json:"repo_slug"`
+	SourcecraftUUID string `json:"sourcecraft_uuid,omitempty"`
+	S3Prefix        string `json:"s3_prefix,omitempty"`
+	Status          string `json:"status"` // StatusReady | StatusFailed
+	Error           string `json:"error,omitempty"`
 }
