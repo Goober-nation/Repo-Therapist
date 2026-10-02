@@ -74,6 +74,7 @@ class AlgorithmicGradeTests(unittest.TestCase):
                         extra=["pyproject.toml", "tests/test_app.py", "src/app.py"])
         event = build_grade_result(parse_grade_request(request()), payload, llm_used=False)
         self.assertEqual(event["advice"], [ALGORITHMIC_NOTICE])
+        self.assertEqual(event["method"], "algorithmic")
 
     def test_one_line_readme_loses_missing_sections(self):
         payload = grade({"README.md": "# Demo\n\nA tool.\n", **REQUIRED},
@@ -152,6 +153,7 @@ class DocumentationModeTests(unittest.TestCase):
         self.assertEqual(failed["error"], "LLM_RATE_LIMITED")
         success = process_documentation_request(request(), FakeStore(), FakeModel(), "auto")
         self.assertNotIn(ALGORITHMIC_NOTICE, success["advice"])
+        self.assertEqual(success["method"], "llm")
 
     def test_algorithmic_mode_never_calls_model(self):
         model = FakeModel()

@@ -246,6 +246,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .metric-card__score { font-size: 28px; font-weight: 650; letter-spacing: -.05em; }
 .metric-card__score span { margin-left: 4px; color: var(--subtle); font-size: var(--fs-sm); font-weight: 500; letter-spacing: 0; }
 .metric-card p { min-height: 33px; margin: -5px 0 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.5; }
+.metric-card p.metric-card__method { min-height: 0; color: var(--warning); }
 .metric-card .metric-card__empty { margin: 0; font-size: var(--fs-xl); }
 
 .empty-note, .empty-state { color: var(--muted); font-size: var(--fs-sm); line-height: 1.55; }
@@ -422,3 +423,5 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .badge-snippet__preview { height: 20px; width: auto; }
 .badge-snippet__row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .badge-snippet__code { flex: 1 1 320px; min-width: 0; overflow-x: auto; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-sm); white-space: nowrap; }
+.public-view-toggle { display: flex; align-items: baseline; gap: 6px; font-size: var(--fs-sm); }
+.public-view-toggle .muted-copy { margin: 0; }

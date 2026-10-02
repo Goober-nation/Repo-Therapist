@@ -102,7 +102,7 @@ func runGradingRequestsRelay(ctx context.Context, brokers []string, jobs *jobSto
 // runRepoReadyGrader consumes repo.ready, grades each ready repo, and publishes the result to
 // grading.results for the Aggregator. Failed/skipped repos are logged, not silently dropped, but
 // don't kill the loop — one repo's failure shouldn't stop grading for every other repo.
-func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Config, catalog map[string]string, jobs *jobStore, docs docsSettings) error {
+func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Config, catalog map[string]config.RecommendationEntry, jobs *jobStore, docs docsSettings) error {
 	consumer := kafkaclient.NewConsumer(brokers, contracts.TopicRepoReady, "grade-service")
 	defer consumer.Close()
 	producer := kafkaclient.NewProducer(brokers, contracts.TopicGradingResults)

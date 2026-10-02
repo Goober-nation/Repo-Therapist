@@ -27,11 +27,11 @@ func TestMatchResult(t *testing.T) {
 		name, value string
 		want        bool
 	}{
-		{"this repo and view", `{"sourcecraft_uuid":"u1","visibility":"public","score":80}`, true},
-		{"this repo, failure result", `{"sourcecraft_uuid":"u1","visibility":"public","error":"GRADING_FAILED"}`, true},
+		{"this repo and view", `{"sourcecraft_uuid":"u1","grade_mode":"public","score":80}`, true},
+		{"this repo, failure result", `{"sourcecraft_uuid":"u1","grade_mode":"public","error":"GRADING_FAILED"}`, true},
 		// The bug this fixes: a late result for an earlier request must not be taken as ours.
-		{"late result of another repo", `{"sourcecraft_uuid":"u0","visibility":"public","score":85}`, false},
-		{"same repo, other view", `{"sourcecraft_uuid":"u1","visibility":"private","score":70}`, false},
+		{"late result of another repo", `{"sourcecraft_uuid":"u0","grade_mode":"public","score":85}`, false},
+		{"same repo, other view", `{"sourcecraft_uuid":"u1","grade_mode":"private","score":70}`, false},
 		{"garbage", `{`, false},
 	}
 	for _, tc := range cases {

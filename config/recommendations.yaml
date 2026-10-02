@@ -1,39 +1,40 @@
 # Recommendation catalog — one entry per metric ID, appended to a repo's recommendation list
 # whenever that metric scores below perfect (see internal/scoring/recommendations.go).
-# Each text starts with a [critical|high|medium|low] tag: the frontend turns it into the
-# priority label and shows the rest. Texts are user-facing, so they are in Russian like the UI.
+# Each entry is {priority, text}: priority is one of critical|high|medium|low and is sent as the
+# recommendation's `priority` field; text is user-facing, so it is in Russian like the UI.
+# During the transition grade-service also prefixes the sent text with "[priority] ".
 
 # --- Activity (docs/grading/activity.md) ---
-commits_per_week: "[low] Коммиты появляются реже, чем обычно для здорового проекта. Проверьте, не мешают ли регулярным изменениям распределение ответственности или барьеры для участников."
-days_since_last_activity: "[medium] В репозитории давно не было коммитов. Если проект жив, даже небольшое свежее изменение покажет это пользователям."
-unique_contributors: "[medium] Коммиты делает мало разных авторов. Зависимость от узкой группы людей — риск, если кто-то из них станет недоступен."
-issue_rate_per_week: "[low] Новые issues появляются редко. Низкая активность в трекере может означать, что реальные проблемы просто не видны, а не что их нет."
-milestones_per_year: "[low] Milestones создаются редко. Регулярные milestones помогают показать пользователям и участникам направление и прогресс проекта."
-days_since_last_milestone: "[low] Последний milestone закрыт давно. Свежий milestone показывает, что проект движется к конкретным целям."
-top_contributor_share: "[high] Большинство коммитов делает один автор. Это риск bus factor — стоит распределить владение кодом между несколькими людьми."
+commits_per_week: {priority: low, text: "Коммиты появляются реже, чем обычно для здорового проекта. Проверьте, не мешают ли регулярным изменениям распределение ответственности или барьеры для участников."}
+days_since_last_activity: {priority: medium, text: "В репозитории давно не было коммитов. Если проект жив, даже небольшое свежее изменение покажет это пользователям."}
+unique_contributors: {priority: medium, text: "Коммиты делает мало разных авторов. Зависимость от узкой группы людей — риск, если кто-то из них станет недоступен."}
+issue_rate_per_week: {priority: low, text: "Новые issues появляются редко. Низкая активность в трекере может означать, что реальные проблемы просто не видны, а не что их нет."}
+milestones_per_year: {priority: low, text: "Milestones создаются редко. Регулярные milestones помогают показать пользователям и участникам направление и прогресс проекта."}
+days_since_last_milestone: {priority: low, text: "Последний milestone закрыт давно. Свежий milestone показывает, что проект движется к конкретным целям."}
+top_contributor_share: {priority: high, text: "Большинство коммитов делает один автор. Это риск bus factor — стоит распределить владение кодом между несколькими людьми."}
 
 # --- Issues (docs/grading/issues.md) ---
-abandoned_share: "[medium] Большая часть открытых issues давно не обновлялась. Разбор и закрытие устаревших задач улучшит состояние бэклога и доверие участников."
-median_closure_days: "[medium] Issues в среднем закрываются долго. Более быстрый разбор и решение задач улучшит опыт участников."
-growth_ratio: "[high] Issues открываются быстрее, чем закрываются. Без внимания бэклог станет неуправляемым."
-share_resolved: "[medium] Решается малая доля задач из бэклога. Выделите время на закрытие старых issues."
+abandoned_share: {priority: medium, text: "Большая часть открытых issues давно не обновлялась. Разбор и закрытие устаревших задач улучшит состояние бэклога и доверие участников."}
+median_closure_days: {priority: medium, text: "Issues в среднем закрываются долго. Более быстрый разбор и решение задач улучшит опыт участников."}
+growth_ratio: {priority: high, text: "Issues открываются быстрее, чем закрываются. Без внимания бэклог станет неуправляемым."}
+share_resolved: {priority: medium, text: "Решается малая доля задач из бэклога. Выделите время на закрытие старых issues."}
 
 # --- Code health (docs/grading/code-health.md) ---
-median_marker_age: "[low] Маркеры TODO/FIXME подолгу остаются в коде. Периодически пересматривайте и закрывайте старые маркеры."
-density_per_kloc: "[medium] Высокая плотность TODO/FIXME относительно размера кода. Стоит погасить часть этого технического долга."
-share_stale_markers: "[low] Большая доля маркеров TODO/FIXME устарела. Старый маркер часто означает забытую задачу, а не низкий приоритет — их стоит пересмотреть."
-worst_file_concentration: "[low] Маркеры TODO/FIXME сосредоточены в одном файле. Этот файл — хороший кандидат для точечной чистки или рефакторинга."
+median_marker_age: {priority: low, text: "Маркеры TODO/FIXME подолгу остаются в коде. Периодически пересматривайте и закрывайте старые маркеры."}
+density_per_kloc: {priority: medium, text: "Высокая плотность TODO/FIXME относительно размера кода. Стоит погасить часть этого технического долга."}
+share_stale_markers: {priority: low, text: "Большая доля маркеров TODO/FIXME устарела. Старый маркер часто означает забытую задачу, а не низкий приоритет — их стоит пересмотреть."}
+worst_file_concentration: {priority: low, text: "Маркеры TODO/FIXME сосредоточены в одном файле. Этот файл — хороший кандидат для точечной чистки или рефакторинга."}
 
 # --- Security (docs/grading/security.md; metric IDs hardcoded in internal/scoring/security.go) ---
-open_critical: "[critical] Есть открытые находки критической важности. Это самый срочный риск безопасности, их нужно исправить в первую очередь."
-open_high: "[high] Есть открытые находки высокой важности. Их стоит исправить сразу после критических."
-open_medium: "[medium] Есть открытые находки средней важности. Запланируйте время на их исправление."
-open_low: "[low] Есть открытые находки низкой важности. Не срочно, но отслеживайте их, чтобы они не накапливались."
-days_since_last_scan: "[high] Последний скан безопасности был давно. Свежий скан покажет актуальное состояние кода."
+open_critical: {priority: critical, text: "Есть открытые находки критической важности. Это самый срочный риск безопасности, их нужно исправить в первую очередь."}
+open_high: {priority: high, text: "Есть открытые находки высокой важности. Их стоит исправить сразу после критических."}
+open_medium: {priority: medium, text: "Есть открытые находки средней важности. Запланируйте время на их исправление."}
+open_low: {priority: low, text: "Есть открытые находки низкой важности. Не срочно, но отслеживайте их, чтобы они не накапливались."}
+days_since_last_scan: {priority: high, text: "Последний скан безопасности был давно. Свежий скан покажет актуальное состояние кода."}
 
 # --- CI/CD (docs/grading/ci-cd.md) ---
-has_ci: "[critical] CI-пайплайн не найден. Добавьте .sourcecraft/ci.yaml, который собирает и тестирует каждое изменение, чтобы ловить регрессии до попадания в основную ветку."
-ci_success_rate: "[high] Большая доля прогонов CI падает. Почините или изолируйте падающие проверки, чтобы CI оставался надёжным сигналом, а не шумом."
-ci_stability_trend: "[medium] В последнее время CI падает чаще, чем раньше. Разберите, что изменилось в последних упавших прогонах, пока падения не стали нормой."
-ci_noop_pipeline: "[high] CI выполняет только команды-заглушки (echo, true, sleep…) и не собирает и не тестирует код. Замените их настоящими шагами сборки и тестов."
-ci_median_duration_min: "[low] Прогоны CI идут долго. Кэширование зависимостей или разделение медленных задач ускорит обратную связь для участников."
+has_ci: {priority: critical, text: "CI-пайплайн не найден. Добавьте .sourcecraft/ci.yaml, который собирает и тестирует каждое изменение, чтобы ловить регрессии до попадания в основную ветку."}
+ci_success_rate: {priority: high, text: "Большая доля прогонов CI падает. Почините или изолируйте падающие проверки, чтобы CI оставался надёжным сигналом, а не шумом."}
+ci_stability_trend: {priority: medium, text: "В последнее время CI падает чаще, чем раньше. Разберите, что изменилось в последних упавших прогонах, пока падения не стали нормой."}
+ci_noop_pipeline: {priority: high, text: "CI выполняет только команды-заглушки (echo, true, sleep…) и не собирает и не тестирует код. Замените их настоящими шагами сборки и тестов."}
+ci_median_duration_min: {priority: low, text: "Прогоны CI идут долго. Кэширование зависимостей или разделение медленных задач ускорит обратную связь для участников."}

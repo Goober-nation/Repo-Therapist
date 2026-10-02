@@ -20,6 +20,9 @@ type CategoryResult struct {
 	NoData  bool           `json:"no_data"`
 	Score   float64        `json:"score"` // 0-100
 	Metrics []MetricResult `json:"metrics"`
+	// Method is set only for Documentation: "llm" or "algorithmic" (repo.docs.graded method);
+	// "algorithmic" means a simplified grade that only checked which sections exist.
+	Method string `json:"method,omitempty"`
 }
 
 // combineWeighted renormalizes over whatever isn't NoData — a metric that's config-disabled

@@ -2,9 +2,10 @@ import os
 import unittest
 from unittest import mock
 
-from llm_service.kafka_worker import KafkaConfig, SummaryKafkaConfig
+from llm_service.kafka_worker import (DEFAULT_REQUEST_MAX_AGE, KafkaConfig, SummaryKafkaConfig,
+                                      request_max_age_from_env)
 from llm_service.s3_store import S3Config
-from llm_service.summary import DEFAULT_STRENGTH_THRESHOLD, strength_threshold_from_env
+from llm_service.summary import DEFAULT_PRIORITY_THRESHOLD, priority_threshold_from_env
 
 
 class TopicEnvTest(unittest.TestCase):
@@ -43,9 +44,36 @@ class S3TimeoutEnvTest(unittest.TestCase):
                     S3Config.from_env()
 
 
-class StrengthThresholdEnvTest(unittest.TestCase):
+class PriorityThresholdEnvTest(unittest.TestCase):
     def test_values(self):
-        for value, want in (("", DEFAULT_STRENGTH_THRESHOLD), ("80", 80),
-                            ("101", DEFAULT_STRENGTH_THRESHOLD), ("high", DEFAULT_STRENGTH_THRESHOLD)):
-            with mock.patch.dict(os.environ, {"LLM_STRENGTH_THRESHOLD": value}, clear=True):
-                self.assertEqual(strength_threshold_from_env(), want, value)
+        for value, want in (("", DEFAULT_PRIORITY_THRESHOLD), ("80", 80),
+                            ("101", DEFAULT_PRIORITY_THRESHOLD), ("high", DEFAULT_PRIORITY_THRESHOLD)):
+            with mock.patch.dict(os.environ, {"LLM_PRIORITY_THRESHOLD": value}, clear=True):
+                self.assertEqual(priority_threshold_from_env(), want, value)
+
+    def test_old_name_is_fallback(self):
+        with mock.patch.dict(os.environ, {"LLM_STRENGTH_THRESHOLD": "60"}, clear=True):
+            self.assertEqual(priority_threshold_from_env(), 60)
+        env = {"LLM_STRENGTH_THRESHOLD": "60", "LLM_PRIORITY_THRESHOLD": " "}
+        with mock.patch.dict(os.environ, env, clear=True):
+            self.assertEqual(priority_threshold_from_env(), 60)
+
+    def test_new_name_wins(self):
+        env = {"LLM_STRENGTH_THRESHOLD": "60", "LLM_PRIORITY_THRESHOLD": "90"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            self.assertEqual(priority_threshold_from_env(), 90)
+
+
+class RequestMaxAgeEnvTest(unittest.TestCase):
+    def test_default_and_override(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(request_max_age_from_env(), DEFAULT_REQUEST_MAX_AGE)
+        self.assertEqual(DEFAULT_REQUEST_MAX_AGE, 70)
+        with mock.patch.dict(os.environ, {"LLM_DOCS_REQUEST_MAX_AGE_SECONDS": "120"}, clear=True):
+            self.assertEqual(request_max_age_from_env(), 120)
+
+    def test_invalid_rejected(self):
+        for value in ("soon", "0", "-5", "nan"):
+            with mock.patch.dict(os.environ, {"LLM_DOCS_REQUEST_MAX_AGE_SECONDS": value}, clear=True):
+                with self.assertRaises(ValueError, msg=value):
+                    request_max_age_from_env()

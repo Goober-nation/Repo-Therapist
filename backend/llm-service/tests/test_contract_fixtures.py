@@ -39,11 +39,21 @@ class ContractFixtureTests(unittest.TestCase):
         parsed = parse_summary_request(raw("llm.recommendations.requested.json"))
         self.assertEqual(parsed["sourcecraft_uuid"], fixture["sourcecraft_uuid"])
         self.assertEqual(parsed["visibility"], fixture["visibility"])
+        self.assertEqual(parsed["graded_at"], fixture["grade"]["graded_at"])
+        self.assertEqual(parsed["advice"], fixture["grade"]["advice"])
+
+    def test_docs_success_fixture_advice_items(self):
+        success = load("repo.docs.graded.success.json")
+        self.assertIn(success["method"], ("llm", "algorithmic"))
+        for item in success["advice"]:
+            self.assertEqual(set(item), {"code", "priority", "text"})
+            self.assertIn(item["priority"], ("critical", "high", "medium", "low"))
 
     def test_recommendations_result_fixtures_match_builder_shape(self):
         failure = load("llm.recommendations.received.failure.json")
         built = build_summary_failure(failure["sourcecraft_uuid"], failure["visibility"],
-                                      failure["error"], failure["model_used"])
+                                      failure["error"], failure["model_used"],
+                                      failure["graded_at"])
         self.assertEqual(without_time(built), without_time(failure))
         self.assertEqual(set(load("llm.recommendations.received.success.json")), set(built))
 

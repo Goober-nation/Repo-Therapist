@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -125,8 +126,8 @@ func (as *AggregatorService) SaveLLMRecommendations(ctx context.Context, event d
 	return nil
 }
 
-// RequestLLMRecommendations returns the stored LLM response when it is at least as new as the
-// grade it describes. Otherwise it asks for one (or for a grading first, when the grade is
+// RequestLLMRecommendations returns the stored LLM response when it describes the current grade
+// (same graded_at). Otherwise it asks for one (or for a grading first, when the grade is
 // missing or outdated) and reports GradingPending.
 func (as *AggregatorService) RequestLLMRecommendations(
 	ctx context.Context,
@@ -160,7 +161,7 @@ func (as *AggregatorService) RequestLLMRecommendations(
 		)
 	}
 
-	if err == nil && llmResponseIsCurrent(response.EvaluatedAt, grade.GradedAt) {
+	if err == nil && llmResponseIsCurrent(response.GradedAt, grade.GradedAt) {
 		return response, nil
 	}
 
@@ -216,12 +217,17 @@ func (as *AggregatorService) RequestLLMRecommendations(
 	return domain.RepoLLMResponse{}, domain.GradingPending
 }
 
-func llmResponseIsCurrent(evaluatedAt *time.Time, gradedAt *time.Time) bool {
-	if evaluatedAt == nil || gradedAt == nil {
+// llmResponseIsCurrent reports whether a stored LLM response describes the current grade: the
+// graded_at it echoed must equal the grade's graded_at exactly. Comparing graded_at values, both
+// set by grade-service, avoids trusting the LLM service's clock; a response for an earlier grade
+// that arrives after a regrade is never taken as current. A response without graded_at (stored
+// before it was recorded) is not current.
+func llmResponseIsCurrent(responseGradedAt *time.Time, gradedAt *time.Time) bool {
+	if responseGradedAt == nil || gradedAt == nil {
 		return false
 	}
 
-	return !evaluatedAt.Before(*gradedAt)
+	return responseGradedAt.Equal(*gradedAt)
 }
 
 func (as *AggregatorService) GetGrading(
@@ -486,7 +492,7 @@ func (as *AggregatorService) runPublicRegrade(ctx context.Context) {
 // SaveGradingResult stores a grading.results message and always releases the repo lock, so a
 // failed save can't leave the repo locked.
 func (as *AggregatorService) SaveGradingResult(ctx context.Context,
-	grade domain.RepoGrade, visibility string, errorCode string) error {
+	grade domain.RepoGrade, gradeMode string, errorCode string) error {
 	defer func() {
 		if err := as.ReposRepo.ReleaseRepositoryLock(ctx, grade.SourcecraftUUID); err != nil {
 			log.Printf("release repository lock %s: %v", grade.SourcecraftUUID, err)
@@ -494,7 +500,7 @@ func (as *AggregatorService) SaveGradingResult(ctx context.Context,
 	}()
 
 	if errorCode != "" {
-		as.gradingFailed(llmKey(grade.SourcecraftUUID, visibility))
+		as.gradingFailed(llmKey(grade.SourcecraftUUID, gradeMode))
 
 		return fmt.Errorf(
 			"%w: %v",
@@ -505,7 +511,7 @@ func (as *AggregatorService) SaveGradingResult(ctx context.Context,
 
 	normalizeGrade(&grade)
 
-	switch visibility {
+	switch gradeMode {
 	case domain.VisibilityPublic:
 		if err := as.GradesRepo.UpsertPublicGrade(ctx, grade); err != nil {
 			return fmt.Errorf(
@@ -515,7 +521,7 @@ func (as *AggregatorService) SaveGradingResult(ctx context.Context,
 			)
 		}
 
-	case domain.VisibilityPrivate, "internal":
+	case domain.VisibilityPrivate:
 		if err := as.GradesRepo.UpsertPrivateGrade(ctx, grade); err != nil {
 			return fmt.Errorf(
 				"%w: save private grade: %v",
@@ -526,9 +532,9 @@ func (as *AggregatorService) SaveGradingResult(ctx context.Context,
 
 	default:
 		return fmt.Errorf(
-			"%w: unknown grade visibility %q",
+			"%w: unknown grade mode %q",
 			domain.ErrInvalidGrade,
-			visibility,
+			gradeMode,
 		)
 	}
 
@@ -737,7 +743,9 @@ func llmGradeFromRepoGrade(grade domain.RepoGrade) (domain.LLMGrade, error) {
 	}
 
 	var recommendations []struct {
-		Text string `json:"text"`
+		CategoryID string `json:"category_id"`
+		Priority   string `json:"priority"`
+		Text       string `json:"text"`
 	}
 
 	if !isJSONEmpty(grade.Advice) {
@@ -746,10 +754,11 @@ func llmGradeFromRepoGrade(grade domain.RepoGrade) (domain.LLMGrade, error) {
 		}
 	}
 
-	advice := make([]string, 0, len(recommendations))
+	advice := make([]domain.LLMAdvice, 0, len(recommendations))
 	for _, recommendation := range recommendations {
-		if text := strings.TrimSpace(recommendation.Text); text != "" {
-			advice = append(advice, text)
+		priority, text := splitPriority(recommendation.Priority, recommendation.Text)
+		if text != "" {
+			advice = append(advice, domain.LLMAdvice{CategoryID: recommendation.CategoryID, Priority: priority, Text: text})
 		}
 	}
 
@@ -765,6 +774,35 @@ func llmGradeFromRepoGrade(grade domain.RepoGrade) (domain.LLMGrade, error) {
 		MissingData:    missingData,
 		GradedAt:       grade.GradedAt,
 	}, nil
+}
+
+// recommendationPriorities are the valid recommendation priorities.
+var recommendationPriorities = []string{"critical", "high", "medium", "low"}
+
+// defaultRecommendationPriority is used when a stored recommendation has no recognizable priority.
+const defaultRecommendationPriority = "medium"
+
+// splitPriority returns a recommendation's priority and its text without the transitional
+// "[priority] " tag. The priority field wins; a grade stored before it existed falls back to the
+// tag, and to medium when neither is valid.
+func splitPriority(priority, text string) (string, string) {
+	text = strings.TrimSpace(text)
+	tagged := ""
+	for _, p := range recommendationPriorities {
+		if rest, ok := strings.CutPrefix(text, "["+p+"]"); ok {
+			tagged, text = p, strings.TrimSpace(rest)
+			break
+		}
+	}
+
+	switch {
+	case slices.Contains(recommendationPriorities, priority):
+		return priority, text
+	case tagged != "":
+		return tagged, text
+	default:
+		return defaultRecommendationPriority, text
+	}
 }
 
 func llmKey(repoID uuid.UUID, visibility string) string {

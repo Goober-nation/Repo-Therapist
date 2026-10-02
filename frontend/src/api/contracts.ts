@@ -23,6 +23,8 @@ export interface CategoryScorePayload {
   description?: string
   trend?: number | null
   metrics?: MetricPayload[]
+  /** Documentation only: "llm" or "algorithmic" (simplified grade). */
+  method?: string
 }
 
 export type CategoryScoreValue = number | null | CategoryScorePayload
@@ -30,10 +32,14 @@ export type CategoryScoresPayload =
   | Record<string, CategoryScoreValue>
   | Array<Record<string, CategoryScoreValue>>
 
-/** grade-service rule output; `text` starts with a "[priority]" tag from config/recommendations.yaml. */
+/**
+ * grade-service recommendation. `priority` is authoritative; during the transition `text` still
+ * starts with the same "[priority]" tag, and older stored grades have only the tag.
+ */
 export interface AdvicePayload {
   category_id?: string
   metric_id?: string
+  priority?: string
   text?: string
 }
 
@@ -60,6 +66,8 @@ export interface GradingResponse {
 
 export interface RecommendationsResponse {
   status: GradeStatus
+  /** Name of the LLM that produced the summary. */
+  model_used?: string
   raw_response?: {
     summary?: string
     recommendations?: Array<{

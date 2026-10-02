@@ -19,6 +19,9 @@ function CriterionCard({ id, result, weight }: { id: string; result: MetricResul
         </div>
       )}
       {result.description && <p>{result.description}</p>}
+      {result.score !== null && result.method === "algorithmic" && (
+        <p className="metric-card__method">Упрощённая оценка: проверено только наличие разделов</p>
+      )}
       {result.score !== null && <ScoreBar score={result.score} label={`${label}: ${result.score} из 100`} />}
       {result.facts && result.facts.length > 0 && (
         <details className="fact-list">

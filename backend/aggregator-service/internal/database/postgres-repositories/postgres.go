@@ -398,19 +398,22 @@ func (r *LLMRepository) UpsertPublicResponse(ctx context.Context, response domai
             sourcecraft_uuid,
             raw_response,
             model_used,
-            evaluated_at
+            evaluated_at,
+            graded_at
         )
-        VALUES ($1, $2, $3, $4)
+        VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT (sourcecraft_uuid)
         DO UPDATE SET
             raw_response = EXCLUDED.raw_response,
             model_used = EXCLUDED.model_used,
-            evaluated_at = EXCLUDED.evaluated_at
+            evaluated_at = EXCLUDED.evaluated_at,
+            graded_at = EXCLUDED.graded_at
         `,
 		response.SourcecraftUUID,
 		response.RawResponse,
 		response.ModelUsed,
 		response.EvaluatedAt,
+		response.GradedAt,
 	)
 	if err != nil {
 		return mapLLMResponseError(err)
@@ -450,7 +453,8 @@ func (r *LLMRepository) GetPublicResponseByRepoID(ctx context.Context, repoID uu
 			sourcecraft_uuid,
 			raw_response,
 			model_used,
-			evaluated_at
+			evaluated_at,
+			graded_at
 		FROM repo_llm_responses_public
 		WHERE sourcecraft_uuid = $1
 		`,
@@ -460,6 +464,7 @@ func (r *LLMRepository) GetPublicResponseByRepoID(ctx context.Context, repoID uu
 		&response.RawResponse,
 		&response.ModelUsed,
 		&response.EvaluatedAt,
+		&response.GradedAt,
 	)
 
 	if err != nil {
@@ -480,19 +485,22 @@ func (r *LLMRepository) UpsertPrivateResponse(
             sourcecraft_uuid,
             raw_response,
             model_used,
-            evaluated_at
+            evaluated_at,
+            graded_at
         )
-        VALUES ($1, $2, $3, $4)
+        VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT (sourcecraft_uuid)
         DO UPDATE SET
             raw_response = EXCLUDED.raw_response,
             model_used = EXCLUDED.model_used,
-            evaluated_at = EXCLUDED.evaluated_at
+            evaluated_at = EXCLUDED.evaluated_at,
+            graded_at = EXCLUDED.graded_at
         `,
 		response.SourcecraftUUID,
 		response.RawResponse,
 		response.ModelUsed,
 		response.EvaluatedAt,
+		response.GradedAt,
 	)
 	if err != nil {
 		return mapLLMResponseError(err)
@@ -532,7 +540,8 @@ func (r *LLMRepository) GetPrivateResponseByRepoID(ctx context.Context, repoID u
 			sourcecraft_uuid,
 			raw_response,
 			model_used,
-			evaluated_at
+			evaluated_at,
+			graded_at
 		FROM repo_llm_responses_private
 		WHERE sourcecraft_uuid = $1
 		`,
@@ -542,6 +551,7 @@ func (r *LLMRepository) GetPrivateResponseByRepoID(ctx context.Context, repoID u
 		&response.RawResponse,
 		&response.ModelUsed,
 		&response.EvaluatedAt,
+		&response.GradedAt,
 	)
 
 	if err != nil {

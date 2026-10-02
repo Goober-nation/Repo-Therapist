@@ -17,7 +17,7 @@ func TestShippedConfigsLoad(t *testing.T) {
 		t.Fatalf("recommendations.yaml: %v", err)
 	}
 	for _, id := range []string{"ci_noop_pipeline", "ci_median_duration_min"} {
-		if catalog[id] == "" {
+		if catalog[id].Text == "" || catalog[id].Priority == "" {
 			t.Errorf("recommendations.yaml has no text for %q", id)
 		}
 	}

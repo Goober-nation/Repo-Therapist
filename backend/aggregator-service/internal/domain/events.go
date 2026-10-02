@@ -33,13 +33,21 @@ type LLMRecommendationsRequestedEvent struct {
 }
 
 // LLMGrade is the grade in the shape the LLM service accepts: category scores are 0-100 numbers
-// or null for no-data, advice is a list of recommendation texts.
+// or null for no-data, advice is a list of recommendations with their priorities.
 type LLMGrade struct {
 	Score          *int16              `json:"score"`
 	CategoryScores map[string]*float64 `json:"category_scores"`
-	Advice         []string            `json:"advice"`
+	Advice         []LLMAdvice         `json:"advice"`
 	MissingData    []string            `json:"missing_data"`
 	GradedAt       *time.Time          `json:"graded_at"`
+}
+
+// LLMAdvice is one grade recommendation passed to the LLM: its category, priority
+// (critical|high|medium|low) and text without the transitional "[priority] " tag.
+type LLMAdvice struct {
+	CategoryID string `json:"category_id"`
+	Priority   string `json:"priority"`
+	Text       string `json:"text"`
 }
 
 type LLMRecommendationsReceivedEvent struct {
@@ -47,8 +55,10 @@ type LLMRecommendationsReceivedEvent struct {
 	RawResponse     json.RawMessage `json:"raw_response"`
 	ModelUsed       string          `json:"model_used"`
 	EvaluatedAt     time.Time       `json:"evaluated_at"`
-	Visibility      string          `json:"visibility"`
-	Error           string          `json:"error"`
+	// GradedAt echoes grade.graded_at of the request: the grade this response describes.
+	GradedAt   *time.Time `json:"graded_at"`
+	Visibility string     `json:"visibility"`
+	Error      string     `json:"error"`
 }
 
 type GradingResultReceivedEvent struct {
@@ -60,6 +70,8 @@ type GradingResultReceivedEvent struct {
 
 	MissingData []string  `json:"missing_data"`
 	GradedAt    time.Time `json:"graded_at"`
-	Visibility  string    `json:"visibility"`
-	Error       string    `json:"error"`
+	// GradeMode is how the repo was graded: public (no user token) or private (with one).
+	// It is not the repo's SourceCraft visibility.
+	GradeMode string `json:"grade_mode"`
+	Error     string `json:"error"`
 }

@@ -37,7 +37,7 @@ type GradeOutput struct {
 	// DocsAdvice is the LLM service's Documentation advice (repo.docs.graded), set only when
 	// that reply succeeded. The last item is the "graded without LLM" notice when the grade was
 	// algorithmic; it is forwarded like any other item.
-	DocsAdvice []string `json:"docs_advice,omitempty"`
+	DocsAdvice []contracts.DocsAdvice `json:"docs_advice,omitempty"`
 }
 
 // CategoryIDs returns the categories graded for a visibility: the private view is a superset
@@ -193,7 +193,7 @@ func DeleteRepoData(ctx context.Context, repoID string) (int, error) {
 // text lookup (config.LoadRecommendations); an empty catalog just means every metric that would
 // otherwise get a recommendation is silently skipped (see scoring.BuildRecommendations), not an
 // error.
-func BuildGradingResult(out *GradeOutput, cfg *config.Config, catalog map[string]string, visibility string, now time.Time) (contracts.GradingResultEvent, error) {
+func BuildGradingResult(out *GradeOutput, cfg *config.Config, catalog map[string]config.RecommendationEntry, visibility string, now time.Time) (contracts.GradingResultEvent, error) {
 	weights := make(map[string]float64, len(cfg.Categories))
 	for id, cat := range cfg.Categories {
 		weights[id] = cat.Weight
@@ -237,7 +237,7 @@ func BuildGradingResult(out *GradeOutput, cfg *config.Config, catalog map[string
 
 	result := contracts.GradingResultEvent{
 		SourcecraftUUID: out.RepoID,
-		Visibility:      visibility,
+		GradeMode:       visibility,
 		Score:           scorePtr,
 		CategoryScores:  categoryJSON,
 		Advice:          recsJSON,
@@ -250,13 +250,13 @@ func BuildGradingResult(out *GradeOutput, cfg *config.Config, catalog map[string
 // GradingFailure is the result published when a repo couldn't be graded, so the Aggregator can
 // release its lock instead of waiting on a result that will never come.
 func GradingFailure(sourcecraftUUID, visibility, code string, now time.Time) contracts.GradingResultEvent {
-	return contracts.GradingResultEvent{SourcecraftUUID: sourcecraftUUID, Visibility: visibility, GradedAt: now, Error: code}
+	return contracts.GradingResultEvent{SourcecraftUUID: sourcecraftUUID, GradeMode: visibility, GradedAt: now, Error: code}
 }
 
 func toContractRecommendations(recs []scoring.Recommendation) []contracts.Recommendation {
 	out := make([]contracts.Recommendation, len(recs))
 	for i, r := range recs {
-		out[i] = contracts.Recommendation{CategoryID: r.CategoryID, MetricID: r.MetricID, Text: r.Text}
+		out[i] = contracts.Recommendation{CategoryID: r.CategoryID, MetricID: r.MetricID, Priority: r.Priority, Text: r.Text}
 	}
 	return out
 }

@@ -410,7 +410,9 @@ func TestSaveGradingResultReleasesLockOnEveryFailure(t *testing.T) {
 	}{
 		"grading error":      {visibility: "public", code: "GRADING_FAILED"},
 		"save error":         {visibility: "private", upsertErr: errors.New("db down")},
-		"unknown visibility": {visibility: "secret"},
+		"unknown grade mode": {visibility: "secret"},
+		// internal is a repo visibility, never a grade mode.
+		"internal grade mode": {visibility: "internal"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -433,8 +435,11 @@ func TestLLMGradeFromRepoGrade(t *testing.T) {
 	grade := domain.RepoGrade{
 		Score:          &score,
 		CategoryScores: json.RawMessage(`{"activity":{"id":"activity","no_data":false,"score":90.5,"metrics":[]},"issues":{"id":"issues","no_data":true,"score":0}}`),
-		Advice:         json.RawMessage(`[{"category_id":"activity","metric_id":"m","text":"Делайте коммиты чаще."},{"category_id":"x","metric_id":"y","text":"  "}]`),
-		GradedAt:       gradedAt(testNow),
+		Advice: json.RawMessage(`[{"category_id":"activity","metric_id":"m","priority":"critical","text":"[critical] Делайте коммиты чаще."},` +
+			`{"category_id":"x","metric_id":"y","priority":"low","text":"  "},` +
+			`{"category_id":"issues","metric_id":"old","text":"[high] Старый формат."},` +
+			`{"category_id":"documentation","metric_id":"z","text":"Без приоритета."}]`),
+		GradedAt: gradedAt(testNow),
 	}
 
 	got, err := llmGradeFromRepoGrade(grade)
@@ -448,14 +453,19 @@ func TestLLMGradeFromRepoGrade(t *testing.T) {
 	if value, ok := got.CategoryScores["issues"]; !ok || value != nil {
 		t.Errorf("issues = %v (present=%v), want explicit null for no-data", value, ok)
 	}
-	if !reflect.DeepEqual(got.Advice, []string{"Делайте коммиты чаще."}) {
-		t.Errorf("advice = %#v, want the recommendation texts only", got.Advice)
+	wantAdvice := []domain.LLMAdvice{
+		{CategoryID: "activity", Priority: "critical", Text: "Делайте коммиты чаще."},
+		{CategoryID: "issues", Priority: "high", Text: "Старый формат."},
+		{CategoryID: "documentation", Priority: "medium", Text: "Без приоритета."},
+	}
+	if !reflect.DeepEqual(got.Advice, wantAdvice) {
+		t.Errorf("advice = %#v, want %#v", got.Advice, wantAdvice)
 	}
 	if got.MissingData == nil {
 		t.Errorf("missing_data should be an empty list, not null")
 	}
 
-	// The wire form carries null for no-data and strings for advice.
+	// The wire form carries null for no-data and {category_id, priority, text} objects for advice.
 	raw, _ := json.Marshal(got)
 	var wire map[string]any
 	_ = json.Unmarshal(raw, &wire)
@@ -467,8 +477,9 @@ func TestLLMGradeFromRepoGrade(t *testing.T) {
 func TestRequestLLMRecommendationsReturnsCurrentResponse(t *testing.T) {
 	f := newFixture("public")
 	f.grades.public[testRepoID] = domain.RepoGrade{GradedAt: gradedAt(testNow)}
-	evaluated := testNow.Add(time.Minute)
-	f.llm.public[testRepoID] = domain.RepoLLMResponsePublic{SourcecraftUUID: testRepoID, RawResponse: json.RawMessage(`{"summary":"ok"}`), EvaluatedAt: &evaluated}
+	// evaluated_at earlier than graded_at (clock skew) must not matter: only graded_at counts.
+	evaluated := testNow.Add(-time.Minute)
+	f.llm.public[testRepoID] = domain.RepoLLMResponsePublic{SourcecraftUUID: testRepoID, RawResponse: json.RawMessage(`{"summary":"ok"}`), EvaluatedAt: &evaluated, GradedAt: gradedAt(testNow)}
 
 	resp, err := f.svc.RequestLLMRecommendations(userCtx(""), "org", "repo")
 	if err != nil {
@@ -479,6 +490,45 @@ func TestRequestLLMRecommendationsReturnsCurrentResponse(t *testing.T) {
 	}
 	if len(f.llmPub.events) != 0 {
 		t.Errorf("a current response must not trigger a new LLM request")
+	}
+}
+
+func TestRequestLLMRecommendationsIgnoresResponseForOtherGrade(t *testing.T) {
+	cases := map[string]*time.Time{
+		// The repo was regraded while the LLM worked on the old grade; the late reply is
+		// newer than the grade by evaluated_at but describes the old one.
+		"older grade":  gradedAt(testNow.Add(-time.Hour)),
+		"no graded_at": nil,
+	}
+	for name, responseGradedAt := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture("public")
+			f.grades.public[testRepoID] = domain.RepoGrade{GradedAt: gradedAt(testNow)}
+			evaluated := testNow.Add(time.Minute)
+			f.llm.public[testRepoID] = domain.RepoLLMResponsePublic{SourcecraftUUID: testRepoID, RawResponse: json.RawMessage(`{"summary":"old"}`), EvaluatedAt: &evaluated, GradedAt: responseGradedAt}
+
+			if _, err := f.svc.RequestLLMRecommendations(userCtx(""), "org", "repo"); !errors.Is(err, domain.GradingPending) {
+				t.Fatalf("err = %v, want GradingPending", err)
+			}
+			if len(f.llmPub.events) != 1 {
+				t.Fatalf("published %d LLM requests, want 1", len(f.llmPub.events))
+			}
+			if got := f.llmPub.events[0].Grade.GradedAt; got == nil || !got.Equal(testNow) {
+				t.Errorf("request grade.graded_at = %v, want %v", got, testNow)
+			}
+		})
+	}
+}
+
+func TestLLMReceivedEventKeepsGradedAt(t *testing.T) {
+	var event domain.LLMRecommendationsReceivedEvent
+	payload := `{"sourcecraft_uuid":"` + testRepoID.String() + `","raw_response":{},"model_used":"m","evaluated_at":"2026-10-02T10:00:00Z","graded_at":"2026-10-02T09:00:00.123456Z","visibility":"public","error":""}`
+	if err := json.Unmarshal([]byte(payload), &event); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	want := time.Date(2026, 10, 2, 9, 0, 0, 123456000, time.UTC)
+	if event.GradedAt == nil || !event.GradedAt.Equal(want) {
+		t.Errorf("graded_at = %v, want %v", event.GradedAt, want)
 	}
 }
 

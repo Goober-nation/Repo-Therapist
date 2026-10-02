@@ -1254,10 +1254,14 @@ test("Gateway grade response maps its nested payload into repository details", (
   assert.deepEqual(refreshed.missingData, ["issues"])
 })
 
-test("rule-based advice keeps its priority tag and category", () => {
+test("rule-based advice reads the priority field, falls back to the tag, keeps category", () => {
   const advice = adviceToRecommendations([
     { category_id: "code_health", metric_id: "density_per_kloc", text: "[low] Разберите TODO." },
     { category_id: "ci_cd", metric_id: "has_ci", text: "[critical] Добавьте CI." },
+    { category_id: "security", metric_id: "open_high", priority: "high", text: "[high] Исправьте находки." },
+    // The field wins over a disagreeing tag; the tag is still stripped.
+    { category_id: "activity", metric_id: "m", priority: "low", text: "[high] Коммитьте чаще." },
+    { category_id: "documentation", metric_id: "DOC_README_MISSING", priority: "high", text: "Добавьте README." },
     { text: "Без тега." },
     { text: "  " },
     null,
@@ -1266,9 +1270,12 @@ test("rule-based advice keeps its priority tag and category", () => {
   assert.deepEqual(
     advice.map(({ priority, title, description }) => [priority, title, description]),
     [
-      ["high", "CI/CD", "Добавьте CI."],
+      ["critical", "CI/CD", "Добавьте CI."],
+      ["high", "Security", "Исправьте находки."],
+      ["high", "Documentation", "Добавьте README."],
       ["medium", "Рекомендация", "Без тега."],
-      ["low", "Состояние кода", "Разберите TODO."],
+      ["low", "Code health", "Разберите TODO."],
+      ["low", "Activity", "Коммитьте чаще."],
     ],
   )
 })
@@ -1648,4 +1655,107 @@ test("the README badge snippet links the SVG badge to the repo page", async () =
     badgeMarkdown("https://repo-therapist.alo.quest", "org", "my repo"),
     "[![Repo Health](https://repo-therapist.alo.quest/api/badge/org/my%20repo.svg)](https://repo-therapist.alo.quest/repo/org/my%20repo)",
   )
+})
+
+test("public grade toggle drops the token only for a public repository opened by its owner", async () => {
+  const { gradingToken } = await vite.ssrLoadModule("/src/metrics.ts")
+
+  assert.equal(gradingToken("pat", true, "public", true), undefined)
+  assert.equal(gradingToken("pat", true, "public", false), "pat")
+  assert.equal(gradingToken("pat", true, "private", true), "pat")
+  assert.equal(gradingToken("pat", false, "public", false), undefined)
+
+  const sent = []
+  const api = new HttpRepoHealthApi({
+    fetcher: async (url, init) => {
+      sent.push([url, "PAT" in init.headers])
+      return Response.json({ status: "FINISHED" })
+    },
+  })
+  await api.getGrading("org", "repo", gradingToken("pat", true, "public", true))
+  await api.getRecommendations("org", "repo", gradingToken("pat", true, "public", true))
+  assert.deepEqual(sent, [
+    ["/api/grading/org/repo", false],
+    ["/api/recommendations/org/repo", false],
+  ])
+})
+
+test("overview shows the public grade toggle and which grade is displayed", () => {
+  const props = { analysis: idleAnalysis, onBackToRanking() {} }
+  const toggle = (checked) => ({ checked, onChange() {} })
+
+  const privateHtml = render(Overview, {
+    ...props,
+    repository: { ...baseline, visibility: "public", analysisMode: "private" },
+    publicView: toggle(false),
+  })
+  assert.match(privateHtml, /Публичная оценка/)
+  assert.match(privateHtml, /показана приватная оценка \(6 категорий\)/)
+
+  const publicHtml = render(Overview, {
+    ...props,
+    repository: { ...baseline, visibility: "public", analysisMode: "public" },
+    publicView: toggle(true),
+  })
+  assert.match(publicHtml, /показана публичная оценка \(4 категории\)/)
+  assert.match(publicHtml, /checked=""/)
+
+  const noToggle = render(Overview, { ...props, repository: { ...baseline, analysisMode: "public" } })
+  assert.doesNotMatch(noToggle, /Публичная оценка/)
+})
+
+test("private analysis of a private repository hints at Security Add-on", () => {
+  const graded = {
+    ...baseline,
+    visibility: "private",
+    analysisMode: "private",
+    categoryScores: { activity: { score: 80, trend: null }, security: { score: null, trend: null } },
+    gradedAt: "2026-09-28",
+  }
+  const security = missingCategories(graded).find((item) => item.id === "security")
+  assert.equal(security.reason, "Анализ безопасности для приватных репозиториев доступен только с Security Add-on")
+
+  const publicRepo = missingCategories({ ...graded, visibility: "public" }).find((item) => item.id === "security")
+  assert.doesNotMatch(publicRepo.reason, /Add-on/)
+  for (const item of missingCategories({ ...graded, analysisMode: "public" })) {
+    assert.doesNotMatch(item.reason, /Add-on/)
+  }
+})
+
+test("AI report carries the model that produced the summary", () => {
+  const ai = aiReportFromResponse({ status: "FINISHED", model_used: " yandexgpt-5-pro ", raw_response: { summary: "Итог." } })
+  assert.equal(ai.modelUsed, "yandexgpt-5-pro")
+  assert.equal(aiReportFromResponse({ status: "FINISHED", raw_response: { summary: "Итог." } }).modelUsed, undefined)
+  assert.equal(aiReportFromResponse({ status: "FINISHED", model_used: "  " }).modelUsed, undefined)
+})
+
+test("documentation card marks an algorithmic grade as simplified", () => {
+  const scores = normalizeCategoryScores({
+    documentation: { id: "documentation", score: 52, method: "algorithmic", metrics: [] },
+    activity: { id: "activity", score: 80, metrics: [] },
+    issues: { id: "issues", score: 70, method: "magic", metrics: [] },
+  })
+
+  assert.equal(scores.documentation.method, "algorithmic")
+  assert.equal(scores.activity.method, undefined)
+  assert.equal(scores.issues.method, undefined)
+
+  const simplified = results(scores, "FINISHED")
+  assert.equal(simplified.match(/Упрощённая оценка: проверено только наличие разделов/g)?.length, 1)
+
+  const llm = results(normalizeCategoryScores({ documentation: { score: 80, method: "llm" } }), "FINISHED")
+  assert.doesNotMatch(llm, /Упрощённая оценка/)
+})
+
+test("critical recommendations rank above high and keep their own label", () => {
+  const advice = adviceToRecommendations([
+    { category_id: "security", priority: "high", text: "[high] B" },
+    { category_id: "ci_cd", priority: "critical", text: "[critical] A" },
+  ])
+  assert.deepEqual(advice.map((item) => item.priority), ["critical", "high"])
+  const page = render(Overview, {
+    repository: { ...baseline, gradeStatus: "FINISHED", healthScore: 50, advice },
+    analysis: idleAnalysis,
+  })
+  assert.match(page, /Критический приоритет/)
 })

@@ -15,6 +15,15 @@ class RecommendationTests(unittest.TestCase):
     def test_catalog_covers_all_known_deficiencies(self):
         self.assertEqual(set(RECOMMENDATIONS), set(RULES))
 
+    def test_every_item_has_code_priority_and_text(self):
+        items = list(RECOMMENDATIONS.values()) + list(FALLBACKS.values()) + [ALGORITHMIC_NOTICE]
+        for item in items:
+            self.assertEqual(set(item), {'code', 'priority', 'text'})
+            self.assertIn(item['priority'], ('critical', 'high', 'medium', 'low'))
+        self.assertTrue(all(code == item['code'] for code, item in RECOMMENDATIONS.items()))
+        self.assertEqual(ALGORITHMIC_NOTICE['code'], 'DOC_ALGORITHMIC_NOTICE')
+        self.assertEqual(ALGORITHMIC_NOTICE['priority'], 'low')
+
     def test_catalog_is_read_from_yaml_and_validated(self):
         self.assertEqual(advice_path().name, 'advice.yaml')
         good = advice_path().read_text(encoding='utf-8')
@@ -24,6 +33,8 @@ class RecommendationTests(unittest.TestCase):
             'missing code': good.replace('codes: [DOC_BUILD_OUTPUT_UNCLEAR]', 'codes: [DOC_X]'),
             'missing section': good.replace('  consistency: ', '  other: '),
             'empty notice': good.replace('algorithmic_notice: "', 'algorithmic_notice: " "#'),
+            'unknown priority': good.replace('    priority: high\n', '    priority: urgent\n', 1),
+            'no priority': good.replace('    priority: high\n', '', 1),
             'not yaml': 'recommendations: [',
         }
         with tempfile.TemporaryDirectory() as tmp:
@@ -45,7 +56,10 @@ class RecommendationTests(unittest.TestCase):
                               'end_line': 8, 'quote': 'internal quote'},
                              {'type': 'document_review', 'paths': ['README.md'],
                               'context_sha256': 'internal-hash'}]}
-        text = render_advice(fact)
+        item = render_advice(fact)
+        self.assertEqual((item['code'], item['priority']),
+                         ('DOC_LOCAL_RUN_VERIFICATION_INCOMPLETE', 'low'))
+        text = item['text']
         self.assertNotIn('не показан ожидаемый ответ', text)
         self.assertIn('Добавьте ожидаемый вывод', text)
         self.assertNotIn('README.md', text)
@@ -63,9 +77,11 @@ class RecommendationTests(unittest.TestCase):
         before = deepcopy(payload)
         event = build_grade_result(parse_grade_request(request()), payload)
         self.assertEqual(payload, before)
-        self.assertNotIn('Пример обрывается', event['advice'][0])
-        self.assertIn('Дополните пример использования', event['advice'][0])
-        self.assertNotIn('NEW_CODE', event['advice'][0])
+        self.assertNotIn('Пример обрывается', event['advice'][0]['text'])
+        self.assertIn('Дополните пример использования', event['advice'][0]['text'])
+        self.assertNotIn('NEW_CODE', event['advice'][0]['text'])
+        self.assertEqual((event['advice'][0]['code'], event['advice'][0]['priority']),
+                         ('DOC_SECTION_USAGE', 'medium'))
 
     def test_no_advice_for_unreviewed_or_perfect_sections(self):
         for grade in (None, 100):
@@ -89,8 +105,10 @@ class RecommendationTests(unittest.TestCase):
                                            FALLBACKS['testing']])
 
     def test_deterministic_missing_file_has_specific_recommendation(self):
-        text = render_advice({'subcategory': 'required_files', 'code': 'DOC_LICENSE_MISSING',
-                           'facts': {}, 'evidence': []})
+        item = render_advice({'subcategory': 'required_files', 'code': 'DOC_LICENSE_MISSING',
+                              'facts': {}, 'evidence': []})
+        self.assertEqual(item['priority'], 'high')
+        text = item['text']
         self.assertNotIn('Файл LICENSE не найден', text)
         self.assertIn('выбранные владельцем проекта условия', text)
         self.assertNotIn('По рассмотренным фрагментам', text)

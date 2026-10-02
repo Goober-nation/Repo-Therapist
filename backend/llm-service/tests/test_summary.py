@@ -22,14 +22,20 @@ SCORES = {"security": 40, "activity": 90, "documentation": 70, "ci_cd": None,
           "issues": 80, "code_health": 55}
 
 
+GRADED_AT = "2026-09-27T11:59:00.123456Z"
+ADVICE = [{"category_id": "security", "priority": "critical",
+           "text": "Обновите уязвимые зависимости."}]
+
+
 def request(visibility="private", **grade):
     body = {"visibility": visibility, "sourcecraft_uuid": REPOSITORY,
             "org_slug": "examples", "repo_slug": "demo",
             "requested_at": "2026-09-27T12:00:00.123456789+03:00",
             "grade": {"SourcecraftUUID": REPOSITORY, "Score": 64,
                       "CategoryScores": dict(SCORES),
-                      "Advice": ["Обновите уязвимые зависимости."],
-                      "MissingData": ["ci_cd"], "GradedAt": "2026-09-27T11:59:00Z"}}
+                      "Advice": [{"category_id": "security", "priority": "critical",
+                                  "text": "Обновите уязвимые зависимости."}],
+                      "MissingData": ["ci_cd"], "GradedAt": GRADED_AT}}
     body["grade"].update(grade)
     return json.dumps(body, ensure_ascii=False).encode()
 
@@ -71,8 +77,27 @@ class SummaryRequestTests(unittest.TestCase):
         parsed = parse_summary_request(request())
         self.assertEqual(parsed["score"], 64)
         self.assertEqual(parsed["category_scores"], SCORES)
-        self.assertEqual(parsed["advice"], ["Обновите уязвимые зависимости."])
+        self.assertEqual(parsed["advice"], ADVICE)
         self.assertEqual(parsed["missing_data"], ["ci_cd"])
+        self.assertEqual(parsed["graded_at"], GRADED_AT)
+
+    def test_advice_priority_from_field_tag_or_default(self):
+        advice = [{"category_id": "ci_cd", "priority": "high", "text": "[high] Почините CI."},
+                  {"category_id": "issues", "text": "[low] Закройте старые issues."},
+                  "[critical] Строка старого формата.",
+                  {"category_id": "activity", "text": "Без метки."},
+                  {"category_id": "x", "priority": "low", "text": "   "}]
+        parsed = parse_summary_request(request(Advice=advice))
+        self.assertEqual(parsed["advice"], [
+            {"category_id": "ci_cd", "priority": "high", "text": "Почините CI."},
+            {"category_id": "issues", "priority": "low", "text": "Закройте старые issues."},
+            {"category_id": "", "priority": "critical", "text": "Строка старого формата."},
+            {"category_id": "activity", "priority": "medium", "text": "Без метки."}])
+
+    def test_graded_at_is_optional_but_must_be_rfc3339(self):
+        self.assertIsNone(parse_summary_request(request(GradedAt=None))["graded_at"])
+        with self.assertRaises(InvalidEvent):
+            parse_summary_request(request(GradedAt="yesterday"))
 
     def test_accepts_snake_case_nulls_and_score_objects(self):
         body = json.loads(request())
@@ -82,6 +107,7 @@ class SummaryRequestTests(unittest.TestCase):
         self.assertIsNone(parsed["score"])
         self.assertEqual(parsed["category_scores"], {"activity": 72})
         self.assertEqual((parsed["advice"], parsed["missing_data"]), ([], []))
+        self.assertIsNone(parsed["graded_at"])
 
     def test_rejects_invalid_fields(self):
         cases = [("visibility", "secret"), ("sourcecraft_uuid", "not-a-uuid"),
@@ -93,7 +119,9 @@ class SummaryRequestTests(unittest.TestCase):
                 with self.assertRaises(InvalidEvent):
                     parse_summary_request(json.dumps(body).encode())
         for grade in ({"Score": 101}, {"CategoryScores": {"activity": "high"}},
-                      {"Advice": [1]}, {"Score": 1, "score": 2}):
+                      {"Advice": [1]}, {"Score": 1, "score": 2},
+                      {"Advice": [{"text": "x", "priority": "urgent"}]},
+                      {"Advice": [{"text": 5}]}, {"Advice": ["x"] * 51}):
             with self.subTest(grade=grade):
                 body = json.loads(request())
                 body["grade"] = grade
@@ -115,7 +143,7 @@ class SummaryPromptTests(unittest.TestCase):
         by_id = {item["id"]: item["score"] for item in data["categories"]}
         self.assertEqual(by_id["ci_cd"], "нет данных")
         self.assertEqual(data["weak_categories"], ["code_health", "documentation", "security"])
-        self.assertEqual(data["service_recommendations"], ["Обновите уязвимые зависимости."])
+        self.assertEqual(data["service_recommendations"], ADVICE)
         self.assertEqual(data["repository"], "examples/demo")
 
 
@@ -171,9 +199,11 @@ class SummaryWorkerTests(unittest.TestCase):
     def test_success_result_has_exact_contract_fields(self):
         event = process_summary_request(request(), FakeModel(answer()))
         self.assertEqual(set(event), {"sourcecraft_uuid", "raw_response", "model_used",
-                                      "evaluated_at", "visibility", "error"})
+                                      "evaluated_at", "graded_at", "visibility", "error"})
         self.assertEqual((event["error"], event["visibility"], event["model_used"]),
                          ("", "private", "fake-model"))
+        # Echoed verbatim, so the Aggregator can match it to the grade exactly.
+        self.assertEqual(event["graded_at"], GRADED_AT)
         self.assertEqual(event["raw_response"]["summary"], "Итоговая оценка 64/100.")
 
     def test_failures_are_error_codes_without_response(self):
@@ -187,6 +217,7 @@ class SummaryWorkerTests(unittest.TestCase):
                 self.assertEqual(event["error"], code)
                 self.assertIsNone(event["raw_response"])
                 self.assertEqual(event["visibility"], "private")
+                self.assertEqual(event["graded_at"], GRADED_AT)
                 self.assertNotIn("secret", json.dumps(event))
 
     def test_invalid_request_is_reported_or_skipped(self):
@@ -194,6 +225,11 @@ class SummaryWorkerTests(unittest.TestCase):
         body["grade"] = None
         event = process_summary_request(json.dumps(body).encode(), FakeModel())
         self.assertEqual((event["error"], event["visibility"]), ("INVALID_EVENT", "private"))
+        self.assertIsNone(event["graded_at"])
+        body = json.loads(request())
+        body["org_slug"] = ""
+        event = process_summary_request(json.dumps(body).encode(), FakeModel())
+        self.assertEqual((event["error"], event["graded_at"]), ("INVALID_EVENT", GRADED_AT))
         self.assertIsNone(process_summary_request(b"not json", FakeModel()))
 
     def test_worker_uses_summary_topics_and_commits_after_ack(self):

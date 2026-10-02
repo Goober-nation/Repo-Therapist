@@ -26,7 +26,7 @@ func TestBuildGradingResult_RoundsNotTruncates(t *testing.T) {
 		"activity": {Weight: 1.0},
 	}}
 
-	result, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPublic, time.Now())
+	result, err := BuildGradingResult(out, cfg, map[string]config.RecommendationEntry{}, contracts.VisibilityPublic, time.Now())
 	if err != nil {
 		t.Fatalf("BuildGradingResult: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestBuildGradingResult_AbsentCategoriesStayAbsent(t *testing.T) {
 		"code_health": {Weight: 0.20}, "security": {Weight: 0.20}, "ci_cd": {Weight: 0.15},
 	}}
 
-	result, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPrivate, time.Now())
+	result, err := BuildGradingResult(out, cfg, map[string]config.RecommendationEntry{}, contracts.VisibilityPrivate, time.Now())
 	if err != nil {
 		t.Fatalf("BuildGradingResult: %v", err)
 	}
@@ -99,11 +99,11 @@ func TestBuildGradingResult_FillsOnlyItsVisibility(t *testing.T) {
 	}
 	cfg := &config.Config{Categories: map[string]config.CategoryConfig{"activity": {Weight: 1.0}}}
 
-	pub, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPublic, time.Now())
+	pub, err := BuildGradingResult(out, cfg, map[string]config.RecommendationEntry{}, contracts.VisibilityPublic, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pub.Visibility != contracts.VisibilityPublic || pub.Score == nil || pub.Error != "" {
+	if pub.GradeMode != contracts.VisibilityPublic || pub.Score == nil || pub.Error != "" {
 		t.Errorf("unexpected public result: %+v", pub)
 	}
 	for _, id := range pub.MissingData {
@@ -112,11 +112,11 @@ func TestBuildGradingResult_FillsOnlyItsVisibility(t *testing.T) {
 		}
 	}
 
-	priv, err := BuildGradingResult(out, cfg, map[string]string{}, contracts.VisibilityPrivate, time.Now())
+	priv, err := BuildGradingResult(out, cfg, map[string]config.RecommendationEntry{}, contracts.VisibilityPrivate, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if priv.Visibility != contracts.VisibilityPrivate || priv.Score == nil || priv.Error != "" {
+	if priv.GradeMode != contracts.VisibilityPrivate || priv.Score == nil || priv.Error != "" {
 		t.Errorf("unexpected private result: %+v", priv)
 	}
 }
@@ -134,7 +134,10 @@ func TestBuildGradingResult_SendsEveryRecommendationInCategoryOrder(t *testing.T
 	cfg := &config.Config{Categories: map[string]config.CategoryConfig{
 		"activity": {Weight: 0.3}, "issues": {Weight: 0.3}, "code_health": {Weight: 0.4},
 	}}
-	catalog := map[string]string{"a1": "A1", "a2": "A2", "i1": "I1", "i2": "I2", "c1": "C1"}
+	entry := func(text string) config.RecommendationEntry {
+		return config.RecommendationEntry{Priority: "low", Text: text}
+	}
+	catalog := map[string]config.RecommendationEntry{"a1": entry("A1"), "a2": entry("A2"), "i1": entry("I1"), "i2": entry("I2"), "c1": entry("C1")}
 
 	result, err := BuildGradingResult(out, cfg, catalog, contracts.VisibilityPublic, time.Now())
 	if err != nil {
@@ -148,7 +151,7 @@ func TestBuildGradingResult_SendsEveryRecommendationInCategoryOrder(t *testing.T
 	for _, r := range recs {
 		got = append(got, r.Text)
 	}
-	if strings.Join(got, ",") != "A1,A2,I1,I2,C1" {
+	if strings.Join(got, ",") != "[low] A1,[low] A2,[low] I1,[low] I2,[low] C1" {
 		t.Fatalf("recommendations = %v, want all 5 in category order", got)
 	}
 }
@@ -160,12 +163,12 @@ func TestBuildGradingResult_DocsAdviceJoinsThePool(t *testing.T) {
 			"activity":      {ID: "activity", Score: 20, Metrics: []scoring.MetricResult{{ID: "a1", Score: 0.2}}},
 			"documentation": {ID: "documentation", Score: 61},
 		},
-		DocsAdvice: []string{"D1", "D2"},
+		DocsAdvice: []contracts.DocsAdvice{{Code: "DOC_TESTING_INSTRUCTIONS_MISSING", Priority: "medium", Text: "D1"}, {Code: "DOC_README_MISSING", Priority: "high", Text: "D2"}},
 	}
 	cfg := &config.Config{Categories: map[string]config.CategoryConfig{
 		"activity": {Weight: 0.5}, "documentation": {Weight: 0.5},
 	}}
-	result, err := BuildGradingResult(out, cfg, map[string]string{"a1": "A1"}, contracts.VisibilityPublic, time.Now())
+	result, err := BuildGradingResult(out, cfg, map[string]config.RecommendationEntry{"a1": {Priority: "critical", Text: "A1"}}, contracts.VisibilityPublic, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,9 +177,9 @@ func TestBuildGradingResult_DocsAdviceJoinsThePool(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []contracts.Recommendation{
-		{CategoryID: "activity", MetricID: "a1", Text: "A1"},
-		{CategoryID: "documentation", MetricID: "llm_advice", Text: "[medium] D1"},
-		{CategoryID: "documentation", MetricID: "llm_advice", Text: "[medium] D2"},
+		{CategoryID: "activity", MetricID: "a1", Priority: "critical", Text: "[critical] A1"},
+		{CategoryID: "documentation", MetricID: "DOC_TESTING_INSTRUCTIONS_MISSING", Priority: "medium", Text: "[medium] D1"},
+		{CategoryID: "documentation", MetricID: "DOC_README_MISSING", Priority: "high", Text: "[high] D2"},
 	}
 	if len(recs) != len(want) {
 		t.Fatalf("got %+v, want %+v", recs, want)
@@ -198,7 +201,7 @@ func TestGradingFailureWireShape(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got["error"] != "GRADING_FAILED" || got["score"] != nil || got["category_scores"] != nil || got["advice"] != nil ||
-		got["sourcecraft_uuid"] != "u1" || got["visibility"] != "public" {
+		got["sourcecraft_uuid"] != "u1" || got["grade_mode"] != "public" {
 		t.Fatalf("unexpected failure event %s", raw)
 	}
 }
@@ -240,7 +243,7 @@ func TestBuildGradingResult_SecurityCap(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			out := &GradeOutput{RepoID: "r", Categories: tc.categories}
-			result, err := BuildGradingResult(out, cfg, map[string]string{}, tc.visibility, time.Now())
+			result, err := BuildGradingResult(out, cfg, map[string]config.RecommendationEntry{}, tc.visibility, time.Now())
 			if err != nil {
 				t.Fatal(err)
 			}

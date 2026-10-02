@@ -3,11 +3,16 @@
   "raw_response": {
     "summary": "Репозиторий получил 64 балла из 100.",
     "recommendations": [
-      {"priority": "HIGH", "category": "security", "text": "Обновите уязвимые зависимости."}
+      {
+        "priority": "HIGH",
+        "category": "security",
+        "text": "Обновите уязвимые зависимости."
+      }
     ]
   },
   "model_used": "aliceai-llm",
   "evaluated_at": "2026-09-27T12:00:08Z",
+  "graded_at": "2026-09-27T11:59:00Z",
   "visibility": "private",
   "error": ""
 }

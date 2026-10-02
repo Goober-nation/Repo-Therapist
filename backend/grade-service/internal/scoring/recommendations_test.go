@@ -1,6 +1,11 @@
 package scoring
 
-import "testing"
+import (
+	"testing"
+
+	"repo-therapist/grade-service/internal/config"
+	"repo-therapist/grade-service/internal/contracts"
+)
 
 func TestCombineCategories_DropsNoDataAndRenormalizes(t *testing.T) {
 	categories := map[string]CategoryResult{
@@ -73,26 +78,34 @@ func TestBuildRecommendations_SkipsHealthyNoDataAndUncataloged(t *testing.T) {
 		},
 		"security": {ID: "security", NoData: true}, // whole category NoData, skip entirely
 	}
-	catalog := map[string]string{"bad_metric": "fix the bad thing"}
+	catalog := map[string]config.RecommendationEntry{"bad_metric": {Priority: "high", Text: "fix the bad thing"}}
 
 	recs := BuildRecommendations(categories, []string{"activity", "security"}, catalog)
 	if len(recs) != 1 {
 		t.Fatalf("got %d recommendations, want 1: %+v", len(recs), recs)
 	}
-	if recs[0].MetricID != "bad_metric" || recs[0].Text != "fix the bad thing" || recs[0].CategoryID != "activity" {
-		t.Errorf("recommendation = %+v, want {activity bad_metric \"fix the bad thing\"}", recs[0])
+	want := Recommendation{CategoryID: "activity", MetricID: "bad_metric", Priority: "high", Text: "[high] fix the bad thing"}
+	if recs[0] != want {
+		t.Errorf("recommendation = %+v, want %+v", recs[0], want)
 	}
 }
 
 func TestDocsRecommendations_ForwardsAdviceInOrderWithLabel(t *testing.T) {
 	ids := []string{"activity", "documentation"}
 	cats := map[string]CategoryResult{"documentation": {ID: "documentation", Score: 61}}
-	advice := []string{"Добавьте команды тестов.", "  ", "Документация оценена упрощённо, без LLM."}
+	advice := []contracts.DocsAdvice{
+		{Code: "DOC_TESTING_INSTRUCTIONS_MISSING", Priority: "high", Text: "Добавьте команды тестов."},
+		{Code: "DOC_X", Priority: "low", Text: "  "},
+		{Code: "DOC_ALGORITHMIC_NOTICE", Priority: "low", Text: "Документация оценена упрощённо, без LLM."},
+		// No code and an unknown priority fall back to llm_advice / medium.
+		{Priority: "urgent", Text: "Старый формат."},
+	}
 
 	got := DocsRecommendations(cats, ids, advice)
 	want := []Recommendation{
-		{CategoryID: "documentation", MetricID: "llm_advice", Text: "[medium] Добавьте команды тестов."},
-		{CategoryID: "documentation", MetricID: "llm_advice", Text: "[medium] Документация оценена упрощённо, без LLM."},
+		{CategoryID: "documentation", MetricID: "DOC_TESTING_INSTRUCTIONS_MISSING", Priority: "high", Text: "[high] Добавьте команды тестов."},
+		{CategoryID: "documentation", MetricID: "DOC_ALGORITHMIC_NOTICE", Priority: "low", Text: "[low] Документация оценена упрощённо, без LLM."},
+		{CategoryID: "documentation", MetricID: "llm_advice", Priority: "medium", Text: "[medium] Старый формат."},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %v, want %v", got, want)
@@ -105,7 +118,7 @@ func TestDocsRecommendations_ForwardsAdviceInOrderWithLabel(t *testing.T) {
 }
 
 func TestDocsRecommendations_NothingWithoutUsableDocumentation(t *testing.T) {
-	advice := []string{"x"}
+	advice := []contracts.DocsAdvice{{Code: "c", Priority: "low", Text: "x"}}
 	cases := map[string]struct {
 		cats map[string]CategoryResult
 		ids  []string

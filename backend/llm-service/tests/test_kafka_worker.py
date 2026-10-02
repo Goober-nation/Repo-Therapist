@@ -2,6 +2,7 @@ import json
 import unittest
 from unittest.mock import patch
 import io
+from datetime import datetime, timedelta, timezone
 
 from llm_service.grading import GROUPS
 from llm_service.recommendations import FALLBACKS
@@ -16,10 +17,15 @@ REPOSITORY = "019b2102-fa21-7ab7-8ce1-116af406fb5e"
 EVENT = "018f47d2-6d5a-7b72-82fd-1e9834d57a91"
 
 
-def request(prefix=None):
+def request(prefix=None, requested_at="2026-09-21T10:15:30Z"):
     return json.dumps({"sourcecraft_uuid": REPOSITORY,
                        "s3_prefix": prefix or f"repos/{REPOSITORY}",
-                       "requested_at": "2026-09-21T10:15:30Z"}).encode()
+                       "requested_at": requested_at}).encode()
+
+
+def requested_ago(seconds):
+    moment = datetime.now(timezone.utc) - timedelta(seconds=seconds)
+    return moment.isoformat().replace("+00:00", "Z")
 
 
 
@@ -136,11 +142,14 @@ class KafkaWorkerTests(unittest.TestCase):
     def test_success_result_has_exact_flat_fields(self):
         model = FakeModel()
         event = process_documentation_request(request(), FakeStore(), model)
-        self.assertEqual(set(event), {"sourcecraft_uuid", "grade", "subgrades", "advice", "error", "evaluated_at"})
+        self.assertEqual(set(event), {"sourcecraft_uuid", "grade", "subgrades", "advice", "method", "error", "evaluated_at"})
         self.assertEqual(event["sourcecraft_uuid"], REPOSITORY)
         self.assertEqual(event["subgrades"], {group: 95 for group in GROUPS})
         # Every section is reduced without facts, so each gets its fallback once.
         self.assertEqual(event["advice"], [FALLBACKS[group] for group in GROUPS])
+        self.assertEqual({item["priority"] for item in event["advice"]}, {"medium"})
+        self.assertEqual(event["advice"][0]["code"], "DOC_SECTION_" + GROUPS[0].upper())
+        self.assertEqual(event["method"], "llm")
         self.assertEqual(event["error"], "")
         self.assertEqual(model.calls, 1)
 
@@ -243,3 +252,34 @@ class KafkaWorkerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StaleRequestTests(unittest.TestCase):
+    def test_stale_request_is_skipped_without_model_call(self):
+        model = FakeModel()
+        raw = request(requested_at=requested_ago(71))
+        self.assertIsNone(process_documentation_request(raw, FakeStore(), model, max_age=70))
+        self.assertEqual(model.calls, 0)
+
+    def test_fresh_request_is_processed(self):
+        model = FakeModel()
+        raw = request(requested_at=requested_ago(5))
+        event = process_documentation_request(raw, FakeStore(), model, max_age=70)
+        self.assertEqual(event["error"], "")
+        self.assertEqual(model.calls, 1)
+
+    def test_future_timestamp_is_processed(self):
+        model = FakeModel()
+        raw = request(requested_at=requested_ago(-30))
+        self.assertIsNotNone(process_documentation_request(raw, FakeStore(), model, max_age=70))
+        self.assertEqual(model.calls, 1)
+
+    def test_worker_commits_stale_request_without_publishing(self):
+        events = []
+        model = FakeModel()
+        consumer, producer = Consumer(events), Producer(events)
+        with self.assertRaises(KeyboardInterrupt):
+            run_worker(KafkaConfig(), FakeStore(), model, max_age=70,
+                       consumer=consumer, producer=producer)
+        self.assertEqual(events, ["commit"])
+        self.assertEqual(model.calls, 0)

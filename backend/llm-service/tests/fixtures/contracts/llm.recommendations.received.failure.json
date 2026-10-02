@@ -3,6 +3,7 @@
   "raw_response": null,
   "model_used": "aliceai-llm",
   "evaluated_at": "2026-09-27T12:00:08Z",
+  "graded_at": "2026-09-27T11:59:00Z",
   "visibility": "private",
   "error": "LLM_TIMEOUT"
 }

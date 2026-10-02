@@ -3,6 +3,9 @@ package scoring
 import (
 	"slices"
 	"strings"
+
+	"repo-therapist/grade-service/internal/config"
+	"repo-therapist/grade-service/internal/contracts"
 )
 
 // Recommendation is one deduction-reason -> pre-written-text pairing, generated while scoring —
@@ -12,7 +15,15 @@ import (
 type Recommendation struct {
 	CategoryID string `json:"category_id"`
 	MetricID   string `json:"metric_id"`
+	Priority   string `json:"priority"`
 	Text       string `json:"text"`
+}
+
+// TaggedText prefixes text with "[priority] ". Transitional (2026-10): Recommendation.Text keeps
+// the tag for one release so consumers that still parse it keep working; Priority is the
+// authoritative field.
+func TaggedText(priority, text string) string {
+	return "[" + priority + "] " + text
 }
 
 // BuildRecommendations walks every category in categoryIDs and appends one Recommendation for
@@ -22,7 +33,7 @@ type Recommendation struct {
 // yaml) is expected to grow to cover every metric ID, not something this function should guess at.
 // Categories absent from the map (not yet computed, e.g. not_calculated) are skipped, same as
 // NoData ones — nothing to recommend without a real measurement.
-func BuildRecommendations(categories map[string]CategoryResult, categoryIDs []string, catalog map[string]string) []Recommendation {
+func BuildRecommendations(categories map[string]CategoryResult, categoryIDs []string, catalog map[string]config.RecommendationEntry) []Recommendation {
 	var recs []Recommendation
 	for _, catID := range categoryIDs {
 		cat, ok := categories[catID]
@@ -33,36 +44,47 @@ func BuildRecommendations(categories map[string]CategoryResult, categoryIDs []st
 			if m.NoData || m.Score >= 1.0 {
 				continue
 			}
-			text, ok := catalog[m.ID]
+			entry, ok := catalog[m.ID]
 			if !ok {
 				continue
 			}
-			recs = append(recs, Recommendation{CategoryID: catID, MetricID: m.ID, Text: text})
+			recs = append(recs, Recommendation{CategoryID: catID, MetricID: m.ID, Priority: entry.Priority, Text: TaggedText(entry.Priority, entry.Text)})
 		}
 	}
 	return recs
 }
 
-// DocsAdviceMetricID and DocsAdviceSeverity label the LLM service's Documentation advice in the
-// shared pool: its texts carry no metric code or severity of their own (2026-09-29 decision).
+// DocsAdviceMetricID and DocsAdvicePriority stand in for a Documentation advice item that
+// arrives without a code or with an unknown priority.
 const (
 	DocsAdviceMetricID = "llm_advice"
-	DocsAdviceSeverity = "[medium] "
+	DocsAdvicePriority = config.PriorityMedium
 )
 
-// DocsRecommendations turns the LLM service's Documentation advice into pool entries, in order.
-// Nothing is added when Documentation isn't in categoryIDs or has no data — advice from a reply
-// that wasn't used for the score would describe a grade the user never sees.
-func DocsRecommendations(categories map[string]CategoryResult, categoryIDs []string, advice []string) []Recommendation {
+// DocsRecommendations turns the LLM service's Documentation advice into pool entries, in order:
+// the item's code becomes the metric ID and its priority is kept. Nothing is added when
+// Documentation isn't in categoryIDs or has no data — advice from a reply that wasn't used for
+// the score would describe a grade the user never sees.
+func DocsRecommendations(categories map[string]CategoryResult, categoryIDs []string, advice []contracts.DocsAdvice) []Recommendation {
 	cat, ok := categories["documentation"]
 	if !ok || cat.NoData || !slices.Contains(categoryIDs, "documentation") {
 		return nil
 	}
 	recs := make([]Recommendation, 0, len(advice))
-	for _, text := range advice {
-		if text = strings.TrimSpace(text); text != "" {
-			recs = append(recs, Recommendation{CategoryID: "documentation", MetricID: DocsAdviceMetricID, Text: DocsAdviceSeverity + text})
+	for _, item := range advice {
+		text := strings.TrimSpace(item.Text)
+		if text == "" {
+			continue
 		}
+		metricID := strings.TrimSpace(item.Code)
+		if metricID == "" {
+			metricID = DocsAdviceMetricID
+		}
+		priority := item.Priority
+		if !config.ValidPriority(priority) {
+			priority = DocsAdvicePriority
+		}
+		recs = append(recs, Recommendation{CategoryID: "documentation", MetricID: metricID, Priority: priority, Text: TaggedText(priority, text)})
 	}
 	return recs
 }

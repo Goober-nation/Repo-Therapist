@@ -1,6 +1,10 @@
 package scoring
 
-import "testing"
+import (
+	"testing"
+
+	"repo-therapist/grade-service/internal/config"
+)
 
 func TestIsNoOpCIConfig(t *testing.T) {
 	cases := []struct {
@@ -94,7 +98,7 @@ func TestComputeCICD_NoOpPipelineZeroesCategory(t *testing.T) {
 		t.Errorf("metrics = %+v, want single %s at score 0", got.Metrics, noOpMetricID)
 	}
 	recs := BuildRecommendations(map[string]CategoryResult{"ci_cd": got}, []string{"ci_cd"},
-		map[string]string{noOpMetricID: "fix it"})
+		map[string]config.RecommendationEntry{noOpMetricID: {Priority: "high", Text: "fix it"}})
 	if len(recs) != 1 || recs[0].MetricID != noOpMetricID {
 		t.Errorf("recommendations = %+v, want one for %s", recs, noOpMetricID)
 	}

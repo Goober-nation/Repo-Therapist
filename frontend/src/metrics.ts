@@ -60,6 +60,20 @@ export function categoryWeight(id: string, isPrivate: boolean, withData?: Catego
   return scoredCategories(isPrivate, withData).find((item) => item.id === id)?.weight
 }
 
+/**
+ * Token for grading and recommendation requests. A public repository opened from "my
+ * repositories" can be graded publicly on request: then no token is sent.
+ */
+export function gradingToken(
+  pat: string | undefined,
+  privateRoute: boolean,
+  visibility: RepositorySummary["visibility"],
+  publicView: boolean,
+): string | undefined {
+  if (!privateRoute) return undefined
+  return publicView && visibility === "public" ? undefined : pat
+}
+
 export function isPrivateAnalysis(repository: RepositorySummary): boolean {
   return repository.analysisMode === "private"
 }
@@ -86,7 +100,7 @@ export function missingCategories(repository: RepositorySummary) {
       !isPrivate && category(id)?.privateOnly
         ? "доступно только владельцу: данные AppSec и CI/CD SourceCraft отдаёт по токену владельца"
         : id === "security" && repository.visibility === "private"
-          ? "AppSec не вернул данные: для закрытого репозитория нужен подключённый Security Add-on SourceCraft"
+          ? "Анализ безопасности для приватных репозиториев доступен только с Security Add-on"
           : "источник данных не вернул информацию для этого репозитория",
   }))
 }
@@ -142,12 +156,13 @@ export function splitStrengths(categories: CategoryScores) {
 }
 
 export const PRIORITY_LABELS: Record<Priority, string> = {
+  critical: "Критический приоритет",
   high: "Высокий приоритет",
   medium: "Средний приоритет",
   low: "Низкий приоритет",
 }
 
-export const PRIORITY_RANK: Record<Priority, number> = { high: 0, medium: 1, low: 2 }
+export const PRIORITY_RANK: Record<Priority, number> = { critical: 0, high: 1, medium: 2, low: 3 }
 
 export function getLastActivityLabel(daysAgo: number): string {
   if (daysAgo < 0) return "нет данных об активности"

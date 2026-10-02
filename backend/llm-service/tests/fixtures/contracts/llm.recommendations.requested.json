@@ -5,10 +5,24 @@
   "repo_slug": "demo",
   "grade": {
     "score": 64,
-    "category_scores": {"security": 40, "activity": 90, "documentation": 70,
-                        "ci_cd": null, "issues": 80, "code_health": 55},
-    "advice": ["Обновите уязвимые зависимости."],
-    "missing_data": ["ci_cd"],
+    "category_scores": {
+      "security": 40,
+      "activity": 90,
+      "documentation": 70,
+      "ci_cd": null,
+      "issues": 80,
+      "code_health": 55
+    },
+    "advice": [
+      {
+        "category_id": "security",
+        "priority": "critical",
+        "text": "Есть открытые находки критической важности. Это самый срочный риск безопасности, их нужно исправить в первую очередь."
+      }
+    ],
+    "missing_data": [
+      "ci_cd"
+    ],
     "graded_at": "2026-09-27T11:59:00Z"
   },
   "requested_at": "2026-09-27T12:00:00+03:00"

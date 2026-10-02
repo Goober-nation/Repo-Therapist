@@ -96,21 +96,25 @@ type GradingRequestedEvent struct {
 // Recommendation is one deduction-reason -> pre-written-text pairing, generated while scoring
 // (see config/recommendations.yaml) — not the LLM's recommendation for Documentation, which
 // arrives later via the Aggregator's separate LLM event flow and is merged in on that side.
+//
+// Priority is critical|high|medium|low. During the transition (one release) Text still starts
+// with the same "[priority] " tag for consumers that parse it; new consumers read Priority.
 type Recommendation struct {
 	CategoryID string `json:"category_id"`
 	MetricID   string `json:"metric_id"`
+	Priority   string `json:"priority"`
 	Text       string `json:"text"`
 }
 
 // GradingResultEvent is published once grading finishes — consumed by the Aggregator, which
-// writes it to the repo_grades_* table matching Visibility and releases the repo_lock. Score is
+// writes it to the repo_grades_* table matching GradeMode and releases the repo_lock. Score is
 // nil only when every category in that view is NoData. Advice holds every Recommendation of that
 // view's categories, in category order. MissingData names the view's categories
 // that are NoData/not_calculated. A nonempty Error means grading failed: Score, CategoryScores and
 // Advice are null and the Aggregator only releases the lock.
 type GradingResultEvent struct {
 	SourcecraftUUID string          `json:"sourcecraft_uuid"`
-	Visibility      string          `json:"visibility"` // VisibilityPublic or VisibilityPrivate
+	GradeMode       string          `json:"grade_mode"` // VisibilityPublic or VisibilityPrivate: graded without or with a user token
 	Score           *int16          `json:"score"`
 	CategoryScores  json.RawMessage `json:"category_scores"`
 	Advice          json.RawMessage `json:"advice"`
@@ -135,15 +139,32 @@ type DocsGradeRequested struct {
 	RequestedAt     time.Time `json:"requested_at"`
 }
 
+// Documentation grading methods carried in DocsGraded.Method.
+const (
+	DocsMethodLLM         = "llm"
+	DocsMethodAlgorithmic = "algorithmic"
+)
+
+// DocsAdvice is one Documentation recommendation: the LLM service's deduction code (or a
+// section fallback / notice code), its priority (critical|high|medium|low) and Russian text.
+type DocsAdvice struct {
+	Code     string `json:"code"`
+	Priority string `json:"priority"`
+	Text     string `json:"text"`
+}
+
 // DocsGraded is the LLM service's reply: grade and subgrades are integers 0-100; sections it
 // didn't review are absent from Subgrades. Advice holds Russian improvement recommendations.
+// Method is DocsMethodLLM when the model graded, DocsMethodAlgorithmic for the simplified
+// fallback grade; it is null on a failure reply.
 // A nonempty Error means the evaluation failed: Grade is null, the other fields empty, and the
 // reply must be read as Documentation no-data. Grade is a pointer so null never decodes as 0.
 type DocsGraded struct {
 	SourcecraftUUID string         `json:"sourcecraft_uuid"`
 	Grade           *int           `json:"grade"`
 	Subgrades       map[string]int `json:"subgrades"`
-	Advice          []string       `json:"advice"`
+	Advice          []DocsAdvice   `json:"advice"`
+	Method          *string        `json:"method"`
 	Error           string         `json:"error"`
 	EvaluatedAt     time.Time      `json:"evaluated_at"`
 }

@@ -48,13 +48,20 @@ LLM-сервис по-прежнему принимает старые `LLM_SUMM
 
 Собственные топики Aggregator в том виде, как их читает/пишет Grade service:
 
-- `grading.requests`: `{org_slug, repo_slug, visibility, requested_at, token?}`. Токен означает
+- `grading.requests`: `{org_slug, repo_slug, visibility, requested_at, token?}`. `visibility` —
+  видимость репозитория в SourceCraft (`public` | `internal` | `private`). Токен означает
   приватное оценивание; без токена — публичное. Непубличный `visibility` без токена отбрасывается.
-- `grading.results`: `{sourcecraft_uuid, visibility, score, category_scores, advice,
-  missing_data, graded_at, error}`. `visibility` называет таблицу оценок, в которую пишет
-  Aggregator. `advice` — все рекомендации `{category_id, metric_id, text}` по порядку
-  категорий. Для документации это тексты
-  `advice` из `repo.docs.graded`, каждый как `{"documentation", "llm_advice", "[medium] <текст>"}`. `error` при успехе — `""`.
+- `grading.results`: `{sourcecraft_uuid, grade_mode, score, category_scores, advice,
+  missing_data, graded_at, error}`. `grade_mode` — режим оценки, а не видимость репозитория:
+  `private`, если в запросе был токен пользователя, иначе `public` (публичный репозиторий,
+  оценённый владельцем, приходит как `private`). Других значений нет; по нему Aggregator выбирает
+  таблицу `repo_grades_public` или `repo_grades_private`. До 2026-10 поле называлось `visibility`.
+  `advice` — все рекомендации `{category_id, metric_id, priority, text}` по порядку категорий.
+  `priority` — `critical` | `high` | `medium` | `low`. Переходный период (один релиз): `text`
+  по-прежнему начинается с той же метки `"[priority] "`, чтобы старые потребители работали; новые
+  читают `priority`, а метку из текста убирают. Для документации это элементы `advice` из
+  `repo.docs.graded`: `metric_id` — их `code`, `priority` — их `priority` (без кода —
+  `llm_advice`, с неизвестным приоритетом — `medium`). `error` при успехе — `""`.
   При сбое это код — `REPO_FETCH_FAILED` (repo.ready со статусом failed), `GRADING_FAILED`,
   `GRADING_INTERRUPTED` (grade-service остановлен посреди оценки), `RESULT_BUILD_FAILED` — а
   `score`, `category_scores` и `advice` равны null; Aggregator тогда снимает блокировку
@@ -88,6 +95,34 @@ wrapper.
 тогда Grade service публикует `REPO_FETCH_FAILED` в `grading.results`, и Aggregator сразу
 снимает блокировку. Без `sourcecraft_uuid` сбой только логируется, блокировка снимается по
 `GRADING_LOCK_TIMEOUT`.
+
+Пример успешного `grading.results` (сокращён):
+
+```json
+{
+  "sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
+  "grade_mode": "private",
+  "score": 64,
+  "category_scores": {
+    "documentation": {"id": "documentation", "no_data": false, "score": 52,
+                      "metrics": [{"id": "purpose", "no_data": false, "raw_value": 80, "score": 0.8, "weight": 0.5}],
+                      "method": "algorithmic"}
+  },
+  "advice": [
+    {"category_id": "ci_cd", "metric_id": "has_ci", "priority": "critical",
+     "text": "[critical] CI-пайплайн не найден. …"},
+    {"category_id": "documentation", "metric_id": "DOC_README_MISSING", "priority": "high",
+     "text": "[high] Добавьте в README описание проекта и ссылки на основные инструкции."}
+  ],
+  "missing_data": [],
+  "graded_at": "2026-09-27T11:59:00.123456Z",
+  "error": ""
+}
+```
+
+`method` есть только у объекта категории `documentation` и только когда документация оценена
+(`"llm"` или `"algorithmic"`, см. `repo.docs.graded`); у остальных категорий, при отсутствии данных
+и при неизвестном значении поле опускается.
 
 Go-типы: `internal/contracts/repo_grading.go`. Проверено сквозным прогоном (2026-09-19): ручной
 запуск → Repository service → `repo.ready` → Grade service → напечатанная оценка «Активности»,
@@ -151,7 +186,11 @@ LLM → Grade, топик `repo.docs.graded` (успешная оценка):
   "sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
   "grade": 85,
   "subgrades": {"required_files": 100, "purpose": 80, "local_run": 75},
-  "advice": ["Уточните, какую задачу решает проект, для чего его используют и какой результат он даёт."],
+  "advice": [
+    {"code": "DOC_PURPOSE_UNCLEAR", "priority": "high",
+     "text": "Уточните, какую задачу решает проект, для чего его используют и какой результат он даёт."}
+  ],
+  "method": "llm",
   "error": "",
   "evaluated_at": "2026-09-26T12:00:10Z"
 }
@@ -165,26 +204,49 @@ LLM → Grade, тот же топик и ключ Kafka (оценка не уд�
   "grade": null,
   "subgrades": {},
   "advice": [],
+  "method": null,
   "error": "CONTENT_FILTER",
   "evaluated_at": "2026-09-26T12:00:10Z"
 }
 ```
 
 `error` — всегда строка: `""` при успехе, иначе короткий стабильный код без секретов и сырого
-содержимого модели/репозитория. При сбое `grade` равен `null`, `subgrades` — `{}`, `advice` — `[]`
-(ноль никогда не обозначает недоступную оценку); Grade считает непустой `error` или `grade: null`
+содержимого модели/репозитория. При сбое `grade` равен `null`, `subgrades` — `{}`, `advice` — `[]`,
+`method` — `null` (ноль никогда не обозначает недоступную оценку); Grade считает непустой `error` или `grade: null`
 отсутствием данных (`NO_DATA`) для документации и игнорирует остальные поля. `evaluated_at` —
 момент завершения попытки, успешной или нет. Отказ фильтра содержимого или исчерпанные попытки
 модели/S3 дают результат сбоя; истечение 60-секундного бюджета модели даёт `LLM_TIMEOUT`.
 Собственный 70-секундный таймаут Grade покрывает отсутствие обработчика или сбой брокера.
+LLM-сервис пропускает запрос старше `LLM_DOCS_REQUEST_MAX_AGE_SECONDS` секунд (по умолчанию 70,
+отсчёт от `requested_at`) без чтения S3 и вызова модели: результат не публикуется, смещение
+фиксируется. Grade к этому моменту уже не ждёт ответа и отбросил бы его.
 
 Ключи разделов: `required_files`, `purpose`, `local_run`, `build`, `testing`, `usage`,
 `structure`, `consistency`. Непросмотренные или неприменимые разделы опускаются в `subgrades` и
 никогда не передаются нулём или null. Оценки — целые 0–100, округление половины вверх; итог
 нормируется по оценённым проверкам, а не как среднее процентов разделов (см.
-`docs/documentation-grading.md`). `advice` содержит только рекомендации по улучшению на русском,
-выбранные по коду недостатка с запасным вариантом на уровне раздела — без причин, имён файлов,
-доказательств и хэшей, и без рекомендаций для непросмотренных, неприменимых и идеальных разделов.
+`docs/documentation-grading.md`). `advice` — список объектов `{code, priority, text}`: только
+рекомендации по улучшению на русском, выбранные по коду недостатка с запасным вариантом на уровне
+раздела — без причин, имён файлов, доказательств и хэшей, и без рекомендаций для непросмотренных,
+неприменимых и идеальных разделов. Одинаковые тексты не повторяются (остаётся первый код).
+
+- `code` — код недостатка (`DOC_…`, см. `docs/documentation-codes.md`); для запасного текста
+  раздела — `DOC_SECTION_<ID раздела в верхнем регистре>` (например, `DOC_SECTION_USAGE`); для
+  пометки об упрощённой оценке — `DOC_ALGORITHMIC_NOTICE`.
+- `priority` — `critical` | `high` | `medium` | `low`, задаётся в `backend/llm-service/config/advice.yaml`
+  для каждого кода. `critical` для документации не используется. `high`: нет README, назначения
+  проекта, инструкции запуска, LICENSE, или команда не совпадает со скриптами проекта. `medium`:
+  нет основного раздела (возможности, сборка, тесты, пример), неверная ссылка или настройка,
+  неполные требования/зависимости/настройки запуска; запасной текст раздела — тоже `medium`.
+  `low`: детали существующего раздела, CONTRIBUTING, CODEOWNERS и пометка об упрощённой оценке.
+
+`method` — как получена оценка: `"llm"` — модель оценила выборку документации; `"algorithmic"` —
+модель недоступна (режим `auto`) или отключена (режим `algorithmic`), и сервис проверил только
+наличие файлов и разделов. При сбое `method` равен `null`. При `"algorithmic"` последним элементом
+`advice` по-прежнему идёт пометка `DOC_ALGORITHMIC_NOTICE` («Документация оценена упрощённо, без
+LLM») — для потребителей, которые не читают `method`; Grade service передаёт `method` в объект
+категории `documentation` в `grading.results`, и фронтенд показывает пометку на карточке
+документации.
 
 Метки времени — RFC3339 с часовым поясом. S3-префикс — относительный префикс ключа объекта без
 завершающего слэша; сервис только читает объекты репозитория.
@@ -200,26 +262,35 @@ Aggregator → LLM, топик `llm.recommendations.requested` (Go `LLMRecommend
   "org_slug": "examples",
   "repo_slug": "demo",
   "grade": {
-    "Score": 64,
-    "CategoryScores": {"security": 40, "activity": 90, "documentation": 70,
-                       "ci_cd": null, "issues": 80, "code_health": 55},
-    "Advice": ["Обновите уязвимые зависимости."],
-    "MissingData": ["ci_cd"],
-    "GradedAt": "2026-09-27T11:59:00Z"
+    "score": 64,
+    "category_scores": {"security": 40, "activity": 90, "documentation": 70,
+                        "ci_cd": null, "issues": 80, "code_health": 55},
+    "advice": [
+      {"category_id": "security", "priority": "critical",
+       "text": "Есть открытые находки критической важности. …"}
+    ],
+    "missing_data": ["ci_cd"],
+    "graded_at": "2026-09-27T11:59:00.123456Z"
   },
   "requested_at": "2026-09-27T12:00:00+03:00"
 }
 ```
 
-`grade` — это Go-структура `RepoGrade`, у которой есть только теги `db`, поэтому её поля приходят
-с Go-именами. Парсер принимает и Go-имена (`Score`, `CategoryScores`, …), и snake_case (`score`,
-`category_scores`, …); одно и то же поле в обоих написаниях отвергается. Правила:
+Aggregator отправляет `grade` в snake_case (Go `LLMGrade`). Парсер для совместимости принимает и
+Go-имена (`Score`, `CategoryScores`, …); одно и то же поле в обоих написаниях отвергается. Правила:
 
 - `visibility` — `public` или `private`; slug-и непустые; `requested_at` — RFC3339 (точность до
   наносекунд из Go принимается).
 - `Score` — целое 0–100 или `null`. `CategoryScores` сопоставляет ID категории с числом 0–100,
-  `null` (нет данных) или объектом с полем `score`. `Advice` и `MissingData` — списки строк или
-  `null`. Остальные поля `grade` игнорируются.
+  `null` (нет данных) или объектом с полем `score`. `MissingData` — список строк или `null`.
+- `advice` — до 50 рекомендаций Grade `{category_id, priority, text}` или `null`. Aggregator берёт
+  `priority` из поля рекомендации, а у оценок, сохранённых до появления поля, — из метки
+  `"[priority] "` в тексте (иначе `medium`); метку из `text` убирает. Парсер LLM-сервиса так же
+  принимает строку старого формата (приоритет из метки или `medium`). `priority` вне
+  `critical|high|medium|low` и не-строковый `text` отвергаются; пустые тексты отбрасываются.
+  Модель видит рекомендации как `service_recommendations` с категорией и приоритетом.
+- `graded_at` — RFC3339 или `null`: время оценки, которую описывает запрос. Сервис копирует его
+  без изменений в ответ. Остальные поля `grade` игнорируются.
 - Для `public` категории `security` и `ci_cd` скрываются от модели, даже если присутствуют.
 
 LLM → Aggregator, топик `llm.recommendations.received` (Go `LLMRecommendationsReceivedEvent`):
@@ -235,10 +306,19 @@ LLM → Aggregator, топик `llm.recommendations.received` (Go `LLMRecommenda
   },
   "model_used": "aliceai-llm",
   "evaluated_at": "2026-09-27T12:00:08Z",
+  "graded_at": "2026-09-27T11:59:00.123456Z",
   "visibility": "private",
   "error": ""
 }
 ```
+
+`graded_at` — дословная копия `grade.graded_at` из запроса (в том числе при сбое; `null`, если в
+запросе его не было или он некорректен). Aggregator сохраняет его в
+`repo_llm_responses_*.graded_at` и считает сохранённый ответ актуальным, только если этот
+`graded_at` в точности равен `graded_at` текущей оценки той же таблицы; `NULL` (ответы, сохранённые
+до появления поля) актуальным не считается, и Aggregator запрашивает сводку заново. Так ответ на
+старую оценку, пришедший после переоценки, не выдаётся за сводку новой, а расхождение часов
+сервисов не влияет (`evaluated_at` для этого больше не используется).
 
 Правила `raw_response`. Модель пишет только `summary` и тексты рекомендаций; приоритеты задаёт
 код по оценкам запроса. Сильные и слабые стороны сюда не входят — фронтенд считает их сам по
@@ -252,7 +332,8 @@ LLM → Aggregator, топик `llm.recommendations.received` (Go `LLMRecommenda
   категории. Модель просят дать хотя бы одну рекомендацию на каждую слабую категорию; это не
   проверяется принудительно.
 - Граница 75 выше (`MEDIUM`/`LOW` и `HIGH` для безопасности) —
-  `LLM_STRENGTH_THRESHOLD` (целое 0–100, по умолчанию 75); граница 50 для `HIGH` фиксирована.
+  `LLM_PRIORITY_THRESHOLD` (целое 0–100, по умолчанию 75; прежнее имя `LLM_STRENGTH_THRESHOLD`
+  читается, если новое не задано); граница 50 для `HIGH` фиксирована.
 - Лишние маркеры списков и пунктуация по краям текста модели обрезаются. Формулировки не
   проверяются. Модели предписано использовать только данные запроса, не выдумывать цифры и факты
   и не считать отсутствие данных проблемой. Оценки она никогда не меняет.

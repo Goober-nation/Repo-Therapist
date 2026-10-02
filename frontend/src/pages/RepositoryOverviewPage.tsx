@@ -18,7 +18,7 @@ import {
 import type { Priority, RepositorySummary } from "../types"
 import type { RepositoryAnalysis } from "../useRepositoryAnalysis"
 
-const PRIORITY_TONES = { high: "critical", medium: "warning", low: "neutral" } as const satisfies Record<Priority, string>
+const PRIORITY_TONES = { critical: "critical", high: "critical", medium: "warning", low: "neutral" } as const satisfies Record<Priority, string>
 
 function TextList({ title, items, empty }: { title: string; items: string[]; empty: string }) {
   return (
@@ -64,10 +64,13 @@ export default function RepositoryOverviewPage({
   repository,
   analysis,
   onBackToRanking,
+  publicView,
 }: {
   repository: RepositorySummary
   analysis: RepositoryAnalysis
   onBackToRanking: () => void
+  /** Present only for a public repository opened with the owner's token. */
+  publicView?: { checked: boolean; onChange: (checked: boolean) => void }
 }) {
   const isPrivate = isPrivateAnalysis(repository)
   const summaryKey = `${repository.sourceCraftUuid ?? repository.id}:${isPrivate ? "private" : "public"}`
@@ -90,7 +93,7 @@ export default function RepositoryOverviewPage({
   }
   const missing = missingCategories(repository)
   const gradedAt = formatDateTime(repository.gradedAt)
-  const modeLabel = isPrivate ? "приватный анализ (все 6 категорий)" : "публичный анализ"
+  const modeLabel = isPrivate ? "приватный анализ (все 6 категорий)" : "публичный анализ (4 категории)"
   const actualWeights = repository.healthScore === null ? [] : scoredCategories(isPrivate, repository.categoryScores)
   const weights = actualWeights.length > 0 ? actualWeights : scoredCategories(isPrivate)
 
@@ -130,6 +133,21 @@ export default function RepositoryOverviewPage({
           </>
         }
       />
+
+      {publicView && (
+        <label className="public-view-toggle">
+          <input
+            type="checkbox"
+            checked={publicView.checked}
+            disabled={analysis.isRunning}
+            onChange={(event) => publicView.onChange(event.target.checked)}
+          />{" "}
+          Публичная оценка{" "}
+          <span className="muted-copy">
+            — показана {isPrivate ? "приватная оценка (6 категорий)" : "публичная оценка (4 категории)"}
+          </span>
+        </label>
+      )}
 
       <RunNotice analysis={analysis} />
       {analysis.error && (
@@ -200,6 +218,9 @@ export default function RepositoryOverviewPage({
                           ? "AI-сводка ещё рассчитывается. Попробуйте запросить её позже."
                           : "AI-сводка пока недоступна. Ниже показаны оценки и рекомендации, рассчитанные по правилам.")}
                   </p>
+                  {!analysis.aiLoading && !analysis.aiError && ai?.summary && ai.modelUsed && (
+                    <p className="muted-copy ai-summary__model">Сформировано моделью {ai.modelUsed}</p>
+                  )}
                   {analysis.aiError && (
                     <button
                       type="button"

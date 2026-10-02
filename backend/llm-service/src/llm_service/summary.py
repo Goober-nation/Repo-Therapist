@@ -24,27 +24,32 @@ CATEGORY_NAMES = {
 }
 PRIVATE_ONLY = frozenset({"security", "ci_cd"})
 PRIORITIES = ("HIGH", "MEDIUM", "LOW")
-DEFAULT_STRENGTH_THRESHOLD = 75
+DEFAULT_PRIORITY_THRESHOLD = 75
 
 
-def strength_threshold_from_env() -> int:
-    """LLM_STRENGTH_THRESHOLD (integer 0-100): the MEDIUM/LOW priority boundary (and Security's
-    HIGH boundary). Invalid values fall back."""
-    value = os.environ.get("LLM_STRENGTH_THRESHOLD", "").strip()
+def priority_threshold_from_env() -> int:
+    """LLM_PRIORITY_THRESHOLD (integer 0-100): the MEDIUM/LOW priority boundary (and Security's
+    HIGH boundary). The old name LLM_STRENGTH_THRESHOLD is read when the new one is unset.
+    Invalid values fall back."""
+    name = "LLM_PRIORITY_THRESHOLD"
+    value = os.environ.get(name, "").strip()
     if not value:
-        return DEFAULT_STRENGTH_THRESHOLD
+        name = "LLM_STRENGTH_THRESHOLD"
+        value = os.environ.get(name, "").strip()
+    if not value:
+        return DEFAULT_PRIORITY_THRESHOLD
     try:
         threshold = int(value)
     except ValueError:
         threshold = -1
     if not 0 <= threshold <= 100:
         logging.getLogger(__name__).warning(
-            "ignoring invalid LLM_STRENGTH_THRESHOLD=%r, using %d", value, DEFAULT_STRENGTH_THRESHOLD)
-        return DEFAULT_STRENGTH_THRESHOLD
+            "ignoring invalid %s=%r, using %d", name, value, DEFAULT_PRIORITY_THRESHOLD)
+        return DEFAULT_PRIORITY_THRESHOLD
     return threshold
 
 
-STRENGTH_THRESHOLD = strength_threshold_from_env()
+PRIORITY_THRESHOLD = priority_threshold_from_env()
 LIMITS = {"summary": 1500, "text": 600, "recommendations": 8}
 _EDGE_PUNCTUATION = " \t\n.,;:!?-–—•*·"
 
@@ -65,9 +70,9 @@ def scored_categories(request):
 
 
 def priority(category, score):
-    if score < 50 or category == "security" and score < STRENGTH_THRESHOLD:
+    if score < 50 or category == "security" and score < PRIORITY_THRESHOLD:
         return "HIGH"
-    return "MEDIUM" if score < STRENGTH_THRESHOLD else "LOW"
+    return "MEDIUM" if score < PRIORITY_THRESHOLD else "LOW"
 
 
 def _schema(categories):
@@ -98,7 +103,7 @@ def _schema(categories):
 def build_summary_prompt(request):
     categories = summary_categories(request)
     weak = sorted(name for name, score in scored_categories(request).items()
-                  if score < STRENGTH_THRESHOLD)
+                  if score < PRIORITY_THRESHOLD)
     missing = [name for name in request["missing_data"]
                if request["visibility"] == "private" or name not in PRIVATE_ONLY]
     data = {
@@ -122,7 +127,7 @@ def build_summary_prompt(request):
         "2. Категория со значением «нет данных» не является проблемой: не называй её "
         "слабой и не давай по ней рекомендаций; в summary можно упомянуть, что данных нет.\n"
         "3. summary — 3–5 предложений: итоговая оценка, главные сильные и слабые "
-        f"стороны (оценка {STRENGTH_THRESHOLD} и выше — сильная, ниже — слабая), общий вывод.\n"
+        f"стороны (оценка {PRIORITY_THRESHOLD} и выше — сильная, ниже — слабая), общий вывод.\n"
         "4. recommendations — конкретные действия. Для каждой категории из "
         "weak_categories дай хотя бы одну рекомендацию. Если в service_recommendations "
         "есть совет по категории, перескажи его своими словами как понятное действие и "

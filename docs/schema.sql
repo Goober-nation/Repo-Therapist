@@ -55,7 +55,8 @@ CREATE TABLE repo_llm_responses_public (
 
   raw_response       JSONB,
   model_used         TEXT,
-  evaluated_at       TIMESTAMPTZ
+  evaluated_at       TIMESTAMPTZ,
+  graded_at          TIMESTAMPTZ
 );
 
 CREATE TABLE repo_llm_responses_private (
@@ -63,7 +64,8 @@ CREATE TABLE repo_llm_responses_private (
 
   raw_response       JSONB,
   model_used         TEXT,
-  evaluated_at       TIMESTAMPTZ
+  evaluated_at       TIMESTAMPTZ,
+  graded_at          TIMESTAMPTZ
 );
 
 

@@ -16,10 +16,10 @@ func matchRepoReady(value []byte, org, repo string) (ready contracts.RepoReady, 
 }
 
 // matchResult reports whether a grading.results message is the one for this repo's UUID and the
-// requested visibility — the public and private views of one repo are separate results.
-func matchResult(value []byte, uuid, visibility string) (result contracts.GradingResultEvent, ok bool) {
+// requested grade mode — the public and private views of one repo are separate results.
+func matchResult(value []byte, uuid, gradeMode string) (result contracts.GradingResultEvent, ok bool) {
 	if err := json.Unmarshal(value, &result); err != nil {
 		return contracts.GradingResultEvent{}, false
 	}
-	return result, result.SourcecraftUUID == uuid && result.Visibility == visibility
+	return result, result.SourcecraftUUID == uuid && result.GradeMode == gradeMode
 }

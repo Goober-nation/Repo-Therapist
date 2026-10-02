@@ -616,5 +616,7 @@ rpc GetReccomendations(GetReccomendationsRequest) returns (GetReccomendationsRes
 запускает её, если оценки нет или в репозитории была активность после прошлого анализа.
 
 `category_scores` — объект по ID категории: `{id, no_data, score (0–100), metrics: [{id, no_data,
-raw_value, score (0–1)}]}`. `advice` — `[{category_id, metric_id, text}]`, текст начинается с тега
-приоритета `[critical|high|medium|low]` (`config/recommendations.yaml`).
+raw_value, score (0–1)}]}`; у `documentation` дополнительно может быть `method` (`"llm"` или
+`"algorithmic"` — упрощённая оценка). `advice` — `[{category_id, metric_id, priority, text}]`,
+`priority` — `critical|high|medium|low` (`config/recommendations.yaml`); в переходный период текст
+ещё начинается с той же метки `[priority]`, у оценок, сохранённых раньше, есть только метка.

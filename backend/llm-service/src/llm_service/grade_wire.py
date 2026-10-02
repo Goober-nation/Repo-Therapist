@@ -54,7 +54,7 @@ def request_uuid_if_valid(raw):
 
 
 def _advice(payload, reduced_groups, *, fallbacks=True):
-    """One copy of each recommendation; a reduced section without facts gets its fallback.
+    """One item per recommendation text; a reduced section without facts gets its fallback.
 
     Algorithmic grades halve every present section, so fallbacks are off there:
     only missing sections and files produce advice.
@@ -68,7 +68,10 @@ def _advice(payload, reduced_groups, *, fallbacks=True):
     if fallbacks:
         advice += [FALLBACKS[item["id"]] for item in payload["subcategories"]
                    if item["id"] in reduced_groups and item["id"] not in covered]
-    return list(dict.fromkeys(advice))
+    unique = {}
+    for item in advice:
+        unique.setdefault(item["text"], dict(item))
+    return list(unique.values())
 
 
 def build_grade_result(request, payload, *, llm_used=True):
@@ -83,7 +86,8 @@ def build_grade_result(request, payload, *, llm_used=True):
         "subgrades": {item["id"]: integer(item["grade"])
                       for item in payload["subcategories"] if item["grade"] is not None},
         "advice": (_advice(payload, reduced_groups, fallbacks=llm_used) +
-                   ([] if llm_used else [ALGORITHMIC_NOTICE])),
+                   ([] if llm_used else [dict(ALGORITHMIC_NOTICE)])),
+        "method": "llm" if llm_used else "algorithmic",
         "error": "",
         "evaluated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }
@@ -98,6 +102,7 @@ def build_grade_failure(sourcecraft_uuid, error_code):
         "grade": None,
         "subgrades": {},
         "advice": [],
+        "method": None,
         "error": error_code,
         "evaluated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }

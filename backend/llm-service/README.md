@@ -84,6 +84,9 @@ Documentation `NO_DATA` instead of using the grade fields.
 The Yandex adapter has a 60-second model-call budget per Documentation evaluation,
 shared by the initial request and its optional format retry. An exhausted budget
 produces `LLM_TIMEOUT`; the Grade service retains its 70-second fallback timeout.
+A request whose `requested_at` is older than `LLM_DOCS_REQUEST_MAX_AGE_SECONDS`
+(default 70) is skipped without reading S3 or calling the model: nothing is
+published and the offset is committed, since Grade no longer waits for it.
 Redelivery can repeat results; there is no request ID in this contract to
 distinguish simultaneous grading runs for the same repository.
 
@@ -131,7 +134,9 @@ PYTHONPATH=src python3 -m llm_service --summary-file request.json
 ```
 
 Optional: `LLM_SUMMARY_KAFKA_GROUP_ID` (default `llm-service-recommendations-v1`),
-`LLM_SUMMARY_REQUEST_TOPIC`, `LLM_SUMMARY_RESULT_TOPIC`.
+`LLM_SUMMARY_REQUEST_TOPIC`, `LLM_SUMMARY_RESULT_TOPIC`, `LLM_PRIORITY_THRESHOLD` (integer
+0-100, default 75: the `MEDIUM`/`LOW` recommendation priority boundary and Security's `HIGH`
+boundary; the old name `LLM_STRENGTH_THRESHOLD` is read when the new one is unset).
 
 Documentation grading mode, `LLM_DOCS_MODE`: `auto` (default) grades with the model and falls
 back to the algorithmic grade on any failure of the model path — the call or building its

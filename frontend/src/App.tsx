@@ -10,6 +10,7 @@ import MyRepositoriesPage from "./pages/MyRepositoriesPage"
 import RankingPage, { DEFAULT_RANKING_QUERY, type RankingQuery } from "./pages/RankingPage"
 import RepositoryOverviewPage from "./pages/RepositoryOverviewPage"
 import RulesPage from "./pages/RulesPage"
+import { gradingToken } from "./metrics"
 import { loadPat, patExpiresIn, savePat } from "./patStorage"
 import { parseRepositoryLink, useRoute } from "./route"
 import type { PageId, RepositorySummary } from "./types"
@@ -59,6 +60,8 @@ export default function App() {
   const [languages, setLanguages] = useState<string[]>([])
   const [mine, setMine] = useState<RepositoryList>({ items: [], isLoading: false })
   const [gradings, setGradings] = useState<Record<string, GradingResponse>>({})
+  // Repositories ("org/repo") the owner switched to the public grade.
+  const [publicViews, setPublicViews] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -123,7 +126,6 @@ export default function App() {
   }, [pat])
 
   const target = route.page === "repository" ? route : undefined
-  const key = target && `${target.private ? "my" : "repo"}:${target.org}/${target.repo}`
   const needsToken = Boolean(target?.private && !pat)
 
   const baseRepository = useMemo(() => {
@@ -135,11 +137,17 @@ export default function App() {
     )
   }, [target, mine.items, ranking.items])
 
+  const repoName = target && `${target.org}/${target.repo}`
+  const publicView = Boolean(repoName && publicViews[repoName])
+  const token = target ? gradingToken(pat, target.private, baseRepository?.visibility, publicView) : undefined
+  const canViewPublicly = Boolean(target?.private && pat && baseRepository?.visibility === "public")
+  const key = target && `${token ? "my" : "repo"}:${repoName}`
   const grading = key ? gradings[key] : undefined
-  const repository = useMemo(
-    () => (baseRepository && grading ? mergeGradingIntoRepository(baseRepository, grading) : baseRepository),
-    [baseRepository, grading],
-  )
+  const repository = useMemo(() => {
+    if (!baseRepository) return undefined
+    const merged = grading ? mergeGradingIntoRepository(baseRepository, grading) : baseRepository
+    return target?.private && !token ? { ...merged, analysisMode: "public" as const } : merged
+  }, [baseRepository, grading, target?.private, token])
 
   const handleGrading = useCallback(
     (response: GradingResponse) => {
@@ -154,7 +162,7 @@ export default function App() {
 
   const analysis = useRepositoryAnalysis(
     api,
-    target && !needsToken ? { org: target.org, repo: target.repo, pat: target.private ? pat : undefined } : undefined,
+    target && !needsToken ? { org: target.org, repo: target.repo, pat: token } : undefined,
     repository?.gradedAt,
     handleGrading,
   )
@@ -252,6 +260,14 @@ export default function App() {
                     repository={repository}
                     analysis={analysis}
                     onBackToRanking={() => showPage("ranking")}
+                    publicView={
+                      canViewPublicly && repoName
+                        ? {
+                            checked: publicView,
+                            onChange: (checked) => setPublicViews((current) => ({ ...current, [repoName]: checked })),
+                          }
+                        : undefined
+                    }
                   />
                 )
               ))}

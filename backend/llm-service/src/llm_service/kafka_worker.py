@@ -6,6 +6,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from .algorithmic import algorithmic_grade
 from .context import ContextBuildError, prepare_documentation_context
@@ -13,7 +14,7 @@ from .contracts import InvalidEvent
 from .grade_wire import (REQUEST_TOPIC, RESULT_TOPIC, parse_grade_request,
                          request_uuid_if_valid, build_grade_result, build_grade_failure)
 from .model_response import InvalidModelResponse
-from .s3_store import S3Config, S3Store
+from .s3_store import S3Config, S3Store, _seconds_env
 from .snapshot import SnapshotError
 from . import summary_wire
 from .summary import NoGradeData, generate_summary
@@ -25,6 +26,23 @@ from .yandex_model import (ModelContentFiltered, ModelDeadlineExceeded, ModelInp
 
 LOG = logging.getLogger(__name__)
 DOCUMENTATION_MODES = ("auto", "llm", "algorithmic")
+# The Grade service stops waiting for a Documentation reply after 70 seconds.
+DEFAULT_REQUEST_MAX_AGE = 70.0
+
+
+def request_max_age_from_env() -> float:
+    """LLM_DOCS_REQUEST_MAX_AGE_SECONDS (positive number, default 70): older requests are
+    skipped without a model call. Invalid values fail at startup."""
+    max_age = _seconds_env("LLM_DOCS_REQUEST_MAX_AGE_SECONDS", DEFAULT_REQUEST_MAX_AGE)
+    if not max_age > 0:
+        raise ValueError("LLM_DOCS_REQUEST_MAX_AGE_SECONDS must be positive")
+    return max_age
+
+
+def request_age(request: dict) -> float:
+    """Seconds since the validated requested_at; negative under clock skew."""
+    requested = datetime.fromisoformat(request["requested_at"].replace("Z", "+00:00"))
+    return (datetime.now(timezone.utc) - requested).total_seconds()
 
 
 def _env_first(*keys: str, default: str) -> str:
@@ -152,10 +170,13 @@ def grade_documentation(snapshot, context, model, mode: str, finish=_keep):
         return finish(algorithmic_grade(snapshot, context), False)
 
 
-def process_documentation_request(raw: bytes, store, model, mode: str = "llm") -> dict | None:
-    """Return success or failure; only uncorrelatable input lacks a result.
+def process_documentation_request(raw: bytes, store, model, mode: str = "llm",
+                                  max_age: float | None = None) -> dict | None:
+    """Return success or failure; uncorrelatable and stale input lack a result.
 
     The default ``llm`` keeps model failures visible; the worker reads LLM_DOCS_MODE.
+    A request older than max_age seconds is skipped without reading S3 or calling the
+    model: the Grade service no longer waits for it and would drop any reply.
     """
     try:
         request = parse_grade_request(raw)
@@ -165,6 +186,12 @@ def process_documentation_request(raw: bytes, store, model, mode: str = "llm") -
         if sourcecraft_uuid is None:
             return None
         return build_grade_failure(sourcecraft_uuid, "INVALID_EVENT")
+    if max_age is not None:
+        age = request_age(request)
+        if age > max_age:
+            LOG.warning("Stale Documentation request skipped (%.0fs old, limit %.0fs); "
+                        "sourcecraft_uuid=%s", age, max_age, request["sourcecraft_uuid"])
+            return None
     try:
         snapshot, context = prepare_documentation_context(store, request["s3_prefix"])
         return grade_documentation(
@@ -182,11 +209,12 @@ def process_summary_request(raw: bytes, model) -> dict | None:
     try:
         request = parse_summary_request(raw)
     except InvalidEvent:
-        sourcecraft_uuid, visibility = request_correlation_if_valid(raw)
+        sourcecraft_uuid, visibility, graded_at = request_correlation_if_valid(raw)
         LOG.warning("Invalid summary request; sourcecraft_uuid=%s", sourcecraft_uuid or "unknown")
         if sourcecraft_uuid is None:
             return None
-        return build_summary_failure(sourcecraft_uuid, visibility, "INVALID_EVENT", model.name)
+        return build_summary_failure(sourcecraft_uuid, visibility, "INVALID_EVENT", model.name,
+                                     graded_at)
     try:
         return build_summary_result(request, generate_summary(model, request), model.name)
     except Exception as exc:
@@ -194,7 +222,7 @@ def process_summary_request(raw: bytes, model) -> dict | None:
         LOG.error("Summary generation failed: %s; sourcecraft_uuid=%s", code,
                   request["sourcecraft_uuid"])
         return build_summary_failure(request["sourcecraft_uuid"], request["visibility"], code,
-                                     model.name)
+                                     model.name, request["graded_at"])
 
 
 def publish_terminal(producer, event: dict, *, topic: str = RESULT_TOPIC,
@@ -254,7 +282,8 @@ def _serve(config, request_topic, result_topic, handle, *, consumer=None, produc
             if event is not None:
                 publish_terminal(producer, event, topic=result_topic)
             else:
-                LOG.error("Uncorrelatable request on %s skipped", request_topic)
+                LOG.warning("No result published for request on %s; offset committed",
+                            request_topic)
             committed = consumer.commit(message=message, asynchronous=False)
             if any(partition.error for partition in committed):
                 raise RuntimeError("Kafka did not commit input offset")
@@ -262,10 +291,10 @@ def _serve(config, request_topic, result_topic, handle, *, consumer=None, produc
         consumer.close()
 
 
-def run_worker(config: KafkaConfig, store, model, *, mode: str = "llm", consumer=None,
-               producer=None) -> None:
+def run_worker(config: KafkaConfig, store, model, *, mode: str = "llm",
+               max_age: float | None = None, consumer=None, producer=None) -> None:
     _serve(config, config.request_topic, config.result_topic,
-           lambda raw: process_documentation_request(raw, store, model, mode),
+           lambda raw: process_documentation_request(raw, store, model, mode, max_age),
            consumer=consumer, producer=producer)
 
 
@@ -279,11 +308,12 @@ def run_summary_worker(config: SummaryKafkaConfig, model, *, consumer=None,
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
     mode = documentation_mode()
+    max_age = request_max_age_from_env()
     store = S3Store(S3Config.from_env())
     model = documentation_model(mode)
     LOG.info("Documentation mode: %s", mode)
     try:
-        run_worker(KafkaConfig.from_env(), store, model, mode=mode)
+        run_worker(KafkaConfig.from_env(), store, model, mode=mode, max_age=max_age)
     except KeyboardInterrupt:
         pass
 

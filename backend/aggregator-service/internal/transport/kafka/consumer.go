@@ -17,7 +17,7 @@ type GradeConsumer struct {
 }
 
 type GradeSaver interface {
-	SaveGradingResult(ctx context.Context, grade domain.RepoGrade, visibility string, error string) error
+	SaveGradingResult(ctx context.Context, grade domain.RepoGrade, gradeMode string, error string) error
 }
 
 func NewGradeConsumer(
@@ -82,7 +82,7 @@ func (c *GradeConsumer) handleMessage(
 		GradedAt:    &event.GradedAt,
 	}
 
-	if err := c.service.SaveGradingResult(ctx, grade, event.Visibility, event.Error); err != nil {
+	if err := c.service.SaveGradingResult(ctx, grade, event.GradeMode, event.Error); err != nil {
 		return fmt.Errorf("save grading result: %w", err)
 	}
 

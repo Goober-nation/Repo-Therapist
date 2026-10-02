@@ -1,7 +1,9 @@
 """Deterministic improvement recommendations for the Grade service.
 
-The texts live in config/advice.yaml (LLM_ADVICE_PATH overrides the path) and are
-loaded once at import, so a missing or incomplete catalog stops the service at startup.
+The texts and priorities live in config/advice.yaml (LLM_ADVICE_PATH overrides the path)
+and are loaded once at import, so a missing or incomplete catalog stops the service at
+startup. Every advice item is {code, priority, text}: code is the deduction code, or
+DOC_SECTION_<ID> for a section fallback, or DOC_ALGORITHMIC_NOTICE for the notice.
 """
 
 from __future__ import annotations
@@ -20,8 +22,22 @@ _DEFAULT_PATHS = (Path("config/advice.yaml"),
                   Path(__file__).resolve().parents[2] / "config" / "advice.yaml")
 
 
+PRIORITIES = ("critical", "high", "medium", "low")
+FALLBACK_PRIORITY = "medium"
+NOTICE_PRIORITY = "low"
+NOTICE_CODE = "DOC_ALGORITHMIC_NOTICE"
+
+
 class AdviceConfigError(ValueError):
     pass
+
+
+def fallback_code(group):
+    return f"DOC_SECTION_{group.upper()}"
+
+
+def _item(code, priority, text):
+    return {"code": code, "priority": priority, "text": text}
 
 
 def _text(value, where):
@@ -37,8 +53,8 @@ def advice_path() -> Path:
     return next((path for path in _DEFAULT_PATHS if path.is_file()), _DEFAULT_PATHS[0])
 
 
-def load_advice(path: Path) -> tuple[dict, dict, str]:
-    """Return (recommendations by code, fallbacks by section, algorithmic notice)."""
+def load_advice(path: Path) -> tuple[dict, dict, dict]:
+    """Return advice items: (by deduction code, fallbacks by section, algorithmic notice)."""
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as exc:
@@ -52,8 +68,10 @@ def load_advice(path: Path) -> tuple[dict, dict, str]:
     recommendations = {}
     for index, entry in enumerate(data["recommendations"]):
         where = f"{path}: recommendations[{index}]"
-        if not isinstance(entry, dict) or set(entry) != {"codes", "text"}:
-            raise AdviceConfigError(f"{where}: expected codes and text")
+        if not isinstance(entry, dict) or set(entry) != {"codes", "priority", "text"}:
+            raise AdviceConfigError(f"{where}: expected codes, priority and text")
+        if entry["priority"] not in PRIORITIES:
+            raise AdviceConfigError(f"{where}: priority must be one of {', '.join(PRIORITIES)}")
         codes = entry["codes"]
         if not isinstance(codes, list) or not codes:
             raise AdviceConfigError(f"{where}: codes must be a nonempty list")
@@ -63,21 +81,24 @@ def load_advice(path: Path) -> tuple[dict, dict, str]:
                 raise AdviceConfigError(f"{where}: unknown deduction code {code!r}")
             if code in recommendations:
                 raise AdviceConfigError(f"{where}: duplicate code {code}")
-            recommendations[code] = text
+            recommendations[code] = _item(code, entry["priority"], text)
     missing = sorted(set(RULES) - set(recommendations))
     if missing:
         raise AdviceConfigError(f"{path}: no recommendation for {', '.join(missing)}")
     fallbacks = data["fallbacks"]
     if not isinstance(fallbacks, dict) or set(fallbacks) != set(GROUPS):
         raise AdviceConfigError(f"{path}: fallbacks must cover exactly {', '.join(GROUPS)}")
-    fallbacks = {group: _text(fallbacks[group], f"{path}: fallbacks.{group}") for group in GROUPS}
-    return recommendations, fallbacks, _text(data["algorithmic_notice"],
-                                             f"{path}: algorithmic_notice")
+    fallbacks = {group: _item(fallback_code(group), FALLBACK_PRIORITY,
+                              _text(fallbacks[group], f"{path}: fallbacks.{group}"))
+                 for group in GROUPS}
+    notice = _item(NOTICE_CODE, NOTICE_PRIORITY,
+                   _text(data["algorithmic_notice"], f"{path}: algorithmic_notice"))
+    return recommendations, fallbacks, notice
 
 
 RECOMMENDATIONS, FALLBACKS, ALGORITHMIC_NOTICE = load_advice(advice_path())
 
 
 def render_advice(fact):
-    """Return only an improvement recommendation for the Grade service."""
+    """Return the improvement recommendation item ({code, priority, text}) for a fact."""
     return RECOMMENDATIONS.get(fact['code'], FALLBACKS[fact['subcategory']])

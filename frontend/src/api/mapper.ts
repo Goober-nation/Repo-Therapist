@@ -66,6 +66,8 @@ export function normalizeCategoryScores(payload?: unknown): CategoryScores {
       const displayName = optionalText(details?.name)
       const description = optionalText(details?.description)
       const facts = metricFacts(details?.metrics)
+      const method = details?.method
+      if (method === "llm" || method === "algorithmic") result.method = method
       if (displayName) result.name = displayName
       if (description) result.description = description
       if (facts.length > 0) result.facts = facts
@@ -89,17 +91,25 @@ function gradeScore(grading?: GradingResponse): number | null | undefined {
   return scoreValue(score)
 }
 
+const PRIORITIES: readonly Priority[] = ["critical", "high", "medium", "low"]
+
+function isPriority(value: string | undefined): value is Priority {
+  return PRIORITIES.includes(value as Priority)
+}
+
 function toPriority(value?: string): Priority {
   const normalized = value?.toLowerCase()
-  if (normalized === "critical" || normalized === "high") return "high"
-  return normalized === "low" ? "low" : "medium"
+  return isPriority(normalized) ? normalized : "medium"
 }
 
 function byPriority(left: Recommendation, right: Recommendation) {
   return PRIORITY_RANK[left.priority] - PRIORITY_RANK[right.priority]
 }
 
-/** grade-service advice: "[high] Text" → priority + text. */
+/**
+ * grade-service advice → recommendations. The `priority` field wins; without it the
+ * transitional "[high] Text" tag is used. The tag is always stripped from the text.
+ */
 export function adviceToRecommendations(advice: AdvicePayload[] | null | undefined): Recommendation[] {
   if (!Array.isArray(advice)) return []
   return advice
@@ -107,10 +117,11 @@ export function adviceToRecommendations(advice: AdvicePayload[] | null | undefin
       const text = optionalText(item?.text)
       if (!text) return []
       const [, tag, body] = /^\s*\[(\w+)\]\s*(.*)$/s.exec(text) ?? [, undefined, text]
+      const field = item.priority?.toLowerCase()
       return [
         {
           id: `advice-${index}`,
-          priority: toPriority(tag),
+          priority: isPriority(field) ? field : toPriority(tag),
           title: item.category_id ? categoryLabel(item.category_id) : "Рекомендация",
           description: body.trim(),
           ...(item.category_id ? { category: item.category_id } : {}),
@@ -236,6 +247,7 @@ export function aiReportFromResponse(response: RecommendationsResponse): AiRepor
   return {
     status: response.status,
     summary: optionalText(response.raw_response?.summary)?.trim(),
+    modelUsed: optionalText(response.model_used)?.trim() || undefined,
     recommendations: recommendationsFromResponse(response),
   }
 }

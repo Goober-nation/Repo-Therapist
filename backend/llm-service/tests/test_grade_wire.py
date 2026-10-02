@@ -37,17 +37,19 @@ class GradeWireTests(unittest.TestCase):
         self.assertEqual(event["subgrades"]["purpose"], 93)
         self.assertNotIn("required_files", event["subgrades"])
         self.assertTrue(all(type(v) is int for v in event["subgrades"].values()))
-        self.assertIsInstance(event["advice"][0], str)
-        self.assertEqual(event["advice"], [
-            "Уточните, какую задачу решает проект, для чего его используют и какой результат он даёт."])
-        self.assertNotIn("README.md", event["advice"][0])
-        self.assertNotIn("summary", event["advice"][0])
+        self.assertEqual(event["advice"], [{
+            "code": "DOC_PURPOSE_UNCLEAR", "priority": "high",
+            "text": "Уточните, какую задачу решает проект, для чего его используют и какой результат он даёт."}])
+        self.assertNotIn("README.md", event["advice"][0]["text"])
+        self.assertNotIn("summary", event["advice"][0]["text"])
+        self.assertEqual(event["method"], "llm")
         self.assertIsNotNone(datetime.fromisoformat(event["evaluated_at"].replace("Z", "+00:00")).tzinfo)
 
     def test_failure_contract_has_no_fake_score(self):
         event = build_grade_failure(REPOSITORY, "CONTENT_FILTER")
         self.assertEqual(set(event), {"sourcecraft_uuid", "grade", "subgrades", "advice",
-                                      "error", "evaluated_at"})
+                                      "method", "error", "evaluated_at"})
+        self.assertIsNone(event["method"])
         self.assertEqual(event["error"], "CONTENT_FILTER")
         self.assertIsNone(event["grade"])
         self.assertEqual(event["subgrades"], {})

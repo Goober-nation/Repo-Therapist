@@ -105,7 +105,7 @@ go build ./... && go test ./... && go vet ./...
 Рекомендации формируются в два этапа:
 
 1. **Правила.** Каждая метрика ниже здорового порога даёт рекомендацию из
-   [config/recommendations.yaml](https://sourcecraft.dev/lct-hackaton-2026/case-18-repo-health-score-team-95/browse/config/recommendations.yaml) с приоритетом `high`/`medium`/`low`.
+   [config/recommendations.yaml](https://sourcecraft.dev/lct-hackaton-2026/case-18-repo-health-score-team-95/browse/config/recommendations.yaml) с приоритетом `critical`/`high`/`medium`/`low`.
    Рекомендации по документации формируются детерминированно на основе вычетов, на русском языке.
 2. **AI.** LLM-сервис получает итоговую оценку, оценки категорий и рекомендации из шага 1 и
    формирует summary, сильные и слабые стороны и список рекомендаций с приоритетом

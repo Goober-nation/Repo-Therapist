@@ -1,6 +1,6 @@
 export type GradeStatus = "PENDING" | "FINISHED" | "NO_DATA"
 
-export type Priority = "high" | "medium" | "low"
+export type Priority = "critical" | "high" | "medium" | "low"
 
 /**
  * A measured input behind a category score. `value` is the raw measurement and `score` the
@@ -12,12 +12,17 @@ export interface MetricFact {
   score: number | null
 }
 
+/** How the Documentation grade was computed (repo.docs.graded `method`). */
+export type GradeMethod = "llm" | "algorithmic"
+
 export interface MetricResult {
   score: number | null
   trend: number | null
   name?: string
   description?: string
   facts?: MetricFact[]
+  /** Set only for Documentation; "algorithmic" is the simplified grade. */
+  method?: GradeMethod
 }
 
 export type CategoryScores = Record<string, MetricResult>
@@ -63,6 +68,8 @@ export interface RepositorySummary {
 export interface AiReport {
   status?: GradeStatus
   summary?: string
+  /** LLM that produced the summary (`model_used`). */
+  modelUsed?: string
   recommendations: Recommendation[]
 }
 

@@ -101,6 +101,9 @@ type RepoLLMResponse struct {
 	RawResponse     json.RawMessage
 	ModelUsed       string
 	EvaluatedAt     *time.Time
+	// GradedAt is graded_at of the grade the response describes; nil for rows stored before
+	// it was recorded.
+	GradedAt *time.Time
 }
 type RepoLLMResponsePublic struct {
 	SourcecraftUUID uuid.UUID `db:"sourcecraft_uuid"`
@@ -110,6 +113,8 @@ type RepoLLMResponsePublic struct {
 	ModelUsed string `db:"model_used"`
 
 	EvaluatedAt *time.Time `db:"evaluated_at"`
+
+	GradedAt *time.Time `db:"graded_at"`
 }
 
 type RepoLLMResponsePrivate struct {
@@ -120,4 +125,6 @@ type RepoLLMResponsePrivate struct {
 	ModelUsed string `db:"model_used"`
 
 	EvaluatedAt *time.Time `db:"evaluated_at"`
+
+	GradedAt *time.Time `db:"graded_at"`
 }

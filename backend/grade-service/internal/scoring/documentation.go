@@ -25,5 +25,18 @@ func ComputeDocumentation(reply *contracts.DocsGraded) CategoryResult {
 		v := reply.Subgrades[id]
 		metrics = append(metrics, MetricResult{ID: id, RawValue: float64(v), Score: float64(v) / 100, Weight: 1 / float64(len(ids))})
 	}
-	return CategoryResult{ID: "documentation", Score: float64(*reply.Grade), Metrics: metrics}
+	return CategoryResult{ID: "documentation", Score: float64(*reply.Grade), Metrics: metrics, Method: docsMethod(reply.Method)}
+}
+
+// docsMethod keeps a known method and drops anything else (absent, null, unknown), so the
+// frontend never shows a label for a value it doesn't understand.
+func docsMethod(method *string) string {
+	if method == nil {
+		return ""
+	}
+	switch *method {
+	case contracts.DocsMethodLLM, contracts.DocsMethodAlgorithmic:
+		return *method
+	}
+	return ""
 }

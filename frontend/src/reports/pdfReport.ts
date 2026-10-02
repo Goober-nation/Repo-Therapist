@@ -167,7 +167,7 @@ export function buildPdfDocument(
           { text: `${String(index + 1).padStart(2, "0")}   ${item.title}`, style: "cardTitle" },
           {
             text: item.priority,
-            color: item.priority === "Высокий приоритет" ? colors.critical : colors.muted,
+            color: item.priority === "Критический приоритет" || item.priority === "Высокий приоритет" ? colors.critical : colors.muted,
             fontSize: 9,
             margin: [0, 3, 0, 4],
           },
