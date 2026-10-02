@@ -12,7 +12,7 @@ from .algorithmic import algorithmic_grade
 from .context import ContextBuildError, prepare_documentation_context
 from .contracts import InvalidEvent
 from .grade_wire import (REQUEST_TOPIC, RESULT_TOPIC, parse_grade_request,
-                         request_uuid_if_valid, build_grade_result, build_grade_failure)
+                         docs_request_correlation_if_valid, build_grade_result, build_grade_failure)
 from .model_response import InvalidModelResponse
 from .s3_store import S3Config, S3Store, _seconds_env
 from .snapshot import SnapshotError
@@ -181,11 +181,12 @@ def process_documentation_request(raw: bytes, store, model, mode: str = "llm",
     try:
         request = parse_grade_request(raw)
     except InvalidEvent:
-        sourcecraft_uuid = request_uuid_if_valid(raw)
-        LOG.warning("Invalid Documentation request; sourcecraft_uuid=%s", sourcecraft_uuid or "unknown")
-        if sourcecraft_uuid is None:
+        correlation = docs_request_correlation_if_valid(raw)
+        LOG.warning("Invalid Documentation request; sourcecraft_uuid=%s",
+                    correlation[0] if correlation else "unknown")
+        if correlation is None:
             return None
-        return build_grade_failure(sourcecraft_uuid, "INVALID_EVENT")
+        return build_grade_failure(*correlation, "INVALID_EVENT")
     if max_age is not None:
         age = request_age(request)
         if age > max_age:
@@ -201,7 +202,7 @@ def process_documentation_request(raw: bytes, store, model, mode: str = "llm",
         code, _, _ = _failure(exc)
         LOG.error("Documentation analysis failed: %s; sourcecraft_uuid=%s", code,
                   request["sourcecraft_uuid"])
-        return build_grade_failure(request["sourcecraft_uuid"], code)
+        return build_grade_failure(request["sourcecraft_uuid"], request["job_id"], code)
 
 
 def process_summary_request(raw: bytes, model) -> dict | None:

@@ -11,11 +11,11 @@ func TestWithRepoDataCleanupRunsAfterPublishedResult(t *testing.T) {
 	handler := withRepoDataCleanup(func(repoID string) { cleaned = append(cleaned, repoID) },
 		func(context.Context, []byte) error { return nil })
 
-	if err := handler(context.Background(), []byte(`{"sourcecraft_uuid":"u1","status":"failed"}`)); err != nil {
+	if err := handler(context.Background(), []byte(`{"sourcecraft_uuid":"u1","s3_prefix":"repos/u1/j1","status":"failed"}`)); err != nil {
 		t.Fatalf("handler error = %v", err)
 	}
-	if len(cleaned) != 1 || cleaned[0] != "u1" {
-		t.Errorf("cleaned = %v; want [u1]", cleaned)
+	if len(cleaned) != 1 || cleaned[0] != "repos/u1/j1" {
+		t.Errorf("cleaned = %v; want [repos/u1/j1]", cleaned)
 	}
 }
 
@@ -25,7 +25,7 @@ func TestWithRepoDataCleanupKeepsDataOnHandlerError(t *testing.T) {
 	handler := withRepoDataCleanup(func(string) { cleaned++ },
 		func(context.Context, []byte) error { return wantErr })
 
-	if err := handler(context.Background(), []byte(`{"sourcecraft_uuid":"u1"}`)); !errors.Is(err, wantErr) {
+	if err := handler(context.Background(), []byte(`{"sourcecraft_uuid":"u1","s3_prefix":"repos/u1/j1"}`)); !errors.Is(err, wantErr) {
 		t.Fatalf("handler error = %v; want %v", err, wantErr)
 	}
 	if cleaned != 0 {
@@ -33,12 +33,12 @@ func TestWithRepoDataCleanupKeepsDataOnHandlerError(t *testing.T) {
 	}
 }
 
-func TestWithRepoDataCleanupSkipsMessagesWithoutUUID(t *testing.T) {
+func TestWithRepoDataCleanupSkipsMessagesWithoutPrefix(t *testing.T) {
 	cleaned := 0
 	handler := withRepoDataCleanup(func(string) { cleaned++ },
 		func(context.Context, []byte) error { return nil })
 
-	for _, value := range []string{`not json`, `{"org_slug":"o","repo_slug":"r"}`} {
+	for _, value := range []string{`not json`, `{"org_slug":"o","repo_slug":"r","sourcecraft_uuid":"u1"}`} {
 		if err := handler(context.Background(), []byte(value)); err != nil {
 			t.Fatalf("handler(%q) error = %v", value, err)
 		}
@@ -54,7 +54,7 @@ func TestRepoDataCleanupDisabledByKeep(t *testing.T) {
 	if repoDataCleanup(true, del) != nil {
 		t.Fatal("repoDataCleanup(keep=true) != nil")
 	}
-	repoDataCleanup(false, del)("u1")
+	repoDataCleanup(false, del)("repos/u1/j1")
 	if calls != 1 {
 		t.Errorf("delete calls = %d; want 1", calls)
 	}

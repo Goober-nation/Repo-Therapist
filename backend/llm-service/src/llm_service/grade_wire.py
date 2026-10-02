@@ -19,8 +19,9 @@ def parse_grade_request(raw):
                              parse_constant=_reject_constant)
     except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
         raise InvalidEvent('invalid request JSON') from exc
-    if not isinstance(request, dict) or set(request) != {'sourcecraft_uuid', 's3_prefix', 'requested_at'}:
-        raise InvalidEvent('expected sourcecraft_uuid, s3_prefix, requested_at')
+    if not isinstance(request, dict) or set(request) != {'job_id', 'sourcecraft_uuid', 's3_prefix', 'requested_at'}:
+        raise InvalidEvent('expected job_id, sourcecraft_uuid, s3_prefix, requested_at')
+    _uuid(request['job_id'])
     _uuid(request['sourcecraft_uuid'])
     prefix = request['s3_prefix']
     if (not isinstance(prefix, str) or not prefix or '\\' in prefix or
@@ -39,18 +40,24 @@ def parse_grade_request(raw):
     return request
 
 
-def request_uuid_if_valid(raw):
-    """Recover correlation from an invalid request without trusting other fields."""
+def docs_request_correlation_if_valid(raw):
+    """Recover (sourcecraft_uuid, job_id) from an invalid request without trusting other fields.
+
+    The Grade service waits on job_id, so a request without a valid one is uncorrelatable.
+    """
     if not isinstance(raw, bytes) or len(raw) > 524_288:
         return None
     try:
         body = json.loads(raw.decode('utf-8'), object_pairs_hook=_unique_pairs,
                           parse_constant=_reject_constant)
-        value = body.get('sourcecraft_uuid') if isinstance(body, dict) else None
-        _uuid(value)
+        if not isinstance(body, dict):
+            return None
+        sourcecraft_uuid, job_id = body.get('sourcecraft_uuid'), body.get('job_id')
+        _uuid(sourcecraft_uuid)
+        _uuid(job_id)
     except (UnicodeDecodeError, json.JSONDecodeError, InvalidEvent, RecursionError):
         return None
-    return value
+    return sourcecraft_uuid, job_id
 
 
 def _advice(payload, reduced_groups, *, fallbacks=True):
@@ -81,6 +88,7 @@ def build_grade_result(request, payload, *, llm_used=True):
     def integer(value):
         return int(Decimal(str(value)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
     return {
+        "job_id": request["job_id"],
         "sourcecraft_uuid": request["sourcecraft_uuid"],
         "grade": integer(payload["grade"]),
         "subgrades": {item["id"]: integer(item["grade"])
@@ -93,11 +101,13 @@ def build_grade_result(request, payload, *, llm_used=True):
     }
 
 
-def build_grade_failure(sourcecraft_uuid, error_code):
+def build_grade_failure(sourcecraft_uuid, job_id, error_code):
     _uuid(sourcecraft_uuid)
+    _uuid(job_id)
     if not isinstance(error_code, str) or not error_code or not re.fullmatch(r'[A-Z][A-Z0-9_]*', error_code):
         raise ValueError('error code must be a nonempty uppercase identifier')
     return {
+        "job_id": job_id,
         "sourcecraft_uuid": sourcecraft_uuid,
         "grade": None,
         "subgrades": {},

@@ -15,6 +15,7 @@ import (
 	"repo-therapist/repository-service/internal/contracts"
 	kafkaclient "repo-therapist/repository-service/internal/kafka"
 	"repo-therapist/repository-service/internal/service"
+	"repo-therapist/repository-service/internal/tokenstore"
 )
 
 // RunListen consumes repo.grade.requested and publishes repo.ready for each one — a thin loop
@@ -33,6 +34,15 @@ func RunListen() error {
 		return fmt.Errorf("provisioning topics: %w", err)
 	}
 
+	tokens := tokenstore.NewFromEnv()
+	defer tokens.Close()
+	pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	err = tokens.Ping(pingCtx)
+	cancel()
+	if err != nil {
+		return fmt.Errorf("connecting to redis: %w", err)
+	}
+
 	consumer := kafkaclient.NewConsumer(brokers, contracts.TopicGradeRequested, "repository-service")
 	defer consumer.Close()
 	producer := kafkaclient.NewProducer(brokers, contracts.TopicRepoReady)
@@ -47,7 +57,7 @@ func RunListen() error {
 		}
 
 		log.Printf("received grade request for %s/%s", req.OrgSlug, req.RepoSlug)
-		ready := handleRequest(ctx, req)
+		ready := handleRequest(ctx, tokens, req)
 		// A clone cut short by shutdown still reports its failure downstream.
 		publishCtx, cancel := detachedOnShutdown(ctx)
 		defer cancel()
@@ -62,14 +72,22 @@ func RunListen() error {
 // handleRequest runs service.CloneAndUpload and turns either outcome into a RepoReady message —
 // clone failures are reported via status="failed", not swallowed or left for the consumer to
 // guess at.
-func handleRequest(ctx context.Context, req contracts.GradeRequested) contracts.RepoReady {
+//
+// The user PAT of a private job is read from tokens by job id; a Redis error fails the job
+// rather than silently falling back to the service PAT.
+func handleRequest(ctx context.Context, tokens tokenstore.Getter, req contracts.GradeRequested) contracts.RepoReady {
 	cloneCtx, cancel := context.WithTimeout(ctx, service.CloneTimeout())
 	defer cancel()
 
-	res, err := cloneAndUpload(cloneCtx, req.OrgSlug, req.RepoSlug, req.Token)
+	var res *service.Result
+	token, err := tokens.GetToken(cloneCtx, req.JobID)
+	if err == nil {
+		res, err = cloneAndUpload(cloneCtx, req.OrgSlug, req.RepoSlug, req.JobID, token)
+	}
 	if err != nil {
 		log.Printf("clone/upload failed for %s/%s: %v", req.OrgSlug, req.RepoSlug, err)
 		failed := contracts.RepoReady{
+			JobID:    req.JobID,
 			OrgSlug:  req.OrgSlug,
 			RepoSlug: req.RepoSlug,
 			Status:   contracts.StatusFailed,
@@ -82,6 +100,7 @@ func handleRequest(ctx context.Context, req contracts.GradeRequested) contracts.
 		return failed
 	}
 	return contracts.RepoReady{
+		JobID:           req.JobID,
 		OrgSlug:         req.OrgSlug,
 		RepoSlug:        req.RepoSlug,
 		SourcecraftUUID: res.SourcecraftUUID,

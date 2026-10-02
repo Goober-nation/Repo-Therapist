@@ -10,6 +10,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"strings"
 	"time"
 
 	"repo-therapist/grade-service/internal/appsecwrapper"
@@ -52,14 +53,19 @@ func CategoryIDs(visibility string) []string {
 // Grade does the actual work: pull this repo's S3 exports, compute every category's score.
 // token is the user's SourceCraft PAT for private grading; empty uses the service PAT. Public
 // grading skips the private-only categories entirely (no AppSec call, no CI/CD read).
-func Grade(ctx context.Context, repoID string, cfg *config.Config, token, visibility string) (*GradeOutput, error) {
+// prefix is the job's S3 export (repo.ready s3_prefix, no trailing slash). tokenDone, when not
+// nil, is called once the token is no longer needed — right after the Security call, or before
+// reading S3 when there is none.
+func Grade(ctx context.Context, repoID, prefix string, cfg *config.Config, token, visibility string, tokenDone func()) (*GradeOutput, error) {
+	if tokenDone == nil {
+		tokenDone = func() {}
+	}
 	private := visibility == contracts.VisibilityPrivate
 	s3Client, err := newS3Client(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to S3: %w", err)
 	}
 
-	prefix := "repos/" + repoID
 	inputs := scoring.ActivityInputs{}
 
 	if data, err := s3Client.GetObject(ctx, prefix+"/_meta/commits.json"); err != nil {
@@ -109,6 +115,7 @@ func Grade(ctx context.Context, repoID string, cfg *config.Config, token, visibi
 	if securityCfg, ok := cfg.Categories["security"]; private && ok && securityCfg.Status == config.StatusCalculated {
 		securityResult = gradeSecurity(ctx, repoID, token)
 	}
+	tokenDone()
 
 	codeHealthInputs := scoring.CodeHealthInputs{}
 	if data, err := s3Client.GetObject(ctx, prefix+"/_meta/todo-markers.json"); err != nil {
@@ -177,14 +184,17 @@ func newS3Client(ctx context.Context) (*storage.Client, error) {
 	})
 }
 
-// DeleteRepoData removes the repo's whole S3 export (repos/<repoID>/) once nothing reads it any
-// more, and returns how many objects were removed.
-func DeleteRepoData(ctx context.Context, repoID string) (int, error) {
+// DeleteRepoData removes one job's S3 export (prefix, e.g. repos/<uuid>/<job_id>) once nothing
+// reads it any more, and returns how many objects were removed.
+func DeleteRepoData(ctx context.Context, prefix string) (int, error) {
+	if !strings.HasPrefix(prefix, "repos/") || strings.Count(strings.Trim(prefix, "/"), "/") < 1 {
+		return 0, fmt.Errorf("refusing to delete unexpected S3 prefix %q", prefix)
+	}
 	s3Client, err := newS3Client(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("connecting to S3: %w", err)
 	}
-	return s3Client.DeletePrefix(ctx, "repos/"+repoID+"/")
+	return s3Client.DeletePrefix(ctx, strings.TrimSuffix(prefix, "/")+"/")
 }
 
 // BuildGradingResult turns a GradeOutput into the Aggregator-facing contracts.GradingResultEvent

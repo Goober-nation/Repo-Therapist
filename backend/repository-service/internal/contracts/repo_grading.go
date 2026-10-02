@@ -31,13 +31,13 @@ var AllTopics = []string{TopicGradeRequested, TopicRepoReady}
 
 // GradeRequested is published to ask Repository service to clone+upload a repo. Consumed by
 // Repository service, produced by grade-service relaying grading.requests.
+// JobID is the Aggregator's grading job id; a private job's user PAT is read from Redis under
+// it (tokenstore.Key). No stored token means the service PAT.
 type GradeRequested struct {
+	JobID       string    `json:"job_id"`
 	OrgSlug     string    `json:"org_slug"`
 	RepoSlug    string    `json:"repo_slug"`
 	RequestedAt time.Time `json:"requested_at"`
-	// Token is the user's SourceCraft PAT for private grading; empty means use the service PAT.
-	// Never log it.
-	Token string `json:"token,omitempty"`
 }
 
 // ReadyStatus values for RepoReady.Status.
@@ -50,7 +50,9 @@ const (
 // by Grade service, which pulls from S3 and scores on StatusReady, reports a failure on
 // StatusFailed. SourcecraftUUID is set on a failure once the repo id was resolved; without it the
 // failure cannot reach the Aggregator.
+// JobID echoes GradeRequested.JobID.
 type RepoReady struct {
+	JobID           string `json:"job_id"`
 	OrgSlug         string `json:"org_slug"`
 	RepoSlug        string `json:"repo_slug"`
 	SourcecraftUUID string `json:"sourcecraft_uuid,omitempty"`

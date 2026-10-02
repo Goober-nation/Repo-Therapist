@@ -14,6 +14,14 @@ type Config struct {
 	SourceCraftWrapper WrapperConfig
 	Grading            GradingConfig
 	Token              ServiceToken
+	Redis              RedisConfig
+}
+
+// RedisConfig uses the same env names as gateway-service.
+type RedisConfig struct {
+	Address  string
+	Password string
+	DB       int
 }
 type ServiceToken struct {
 	Token string
@@ -87,6 +95,11 @@ type GradingConfig struct {
 
 func LoadConfig() *Config {
 	return &Config{
+		Redis: RedisConfig{
+			Address:  getEnvDefault("REDIS_ADDRESS", "localhost:6379"),
+			Password: getEnvDefault("REDIS_PASSWORD", ""),
+			DB:       getEnvInt("REDIS_DB", 0),
+		},
 		Token: ServiceToken{
 			Token: getEnvDefault(
 				"SERVICE_TOKEN",

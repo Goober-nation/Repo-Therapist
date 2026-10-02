@@ -11,6 +11,16 @@ import (
 	"repo-therapist/grade-service/internal/scoring"
 )
 
+// DeleteRepoData only ever deletes one job's export, never the whole bucket or every job of a repo
+// via an empty or malformed prefix.
+func TestDeleteRepoDataRefusesUnexpectedPrefix(t *testing.T) {
+	for _, prefix := range []string{"", "/", "repos/", "repos", "other/u1/j1"} {
+		if _, err := DeleteRepoData(t.Context(), prefix); err == nil || !strings.Contains(err.Error(), "refusing") {
+			t.Errorf("DeleteRepoData(%q) err = %v, want refusal", prefix, err)
+		}
+	}
+}
+
 // TestBuildGradingResult_RoundsNotTruncates is the regression test for the real bug found
 // reviewing a live pipeline run (2026-09-25): int16(x) truncates rather than rounds, silently
 // biasing every headline score down by up to a full point.

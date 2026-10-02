@@ -38,7 +38,10 @@ type Result struct {
 // loop (via transport.handleRequest). token is the caller's SourceCraft PAT; empty falls back to
 // the service's own SOURCECRAFT_PAT. A failure after the repo id is resolved still returns a
 // Result carrying SourcecraftUUID, so the failure can be correlated downstream.
-func CloneAndUpload(ctx context.Context, org, repo, token string) (res *Result, err error) {
+//
+// jobID scopes the S3 export to repos/<uuid>/<jobID>, so overlapping runs of one repo never
+// share or delete each other's files; empty (one-shot CLI) keeps the legacy repos/<uuid>.
+func CloneAndUpload(ctx context.Context, org, repo, jobID, token string) (res *Result, err error) {
 	var knownID string
 	defer func() {
 		if err != nil && knownID != "" {
@@ -112,7 +115,7 @@ func CloneAndUpload(ctx context.Context, org, repo, token string) (res *Result, 
 		return nil, fmt.Errorf("connecting to S3: %w", err)
 	}
 
-	keyPrefix := "repos/" + repoID
+	keyPrefix := S3Prefix(repoID, jobID)
 	// A previous export may still be there (Grade kept or failed to delete it); clear it so files
 	// removed from the repo since then aren't graded again.
 	if n, err := s3Client.DeletePrefix(ctx, keyPrefix+"/"); err != nil {
@@ -197,6 +200,14 @@ func CloneAndUpload(ctx context.Context, org, repo, token string) (res *Result, 
 		MilestoneCount:  len(milestones),
 		TodoMarkerCount: len(todoExport.Markers),
 	}, nil
+}
+
+// S3Prefix is a job's export prefix (no trailing slash).
+func S3Prefix(repoID, jobID string) string {
+	if jobID == "" {
+		return "repos/" + repoID
+	}
+	return "repos/" + repoID + "/" + jobID
 }
 
 func resolvePAT(token string) (string, error) {

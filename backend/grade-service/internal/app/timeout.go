@@ -12,7 +12,7 @@ import (
 // alongside and fits inside it.
 const DefaultGradeTimeout = 4 * time.Minute
 
-// DefaultJobTTL bounds how long a user token can sit in memory if repo.ready never arrives.
+// DefaultJobTTL bounds how long a job's grading mode is remembered if repo.ready never arrives.
 const DefaultJobTTL = 30 * time.Minute
 
 // GradeTimeout returns GRADE_TIMEOUT (a Go duration, e.g. "6m") or DefaultGradeTimeout when it is

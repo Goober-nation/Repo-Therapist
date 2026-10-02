@@ -41,7 +41,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'echo; echo interrupted; exit 130' INT TERM
 
-(cd "$ROOT" && docker compose up -d postgres kafka minio migrate) || exit 1
+(cd "$ROOT" && docker compose up -d postgres kafka minio redis migrate) || exit 1
 
 echo "building..."
 (cd "$ROOT/backend/sourcecraft-wrapper-service" && go build -o "$BIN/sc-wrapper" ./cmd) &&

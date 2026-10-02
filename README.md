@@ -56,6 +56,8 @@ docker compose up -d        # Postgres, S3 (RustFS), Redis, Kafka, миграц�
 - Фронтенд: http://localhost:8081 (рейтинг — `/`, анализ — `/repo/<org>/<repo>`,
   собственные репозитории — `/my`). Подробнее: [frontend/README.md](frontend/README.md).
 - Консоль S3 (RustFS): http://localhost:8055/rustfs/console/index.html
+- Redis (`8052`) и Kafka (`8053`) опубликованы только на `127.0.0.1` — для сервисов, запущенных на
+  хосте, и отладки; Redis требует пароль `REDIS_PASSWORD` из `.env`.
 
 Все настройки описаны в комментариях в [.env.example](.env.example).
 Ручное сквозное тестирование: [docs/testing.md](docs/testing.md).

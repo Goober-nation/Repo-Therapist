@@ -14,13 +14,19 @@ const (
 )
 
 // GradingRequestedEvent is grading.requests (docs/kafka-contracts.md). Visibility is the repo's
-// SourceCraft visibility; Token is the caller's PAT and is set only for private grading.
+// SourceCraft visibility. JobID identifies this grading run end to end; for private grading the
+// caller's PAT is stored in Redis under GradingTokenKey(JobID), never in the message itself.
 type GradingRequestedEvent struct {
+	JobID       string    `json:"job_id"`
 	OrgSlug     string    `json:"org_slug"`
 	RepoSlug    string    `json:"repo_slug"`
 	Visibility  string    `json:"visibility"`
 	RequestedAt time.Time `json:"requested_at"`
-	Token       string    `json:"token,omitempty"`
+}
+
+// GradingTokenKey is the Redis key holding a private grading's user PAT (docs/kafka-contracts.md).
+func GradingTokenKey(jobID string) string {
+	return "grading:token:" + jobID
 }
 
 type LLMRecommendationsRequestedEvent struct {

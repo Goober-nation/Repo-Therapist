@@ -15,11 +15,12 @@ from llm_service.yandex_model import (ModelContentFiltered, ModelDeadlineExceede
 ANALYSIS = "018f47d1-e33b-7af3-a642-229ac22a9e82"
 REPOSITORY = "019b2102-fa21-7ab7-8ce1-116af406fb5e"
 EVENT = "018f47d2-6d5a-7b72-82fd-1e9834d57a91"
+JOB = "0f6c2b8e-3d4a-4b7e-9c1d-5a2e8f9b7c31"
 
 
 def request(prefix=None, requested_at="2026-09-21T10:15:30Z"):
-    return json.dumps({"sourcecraft_uuid": REPOSITORY,
-                       "s3_prefix": prefix or f"repos/{REPOSITORY}",
+    return json.dumps({"job_id": JOB, "sourcecraft_uuid": REPOSITORY,
+                       "s3_prefix": prefix or f"repos/{REPOSITORY}/{JOB}",
                        "requested_at": requested_at}).encode()
 
 
@@ -142,7 +143,7 @@ class KafkaWorkerTests(unittest.TestCase):
     def test_success_result_has_exact_flat_fields(self):
         model = FakeModel()
         event = process_documentation_request(request(), FakeStore(), model)
-        self.assertEqual(set(event), {"sourcecraft_uuid", "grade", "subgrades", "advice", "method", "error", "evaluated_at"})
+        self.assertEqual(set(event), {"job_id", "sourcecraft_uuid", "grade", "subgrades", "advice", "method", "error", "evaluated_at"})
         self.assertEqual(event["sourcecraft_uuid"], REPOSITORY)
         self.assertEqual(event["subgrades"], {group: 95 for group in GROUPS})
         # Every section is reduced without facts, so each gets its fallback once.

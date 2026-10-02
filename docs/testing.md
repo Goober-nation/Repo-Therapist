@@ -32,8 +32,9 @@ docker run --rm --network <compose-project>_default \
   amazon/aws-cli --endpoint-url http://minio:9000 s3 ls --recursive s3://repo-content/repos/<sourcecraft_uuid>/
 ```
 
-В полном стеке Grade service удаляет `repos/<uuid>/` после публикации результата оценки,
-а Repository service очищает его перед каждой загрузкой. Чтобы сохранить выгрузки для
+Разовый запуск пишет в `repos/<uuid>/`. В полном стеке выгрузка каждого задания лежит в
+`repos/<uuid>/<job_id>/`: Grade service удаляет этот префикс после публикации результата оценки,
+а Repository service очищает его перед загрузкой. Чтобы сохранить выгрузки для
 проверки, задайте `S3_KEEP_REPO_DATA=true`.
 
 (`<compose-project>` — имя проекта docker-compose, обычно имя каталога; если не уверены,
@@ -59,12 +60,18 @@ go run ./backend/repository-service/cmd/repository-service --listen
 go run ./backend/grade-service/cmd/grade-service --listen
 ```
 
+Оба сервиса подключаются к Redis (`REDIS_ADDRESS`/`REDIS_PASSWORD` из `.env`; Redis и Kafka
+в compose доступны только с этой машины: `127.0.0.1:8052` и `127.0.0.1:8053`).
+
 Затем запустите оценку из третьего терминала. Команда публикует `grading.requests` точно так же,
 как Aggregator, и печатает сообщение `grading.results` для этого репозитория:
 
 ```bash
 go run ./backend/grade-service/cmd/grading-request --org=examples --repo=vulnerable-repo
 ```
+
+С `--visibility=private` команда, как Aggregator, кладёт `SOURCECRAFT_PAT` в Redis под ключом
+`grading:token:<job_id>` (TTL 20 минут), а в Kafka отправляет только `job_id`.
 
 `grading.results` содержит только UUID репозитория, поэтому `grading-request` сначала ждёт
 сообщение `repo.ready` для этой организации/репозитория (в нём есть UUID), а затем результат с

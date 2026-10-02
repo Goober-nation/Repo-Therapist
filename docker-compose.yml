@@ -26,13 +26,18 @@ services:
     volumes:
       - s3data:/data
 
-  # Gateway sessions and rate limiting.
+  # Gateway sessions and rate limiting; private grading tokens (grading:token:<job_id>).
   redis:
     image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set in .env}"]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
+    # Loopback only: host-run services and the manual grading-request tool still reach it,
+    # other machines do not.
     ports:
-      - "8052:6379"
+      - "127.0.0.1:8052:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
       interval: 5s
       retries: 10
 
@@ -43,7 +48,7 @@ services:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
-      # INTERNAL for containers (kafka:29092), EXTERNAL for the host (localhost:8053).
+      # INTERNAL for containers (kafka:29092), EXTERNAL for the host only (localhost:8053).
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
       KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:8053
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
@@ -53,8 +58,9 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       # Default heap is 1G; a single dev broker with small messages needs far less.
       KAFKA_HEAP_OPTS: "-Xmx256m -Xms256m"
+    # Loopback only: plaintext, unauthenticated listener for host-run services and debugging.
     ports:
-      - "8053:9092"
+      - "127.0.0.1:8053:9092"
     volumes:
       # The apache/kafka image's log.dirs; anything else leaves data on an anonymous volume lost on recreate.
       - kafkadata:/var/lib/kafka/data
@@ -91,6 +97,7 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
       REDIS_ADDRESS: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set in .env}
       AGGREGATOR_GRPC_ADDRESS: localhost:8083
       RATING_GRPC_ADDRESS: localhost:8086
       # Gateway requests per client IP per minute (code default 10 is too low for the SPA's polling).

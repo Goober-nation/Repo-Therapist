@@ -37,7 +37,7 @@ func main() {
 	case *org != "" && *repo != "":
 		ctx, cancel := context.WithTimeout(context.Background(), service.CloneTimeout())
 		defer cancel()
-		result, err := service.CloneAndUpload(ctx, *org, *repo, "")
+		result, err := service.CloneAndUpload(ctx, *org, *repo, "", "")
 		if err != nil {
 			log.Fatalf("repository-service: %v", err)
 		}

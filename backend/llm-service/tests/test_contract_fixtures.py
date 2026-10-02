@@ -24,13 +24,14 @@ def without_time(event):
 
 class ContractFixtureTests(unittest.TestCase):
     def test_docs_request_fixture_parses(self):
-        expected = load("repo.docs.grade.requested.json")["sourcecraft_uuid"]
-        self.assertEqual(parse_grade_request(raw("repo.docs.grade.requested.json"))["sourcecraft_uuid"],
-                         expected)
+        fixture = load("repo.docs.grade.requested.json")
+        parsed = parse_grade_request(raw("repo.docs.grade.requested.json"))
+        self.assertEqual(parsed["sourcecraft_uuid"], fixture["sourcecraft_uuid"])
+        self.assertEqual(parsed["job_id"], fixture["job_id"])
 
     def test_docs_result_fixtures_match_builder_shape(self):
         failure = load("repo.docs.graded.failure.json")
-        built = build_grade_failure(failure["sourcecraft_uuid"], failure["error"])
+        built = build_grade_failure(failure["sourcecraft_uuid"], failure["job_id"], failure["error"])
         self.assertEqual(without_time(built), without_time(failure))
         self.assertEqual(set(load("repo.docs.graded.success.json")), set(built))
 

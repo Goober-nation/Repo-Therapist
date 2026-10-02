@@ -11,8 +11,8 @@ import (
 	kafkaclient "repo-therapist/grade-service/internal/kafka"
 )
 
-// docsWaiters hands repo.docs.graded replies to the repo.ready handler waiting on that
-// sourcecraft_uuid. A reply nobody is waiting for (late, after the timeout; or a duplicate —
+// docsWaiters hands repo.docs.graded replies to the repo.ready handler waiting on that job_id,
+// so overlapping runs of one repo never take each other's reply. A reply nobody is waiting for (late, after the timeout; or a duplicate —
 // the LLM service delivers at least once) is dropped.
 type docsWaiters struct {
 	mu      sync.Mutex
@@ -23,25 +23,25 @@ func newDocsWaiters() *docsWaiters {
 	return &docsWaiters{waiting: map[string]chan contracts.DocsGraded{}}
 }
 
-func (w *docsWaiters) register(repoID string) chan contracts.DocsGraded {
+func (w *docsWaiters) register(jobID string) chan contracts.DocsGraded {
 	ch := make(chan contracts.DocsGraded, 1)
 	w.mu.Lock()
-	w.waiting[repoID] = ch
+	w.waiting[jobID] = ch
 	w.mu.Unlock()
 	return ch
 }
 
-func (w *docsWaiters) unregister(repoID string) {
+func (w *docsWaiters) unregister(jobID string) {
 	w.mu.Lock()
-	delete(w.waiting, repoID)
+	delete(w.waiting, jobID)
 	w.mu.Unlock()
 }
 
 // deliver reports whether a waiter took the reply.
 func (w *docsWaiters) deliver(reply contracts.DocsGraded) bool {
 	w.mu.Lock()
-	ch, ok := w.waiting[reply.SourcecraftUUID]
-	delete(w.waiting, reply.SourcecraftUUID)
+	ch, ok := w.waiting[reply.JobID]
+	delete(w.waiting, reply.JobID)
 	w.mu.Unlock()
 	if ok {
 		ch <- reply // buffered, never blocks
@@ -50,8 +50,8 @@ func (w *docsWaiters) deliver(reply contracts.DocsGraded) bool {
 }
 
 // wait returns the reply, or nil once deadline passes or ctx ends. Always unregisters.
-func (w *docsWaiters) wait(ctx context.Context, repoID string, ch chan contracts.DocsGraded, deadline time.Time) *contracts.DocsGraded {
-	defer w.unregister(repoID)
+func (w *docsWaiters) wait(ctx context.Context, jobID string, ch chan contracts.DocsGraded, deadline time.Time) *contracts.DocsGraded {
+	defer w.unregister(jobID)
 	timer := time.NewTimer(time.Until(deadline))
 	defer timer.Stop()
 	select {
@@ -77,7 +77,7 @@ func runDocsGradedConsumer(ctx context.Context, brokers []string, waiters *docsW
 			return nil
 		}
 		if !waiters.deliver(reply) {
-			log.Printf("dropping %s reply for %s: no grading is waiting for it (late or duplicate)", contracts.TopicDocsGraded, reply.SourcecraftUUID)
+			log.Printf("dropping %s reply for %s (job %s): no grading is waiting for it (late or duplicate)", contracts.TopicDocsGraded, reply.SourcecraftUUID, reply.JobID)
 		}
 		return nil
 	})

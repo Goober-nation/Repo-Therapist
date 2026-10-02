@@ -57,7 +57,7 @@ func runOnce(repoID, configPath string) error {
 	defer cancel()
 
 	// One-shot debugging prints every category, so it grades the full private view.
-	out, err := app.Grade(ctx, repoID, cfg, "", contracts.VisibilityPrivate)
+	out, err := app.Grade(ctx, repoID, "repos/"+repoID, cfg, "", contracts.VisibilityPrivate, nil)
 	if err != nil {
 		return err
 	}

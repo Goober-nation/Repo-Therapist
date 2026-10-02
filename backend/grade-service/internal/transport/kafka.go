@@ -8,6 +8,7 @@ import (
 	"log"
 
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -18,11 +19,13 @@ import (
 	"repo-therapist/grade-service/internal/contracts"
 	kafkaclient "repo-therapist/grade-service/internal/kafka"
 	"repo-therapist/grade-service/internal/scoring"
+	"repo-therapist/grade-service/internal/tokenstore"
 )
 
 // RunListen runs two consumers concurrently for as long as the process lives:
 //   - grading.requests (the Aggregator's trigger) -> relayed as repo.grade.requested, our own
-//     internal trigger to Repository service; the job's token is kept in memory for repo.ready.
+//     internal trigger to Repository service; the job's grading mode is kept in memory for
+//     repo.ready. The user token stays in Redis under the job_id.
 //   - repo.ready (Repository service's handoff) -> graded, and the result published to
 //     grading.results for the Aggregator to consume.
 //
@@ -53,11 +56,20 @@ func RunListen(configPath string) error {
 	// Two independent consumer loops, one goroutine each. If either returns (error or shutdown),
 	// stop() cancels the shared ctx so the other one exits too — Consumer.Run treats a cancelled
 	// ctx as a clean stop (returns nil), not an error, so this doesn't mask a real first error.
+	tokens := tokenstore.NewFromEnv()
+	defer tokens.Close()
+	pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	err = tokens.Ping(pingCtx)
+	cancel()
+	if err != nil {
+		return fmt.Errorf("connecting to redis: %w", err)
+	}
+
 	jobs := newJobStore()
 	docs := newDocsSettings(cfg)
 	errCh := make(chan error, 3)
-	go func() { errCh <- runGradingRequestsRelay(ctx, brokers, jobs) }()
-	go func() { errCh <- runRepoReadyGrader(ctx, brokers, cfg, catalog, jobs, docs) }()
+	go func() { errCh <- runGradingRequestsRelay(ctx, brokers, jobs, tokens) }()
+	go func() { errCh <- runRepoReadyGrader(ctx, brokers, cfg, catalog, jobs, tokens, docs) }()
 	go func() { errCh <- runDocsGradedConsumer(ctx, brokers, docs.waiters) }()
 
 	firstErr := <-errCh
@@ -67,9 +79,9 @@ func RunListen(configPath string) error {
 	return firstErr
 }
 
-// runGradingRequestsRelay consumes the Aggregator's grading.requests, remembers the job's token
-// for when repo.ready arrives, and republishes it as our internal repo.grade.requested.
-func runGradingRequestsRelay(ctx context.Context, brokers []string, jobs *jobStore) error {
+// runGradingRequestsRelay consumes the Aggregator's grading.requests, remembers the job's grading
+// mode for when repo.ready arrives, and republishes it as our internal repo.grade.requested.
+func runGradingRequestsRelay(ctx context.Context, brokers []string, jobs *jobStore, tokens tokenstore.Store) error {
 	consumer := kafkaclient.NewConsumer(brokers, contracts.TopicGradingRequests, "grade-service")
 	defer consumer.Close()
 	producer := kafkaclient.NewProducer(brokers, contracts.TopicGradeRequested)
@@ -77,32 +89,50 @@ func runGradingRequestsRelay(ctx context.Context, brokers []string, jobs *jobSto
 
 	log.Printf("grade-service listening on %s, relaying to %s", contracts.TopicGradingRequests, contracts.TopicGradeRequested)
 	return consumer.Run(ctx, func(ctx context.Context, value []byte) error {
-		var req contracts.GradingRequestedEvent
-		if err := json.Unmarshal(value, &req); err != nil {
-			log.Printf("skipping unparseable %s message: %v", contracts.TopicGradingRequests, err)
-			return nil
+		out, ok, err := relayGradingRequest(ctx, jobs, tokens, value)
+		if err != nil || !ok {
+			return err
 		}
-
-		key := req.OrgSlug + "/" + req.RepoSlug
-		visibility, ok := gradingVisibility(req)
-		if !ok {
-			log.Printf("dropping grading request for %s/%s: visibility=%q needs a user token", req.OrgSlug, req.RepoSlug, req.Visibility)
-			return nil
-		}
-		jobs.put(key, req.Token, visibility)
-		out := contracts.GradeRequested{OrgSlug: req.OrgSlug, RepoSlug: req.RepoSlug, RequestedAt: req.RequestedAt, Token: req.Token}
-		if err := producer.Publish(ctx, key, out); err != nil {
+		if err := producer.Publish(ctx, out.OrgSlug+"/"+out.RepoSlug, out); err != nil {
 			return fmt.Errorf("relaying to %s: %w", contracts.TopicGradeRequested, err)
 		}
-		log.Printf("relayed %s grading request for %s/%s to %s", visibility, req.OrgSlug, req.RepoSlug, contracts.TopicGradeRequested)
+		log.Printf("relayed grading request for %s/%s (job %s) to %s", out.OrgSlug, out.RepoSlug, out.JobID, contracts.TopicGradeRequested)
 		return nil
 	})
+}
+
+// relayGradingRequest turns one grading.requests message into the repo.grade.requested to
+// publish, remembering the job's mode. ok is false for a message that is skipped. A Redis error
+// is returned so the message is redelivered instead of being graded in the wrong mode.
+func relayGradingRequest(ctx context.Context, jobs *jobStore, tokens tokenstore.Store, value []byte) (out contracts.GradeRequested, ok bool, err error) {
+	var req contracts.GradingRequestedEvent
+	if err := json.Unmarshal(value, &req); err != nil {
+		log.Printf("skipping unparseable %s message: %v", contracts.TopicGradingRequests, err)
+		return out, false, nil
+	}
+	if req.JobID == "" {
+		log.Printf("dropping grading request for %s/%s: no job_id", req.OrgSlug, req.RepoSlug)
+		return out, false, nil
+	}
+
+	token, err := tokens.GetToken(ctx, req.JobID)
+	if err != nil {
+		return out, false, err
+	}
+	visibility, ok := gradingVisibility(req, token != "")
+	if !ok {
+		log.Printf("dropping grading request for %s/%s: visibility=%q needs a user token", req.OrgSlug, req.RepoSlug, req.Visibility)
+		return out, false, nil
+	}
+	jobs.put(req.JobID, visibility)
+	log.Printf("%s grading job %s for %s/%s", visibility, req.JobID, req.OrgSlug, req.RepoSlug)
+	return contracts.GradeRequested{JobID: req.JobID, OrgSlug: req.OrgSlug, RepoSlug: req.RepoSlug, RequestedAt: req.RequestedAt}, true, nil
 }
 
 // runRepoReadyGrader consumes repo.ready, grades each ready repo, and publishes the result to
 // grading.results for the Aggregator. Failed/skipped repos are logged, not silently dropped, but
 // don't kill the loop — one repo's failure shouldn't stop grading for every other repo.
-func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Config, catalog map[string]config.RecommendationEntry, jobs *jobStore, docs docsSettings) error {
+func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Config, catalog map[string]config.RecommendationEntry, jobs *jobStore, tokens tokenstore.Store, docs docsSettings) error {
 	consumer := kafkaclient.NewConsumer(brokers, contracts.TopicRepoReady, "grade-service")
 	defer consumer.Close()
 	producer := kafkaclient.NewProducer(brokers, contracts.TopicGradingResults)
@@ -120,24 +150,40 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 			return nil
 		}
 
-		// Taken before the status check so a failed job's token is dropped too. A missing job
-		// (unknown/expired, or relayed by another instance) is graded publicly with the service PAT.
-		job := jobs.take(ready.OrgSlug + "/" + ready.RepoSlug)
+		// Taken before the status check so a failed job is forgotten and its token deleted too.
+		j, known := jobs.take(ready.JobID)
+		releaseToken := tokenReleaser(tokens, ready.JobID)
+		defer releaseToken()
+
+		token, err := tokens.GetToken(ctx, ready.JobID)
+		if err != nil {
+			log.Printf("reading the token of job %s for %s/%s failed: %v", ready.JobID, ready.OrgSlug, ready.RepoSlug, err)
+			visibility := j.visibility
+			if !known {
+				visibility = contracts.VisibilityPrivate
+			}
+			return publishFailure(ctx, producer, ready, visibility, contracts.GradingErrGrading)
+		}
+		visibility, ok := readyVisibility(j, known, token)
+		if !ok {
+			log.Printf("not grading %s/%s: the user token of private job %s expired", ready.OrgSlug, ready.RepoSlug, ready.JobID)
+			return publishFailure(ctx, producer, ready, visibility, contracts.GradingErrGrading)
+		}
 
 		if ready.Status != contracts.StatusReady {
 			log.Printf("not grading %s/%s: status=%s error=%q", ready.OrgSlug, ready.RepoSlug, ready.Status, ready.Error)
-			return publishFailure(ctx, producer, ready, job.visibility, contracts.GradingErrRepoFailed)
+			return publishFailure(ctx, producer, ready, visibility, contracts.GradingErrRepoFailed)
 		}
 
-		log.Printf("grading %s/%s %s (sourcecraft_uuid=%s)", ready.OrgSlug, ready.RepoSlug, job.visibility, ready.SourcecraftUUID)
+		log.Printf("grading %s/%s %s (sourcecraft_uuid=%s, job %s)", ready.OrgSlug, ready.RepoSlug, visibility, ready.SourcecraftUUID, ready.JobID)
 		// Documentation is asked for first so the LLM works while the other categories are graded.
 		docsCh, docsDeadline := requestDocs(ctx, docsProducer, docs, ready)
 		gradeCtx, cancel := context.WithTimeout(ctx, app.GradeTimeout())
-		out, err := app.Grade(gradeCtx, ready.SourcecraftUUID, cfg, job.token, job.visibility)
+		out, err := app.Grade(gradeCtx, ready.SourcecraftUUID, ready.S3Prefix, cfg, token, visibility, releaseToken)
 		cancel()
 		var reply *contracts.DocsGraded
 		if docsCh != nil {
-			reply = docs.waiters.wait(ctx, ready.SourcecraftUUID, docsCh, docsDeadline)
+			reply = docs.waiters.wait(ctx, ready.JobID, docsCh, docsDeadline)
 			if reply == nil {
 				log.Printf("no %s reply for %s/%s within %s: Documentation will be no-data", contracts.TopicDocsGraded, ready.OrgSlug, ready.RepoSlug, docs.timeout)
 			} else if reply.Error != "" {
@@ -146,7 +192,7 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 		}
 		if err != nil {
 			log.Printf("grading %s/%s failed: %v", ready.OrgSlug, ready.RepoSlug, err)
-			return publishFailure(ctx, producer, ready, job.visibility, gradingErrCode(ctx))
+			return publishFailure(ctx, producer, ready, visibility, gradingErrCode(ctx))
 		}
 		out.Categories["documentation"] = scoring.ComputeDocumentation(reply)
 		if docs := out.Categories["documentation"]; !docs.NoData {
@@ -154,10 +200,10 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 		}
 		app.PrintResult(out)
 
-		result, err := app.BuildGradingResult(out, cfg, catalog, job.visibility, time.Now())
+		result, err := app.BuildGradingResult(out, cfg, catalog, visibility, time.Now())
 		if err != nil {
 			log.Printf("building grading result for %s/%s failed: %v", ready.OrgSlug, ready.RepoSlug, err)
-			return publishFailure(ctx, producer, ready, job.visibility, contracts.GradingErrBuildResult)
+			return publishFailure(ctx, producer, ready, visibility, contracts.GradingErrBuildResult)
 		}
 		if err := producer.Publish(ctx, ready.SourcecraftUUID, result); err != nil {
 			return fmt.Errorf("publishing %s: %w", contracts.TopicGradingResults, err)
@@ -167,34 +213,53 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 	}))
 }
 
+// tokenDeleteTimeout bounds deleting one job's token from Redis.
+const tokenDeleteTimeout = 5 * time.Second
+
+// tokenReleaser returns an idempotent func deleting jobID's token from Redis. Grade calls it
+// right after the Security call; the repo.ready handler also defers it, covering every path that
+// never reaches that call. A failed delete is only logged: the key expires on its own TTL.
+func tokenReleaser(tokens tokenstore.Store, jobID string) func() {
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), tokenDeleteTimeout)
+			defer cancel()
+			if err := tokens.DeleteToken(ctx, jobID); err != nil {
+				log.Printf("deleting the token of job %s failed: %v", jobID, err)
+			}
+		})
+	}
+}
+
 // repoDataCleanupTimeout bounds one repo's S3 export deletion.
 const repoDataCleanupTimeout = time.Minute
 
-// repoDataCleanup returns the function that deletes a graded repo's S3 export, or nil when
-// S3_KEEP_REPO_DATA keeps it. A failed delete is only logged: the grade is already published,
-// and Repository service clears the prefix again before its next upload.
-func repoDataCleanup(keep bool, deleteRepoData func(ctx context.Context, repoID string) (int, error)) func(repoID string) {
+// repoDataCleanup returns the function that deletes a graded job's S3 export (its s3_prefix), or
+// nil when S3_KEEP_REPO_DATA keeps it. A failed delete is only logged: the grade is already
+// published.
+func repoDataCleanup(keep bool, deleteRepoData func(ctx context.Context, prefix string) (int, error)) func(prefix string) {
 	if keep {
 		log.Printf("S3_KEEP_REPO_DATA is set: repo exports stay in S3 after grading")
 		return nil
 	}
-	return func(repoID string) {
+	return func(prefix string) {
 		ctx, cancel := context.WithTimeout(context.Background(), repoDataCleanupTimeout)
 		defer cancel()
-		n, err := deleteRepoData(ctx, repoID)
+		n, err := deleteRepoData(ctx, prefix)
 		if err != nil {
-			log.Printf("deleting S3 export for %s failed: %v", repoID, err)
+			log.Printf("deleting S3 export %s failed: %v", prefix, err)
 			return
 		}
-		log.Printf("deleted %d S3 objects for %s", n, repoID)
+		log.Printf("deleted %d S3 objects under %s", n, prefix)
 	}
 }
 
-// withRepoDataCleanup runs cleanup on the repo.ready message's repo once handler has published
+// withRepoDataCleanup runs cleanup on the repo.ready message's s3_prefix once handler has published
 // its result or failure (handler returned nil). Every reader of the export is done by then: Grade
 // read its inputs, and the LLM service replied or timed out. A handler error stops the consumer
 // without committing, so the message is redelivered and its export must stay.
-func withRepoDataCleanup(cleanup func(repoID string), handler func(ctx context.Context, value []byte) error) func(ctx context.Context, value []byte) error {
+func withRepoDataCleanup(cleanup func(prefix string), handler func(ctx context.Context, value []byte) error) func(ctx context.Context, value []byte) error {
 	if cleanup == nil {
 		return handler
 	}
@@ -203,8 +268,8 @@ func withRepoDataCleanup(cleanup func(repoID string), handler func(ctx context.C
 			return err
 		}
 		var ready contracts.RepoReady
-		if json.Unmarshal(value, &ready) == nil && ready.SourcecraftUUID != "" {
-			cleanup(ready.SourcecraftUUID)
+		if json.Unmarshal(value, &ready) == nil && ready.S3Prefix != "" {
+			cleanup(ready.S3Prefix)
 		}
 		return nil
 	}
@@ -277,10 +342,10 @@ func requestDocs(ctx context.Context, producer *kafkaclient.Producer, docs docsS
 	if !docs.enabled {
 		return nil, time.Time{}
 	}
-	ch := docs.waiters.register(ready.SourcecraftUUID)
-	req := contracts.DocsGradeRequested{SourcecraftUUID: ready.SourcecraftUUID, S3Prefix: ready.S3Prefix, RequestedAt: time.Now()}
+	ch := docs.waiters.register(ready.JobID)
+	req := contracts.DocsGradeRequested{JobID: ready.JobID, SourcecraftUUID: ready.SourcecraftUUID, S3Prefix: ready.S3Prefix, RequestedAt: time.Now()}
 	if err := producer.Publish(ctx, ready.SourcecraftUUID, req); err != nil {
-		docs.waiters.unregister(ready.SourcecraftUUID)
+		docs.waiters.unregister(ready.JobID)
 		log.Printf("publishing %s for %s/%s failed: %v (Documentation will be no-data)", contracts.TopicDocsGradeRequested, ready.OrgSlug, ready.RepoSlug, err)
 		return nil, time.Time{}
 	}

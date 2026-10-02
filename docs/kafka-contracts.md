@@ -39,18 +39,32 @@ LLM-сервис по-прежнему принимает старые `LLM_SUMM
 
 ```json
 {
+  "job_id": "0f6c2b8e-3d4a-4b7e-9c1d-5a2e8f9b7c31",
   "org_slug": "examples",
   "repo_slug": "vulnerable-repo",
-  "requested_at": "2026-09-19T23:49:12+03:00",
-  "token": "<необязательный PAT SourceCraft пользователя>"
+  "requested_at": "2026-09-19T23:49:12+03:00"
 }
 ```
 
 Собственные топики Aggregator в том виде, как их читает/пишет Grade service:
 
-- `grading.requests`: `{org_slug, repo_slug, visibility, requested_at, token?}`. `visibility` —
-  видимость репозитория в SourceCraft (`public` | `internal` | `private`). Токен означает
-  приватное оценивание; без токена — публичное. Непубличный `visibility` без токена отбрасывается.
+- `grading.requests`: `{job_id, org_slug, repo_slug, visibility, requested_at}`. `job_id` —
+  UUID задания оценки, который Aggregator создаёт на каждый запрос. `visibility` — видимость
+  репозитория в SourceCraft (`public` | `internal` | `private`). Токен пользователя в сообщении
+  нет: он лежит в Redis (см. «Токен пользователя в Redis» ниже). Токен в Redis для `job_id`
+  означает приватное оценивание; без токена — публичное. Непубличный `visibility` без токена
+  отбрасывается; сообщение без `job_id` тоже отбрасывается.
+
+  ```json
+  {
+    "job_id": "0f6c2b8e-3d4a-4b7e-9c1d-5a2e8f9b7c31",
+    "org_slug": "examples",
+    "repo_slug": "vulnerable-repo",
+    "visibility": "private",
+    "requested_at": "2026-09-19T23:49:12+03:00"
+  }
+  ```
+
 - `grading.results`: `{sourcecraft_uuid, grade_mode, score, category_scores, advice,
   missing_data, graded_at, error}`. `grade_mode` — режим оценки, а не видимость репозитория:
   `private`, если в запросе был токен пользователя, иначе `public` (публичный репозиторий,
@@ -69,11 +83,28 @@ LLM-сервис по-прежнему принимает старые `LLM_SUMM
   `sourcecraft_uuid` нельзя сопоставить, и он не публикуется; такую блокировку Aggregator
   снимает сам, когда она занята дольше `GRADING_LOCK_TIMEOUT` (по умолчанию 20m).
 
-`token` копируется из `grading.requests`. Если он есть, Repository service использует его для
-вызовов обёртки и git clone; если нет — свой `SOURCECRAFT_PAT`. Токен никогда не логируется и
-намеренно **не** повторяется в `repo.ready` — Grade service хранит его в памяти (по ключу
-`org/repo`, удаляется при `repo.ready` или через 30 минут) для собственного вызова Security
-wrapper.
+`job_id` копируется из `grading.requests`. Repository service читает по нему токен из Redis:
+если он есть, использует его для вызовов обёртки и git clone; если нет — свой `SOURCECRAFT_PAT`.
+Ошибка Redis — сбой задания (`repo.ready` со статусом `failed`), без перехода на сервисный PAT.
+Токен не передаётся ни в одном сообщении Kafka и никогда не логируется.
+
+### Токен пользователя в Redis (2026-10-02)
+
+- Ключ: `grading:token:<job_id>`, значение — PAT SourceCraft пользователя. Пишется только для
+  приватной оценки; для публичной ключа нет.
+- Пишет Aggregator перед публикацией `grading.requests`, с TTL, равным `GRADING_LOCK_TIMEOUT`
+  (по умолчанию 20m): дольше блокировки репозитория задание не живёт. Если публикация не удалась,
+  Aggregator сразу удаляет ключ.
+- Читают Grade service (при `grading.requests` — чтобы определить режим, и при `repo.ready` — для
+  вызова Security wrapper) и Repository service (для клонирования).
+- Удаляет Grade service сразу после вызова Security wrapper, а если до него не дошло (сбой
+  клонирования, истёкший токен, ошибка) — в конце обработки `repo.ready`. Иначе ключ истекает по TTL.
+- Режим определяется как раньше: токен есть → `private`. Если Grade запомнил задание как
+  приватное, а токена к `repo.ready` уже нет (истёк), оценка не выполняется: в `grading.results`
+  уходит `GRADING_FAILED`. Неизвестное Grade задание (перезапуск сервиса) оценивается по наличию
+  токена в Redis.
+- Redis защищён паролем (`REDIS_PASSWORD`, `requirepass`); адрес и пароль сервисы читают из
+  `REDIS_ADDRESS`/`REDIS_PASSWORD`/`REDIS_DB`, как gateway.
 
 ## `repo.ready`
 
@@ -82,14 +113,19 @@ wrapper.
 
 ```json
 {
+  "job_id": "0f6c2b8e-3d4a-4b7e-9c1d-5a2e8f9b7c31",
   "org_slug": "examples",
   "repo_slug": "vulnerable-repo",
   "sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
-  "s3_prefix": "repos/019b2102-fa21-7ab7-8ce1-116af406fb5e",
+  "s3_prefix": "repos/019b2102-fa21-7ab7-8ce1-116af406fb5e/0f6c2b8e-3d4a-4b7e-9c1d-5a2e8f9b7c31",
   "status": "ready"
 }
 ```
 
+`job_id` повторяет значение из `repo.grade.requested`; по нему Grade service находит своё задание
+(не по `org/repo`), поэтому перекрывающиеся прогоны одного репозитория не смешиваются.
+`s3_prefix` — выгрузка именно этого задания, `repos/<uuid>/<job_id>`: Repository service перед
+загрузкой очищает только этот префикс, а Grade service после оценки удаляет только его.
 `status` — `"ready"` или `"failed"`; при сбое `error` содержит сообщение, а `s3_prefix`
 опускается. `sourcecraft_uuid` передаётся и при сбое, если репозиторий успел определиться;
 тогда Grade service публикует `REPO_FETCH_FAILED` в `grading.results`, и Aggregator сразу
@@ -164,8 +200,9 @@ Go-типы: `internal/contracts/repo_grading.go`. Проверено сквоз
 повторить результат для того же `sourcecraft_uuid`; потребители должны переносить дубликаты. Если
 не удалась сама публикация результата, вход остаётся незафиксированным, и запасным служит
 собственный таймаут запрашивающей стороны. Запрос без корректного `sourcecraft_uuid` нельзя
-сопоставить: он логируется и пропускается. ID запроса нет, поэтому параллельные прогоны для одного
-репозитория различить нельзя.
+сопоставить: он логируется и пропускается. Для документации то же относится к `job_id`: ответ
+повторяет его, и Grade service сопоставляет ответ с прогоном по `job_id`, поэтому параллельные
+прогоны одного репозитория не смешиваются. У сводки (`llm.recommendations.*`) ID запроса нет.
 
 ## Оценка документации: активный контракт Grade ↔ LLM
 
@@ -173,16 +210,22 @@ Grade → LLM, топик `repo.docs.grade.requested`:
 
 ```json
 {
+  "job_id": "0f6c2b8e-3d4a-4b7e-9c1d-5a2e8f9b7c31",
   "sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
-  "s3_prefix": "repos/019b2102-fa21-7ab7-8ce1-116af406fb5e",
+  "s3_prefix": "repos/019b2102-fa21-7ab7-8ce1-116af406fb5e/0f6c2b8e-3d4a-4b7e-9c1d-5a2e8f9b7c31",
   "requested_at": "2026-09-26T12:00:00Z"
 }
 ```
+
+Все четыре поля обязательны; `job_id` и `sourcecraft_uuid` — UUID в каноническом виде. LLM-сервис
+повторяет `job_id` в ответе (и в успехе, и в сбое). Некорректный запрос с валидными `job_id` и
+`sourcecraft_uuid` получает ответ `INVALID_EVENT`; без них — только логируется.
 
 LLM → Grade, топик `repo.docs.graded` (успешная оценка):
 
 ```json
 {
+  "job_id": "0f6c2b8e-3d4a-4b7e-9c1d-5a2e8f9b7c31",
   "sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
   "grade": 85,
   "subgrades": {"required_files": 100, "purpose": 80, "local_run": 75},
@@ -200,6 +243,7 @@ LLM → Grade, тот же топик и ключ Kafka (оценка не уд�
 
 ```json
 {
+  "job_id": "0f6c2b8e-3d4a-4b7e-9c1d-5a2e8f9b7c31",
   "sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e",
   "grade": null,
   "subgrades": {},

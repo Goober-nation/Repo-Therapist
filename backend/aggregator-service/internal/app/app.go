@@ -3,6 +3,7 @@ package app
 import (
 	"aggregator-service/internal/config"
 	postgres_repositories "aggregator-service/internal/database/postgres-repositories"
+	redis_repositories "aggregator-service/internal/database/redis"
 	"aggregator-service/internal/service"
 	"aggregator-service/internal/transport/kafka"
 	grpctransport "aggregator-service/internal/transport/rpc"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+	goredis "github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -53,6 +55,19 @@ func StartApp() {
 	gradesRepo := postgres_repositories.NewGradesRepository(db)
 	llmRepo := postgres_repositories.NewLLMRepository(db)
 
+	redisClient := goredis.NewClient(&goredis.Options{
+		Addr:     cfg.Redis.Address,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+	})
+	defer redisClient.Close()
+
+	if err := redisClient.Ping(ctx).Err(); err != nil {
+		log.Fatalf("ping redis: %v", err)
+	}
+
+	log.Println("redis connected")
+
 	ensureTopics(ctx, cfg)
 
 	gradingPublisher := kafka.NewGradingPublisher(
@@ -86,6 +101,8 @@ func StartApp() {
 		cfg.GRPC.Timeout,
 		cfg.Token.Token,
 	)
+	aggregatorService.TokenStore = redis_repositories.NewTokenStore(redisClient)
+	aggregatorService.TokenTTL = cfg.Grading.LockTimeout
 	aggregatorService.RegradeLimit = cfg.Grading.RegradeLimit
 	aggregatorService.RegradeListTimeout = cfg.Grading.RegradeListTimeout
 	aggregatorService.GradeLimiter = service.NewGradeLimiter(cfg.Grading.RequestLimit, cfg.Grading.RequestWindow)

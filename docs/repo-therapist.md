@@ -55,6 +55,8 @@ docker compose up -d        # Postgres, S3 (RustFS), Redis, Kafka, миграц�
 - Фронтенд: http://localhost:8081 (рейтинг — `/`, анализ — `/repo/<org>/<repo>`,
   собственные репозитории — `/my`). Подробнее: [frontend/README.md](https://sourcecraft.dev/lct-hackaton-2026/case-18-repo-health-score-team-95/browse/frontend/README.md).
 - Консоль S3 (RustFS): http://localhost:8055/rustfs/console/index.html
+- Redis (`8052`) и Kafka (`8053`) опубликованы только на `127.0.0.1` — для сервисов, запущенных на
+  хосте, и отладки; Redis требует пароль `REDIS_PASSWORD` из `.env`.
 
 Все настройки описаны в комментариях в [.env.example](https://sourcecraft.dev/lct-hackaton-2026/case-18-repo-health-score-team-95/browse/.env.example).
 Ручное сквозное тестирование: [docs/testing.md](https://sourcecraft.dev/lct-hackaton-2026/case-18-repo-health-score-team-95/browse/docs/testing.md).

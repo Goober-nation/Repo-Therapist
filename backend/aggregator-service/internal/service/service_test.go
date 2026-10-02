@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -181,6 +182,27 @@ func (f *fakeGradingPublisher) Publish(ctx context.Context, event domain.Grading
 	return nil
 }
 
+type storedToken struct {
+	token string
+	ttl   time.Duration
+}
+
+type fakeTokenStore struct {
+	tokens  map[string]storedToken
+	deleted []string
+}
+
+func (f *fakeTokenStore) PutToken(ctx context.Context, jobID, token string, ttl time.Duration) error {
+	f.tokens[jobID] = storedToken{token: token, ttl: ttl}
+	return nil
+}
+
+func (f *fakeTokenStore) DeleteToken(ctx context.Context, jobID string) error {
+	delete(f.tokens, jobID)
+	f.deleted = append(f.deleted, jobID)
+	return nil
+}
+
 type fakeLLMPublisher struct {
 	events []domain.LLMRecommendationsRequestedEvent
 }
@@ -198,6 +220,7 @@ type fixture struct {
 	wrapper *fakeWrapper
 	grading *fakeGradingPublisher
 	llmPub  *fakeLLMPublisher
+	tokens  *fakeTokenStore
 }
 
 func newFixture(visibility string) *fixture {
@@ -223,8 +246,11 @@ func newFixture(visibility string) *fixture {
 		},
 		grading: &fakeGradingPublisher{},
 		llmPub:  &fakeLLMPublisher{},
+		tokens:  &fakeTokenStore{tokens: map[string]storedToken{}},
 	}
 	f.svc = NewAggregatorService(f.repos, f.grades, f.llm, f.wrapper, f.grading, f.llmPub, time.Second, "service-pat")
+	f.svc.TokenStore = f.tokens
+	f.svc.TokenTTL = 20 * time.Minute
 	f.svc.now = func() time.Time { return testNow }
 	return f
 }
@@ -257,8 +283,11 @@ func TestGetGradingPublicRepoWithoutGradeRequestsPublicGrading(t *testing.T) {
 	if len(f.grading.events) != 1 {
 		t.Fatalf("published %d grading requests, want 1", len(f.grading.events))
 	}
-	if ev := f.grading.events[0]; ev.Visibility != "public" || ev.Token != "" || ev.OrgSlug != "org" || ev.RepoSlug != "repo" {
-		t.Errorf("event = %+v, want public request without token", ev)
+	if ev := f.grading.events[0]; ev.Visibility != "public" || ev.JobID == "" || ev.OrgSlug != "org" || ev.RepoSlug != "repo" {
+		t.Errorf("event = %+v, want public request with a job id", ev)
+	}
+	if len(f.tokens.tokens) != 0 {
+		t.Errorf("public grading stored a token: %d keys", len(f.tokens.tokens))
 	}
 
 	// Anonymous lookup goes through the service token; no private-access check is attempted.
@@ -313,8 +342,19 @@ func TestGetGradingOwnerGetsPrivateGradingWithToken(t *testing.T) {
 	if len(f.grading.events) != 1 {
 		t.Fatalf("published %d grading requests, want 1", len(f.grading.events))
 	}
-	if ev := f.grading.events[0]; ev.Visibility != "private" || ev.Token != "owner-pat" {
-		t.Errorf("event = %+v, want private request carrying the owner's token", ev)
+	ev := f.grading.events[0]
+	if ev.Visibility != "private" || ev.JobID == "" {
+		t.Errorf("event = %+v, want private request with a job id", ev)
+	}
+	if got, ok := f.tokens.tokens[ev.JobID]; !ok || got.token != "owner-pat" || got.ttl != 20*time.Minute {
+		t.Errorf("token store = %+v, want owner token under the event's job id with the lock TTL", f.tokens.tokens)
+	}
+	payload, err := json.Marshal(ev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(payload), "owner-pat") || strings.Contains(string(payload), `"token"`) {
+		t.Errorf("grading.requests payload carries the token: %s", payload)
 	}
 
 	// The access check used the caller's token, never the service token.
@@ -643,5 +683,50 @@ func TestRegradeLimitTakesTopRated(t *testing.T) {
 	}
 	if len(f.grading.events) != 1 || f.grading.events[0].RepoSlug != "repo" {
 		t.Errorf("events = %+v, want only the top-rated repo", f.grading.events)
+	}
+}
+
+func TestGetGradingJobIDsAreUniquePerRequest(t *testing.T) {
+	f := newFixture("public")
+	_, _ = f.svc.GetGrading(userCtx(""), "org", "repo")
+	f.repos.lockFree = true
+	_, _ = f.svc.GetGrading(userCtx(""), "org", "repo")
+	if len(f.grading.events) != 2 || f.grading.events[0].JobID == f.grading.events[1].JobID {
+		t.Fatalf("events = %+v, want two requests with distinct job ids", f.grading.events)
+	}
+}
+
+type failingGradingPublisher struct{}
+
+func (failingGradingPublisher) Publish(ctx context.Context, event domain.GradingRequestedEvent) error {
+	return errors.New("kafka down")
+}
+
+func TestGetGradingPublishFailureDeletesStoredToken(t *testing.T) {
+	f := newFixture("private")
+	f.svc.gradingPublisher = failingGradingPublisher{}
+
+	_, err := f.svc.GetGrading(userCtx("owner-pat"), "org", "repo")
+	if !errors.Is(err, domain.ErrGradingFailed) {
+		t.Fatalf("err = %v, want ErrGradingFailed", err)
+	}
+	if len(f.tokens.tokens) != 0 || len(f.tokens.deleted) != 1 {
+		t.Errorf("tokens = %+v deleted = %v, want the stored token removed", f.tokens.tokens, f.tokens.deleted)
+	}
+}
+
+func TestGetGradingPrivateWithoutTokenStoreFails(t *testing.T) {
+	f := newFixture("private")
+	f.svc.TokenStore = nil
+
+	_, err := f.svc.GetGrading(userCtx("owner-pat"), "org", "repo")
+	if !errors.Is(err, domain.ErrGradingFailed) {
+		t.Fatalf("err = %v, want ErrGradingFailed", err)
+	}
+	if len(f.grading.events) != 0 {
+		t.Errorf("published %d requests without a stored token", len(f.grading.events))
+	}
+	if err != nil && strings.Contains(err.Error(), "owner-pat") {
+		t.Errorf("error leaks the token: %v", err)
 	}
 }

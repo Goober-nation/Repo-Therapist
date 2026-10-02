@@ -68,10 +68,10 @@ PYTHONPATH=src python3 -c 'from llm_service.yandex_model import YandexModel, Yan
 ```
 
 The Documentation worker consumes `repo.docs.grade.requested` with
-`{sourcecraft_uuid, s3_prefix, requested_at}` and publishes `repo.docs.graded`
-messages with `{sourcecraft_uuid, grade, subgrades, advice, error, evaluated_at}`.
+`{job_id, sourcecraft_uuid, s3_prefix, requested_at}` and publishes `repo.docs.graded`
+messages with `{job_id, sourcecraft_uuid, grade, subgrades, advice, method, error, evaluated_at}`.
 The key is
-`sourcecraft_uuid`. `subgrades` maps section IDs to integer percentages, omitting
+`sourcecraft_uuid`; `job_id` is echoed so the Grade service can match the reply to its run. `subgrades` maps section IDs to integer percentages, omitting
 unreviewed/inapplicable sections. `advice` contains only Russian improvement recommendations selected deterministically
 by deficiency code (or section fallback). Reasons, file references and raw evidence
 are not sent in this field. No additional model call is made. Internal local CLI output retains `subcategories` and `facts`.

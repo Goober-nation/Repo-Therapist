@@ -10,7 +10,7 @@ from llm_service.kafka_worker import KafkaConfig, run_worker
 from llm_service.snapshot import Snapshot, load_snapshot
 from llm_service.s3_store import S3Config, S3Store
 from llm_service.yandex_model import YandexModel, YandexModelConfig, ModelInputTooLarge, ModelProviderError
-from test_kafka_worker import Consumer, Producer, REPOSITORY
+from test_kafka_worker import Consumer, Producer, REPOSITORY, JOB
 from test_s3_store import FakeS3
 from test_snapshot import FakeStore
 from test_yandex_model import full_checks, successful_response, SNAPSHOT, CONTEXT
@@ -19,7 +19,7 @@ from test_yandex_model import full_checks, successful_response, SNAPSHOT, CONTEX
 class ActivePipelineTests(unittest.TestCase):
     def test_actual_adapter_request_and_wire_result(self):
         client = FakeS3()
-        prefix = f"repos/{REPOSITORY}/"
+        prefix = f"repos/{REPOSITORY}/{JOB}/"
         client.objects.clear()
         client.objects.update({
             prefix: b"", prefix + "docs/": b"",
@@ -52,8 +52,9 @@ class ActivePipelineTests(unittest.TestCase):
         self.assertEqual(events, ["produce", "flush", "commit"])
         self.assertEqual(producer.topic, "repo.docs.graded")
         result = producer.event
-        self.assertEqual(set(result), {"sourcecraft_uuid", "grade", "subgrades", "advice", "method", "error", "evaluated_at"})
+        self.assertEqual(set(result), {"job_id", "sourcecraft_uuid", "grade", "subgrades", "advice", "method", "error", "evaluated_at"})
         self.assertEqual(result["sourcecraft_uuid"], REPOSITORY)
+        self.assertEqual(result["job_id"], JOB)
         self.assertEqual(result["error"], "")
         self.assertEqual(producer.key.decode(), REPOSITORY)
         self.assertTrue(all(type(v) is int and 0 <= v <= 100 for v in result["subgrades"].values()))

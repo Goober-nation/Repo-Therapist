@@ -38,13 +38,13 @@ var AllTopics = []string{TopicGradeRequested, TopicRepoReady, TopicGradingReques
 
 // GradeRequested is published to ask Repository service to clone+upload a repo. Consumed by
 // Repository service, produced by grade-service relaying grading.requests.
+// JobID is the Aggregator's grading job id; a private job's user PAT is in Redis under it
+// (tokenstore.Key), never in the message.
 type GradeRequested struct {
+	JobID       string    `json:"job_id"`
 	OrgSlug     string    `json:"org_slug"`
 	RepoSlug    string    `json:"repo_slug"`
 	RequestedAt time.Time `json:"requested_at"`
-	// Token is the user's SourceCraft PAT for private grading; empty means use the service PAT.
-	// Never log it.
-	Token string `json:"token,omitempty"`
 }
 
 // ReadyStatus values for RepoReady.Status.
@@ -57,7 +57,9 @@ const (
 // by Grade service, which pulls from S3 and scores on StatusReady, reports a failure on
 // StatusFailed. SourcecraftUUID is set on a failure once the repo id was resolved; without it the
 // failure cannot reach the Aggregator.
+// JobID echoes GradeRequested.JobID; S3Prefix is that job's export (repos/<uuid>/<job_id>).
 type RepoReady struct {
+	JobID           string `json:"job_id"`
 	OrgSlug         string `json:"org_slug"`
 	RepoSlug        string `json:"repo_slug"`
 	SourcecraftUUID string `json:"sourcecraft_uuid,omitempty"`
@@ -75,7 +77,7 @@ var (
 )
 
 // Grading visibilities. A job is graded as exactly one of these: private when the request
-// carries a user token, public otherwise.
+// has a user token stored for its job, public otherwise.
 const (
 	VisibilityPublic  = "public"
 	VisibilityPrivate = "private"
@@ -83,14 +85,14 @@ const (
 
 // GradingRequestedEvent is published by the Aggregator to ask for a repo to be graded — the exact
 // trigger for GradeRequested above, just from the Aggregator instead of a manual/local trigger.
+// JobID identifies the run end to end. A user token stored in Redis under it -> private grading
+// with the user's PAT; none -> public grading with the service PAT.
 type GradingRequestedEvent struct {
+	JobID       string    `json:"job_id"`
 	OrgSlug     string    `json:"org_slug"`
 	RepoSlug    string    `json:"repo_slug"`
 	Visibility  string    `json:"visibility"`
 	RequestedAt time.Time `json:"requested_at"`
-	// Token present -> private grading with the user's PAT; absent -> public grading with the
-	// service PAT. Never log it.
-	Token string `json:"token,omitempty"`
 }
 
 // Recommendation is one deduction-reason -> pre-written-text pairing, generated while scoring
@@ -133,7 +135,9 @@ const (
 )
 
 // DocsGradeRequested asks the LLM service to grade a repo's documentation from its S3 prefix.
+// JobID correlates the reply; the LLM service echoes it in DocsGraded.
 type DocsGradeRequested struct {
+	JobID           string    `json:"job_id"`
 	SourcecraftUUID string    `json:"sourcecraft_uuid"`
 	S3Prefix        string    `json:"s3_prefix"`
 	RequestedAt     time.Time `json:"requested_at"`
@@ -159,7 +163,9 @@ type DocsAdvice struct {
 // fallback grade; it is null on a failure reply.
 // A nonempty Error means the evaluation failed: Grade is null, the other fields empty, and the
 // reply must be read as Documentation no-data. Grade is a pointer so null never decodes as 0.
+// JobID echoes DocsGradeRequested.JobID.
 type DocsGraded struct {
+	JobID           string         `json:"job_id"`
 	SourcecraftUUID string         `json:"sourcecraft_uuid"`
 	Grade           *int           `json:"grade"`
 	Subgrades       map[string]int `json:"subgrades"`

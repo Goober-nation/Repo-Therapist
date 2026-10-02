@@ -24,6 +24,9 @@ import (
 // the same repo view; the LLM service's own model budget is 60 seconds.
 const DefaultLLMRequestTTL = 2 * time.Minute
 
+// DefaultGradingTokenTTL matches the default GRADING_LOCK_TIMEOUT.
+const DefaultGradingTokenTTL = 20 * time.Minute
+
 type AggregatorService struct {
 	ReposRepo        domain.RepoRepository
 	GradesRepo       domain.GradesRepository
@@ -47,6 +50,11 @@ type AggregatorService struct {
 	// GradeLimiter caps new gradings started by users across the service; the scheduled public
 	// regrade is not counted. nil means no limit.
 	GradeLimiter *GradeLimiter
+	// TokenStore receives the caller's PAT for a private grading, keyed by job id.
+	TokenStore domain.GradingTokenStore
+	// TokenTTL bounds how long a stored PAT lives; keep it equal to the repo lock timeout.
+	// 0 falls back to DefaultGradingTokenTTL.
+	TokenTTL time.Duration
 
 	llmMu       sync.Mutex
 	llmRequests map[string]llmRequest
@@ -396,21 +404,41 @@ func (as *AggregatorService) requestGrading(ctx context.Context, repo domain.Rep
 	}
 
 	event := domain.GradingRequestedEvent{
+		JobID:       uuid.NewString(),
 		OrgSlug:     repo.OrgSlug,
 		RepoSlug:    repo.RepoSlug,
 		Visibility:  repo.Visibility,
 		RequestedAt: as.now(),
 	}
 
-	if private {
-		event.Token = tokenFromContext(ctx)
-	}
-
-	if err := as.gradingPublisher.Publish(ctx, event); err != nil {
+	abort := func() {
 		_ = as.ReposRepo.ReleaseRepositoryLock(ctx, repo.SourcecraftUUID)
 		if userInitiated {
 			as.GradeLimiter.Cancel(reservedAt)
 		}
+	}
+
+	storedToken := false
+	if private {
+		if err := as.storeGradingToken(ctx, event.JobID, tokenFromContext(ctx)); err != nil {
+			abort()
+
+			return fmt.Errorf(
+				"%w: store grading token: %v",
+				domain.ErrGradingFailed,
+				err,
+			)
+		}
+		storedToken = true
+	}
+
+	if err := as.gradingPublisher.Publish(ctx, event); err != nil {
+		if storedToken {
+			if err := as.TokenStore.DeleteToken(ctx, event.JobID); err != nil {
+				log.Printf("deleting grading token for job %s: %v", event.JobID, err)
+			}
+		}
+		abort()
 
 		return fmt.Errorf(
 			"%w: publish grading request: %v",
@@ -420,6 +448,22 @@ func (as *AggregatorService) requestGrading(ctx context.Context, repo domain.Rep
 	}
 
 	return domain.GradingPending
+}
+
+// storeGradingToken puts a private grading's PAT in the token store under jobID.
+func (as *AggregatorService) storeGradingToken(ctx context.Context, jobID, token string) error {
+	if token == "" {
+		return errors.New("no user token for private grading")
+	}
+	if as.TokenStore == nil {
+		return errors.New("no grading token store configured")
+	}
+	ttl := as.TokenTTL
+	if ttl <= 0 {
+		ttl = DefaultGradingTokenTTL
+	}
+
+	return as.TokenStore.PutToken(ctx, jobID, token, ttl)
 }
 
 func (as *AggregatorService) GetMyRepos(

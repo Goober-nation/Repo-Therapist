@@ -8,7 +8,8 @@
 //
 //	grading-request --org=<org> --repo=<repo> [--visibility=public|private] [--wait=10m]
 //
-// --visibility=private sends SOURCECRAFT_PAT from the environment as the user token.
+// --visibility=private stores SOURCECRAFT_PAT from the environment in Redis under a new job id
+// (REDIS_ADDRESS/REDIS_PASSWORD, as the Aggregator does); the Kafka message carries only the id.
 package main
 
 import (
@@ -20,17 +21,19 @@ import (
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	kafkago "github.com/segmentio/kafka-go"
 
 	"repo-therapist/grade-service/internal/app"
 	"repo-therapist/grade-service/internal/contracts"
 	kafkaclient "repo-therapist/grade-service/internal/kafka"
+	"repo-therapist/grade-service/internal/tokenstore"
 )
 
 func main() {
 	org := flag.String("org", "", "org slug")
 	repo := flag.String("repo", "", "repo slug")
-	visibility := flag.String("visibility", "public", "public (no token) or private (SOURCECRAFT_PAT as token)")
+	visibility := flag.String("visibility", "public", "public (no token) or private (SOURCECRAFT_PAT stored in Redis as the user token)")
 	// 10m covers the default clone limit (CLONE_TIMEOUT); failures exit early, so it only bounds
 	// a stuck pipeline. The batch script passes --wait=15m.
 	wait := flag.Duration("wait", 10*time.Minute, "how long to wait for this repo's grading.results message; 0 = publish only")
@@ -80,11 +83,20 @@ func run(org, repo, visibility, token string, wait time.Duration) error {
 	producer := kafkaclient.NewProducer(brokers, contracts.TopicGradingRequests)
 	defer producer.Close()
 
-	req := contracts.GradingRequestedEvent{OrgSlug: org, RepoSlug: repo, Visibility: visibility, Token: token, RequestedAt: time.Now()}
+	jobID := uuid.NewString()
+	if token != "" {
+		tokens := tokenstore.NewFromEnv()
+		defer tokens.Close()
+		if err := tokens.PutToken(ctx, jobID, token, tokenstore.TTL); err != nil {
+			return err
+		}
+	}
+
+	req := contracts.GradingRequestedEvent{JobID: jobID, OrgSlug: org, RepoSlug: repo, Visibility: visibility, RequestedAt: time.Now()}
 	if err := producer.Publish(ctx, org+"/"+repo, req); err != nil {
 		return fmt.Errorf("publishing %s: %w", contracts.TopicGradingRequests, err)
 	}
-	log.Printf("published %s grading request for %s/%s to %s (token: %t)", visibility, org, repo, contracts.TopicGradingRequests, token != "")
+	log.Printf("published %s grading request for %s/%s to %s (job %s, token stored: %t)", visibility, org, repo, contracts.TopicGradingRequests, jobID, token != "")
 
 	if wait == 0 {
 		return nil
