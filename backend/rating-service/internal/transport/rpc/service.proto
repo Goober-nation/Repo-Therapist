@@ -17,6 +17,13 @@ service Rating {
   // scores, for the public score API and the README badges/widget. Read-only: it never starts a
   // grading. NOT_FOUND when the repo is unknown or not public.
   rpc GetPublicSummary(GetPublicSummaryRequest) returns (GetPublicSummaryResponse);
+  // GetScoreHistory returns the stored public score history of one public repository, oldest
+  // first (the latest 200 points). Read-only. NOT_FOUND when the repo is unknown or not public.
+  rpc GetScoreHistory(GetScoreHistoryRequest) returns (GetScoreHistoryResponse);
+  // GetPositionExplanation explains a public repository's place in the default (unfiltered, by
+  // score) ranking. Read-only. NOT_FOUND when the repo is unknown or not public; ranked=false when
+  // it has no grade yet.
+  rpc GetPositionExplanation(GetPositionExplanationRequest) returns (GetPositionExplanationResponse);
 }
 
 enum SortBy {
@@ -61,6 +68,11 @@ message RankingEntry {
   optional bool low_confidence = 9;
   // Generic pre-written reasons; empty unless low_confidence is true.
   repeated ConfidenceReason confidence_reasons = 10;
+  // Score now minus the score dynamics_days ago. Unset when the repo had no grade that long ago.
+  optional int32 score_change = 11;
+  // Places gained (positive) or lost (negative) in this list since dynamics_days ago, among the
+  // same filtered list. Only set when sorting by score and when the repo was graded back then.
+  optional int32 place_change = 12;
 }
 
 message Language {
@@ -75,6 +87,8 @@ message GetRankingResponse {
   // Effective page and page_size after defaults were applied.
   int32 page = 3;
   int32 page_size = 4;
+  // The window of score_change/place_change in days (RANKING_DYNAMICS_DAYS).
+  int32 dynamics_days = 5;
 }
 
 message GetPublicScoreRequest {
@@ -119,4 +133,61 @@ message GetPublicSummaryResponse {
 message ConfidenceReason {
   string code = 1;
   string text = 2;
+}
+
+message GetScoreHistoryRequest {
+  string org_slug = 1;
+  string repo_slug = 2;
+}
+
+message HistoryPoint {
+  google.protobuf.Timestamp graded_at = 1;
+  int32 score = 2;
+  // Sorted by id; a no-data category keeps its score unset.
+  repeated CategoryScore categories = 3;
+  // Unset when the flag was unknown for that grading.
+  optional bool low_confidence = 4;
+}
+
+message GetScoreHistoryResponse {
+  // Oldest first; empty when the repo has no history.
+  repeated HistoryPoint points = 1;
+}
+
+message GetPositionExplanationRequest {
+  string org_slug = 1;
+  string repo_slug = 2;
+}
+
+// A repo next to the explained one in the ranking.
+message Neighbour {
+  int32 place = 1;
+  string org_slug = 2;
+  string name = 3;
+  int32 score = 4;
+  // Points between the two scores (the neighbour above is ahead by this much, the one below is
+  // behind by this much); 0 means a tie broken by recent activity.
+  int32 points = 5;
+}
+
+message CategoryComparison {
+  string id = 1;
+  int32 score = 2;
+  // Median of this category over the top 10 repos that have it; unset with fewer than 3 values.
+  optional int32 top10_median = 3;
+  // score - top10_median; unset when top10_median is.
+  optional int32 gap = 4;
+}
+
+message GetPositionExplanationResponse {
+  // False when the repo has no public grade yet (nothing else is set then).
+  bool ranked = 1;
+  int32 place = 2;
+  int32 total = 3;
+  int32 score = 4;
+  optional Neighbour above = 5;
+  optional Neighbour below = 6;
+  repeated CategoryComparison categories = 7;
+  // The category with the most negative gap to the top-10 median; empty when none is below it.
+  string weakest_category = 8;
 }

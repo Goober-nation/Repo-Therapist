@@ -75,6 +75,8 @@ func (r *RankingRepository) ListRanking(ctx context.Context, q domain.RankingQue
 			&row.LastActivityAt,
 			&low,
 			&reasons,
+			&row.PastScore,
+			&row.PastPlace,
 		); err != nil {
 			return nil, fmt.Errorf("scan ranking row: %w", err)
 		}
@@ -202,9 +204,29 @@ func buildListQuery(q domain.RankingQuery) (string, []any, error) {
 
 	where, args := whereClause(q.Language, q.HideLowConfidence)
 
-	args = append(args, q.Limit, q.Offset)
+	args = append(args, q.DynamicsDays, q.Limit, q.Offset)
+	daysArg, limitArg, offsetArg := len(args)-2, len(args)-1, len(args)
 
+	// past: each repo of the current filtered list with its latest score from DynamicsDays ago,
+	// ranked by that score with the same tie-breaks as the live score order. A repo graded only
+	// recently has no row there and shows no change.
 	query := fmt.Sprintf(`
+		WITH filtered AS (
+			SELECT r.sourcecraft_uuid, r.last_activity_at, r.org_slug, r.repo_slug
+			FROM repos r
+			%[1]s
+		), past AS (
+			SELECT DISTINCT ON (h.sourcecraft_uuid) h.sourcecraft_uuid, h.score
+			FROM repo_grade_history h
+			JOIN filtered f ON f.sourcecraft_uuid = h.sourcecraft_uuid
+			WHERE h.graded_at <= now() - make_interval(days => $%[2]d::int)
+			ORDER BY h.sourcecraft_uuid, h.graded_at DESC
+		), past_rank AS (
+			SELECT p.sourcecraft_uuid, p.score AS past_score,
+				row_number() OVER (ORDER BY p.score DESC, f.last_activity_at DESC NULLS LAST, f.org_slug, f.repo_slug) AS past_place
+			FROM past p
+			JOIN filtered f ON f.sourcecraft_uuid = p.sourcecraft_uuid
+		)
 		SELECT
 			r.sourcecraft_uuid::text,
 			r.repo_slug,
@@ -215,19 +237,107 @@ func buildListQuery(q domain.RankingQuery) (string, []any, error) {
 			COALESCE(r.language_color, ''),
 			r.last_activity_at,
 			c.low_confidence,
-			c.reasons
+			c.reasons,
+			pr.past_score,
+			pr.past_place::int
 		FROM repos r
 		JOIN repo_grades_public g ON g.sourcecraft_uuid = r.sourcecraft_uuid
 		LEFT JOIN repo_confidence_public c ON c.sourcecraft_uuid = r.sourcecraft_uuid
-		%s
-		ORDER BY %s
-		LIMIT $%d OFFSET $%d
+		LEFT JOIN past_rank pr ON pr.sourcecraft_uuid = r.sourcecraft_uuid
+		%[1]s
+		ORDER BY %[3]s
+		LIMIT $%[4]d OFFSET $%[5]d
 		`,
 		where,
+		daysArg,
 		order,
-		len(args)-1,
-		len(args),
+		limitArg,
+		offsetArg,
 	)
 
 	return query, args, nil
+}
+
+// ListScoreHistory returns the latest limit stored public gradings of a public repo, oldest first.
+func (r *RankingRepository) ListScoreHistory(ctx context.Context, orgSlug, repoSlug string, limit int) ([]domain.HistoryRow, error) {
+	var exists bool
+	if err := r.db.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM repos WHERE org_slug = $1 AND repo_slug = $2 AND visibility = 'public')`,
+		orgSlug, repoSlug,
+	).Scan(&exists); err != nil {
+		return nil, fmt.Errorf("check repo for history: %w", err)
+	}
+
+	if !exists {
+		return nil, domain.ErrNotFound
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT h.graded_at, h.score, h.category_scores, h.low_confidence
+		FROM repo_grade_history h
+		JOIN repos r ON r.sourcecraft_uuid = h.sourcecraft_uuid
+		WHERE r.org_slug = $1 AND r.repo_slug = $2 AND r.visibility = 'public'
+		ORDER BY h.graded_at DESC
+		LIMIT $3
+		`,
+		orgSlug, repoSlug, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list score history: %w", err)
+	}
+	defer rows.Close()
+
+	var result []domain.HistoryRow
+
+	for rows.Next() {
+		var row domain.HistoryRow
+		if err := rows.Scan(&row.GradedAt, &row.Score, &row.CategoryScores, &row.LowConfidence); err != nil {
+			return nil, fmt.Errorf("scan history row: %w", err)
+		}
+
+		result = append(result, row)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate history rows: %w", err)
+	}
+
+	// Newest first came out of the query so LIMIT keeps the latest points; callers want oldest first.
+	for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
+		result[i], result[j] = result[j], result[i]
+	}
+
+	return result, nil
+}
+
+// ListRanked returns every graded public repo in the default ranking order (the "score" sort).
+func (r *RankingRepository) ListRanked(ctx context.Context) ([]domain.RankedRow, error) {
+	rows, err := r.db.Query(ctx, fmt.Sprintf(`
+		SELECT r.org_slug, r.repo_slug, g.score, g.category_scores
+		FROM repos r
+		JOIN repo_grades_public g ON g.sourcecraft_uuid = r.sourcecraft_uuid
+		WHERE r.visibility = 'public' AND g.score IS NOT NULL
+		ORDER BY %s
+		`, orderClauses[domain.SortByScore]))
+	if err != nil {
+		return nil, fmt.Errorf("list ranked: %w", err)
+	}
+	defer rows.Close()
+
+	var result []domain.RankedRow
+
+	for rows.Next() {
+		var row domain.RankedRow
+		if err := rows.Scan(&row.OrgSlug, &row.Name, &row.Score, &row.CategoryScores); err != nil {
+			return nil, fmt.Errorf("scan ranked row: %w", err)
+		}
+
+		result = append(result, row)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ranked rows: %w", err)
+	}
+
+	return result, nil
 }

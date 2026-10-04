@@ -36,6 +36,11 @@ type GradesRepository interface {
 	DeletePrivateAnalytics(ctx context.Context, repoID uuid.UUID) error
 	GetPublicAnalytics(ctx context.Context, repoID uuid.UUID) (RepoAnalytics, error)
 	GetPrivateAnalytics(ctx context.Context, repoID uuid.UUID) (RepoAnalytics, error)
+
+	// AppendPublicHistory adds one point to the public score history (docs/ranking.md). It is
+	// append-only and idempotent: a point with the same repo and graded_at is ignored. A grade
+	// without a score or graded_at has no history point and is skipped without error.
+	AppendPublicHistory(ctx context.Context, grade RepoGrade) error
 }
 
 type LLMRepository interface {

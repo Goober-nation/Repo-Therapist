@@ -89,6 +89,17 @@ type fakeGrades struct {
 	analyticsPublic, analyticsPrivate map[uuid.UUID]domain.RepoAnalytics
 	analyticsDeleted                  []string
 	analyticsErr                      error
+
+	history    []domain.RepoGrade
+	historyErr error
+}
+
+func (f *fakeGrades) AppendPublicHistory(ctx context.Context, grade domain.RepoGrade) error {
+	if f.historyErr != nil {
+		return f.historyErr
+	}
+	f.history = append(f.history, grade)
+	return nil
 }
 
 func (f *fakeGrades) putAnalytics(public bool, repoID uuid.UUID, analytics json.RawMessage, gradedAt *time.Time) error {
@@ -991,6 +1002,50 @@ func TestSaveGradingResultSurvivesAnalyticsFailure(t *testing.T) {
 	err := f.svc.SaveGradingResult(context.Background(), domain.RepoGrade{SourcecraftUUID: testRepoID, Analytics: json.RawMessage(`{"version":1}`)}, "public", "")
 	if err != nil {
 		t.Fatalf("err = %v, want nil: the grade is saved and analytics are advisory", err)
+	}
+	if len(f.grades.savedPublic) != 1 || len(f.repos.released) != 1 {
+		t.Errorf("grade saved %d times, lock released %d times", len(f.grades.savedPublic), len(f.repos.released))
+	}
+}
+
+func TestSaveGradingResultAppendsPublicHistoryOnly(t *testing.T) {
+	score := int16(77)
+	grade := domain.RepoGrade{SourcecraftUUID: testRepoID, Score: &score, CategoryScores: json.RawMessage(`{"activity":{"score":80}}`), GradedAt: gradedAt(testNow)}
+
+	pub := newFixture("public")
+	if err := pub.svc.SaveGradingResult(context.Background(), grade, "public", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(pub.grades.history) != 1 || *pub.grades.history[0].Score != 77 || pub.grades.history[0].GradedAt == nil {
+		t.Errorf("public history = %+v, want one point with the score and graded_at", pub.grades.history)
+	}
+
+	priv := newFixture("private")
+	if err := priv.svc.SaveGradingResult(context.Background(), grade, "private", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(priv.grades.history) != 0 {
+		t.Errorf("a private grade wrote %d history points, want none", len(priv.grades.history))
+	}
+
+	failed := newFixture("public")
+	if err := failed.svc.SaveGradingResult(context.Background(), grade, "public", "REPO_FETCH_FAILED"); err == nil {
+		t.Fatal("a failed grading should return an error")
+	}
+	if len(failed.grades.history) != 0 {
+		t.Errorf("a failed grading wrote %d history points, want none", len(failed.grades.history))
+	}
+}
+
+// History is advisory: failing to append must neither fail the grading nor lose the grade.
+func TestSaveGradingResultSurvivesHistoryFailure(t *testing.T) {
+	f := newFixture("public")
+	f.grades.historyErr = errors.New("db down")
+	score := int16(50)
+
+	err := f.svc.SaveGradingResult(context.Background(), domain.RepoGrade{SourcecraftUUID: testRepoID, Score: &score, GradedAt: gradedAt(testNow)}, "public", "")
+	if err != nil {
+		t.Fatalf("err = %v, want nil: the grade is saved and the history is advisory", err)
 	}
 	if len(f.grades.savedPublic) != 1 || len(f.repos.released) != 1 {
 		t.Errorf("grade saved %d times, lock released %d times", len(f.grades.savedPublic), len(f.repos.released))

@@ -490,6 +490,24 @@ func (s *GatewayService) GetPublicSummary(
 	return mapPublicSummary(resp), nil
 }
 
+// allowPublicAPI applies the public API's own per-IP limit; nil limiter means no limit.
+func (s *GatewayService) allowPublicAPI(ctx context.Context, clientIP string) error {
+	if s.publicAPILimiter == nil {
+		return nil
+	}
+
+	allowed, err := s.publicAPILimiter.Allow(ctx, "rate_limit:gateway:public:ip:"+clientIP)
+	if err != nil {
+		return fmt.Errorf("check public api rate limit: %w", err)
+	}
+
+	if !allowed {
+		return domain.ErrLimitExceeded
+	}
+
+	return nil
+}
+
 // GetScore is GetPublicSummary behind the public API's own per-IP limit.
 func (s *GatewayService) GetScore(
 	ctx context.Context,
@@ -497,18 +515,112 @@ func (s *GatewayService) GetScore(
 	orgSlug string,
 	repoSlug string,
 ) (domain.PublicSummary, error) {
-	if s.publicAPILimiter != nil {
-		allowed, err := s.publicAPILimiter.Allow(ctx, "rate_limit:gateway:public:ip:"+clientIP)
-		if err != nil {
-			return domain.PublicSummary{}, fmt.Errorf("check public api rate limit: %w", err)
-		}
-
-		if !allowed {
-			return domain.PublicSummary{}, domain.ErrLimitExceeded
-		}
+	if err := s.allowPublicAPI(ctx, clientIP); err != nil {
+		return domain.PublicSummary{}, err
 	}
 
 	return s.GetPublicSummary(ctx, orgSlug, repoSlug)
+}
+
+// GetScoreHistory returns the stored public score history of a public repo, oldest first, behind
+// the public API's per-IP limit. It only reads: it never starts a grading.
+func (s *GatewayService) GetScoreHistory(
+	ctx context.Context,
+	clientIP string,
+	orgSlug string,
+	repoSlug string,
+) ([]domain.HistoryPoint, error) {
+	if err := s.allowPublicAPI(ctx, clientIP); err != nil {
+		return nil, err
+	}
+
+	rpcCtx, cancel := context.WithTimeout(ctx, s.ratingTimeout)
+	defer cancel()
+
+	resp, err := s.ratingClient.GetScoreHistory(
+		rpcCtx,
+		&rank.GetScoreHistoryRequest{OrgSlug: orgSlug, RepoSlug: repoSlug},
+	)
+	if err != nil {
+		return nil, rpcError("get score history", err)
+	}
+
+	points := make([]domain.HistoryPoint, 0, len(resp.GetPoints()))
+
+	for _, point := range resp.GetPoints() {
+		categories := make([]domain.PublicCategory, 0, len(point.GetCategories()))
+		for _, category := range point.GetCategories() {
+			categories = append(categories, domain.PublicCategory{ID: category.GetId(), Score: category.Score})
+		}
+
+		points = append(points, domain.HistoryPoint{
+			GradedAt:      point.GetGradedAt().AsTime(),
+			Score:         point.GetScore(),
+			Categories:    categories,
+			LowConfidence: point.LowConfidence,
+		})
+	}
+
+	return points, nil
+}
+
+// GetPositionExplanation explains a public repo's place in the default ranking, behind the public
+// API's per-IP limit. It only reads.
+func (s *GatewayService) GetPositionExplanation(
+	ctx context.Context,
+	clientIP string,
+	orgSlug string,
+	repoSlug string,
+) (domain.PositionExplanation, error) {
+	if err := s.allowPublicAPI(ctx, clientIP); err != nil {
+		return domain.PositionExplanation{}, err
+	}
+
+	rpcCtx, cancel := context.WithTimeout(ctx, s.ratingTimeout)
+	defer cancel()
+
+	resp, err := s.ratingClient.GetPositionExplanation(
+		rpcCtx,
+		&rank.GetPositionExplanationRequest{OrgSlug: orgSlug, RepoSlug: repoSlug},
+	)
+	if err != nil {
+		return domain.PositionExplanation{}, rpcError("get position explanation", err)
+	}
+
+	result := domain.PositionExplanation{Ranked: resp.GetRanked()}
+	if !result.Ranked {
+		return result, nil
+	}
+
+	result.Place, result.Total, result.Score = resp.GetPlace(), resp.GetTotal(), resp.GetScore()
+	result.Above, result.Below = mapNeighbour(resp.GetAbove()), mapNeighbour(resp.GetBelow())
+	result.WeakestCategory = resp.GetWeakestCategory()
+
+	result.Categories = make([]domain.CategoryComparison, 0, len(resp.GetCategories()))
+	for _, category := range resp.GetCategories() {
+		result.Categories = append(result.Categories, domain.CategoryComparison{
+			ID:          category.GetId(),
+			Score:       category.GetScore(),
+			Top10Median: category.Top10Median,
+			Gap:         category.Gap,
+		})
+	}
+
+	return result, nil
+}
+
+func mapNeighbour(n *rank.Neighbour) *domain.RankNeighbour {
+	if n == nil {
+		return nil
+	}
+
+	return &domain.RankNeighbour{
+		Place:   n.GetPlace(),
+		OrgSlug: n.GetOrgSlug(),
+		Name:    n.GetName(),
+		Score:   n.GetScore(),
+		Points:  n.GetPoints(),
+	}
 }
 
 // mapConfidence builds the flag from the wire fields; an unset low means it is unknown.
@@ -593,6 +705,8 @@ func mapGetRankingResponse(
 		TotalCount: resp.GetTotalCount(),
 		Page:       resp.GetPage(),
 		PageSize:   resp.GetPageSize(),
+
+		DynamicsDays: resp.GetDynamicsDays(),
 	}, nil
 }
 
@@ -628,6 +742,8 @@ func mapRankingEntry(
 	}
 
 	result.Confidence = mapConfidence(entry.LowConfidence, entry.GetConfidenceReasons())
+	result.ScoreChange = entry.ScoreChange
+	result.PlaceChange = entry.PlaceChange
 
 	if entry.Likes != nil {
 		likes := entry.GetLikes()

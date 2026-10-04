@@ -69,6 +69,11 @@ type RankingEntry struct {
 	LastActivityAt  *time.Time
 	// Confidence is nil when the flag is unknown (grade stored before the flag existed).
 	Confidence *Confidence
+	// ScoreChange is the score now minus the score DynamicsDays ago, PlaceChange the places gained
+	// (positive) or lost since then; nil when the repo was not graded back then ("new"), and
+	// PlaceChange is also nil unless the list is sorted by score.
+	ScoreChange *int32
+	PlaceChange *int32
 }
 
 // RepoAnalytics is a repo's stored informational analytics (bus factor, ownership map) and the time
@@ -94,4 +99,44 @@ type PublicSummary struct {
 	MissingData []string
 	GradedAt    *time.Time
 	Confidence  *Confidence
+}
+
+// HistoryPoint is one stored public grading of a repo; a nil category Score means no data and a
+// nil LowConfidence means the flag was unknown for that grading.
+type HistoryPoint struct {
+	GradedAt      time.Time
+	Score         int32
+	Categories    []PublicCategory
+	LowConfidence *bool
+}
+
+// RankNeighbour is the repo next to the explained one; Points is the gap between the two scores.
+type RankNeighbour struct {
+	Place   int32
+	OrgSlug string
+	Name    string
+	Score   int32
+	Points  int32
+}
+
+// CategoryComparison compares a category with the top-10 median; the median and gap are nil when
+// too few top repos have the category.
+type CategoryComparison struct {
+	ID          string
+	Score       int32
+	Top10Median *int32
+	Gap         *int32
+}
+
+// PositionExplanation explains a public repo's place in the default ranking. Ranked is false for
+// a public repo that has no grade yet.
+type PositionExplanation struct {
+	Ranked          bool
+	Place           int32
+	Total           int32
+	Score           int32
+	Above           *RankNeighbour
+	Below           *RankNeighbour
+	Categories      []CategoryComparison
+	WeakestCategory string
 }

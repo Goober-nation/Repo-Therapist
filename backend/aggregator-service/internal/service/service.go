@@ -619,6 +619,7 @@ func (as *AggregatorService) SaveGradingResult(ctx context.Context,
 		}
 
 		as.saveAnalytics(ctx, grade, true)
+		as.saveHistory(ctx, grade)
 
 	case domain.VisibilityPrivate:
 		if err := as.GradesRepo.UpsertPrivateGrade(ctx, grade); err != nil {
@@ -680,6 +681,14 @@ func (as *AggregatorService) saveAnalytics(ctx context.Context, grade domain.Rep
 
 	if err != nil {
 		log.Printf("save analytics of %s (public=%v): %v", grade.SourcecraftUUID, public, err)
+	}
+}
+
+// saveHistory appends the public grade to the score history. The history is advisory and the
+// grade is already saved, so a failure here is only logged and never fails the grading.
+func (as *AggregatorService) saveHistory(ctx context.Context, grade domain.RepoGrade) {
+	if err := as.GradesRepo.AppendPublicHistory(ctx, grade); err != nil {
+		log.Printf("append score history of %s: %v", grade.SourcecraftUUID, err)
 	}
 }
 

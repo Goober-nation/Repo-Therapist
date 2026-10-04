@@ -19,18 +19,34 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Rating_GetRanking_FullMethodName       = "/rating.Rating/GetRanking"
-	Rating_GetPublicScore_FullMethodName   = "/rating.Rating/GetPublicScore"
-	Rating_GetPublicSummary_FullMethodName = "/rating.Rating/GetPublicSummary"
+	Rating_GetRanking_FullMethodName             = "/rating.Rating/GetRanking"
+	Rating_GetPublicScore_FullMethodName         = "/rating.Rating/GetPublicScore"
+	Rating_GetPublicSummary_FullMethodName       = "/rating.Rating/GetPublicSummary"
+	Rating_GetScoreHistory_FullMethodName        = "/rating.Rating/GetScoreHistory"
+	Rating_GetPositionExplanation_FullMethodName = "/rating.Rating/GetPositionExplanation"
 )
 
 // RatingClient is the client API for Rating service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type RatingClient interface {
+	// GetRanking returns one page of the public repositories ranking. Read-only — the rating
+	// service never writes to the DB.
 	GetRanking(ctx context.Context, in *GetRankingRequest, opts ...grpc.CallOption) (*GetRankingResponse, error)
+	// GetPublicScore returns the stored public score of one public repository, for the README
+	// badge. Read-only: it never starts a grading. NOT_FOUND when the repo is unknown or not public.
 	GetPublicScore(ctx context.Context, in *GetPublicScoreRequest, opts ...grpc.CallOption) (*GetPublicScoreResponse, error)
+	// GetPublicSummary returns the stored public grade of one public repository with its category
+	// scores, for the public score API and the README badges/widget. Read-only: it never starts a
+	// grading. NOT_FOUND when the repo is unknown or not public.
 	GetPublicSummary(ctx context.Context, in *GetPublicSummaryRequest, opts ...grpc.CallOption) (*GetPublicSummaryResponse, error)
+	// GetScoreHistory returns the stored public score history of one public repository, oldest
+	// first (the latest 200 points). Read-only. NOT_FOUND when the repo is unknown or not public.
+	GetScoreHistory(ctx context.Context, in *GetScoreHistoryRequest, opts ...grpc.CallOption) (*GetScoreHistoryResponse, error)
+	// GetPositionExplanation explains a public repository's place in the default (unfiltered, by
+	// score) ranking. Read-only. NOT_FOUND when the repo is unknown or not public; ranked=false when
+	// it has no grade yet.
+	GetPositionExplanation(ctx context.Context, in *GetPositionExplanationRequest, opts ...grpc.CallOption) (*GetPositionExplanationResponse, error)
 }
 
 type ratingClient struct {
@@ -71,13 +87,47 @@ func (c *ratingClient) GetPublicSummary(ctx context.Context, in *GetPublicSummar
 	return out, nil
 }
 
+func (c *ratingClient) GetScoreHistory(ctx context.Context, in *GetScoreHistoryRequest, opts ...grpc.CallOption) (*GetScoreHistoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetScoreHistoryResponse)
+	err := c.cc.Invoke(ctx, Rating_GetScoreHistory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ratingClient) GetPositionExplanation(ctx context.Context, in *GetPositionExplanationRequest, opts ...grpc.CallOption) (*GetPositionExplanationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPositionExplanationResponse)
+	err := c.cc.Invoke(ctx, Rating_GetPositionExplanation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RatingServer is the server API for Rating service.
 // All implementations must embed UnimplementedRatingServer
 // for forward compatibility.
 type RatingServer interface {
+	// GetRanking returns one page of the public repositories ranking. Read-only — the rating
+	// service never writes to the DB.
 	GetRanking(context.Context, *GetRankingRequest) (*GetRankingResponse, error)
+	// GetPublicScore returns the stored public score of one public repository, for the README
+	// badge. Read-only: it never starts a grading. NOT_FOUND when the repo is unknown or not public.
 	GetPublicScore(context.Context, *GetPublicScoreRequest) (*GetPublicScoreResponse, error)
+	// GetPublicSummary returns the stored public grade of one public repository with its category
+	// scores, for the public score API and the README badges/widget. Read-only: it never starts a
+	// grading. NOT_FOUND when the repo is unknown or not public.
 	GetPublicSummary(context.Context, *GetPublicSummaryRequest) (*GetPublicSummaryResponse, error)
+	// GetScoreHistory returns the stored public score history of one public repository, oldest
+	// first (the latest 200 points). Read-only. NOT_FOUND when the repo is unknown or not public.
+	GetScoreHistory(context.Context, *GetScoreHistoryRequest) (*GetScoreHistoryResponse, error)
+	// GetPositionExplanation explains a public repository's place in the default (unfiltered, by
+	// score) ranking. Read-only. NOT_FOUND when the repo is unknown or not public; ranked=false when
+	// it has no grade yet.
+	GetPositionExplanation(context.Context, *GetPositionExplanationRequest) (*GetPositionExplanationResponse, error)
 	mustEmbedUnimplementedRatingServer()
 }
 
@@ -96,6 +146,12 @@ func (UnimplementedRatingServer) GetPublicScore(context.Context, *GetPublicScore
 }
 func (UnimplementedRatingServer) GetPublicSummary(context.Context, *GetPublicSummaryRequest) (*GetPublicSummaryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetPublicSummary not implemented")
+}
+func (UnimplementedRatingServer) GetScoreHistory(context.Context, *GetScoreHistoryRequest) (*GetScoreHistoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetScoreHistory not implemented")
+}
+func (UnimplementedRatingServer) GetPositionExplanation(context.Context, *GetPositionExplanationRequest) (*GetPositionExplanationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPositionExplanation not implemented")
 }
 func (UnimplementedRatingServer) mustEmbedUnimplementedRatingServer() {}
 func (UnimplementedRatingServer) testEmbeddedByValue()                {}
@@ -172,6 +228,42 @@ func _Rating_GetPublicSummary_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Rating_GetScoreHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetScoreHistoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RatingServer).GetScoreHistory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Rating_GetScoreHistory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RatingServer).GetScoreHistory(ctx, req.(*GetScoreHistoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Rating_GetPositionExplanation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPositionExplanationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RatingServer).GetPositionExplanation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Rating_GetPositionExplanation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RatingServer).GetPositionExplanation(ctx, req.(*GetPositionExplanationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Rating_ServiceDesc is the grpc.ServiceDesc for Rating service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -190,6 +282,14 @@ var Rating_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPublicSummary",
 			Handler:    _Rating_GetPublicSummary_Handler,
+		},
+		{
+			MethodName: "GetScoreHistory",
+			Handler:    _Rating_GetScoreHistory_Handler,
+		},
+		{
+			MethodName: "GetPositionExplanation",
+			Handler:    _Rating_GetPositionExplanation_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

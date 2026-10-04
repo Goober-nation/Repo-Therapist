@@ -44,6 +44,8 @@ type GetRankingResponse struct {
 	TotalCount int32
 	Page       int32
 	PageSize   int32
+	// DynamicsDays is the window of the entries' score and place change.
+	DynamicsDays int32
 }
 
 type LoginWithYandexRequest struct {

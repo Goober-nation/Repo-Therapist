@@ -18,6 +18,8 @@ type RatingService interface {
 	GetRanking(ctx context.Context, req domain.RankingRequest) (domain.RankingPage, error)
 	GetPublicScore(ctx context.Context, orgSlug, repoSlug string) (*int16, error)
 	GetPublicSummary(ctx context.Context, orgSlug, repoSlug string) (domain.PublicSummary, error)
+	GetScoreHistory(ctx context.Context, orgSlug, repoSlug string) ([]domain.HistoryPoint, error)
+	GetPositionExplanation(ctx context.Context, orgSlug, repoSlug string) (domain.PositionExplanation, error)
 }
 
 type Server struct {
@@ -59,6 +61,8 @@ func (s *Server) GetRanking(ctx context.Context, req *pb.GetRankingRequest) (*pb
 		TotalCount: int32(page.TotalCount),
 		Page:       int32(page.Page),
 		PageSize:   int32(page.PageSize),
+
+		DynamicsDays: int32(page.DynamicsDays),
 	}, nil
 }
 
@@ -116,6 +120,91 @@ func (s *Server) GetPublicSummary(ctx context.Context, req *pb.GetPublicSummaryR
 	return result, nil
 }
 
+func (s *Server) GetScoreHistory(ctx context.Context, req *pb.GetScoreHistoryRequest) (*pb.GetScoreHistoryResponse, error) {
+	points, err := s.service.GetScoreHistory(ctx, req.GetOrgSlug(), req.GetRepoSlug())
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	result := &pb.GetScoreHistoryResponse{Points: make([]*pb.HistoryPoint, 0, len(points))}
+
+	for _, point := range points {
+		entry := &pb.HistoryPoint{
+			GradedAt:      timestamppb.New(point.GradedAt),
+			Score:         int32(point.Score),
+			Categories:    categoriesToProto(point.Categories),
+			LowConfidence: point.LowConfidence,
+		}
+		result.Points = append(result.Points, entry)
+	}
+
+	return result, nil
+}
+
+func (s *Server) GetPositionExplanation(ctx context.Context, req *pb.GetPositionExplanationRequest) (*pb.GetPositionExplanationResponse, error) {
+	explanation, err := s.service.GetPositionExplanation(ctx, req.GetOrgSlug(), req.GetRepoSlug())
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	result := &pb.GetPositionExplanationResponse{Ranked: explanation.Ranked}
+	if !explanation.Ranked {
+		return result, nil
+	}
+
+	result.Place = int32(explanation.Place)
+	result.Total = int32(explanation.Total)
+	result.Score = int32(explanation.Score)
+	result.Above = neighbourToProto(explanation.Above)
+	result.Below = neighbourToProto(explanation.Below)
+	result.WeakestCategory = explanation.WeakestCategory
+
+	result.Categories = make([]*pb.CategoryComparison, 0, len(explanation.Categories))
+
+	for _, category := range explanation.Categories {
+		entry := &pb.CategoryComparison{Id: category.ID, Score: int32(category.Score)}
+
+		if category.Top10Median != nil {
+			median, gap := int32(*category.Top10Median), int32(*category.Gap)
+			entry.Top10Median, entry.Gap = &median, &gap
+		}
+
+		result.Categories = append(result.Categories, entry)
+	}
+
+	return result, nil
+}
+
+func neighbourToProto(n *domain.Neighbour) *pb.Neighbour {
+	if n == nil {
+		return nil
+	}
+
+	return &pb.Neighbour{
+		Place:   int32(n.Place),
+		OrgSlug: n.OrgSlug,
+		Name:    n.Name,
+		Score:   int32(n.Score),
+		Points:  int32(n.Points),
+	}
+}
+
+func categoriesToProto(categories []domain.CategoryScore) []*pb.CategoryScore {
+	result := make([]*pb.CategoryScore, 0, len(categories))
+
+	for _, category := range categories {
+		entry := &pb.CategoryScore{Id: category.ID}
+		if category.Score != nil {
+			score := int32(*category.Score)
+			entry.Score = &score
+		}
+
+		result = append(result, entry)
+	}
+
+	return result
+}
+
 func sortFromProto(sortBy pb.SortBy) (domain.SortBy, error) {
 	switch sortBy {
 	case pb.SortBy_SORT_BY_SCORE:
@@ -154,6 +243,16 @@ func entryToProto(entry domain.RankingEntry) *pb.RankingEntry {
 	if entry.Confidence != nil {
 		result.LowConfidence = &entry.Confidence.Low
 		result.ConfidenceReasons = reasonsToProto(entry.Confidence.Reasons)
+	}
+
+	if entry.ScoreChange != nil {
+		change := int32(*entry.ScoreChange)
+		result.ScoreChange = &change
+	}
+
+	if entry.PlaceChange != nil {
+		change := int32(*entry.PlaceChange)
+		result.PlaceChange = &change
 	}
 
 	return result

@@ -249,6 +249,143 @@ func (h *Handler) GetScore(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 
 const scoreCacheSeconds = 60
 
+type historyCategory struct {
+	ID     string `json:"id"`
+	Score  *int32 `json:"score"`
+	NoData bool   `json:"no_data"`
+}
+
+type historyPointResponse struct {
+	GradedAt   time.Time         `json:"graded_at"`
+	Score      int32             `json:"score"`
+	Categories []historyCategory `json:"categories"`
+	// LowConfidence is null when the flag was unknown for that grading.
+	LowConfidence *bool `json:"low_confidence"`
+}
+
+type historyResponse struct {
+	Org    string                 `json:"org"`
+	Repo   string                 `json:"repo"`
+	Status string                 `json:"status"`
+	Points []historyPointResponse `json:"points"`
+}
+
+// GetHistory serves GET /history/{org}/{repo}: the stored public score history, oldest first. Like
+// /score it is read-only, public and CORS-open; a repo without history answers 200 with NO_DATA.
+func (h *Handler) GetHistory(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+	setPublicCORS(w)
+
+	org, repo := r.PathValue("org"), r.PathValue("repo")
+	if org == "" || repo == "" {
+		stdhttp.NotFound(w, r)
+		return
+	}
+
+	points, err := h.service.GetScoreHistory(r.Context(), clientIP(r), org, repo)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	response := historyResponse{Org: org, Repo: repo, Status: statusNoData, Points: make([]historyPointResponse, 0, len(points))}
+	if len(points) > 0 {
+		response.Status = statusFinished
+	}
+
+	for _, point := range points {
+		categories := make([]historyCategory, 0, len(point.Categories))
+		for _, category := range point.Categories {
+			categories = append(categories, historyCategory{ID: category.ID, Score: category.Score, NoData: category.Score == nil})
+		}
+
+		response.Points = append(response.Points, historyPointResponse{
+			GradedAt:      point.GradedAt,
+			Score:         point.Score,
+			Categories:    categories,
+			LowConfidence: point.LowConfidence,
+		})
+	}
+
+	w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", scoreCacheSeconds))
+	writeJSON(w, stdhttp.StatusOK, response)
+}
+
+type neighbourResponse struct {
+	Place  int32  `json:"place"`
+	Org    string `json:"org"`
+	Name   string `json:"name"`
+	Score  int32  `json:"score"`
+	Points int32  `json:"points"`
+}
+
+type categoryComparisonResponse struct {
+	ID          string `json:"id"`
+	Score       int32  `json:"score"`
+	Top10Median *int32 `json:"top10_median"`
+	Gap         *int32 `json:"gap"`
+}
+
+type positionResponse struct {
+	Org    string `json:"org"`
+	Repo   string `json:"repo"`
+	Status string `json:"status"`
+
+	Place int32  `json:"place,omitempty"`
+	Total int32  `json:"total,omitempty"`
+	Score *int32 `json:"score,omitempty"`
+	// Above is the repo one place higher, Below the repo one place lower; null at the ends.
+	Above           *neighbourResponse           `json:"above"`
+	Below           *neighbourResponse           `json:"below"`
+	Categories      []categoryComparisonResponse `json:"categories"`
+	WeakestCategory string                       `json:"weakest_category"`
+}
+
+func mapNeighbourResponse(n *domain.RankNeighbour) *neighbourResponse {
+	if n == nil {
+		return nil
+	}
+
+	return &neighbourResponse{Place: n.Place, Org: n.OrgSlug, Name: n.Name, Score: n.Score, Points: n.Points}
+}
+
+// GetPosition serves GET /position/{org}/{repo}: why the repo has its place in the default
+// ranking (neighbours and the per-category gap to the top-10 median). Read-only, public and
+// CORS-open; a public repo that is not graded yet answers 200 with NO_DATA.
+func (h *Handler) GetPosition(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+	setPublicCORS(w)
+
+	org, repo := r.PathValue("org"), r.PathValue("repo")
+	if org == "" || repo == "" {
+		stdhttp.NotFound(w, r)
+		return
+	}
+
+	explanation, err := h.service.GetPositionExplanation(r.Context(), clientIP(r), org, repo)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	response := positionResponse{Org: org, Repo: repo, Status: statusNoData, Categories: []categoryComparisonResponse{}}
+
+	if explanation.Ranked {
+		score := explanation.Score
+		response.Status = statusFinished
+		response.Place, response.Total, response.Score = explanation.Place, explanation.Total, &score
+		response.Above, response.Below = mapNeighbourResponse(explanation.Above), mapNeighbourResponse(explanation.Below)
+		response.WeakestCategory = explanation.WeakestCategory
+
+		for _, category := range explanation.Categories {
+			response.Categories = append(response.Categories, categoryComparisonResponse{
+				ID: category.ID, Score: category.Score, Top10Median: category.Top10Median, Gap: category.Gap,
+			})
+		}
+	}
+
+	w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", scoreCacheSeconds))
+	writeJSON(w, stdhttp.StatusOK, response)
+}
+
 // Widget geometry. The card is a fixed 380x164 box: the score on the left, one bar per public
 // category on the right.
 const (

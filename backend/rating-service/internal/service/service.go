@@ -14,20 +14,37 @@ import (
 const (
 	DefaultPageSize = 20
 	MaxPageSize     = 100
+
+	// DefaultDynamicsDays is the default window of the score and place change.
+	DefaultDynamicsDays = 7
+	// MaxHistoryPoints is how many of the latest history points GetScoreHistory returns.
+	MaxHistoryPoints = 200
+	// topN is how many top repos the explanation's per-category median is taken over, and
+	// minMedianValues how many of them must have the category for a median to be shown.
+	topN            = 10
+	minMedianValues = 3
 )
 
 type RatingService struct {
-	repo domain.RankingRepository
+	repo         domain.RankingRepository
+	dynamicsDays int
 }
 
-func NewRatingService(repo domain.RankingRepository) *RatingService {
+// NewRatingService builds the service; dynamicsDays is the window of the score and place change
+// in ranking pages (a value below 1 means DefaultDynamicsDays).
+func NewRatingService(repo domain.RankingRepository, dynamicsDays int) *RatingService {
+	if dynamicsDays < 1 {
+		dynamicsDays = DefaultDynamicsDays
+	}
+
 	return &RatingService{
-		repo: repo,
+		repo:         repo,
+		dynamicsDays: dynamicsDays,
 	}
 }
 
 func (s *RatingService) GetRanking(ctx context.Context, req domain.RankingRequest) (domain.RankingPage, error) {
-	query, page, err := buildQuery(req)
+	query, page, err := buildQuery(req, s.dynamicsDays)
 	if err != nil {
 		return domain.RankingPage{}, err
 	}
@@ -42,6 +59,8 @@ func (s *RatingService) GetRanking(ctx context.Context, req domain.RankingReques
 		TotalCount: total,
 		Page:       page,
 		PageSize:   query.Limit,
+
+		DynamicsDays: s.dynamicsDays,
 	}
 
 	// Past the last page — nothing to list.
@@ -56,8 +75,11 @@ func (s *RatingService) GetRanking(ctx context.Context, req domain.RankingReques
 
 	result.Entries = make([]domain.RankingEntry, 0, len(rows))
 	for i, row := range rows {
+		place := query.Offset + i + 1
+		applyDynamics(&row, place, query.SortBy == domain.SortByScore)
+
 		result.Entries = append(result.Entries, domain.RankingEntry{
-			Place:      query.Offset + i + 1,
+			Place:      place,
 			RankingRow: row,
 		})
 	}
@@ -136,7 +158,7 @@ func decodeCategories(raw []byte) ([]domain.CategoryScore, error) {
 
 // buildQuery applies defaults and validates the request. Returns the effective page number
 // alongside the query, since the query itself only carries limit/offset.
-func buildQuery(req domain.RankingRequest) (domain.RankingQuery, int, error) {
+func buildQuery(req domain.RankingRequest, dynamicsDays int) (domain.RankingQuery, int, error) {
 	page := req.Page
 	if page < 0 {
 		return domain.RankingQuery{}, 0, fmt.Errorf("%w: page must not be negative", domain.ErrInvalidArgument)
@@ -165,5 +187,186 @@ func buildQuery(req domain.RankingRequest) (domain.RankingQuery, int, error) {
 		HideLowConfidence: req.HideLowConfidence,
 		Limit:             pageSize,
 		Offset:            (page - 1) * pageSize,
+		DynamicsDays:      dynamicsDays,
 	}, page, nil
+}
+
+// applyDynamics turns the past score and place the repository found into the changes shown in the
+// ranking. Without a past score the repo has no change at all ("new"); the place change needs the
+// live place to be a score place, so it is only set when the list is sorted by score. A positive
+// place change means places gained.
+func applyDynamics(row *domain.RankingRow, place int, byScore bool) {
+	if row.PastScore == nil || row.PublicScore == nil {
+		return
+	}
+
+	scoreChange := int(*row.PublicScore) - int(*row.PastScore)
+	row.ScoreChange = &scoreChange
+
+	if byScore && row.PastPlace != nil {
+		placeChange := *row.PastPlace - place
+		row.PlaceChange = &placeChange
+	}
+}
+
+// GetScoreHistory returns the latest stored public gradings of a public repo, oldest first, with
+// category scores decoded. A repo without history comes back with no points.
+func (s *RatingService) GetScoreHistory(ctx context.Context, orgSlug, repoSlug string) ([]domain.HistoryPoint, error) {
+	orgSlug, repoSlug = strings.TrimSpace(orgSlug), strings.TrimSpace(repoSlug)
+	if orgSlug == "" || repoSlug == "" {
+		return nil, fmt.Errorf("%w: org_slug and repo_slug are required", domain.ErrInvalidArgument)
+	}
+
+	rows, err := s.repo.ListScoreHistory(ctx, orgSlug, repoSlug, MaxHistoryPoints)
+	if err != nil {
+		return nil, err
+	}
+
+	points := make([]domain.HistoryPoint, 0, len(rows))
+
+	for _, row := range rows {
+		categories, err := decodeCategories(row.CategoryScores)
+		if err != nil {
+			return nil, err
+		}
+
+		points = append(points, domain.HistoryPoint{
+			GradedAt:      row.GradedAt,
+			Score:         int(row.Score),
+			Categories:    categories,
+			LowConfidence: row.LowConfidence,
+		})
+	}
+
+	return points, nil
+}
+
+// GetPositionExplanation explains a public repo's place in the default ranking. ErrNotFound is
+// returned for an unknown or non-public repo; a public repo without a grade is Ranked=false.
+func (s *RatingService) GetPositionExplanation(ctx context.Context, orgSlug, repoSlug string) (domain.PositionExplanation, error) {
+	orgSlug, repoSlug = strings.TrimSpace(orgSlug), strings.TrimSpace(repoSlug)
+	if orgSlug == "" || repoSlug == "" {
+		return domain.PositionExplanation{}, fmt.Errorf("%w: org_slug and repo_slug are required", domain.ErrInvalidArgument)
+	}
+
+	rows, err := s.repo.ListRanked(ctx)
+	if err != nil {
+		return domain.PositionExplanation{}, err
+	}
+
+	explanation, found, err := explainPosition(rows, orgSlug, repoSlug)
+	if err != nil {
+		return domain.PositionExplanation{}, err
+	}
+
+	if !found {
+		// Either unknown/non-public (ErrNotFound from here) or public but not graded yet.
+		if _, err := s.repo.GetPublicScore(ctx, orgSlug, repoSlug); err != nil {
+			return domain.PositionExplanation{}, err
+		}
+
+		return domain.PositionExplanation{Ranked: false}, nil
+	}
+
+	return explanation, nil
+}
+
+// explainPosition finds the repo in the ranking (best first) and compares it with its neighbours
+// and, per category, with the median of the top repos. found is false when the repo is not in rows.
+func explainPosition(rows []domain.RankedRow, orgSlug, repoSlug string) (domain.PositionExplanation, bool, error) {
+	index := -1
+
+	for i, row := range rows {
+		if row.OrgSlug == orgSlug && row.Name == repoSlug {
+			index = i
+
+			break
+		}
+	}
+
+	if index < 0 {
+		return domain.PositionExplanation{}, false, nil
+	}
+
+	self := rows[index]
+	result := domain.PositionExplanation{
+		Ranked: true,
+		Place:  index + 1,
+		Total:  len(rows),
+		Score:  self.Score,
+	}
+
+	if index > 0 {
+		above := rows[index-1]
+		result.Above = &domain.Neighbour{Place: index, OrgSlug: above.OrgSlug, Name: above.Name, Score: above.Score, Points: above.Score - self.Score}
+	}
+
+	if index+1 < len(rows) {
+		below := rows[index+1]
+		result.Below = &domain.Neighbour{Place: index + 2, OrgSlug: below.OrgSlug, Name: below.Name, Score: below.Score, Points: self.Score - below.Score}
+	}
+
+	own, err := decodeCategories(self.CategoryScores)
+	if err != nil {
+		return domain.PositionExplanation{}, false, err
+	}
+
+	top := rows
+	if len(top) > topN {
+		top = top[:topN]
+	}
+
+	values := map[string][]int{}
+
+	for _, row := range top {
+		categories, err := decodeCategories(row.CategoryScores)
+		if err != nil {
+			return domain.PositionExplanation{}, false, err
+		}
+
+		for _, category := range categories {
+			if category.Score != nil {
+				values[category.ID] = append(values[category.ID], *category.Score)
+			}
+		}
+	}
+
+	worstGap := 0
+
+	for _, category := range own {
+		if category.Score == nil {
+			continue
+		}
+
+		comparison := domain.CategoryComparison{ID: category.ID, Score: *category.Score}
+
+		if scores := values[category.ID]; len(scores) >= minMedianValues {
+			median := medianInt(scores)
+			gap := *category.Score - median
+			comparison.Top10Median, comparison.Gap = &median, &gap
+
+			// Strictly below the top-10 median; ties between categories keep the first by id.
+			if gap < worstGap {
+				worstGap = gap
+				result.WeakestCategory = category.ID
+			}
+		}
+
+		result.Categories = append(result.Categories, comparison)
+	}
+
+	return result, true, nil
+}
+
+// medianInt is the median of values rounded to the nearest integer (halves round up).
+func medianInt(values []int) int {
+	sorted := append([]int(nil), values...)
+	sort.Ints(sorted)
+
+	mid := len(sorted) / 2
+	if len(sorted)%2 == 1 {
+		return sorted[mid]
+	}
+
+	return int(math.Round(float64(sorted[mid-1]+sorted[mid]) / 2))
 }

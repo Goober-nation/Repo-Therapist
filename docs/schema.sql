@@ -98,6 +98,22 @@ CREATE TABLE repo_llm_responses_private (
 );
 
 
+-- Score history of public grades: one row per public grading, append-only (written by the Aggregator
+-- right after the public grade; the composite key makes a redelivered message a no-op). Private
+-- grades are not stored. low_confidence NULL = the flag was unknown for that grade.
+CREATE TABLE repo_grade_history (
+  sourcecraft_uuid   UUID NOT NULL REFERENCES repos(sourcecraft_uuid),
+  graded_at          TIMESTAMPTZ NOT NULL,
+
+  score              SMALLINT NOT NULL CHECK (score BETWEEN 0 AND 100),
+  category_scores    JSONB NOT NULL DEFAULT '{}',
+  low_confidence     BOOLEAN,
+
+  PRIMARY KEY (sourcecraft_uuid, graded_at)
+);
+
+CREATE INDEX ON repo_grade_history (graded_at);
+
 CREATE TABLE users (
     id UUID PRIMARY KEY,
     yandex_id VARCHAR(255) NOT NULL UNIQUE,

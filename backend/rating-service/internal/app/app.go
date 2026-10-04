@@ -46,7 +46,7 @@ func StartApp() {
 	log.Println("postgres connected")
 
 	rankingRepo := database.NewRankingRepository(db)
-	ratingService := service.NewRatingService(rankingRepo)
+	ratingService := service.NewRatingService(rankingRepo, cfg.DynamicsDays)
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterRatingServer(grpcServer, rpc.NewServer(ratingService))

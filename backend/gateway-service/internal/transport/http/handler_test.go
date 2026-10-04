@@ -35,9 +35,23 @@ type fakeService struct {
 	analyticsOut domain.RepoAnalytics
 	analyticsFor string
 
+	historyOut     []domain.HistoryPoint
+	explanationOut domain.PositionExplanation
+	rankFor        string
+
 	orgsOut     domain.GetMyOrgsDTO
 	orgReposOut domain.GetMyReposDTO
 	orgReposFor string
+}
+
+func (f *fakeService) GetScoreHistory(ctx context.Context, clientIP, orgSlug, repoSlug string) ([]domain.HistoryPoint, error) {
+	f.called, f.scoreIP, f.rankFor = true, clientIP, orgSlug+"/"+repoSlug
+	return f.historyOut, f.err
+}
+
+func (f *fakeService) GetPositionExplanation(ctx context.Context, clientIP, orgSlug, repoSlug string) (domain.PositionExplanation, error) {
+	f.called, f.scoreIP, f.rankFor = true, clientIP, orgSlug+"/"+repoSlug
+	return f.explanationOut, f.err
 }
 
 func (f *fakeService) GetAnalytics(ctx context.Context, clientIP, pat, orgSlug, repoSlug string) (domain.RepoAnalytics, error) {

@@ -22,6 +22,17 @@ type fakeService struct {
 
 	summary    domain.PublicSummary
 	summaryErr error
+
+	history     []domain.HistoryPoint
+	explanation domain.PositionExplanation
+}
+
+func (f *fakeService) GetScoreHistory(ctx context.Context, orgSlug, repoSlug string) ([]domain.HistoryPoint, error) {
+	return f.history, f.err
+}
+
+func (f *fakeService) GetPositionExplanation(ctx context.Context, orgSlug, repoSlug string) (domain.PositionExplanation, error) {
+	return f.explanation, f.err
 }
 
 func (f *fakeService) GetPublicSummary(ctx context.Context, orgSlug, repoSlug string) (domain.PublicSummary, error) {
@@ -278,5 +289,71 @@ func TestPublicSummaryConfidenceMapping(t *testing.T) {
 	resp, err = NewServer(&fakeService{}).GetPublicSummary(context.Background(), &pb.GetPublicSummaryRequest{OrgSlug: "o", RepoSlug: "demo"})
 	if err != nil || resp.LowConfidence != nil {
 		t.Errorf("unknown flag: resp = %v err = %v, want low_confidence unset", resp, err)
+	}
+}
+
+func TestGetScoreHistoryMapping(t *testing.T) {
+	when := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	score := 70
+	low := true
+	svc := &fakeService{history: []domain.HistoryPoint{{GradedAt: when, Score: 66, Categories: []domain.CategoryScore{{ID: "activity", Score: &score}, {ID: "issues"}}, LowConfidence: &low}}}
+
+	got, err := NewServer(svc).GetScoreHistory(context.Background(), &pb.GetScoreHistoryRequest{OrgSlug: "o", RepoSlug: "r"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	p := got.Points[0]
+	if p.Score != 66 || !p.GradedAt.AsTime().Equal(when) || p.LowConfidence == nil || !*p.LowConfidence {
+		t.Errorf("point = %+v", p)
+	}
+	if len(p.Categories) != 2 || p.Categories[0].Score == nil || *p.Categories[0].Score != 70 || p.Categories[1].Score != nil {
+		t.Errorf("categories = %+v, want 70 and an unset no-data score", p.Categories)
+	}
+
+	svc.err = domain.ErrNotFound
+	if _, err := NewServer(svc).GetScoreHistory(context.Background(), &pb.GetScoreHistoryRequest{}); status.Code(err) != codes.NotFound {
+		t.Errorf("code = %v, want NotFound", status.Code(err))
+	}
+}
+
+func TestGetPositionExplanationMapping(t *testing.T) {
+	median, gap := 65, -5
+	svc := &fakeService{explanation: domain.PositionExplanation{
+		Ranked: true, Place: 3, Total: 5, Score: 70,
+		Above:           &domain.Neighbour{Place: 2, OrgSlug: "o", Name: "r2", Score: 80, Points: 10},
+		Categories:      []domain.CategoryComparison{{ID: "activity", Score: 60, Top10Median: &median, Gap: &gap}, {ID: "documentation", Score: 80}},
+		WeakestCategory: "activity",
+	}}
+
+	got, err := NewServer(svc).GetPositionExplanation(context.Background(), &pb.GetPositionExplanationRequest{OrgSlug: "o", RepoSlug: "me"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !got.Ranked || got.Place != 3 || got.Total != 5 || got.Above.Name != "r2" || got.Above.Points != 10 || got.Below != nil || got.WeakestCategory != "activity" {
+		t.Errorf("explanation = %+v", got)
+	}
+	if a := got.Categories[0]; a.Top10Median == nil || *a.Top10Median != 65 || *a.Gap != -5 {
+		t.Errorf("activity = %+v", a)
+	}
+	if d := got.Categories[1]; d.Top10Median != nil || d.Gap != nil {
+		t.Errorf("documentation = %+v, want no median or gap", d)
+	}
+
+	svc.explanation = domain.PositionExplanation{Ranked: false}
+	if got, _ := NewServer(svc).GetPositionExplanation(context.Background(), &pb.GetPositionExplanationRequest{OrgSlug: "o", RepoSlug: "x"}); got.Ranked || got.Place != 0 {
+		t.Errorf("ungraded repo = %+v, want ranked=false and nothing else", got)
+	}
+}
+
+func TestRankingEntryCarriesChanges(t *testing.T) {
+	scoreChange, placeChange := 4, -2
+	entry := entryToProto(domain.RankingEntry{Place: 3, RankingRow: domain.RankingRow{ScoreChange: &scoreChange, PlaceChange: &placeChange}})
+	if entry.ScoreChange == nil || *entry.ScoreChange != 4 || entry.PlaceChange == nil || *entry.PlaceChange != -2 {
+		t.Errorf("changes = %v / %v, want 4 / -2", entry.ScoreChange, entry.PlaceChange)
+	}
+	if bare := entryToProto(domain.RankingEntry{Place: 1}); bare.ScoreChange != nil || bare.PlaceChange != nil {
+		t.Error("an entry without changes must leave both unset")
 	}
 }

@@ -51,26 +51,26 @@ func TestBuildListQueryOrder(t *testing.T) {
 }
 
 func TestBuildListQueryPlaceholders(t *testing.T) {
-	query, args, err := buildListQuery(domain.RankingQuery{SortBy: domain.SortByScore, Limit: 20, Offset: 40})
+	query, args, err := buildListQuery(domain.RankingQuery{SortBy: domain.SortByScore, Limit: 20, Offset: 40, DynamicsDays: 7})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(query, "LIMIT $1 OFFSET $2") || strings.Contains(query, "main_language) =") {
+	if !strings.Contains(query, "$1::int") || !strings.Contains(query, "LIMIT $2 OFFSET $3") || strings.Contains(query, "main_language) =") {
 		t.Errorf("unfiltered list query:\n%s", query)
 	}
-	if !reflect.DeepEqual(args, []any{20, 40}) {
-		t.Errorf("args = %v, want [20 40]", args)
+	if !reflect.DeepEqual(args, []any{7, 20, 40}) {
+		t.Errorf("args = %v, want [7 20 40]", args)
 	}
 
-	query, args, err = buildListQuery(domain.RankingQuery{Language: "Go", SortBy: domain.SortByScore, Limit: 20, Offset: 40})
+	query, args, err = buildListQuery(domain.RankingQuery{Language: "Go", SortBy: domain.SortByScore, Limit: 20, Offset: 40, DynamicsDays: 7})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(query, "lower(r.main_language) = lower($1)") || !strings.Contains(query, "LIMIT $2 OFFSET $3") {
+	if !strings.Contains(query, "lower(r.main_language) = lower($1)") || !strings.Contains(query, "$2::int") || !strings.Contains(query, "LIMIT $3 OFFSET $4") {
 		t.Errorf("filtered list query:\n%s", query)
 	}
-	if !reflect.DeepEqual(args, []any{"Go", 20, 40}) {
-		t.Errorf("args = %v, want [Go 20 40]", args)
+	if !reflect.DeepEqual(args, []any{"Go", 7, 20, 40}) {
+		t.Errorf("args = %v, want [Go 7 20 40]", args)
 	}
 }
 
@@ -165,7 +165,8 @@ func TestListQueryReturnsTheFlagAndKeepsTheOrder(t *testing.T) {
 		!strings.Contains(query, "LEFT JOIN repo_confidence_public c ON c.sourcecraft_uuid = r.sourcecraft_uuid") {
 		t.Errorf("list query does not return the flag through a LEFT JOIN:\n%s", query)
 	}
-	if strings.Contains(strings.SplitN(query, "ORDER BY", 2)[1], "low_confidence") {
+	// The query's own ORDER BY is the last one; the dynamics CTEs order by score only.
+	if strings.Contains(query[strings.LastIndex(query, "ORDER BY"):], "low_confidence") {
 		t.Error("the flag must not take part in the ordering")
 	}
 }

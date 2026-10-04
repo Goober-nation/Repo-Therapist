@@ -23,11 +23,25 @@ type fakeRating struct {
 	resp *rank.GetPublicSummaryResponse
 	err  error
 	reqs []*rank.GetPublicSummaryRequest
+
+	history     *rank.GetScoreHistoryResponse
+	explanation *rank.GetPositionExplanationResponse
+	otherReqs   []string
 }
 
 func (f *fakeRating) GetPublicSummary(ctx context.Context, in *rank.GetPublicSummaryRequest, opts ...grpc.CallOption) (*rank.GetPublicSummaryResponse, error) {
 	f.reqs = append(f.reqs, in)
 	return f.resp, f.err
+}
+
+func (f *fakeRating) GetScoreHistory(ctx context.Context, in *rank.GetScoreHistoryRequest, opts ...grpc.CallOption) (*rank.GetScoreHistoryResponse, error) {
+	f.otherReqs = append(f.otherReqs, "history:"+in.GetOrgSlug()+"/"+in.GetRepoSlug())
+	return f.history, f.err
+}
+
+func (f *fakeRating) GetPositionExplanation(ctx context.Context, in *rank.GetPositionExplanationRequest, opts ...grpc.CallOption) (*rank.GetPositionExplanationResponse, error) {
+	f.otherReqs = append(f.otherReqs, "position:"+in.GetOrgSlug()+"/"+in.GetRepoSlug())
+	return f.explanation, f.err
 }
 
 type countingLimiter struct {
@@ -236,5 +250,99 @@ func TestGetAnalyticsValidatesSlugsAndMapsErrors(t *testing.T) {
 	}
 	if _, err := svc.GetAnalytics(context.Background(), "ip", "", "org", "demo"); !errors.Is(err, domain.ErrForbidden) {
 		t.Errorf("permission denied: err %v, want ErrForbidden", err)
+	}
+}
+
+func TestGetScoreHistoryMapsPointsAndAppliesTheLimiter(t *testing.T) {
+	when := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	low := true
+	rating := &fakeRating{history: &rank.GetScoreHistoryResponse{Points: []*rank.HistoryPoint{
+		{GradedAt: timestamppb.New(when), Score: 66, Categories: []*rank.CategoryScore{{Id: "activity", Score: int32Ptr(70)}, {Id: "issues"}}, LowConfidence: &low},
+	}}}
+
+	limiter := &countingLimiter{allow: true}
+	svc := newRatingService(rating)
+	svc.publicAPILimiter = limiter
+
+	points, err := svc.GetScoreHistory(context.Background(), "203.0.113.9", "o", "demo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(limiter.keys) != 1 || limiter.keys[0] != "rate_limit:gateway:public:ip:203.0.113.9" || len(rating.otherReqs) != 1 || rating.otherReqs[0] != "history:o/demo" {
+		t.Errorf("limiter keys = %v, requests = %v", limiter.keys, rating.otherReqs)
+	}
+	if len(points) != 1 || points[0].Score != 66 || !points[0].GradedAt.Equal(when) || points[0].LowConfidence == nil || !*points[0].LowConfidence {
+		t.Fatalf("points = %+v", points)
+	}
+	if c := points[0].Categories; len(c) != 2 || c[0].Score == nil || *c[0].Score != 70 || c[1].Score != nil {
+		t.Errorf("categories = %+v, want 70 and a nil no-data score", c)
+	}
+
+	limiter.allow = false
+	if _, err := svc.GetScoreHistory(context.Background(), "ip", "o", "demo"); !errors.Is(err, domain.ErrLimitExceeded) {
+		t.Errorf("err = %v, want ErrLimitExceeded", err)
+	}
+	if len(rating.otherReqs) != 1 {
+		t.Error("a rate-limited request must not reach the rating service")
+	}
+
+	rating.err = status.Error(codes.NotFound, "repository not found")
+	svc.publicAPILimiter = nil
+	if _, err := svc.GetScoreHistory(context.Background(), "ip", "o", "demo"); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestGetPositionExplanationMapsAndHandlesUnranked(t *testing.T) {
+	median, gap := int32(65), int32(-5)
+	rating := &fakeRating{explanation: &rank.GetPositionExplanationResponse{
+		Ranked: true, Place: 3, Total: 5, Score: 70, WeakestCategory: "activity",
+		Above:      &rank.Neighbour{Place: 2, OrgSlug: "o", Name: "r2", Score: 80, Points: 10},
+		Categories: []*rank.CategoryComparison{{Id: "activity", Score: 60, Top10Median: &median, Gap: &gap}, {Id: "documentation", Score: 80}},
+	}}
+	svc := newRatingService(rating)
+
+	got, err := svc.GetPositionExplanation(context.Background(), "ip", "o", "me")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !got.Ranked || got.Place != 3 || got.Total != 5 || got.Score != 70 || got.Above == nil || got.Above.Name != "r2" || got.Above.Points != 10 || got.Below != nil || got.WeakestCategory != "activity" {
+		t.Errorf("explanation = %+v", got)
+	}
+	if a := got.Categories[0]; a.Top10Median == nil || *a.Top10Median != 65 || *a.Gap != -5 {
+		t.Errorf("activity = %+v", a)
+	}
+	if d := got.Categories[1]; d.Top10Median != nil || d.Gap != nil {
+		t.Errorf("documentation = %+v, want nil median and gap", d)
+	}
+
+	rating.explanation = &rank.GetPositionExplanationResponse{Ranked: false}
+	if got, err := svc.GetPositionExplanation(context.Background(), "ip", "o", "x"); err != nil || got.Ranked || got.Place != 0 {
+		t.Errorf("unranked = %+v err %v, want ranked=false and nothing else", got, err)
+	}
+}
+
+func TestMapGetRankingResponseCarriesDynamics(t *testing.T) {
+	resp, err := mapGetRankingResponse(&rank.GetRankingResponse{
+		DynamicsDays: 7,
+		Entries: []*rank.RankingEntry{
+			{Place: 1, SourcecraftUuid: "0192b0a8-0000-7000-8000-000000000001", ScoreChange: int32Ptr(4), PlaceChange: int32Ptr(-2)},
+			{Place: 2, SourcecraftUuid: "0192b0a8-0000-7000-8000-000000000002"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if resp.DynamicsDays != 7 {
+		t.Errorf("dynamics days = %d, want 7", resp.DynamicsDays)
+	}
+	if e := resp.Entries[0]; e.ScoreChange == nil || *e.ScoreChange != 4 || e.PlaceChange == nil || *e.PlaceChange != -2 {
+		t.Errorf("first = %+v", e)
+	}
+	if e := resp.Entries[1]; e.ScoreChange != nil || e.PlaceChange != nil {
+		t.Errorf("second = %+v, want nil changes", e)
 	}
 }

@@ -25,6 +25,7 @@ const (
 type SortBy int32
 
 const (
+	// Zero value, so an omitted sort_by also means score.
 	SortBy_SORT_BY_SCORE         SortBy = 0
 	SortBy_SORT_BY_LAST_ACTIVITY SortBy = 1
 	SortBy_SORT_BY_LIKES         SortBy = 2
@@ -72,12 +73,19 @@ func (SortBy) EnumDescriptor() ([]byte, []int) {
 }
 
 type GetRankingRequest struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Page              int32                  `protobuf:"varint,1,opt,name=page,proto3" json:"page,omitempty"`
-	PageSize          int32                  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	Language          string                 `protobuf:"bytes,3,opt,name=language,proto3" json:"language,omitempty"`
-	SortBy            SortBy                 `protobuf:"varint,4,opt,name=sort_by,json=sortBy,proto3,enum=rating.SortBy" json:"sort_by,omitempty"`
-	HideLowConfidence bool                   `protobuf:"varint,5,opt,name=hide_low_confidence,json=hideLowConfidence,proto3" json:"hide_low_confidence,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 1-based page number; 0 means the first page.
+	Page int32 `protobuf:"varint,1,opt,name=page,proto3" json:"page,omitempty"`
+	// Entries per page; 0 means the default (20), max 100.
+	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	// Primary language filter, matched case-insensitively. Empty means all languages.
+	Language string `protobuf:"bytes,3,opt,name=language,proto3" json:"language,omitempty"`
+	// Always descending, NULLs last. Ties are broken by public_score, so health stays the dominant
+	// ranking factor whichever sort is chosen.
+	SortBy SortBy `protobuf:"varint,4,opt,name=sort_by,json=sortBy,proto3,enum=rating.SortBy" json:"sort_by,omitempty"`
+	// Leave out repos whose public grade is marked low-confidence. Repos without a flag row
+	// (unknown) are never left out.
+	HideLowConfidence bool `protobuf:"varint,5,opt,name=hide_low_confidence,json=hideLowConfidence,proto3" json:"hide_low_confidence,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -148,19 +156,33 @@ func (x *GetRankingRequest) GetHideLowConfidence() bool {
 }
 
 type RankingEntry struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Place             int32                  `protobuf:"varint,1,opt,name=place,proto3" json:"place,omitempty"`
-	SourcecraftUuid   string                 `protobuf:"bytes,2,opt,name=sourcecraft_uuid,json=sourcecraftUuid,proto3" json:"sourcecraft_uuid,omitempty"`
-	Name              string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	WebUrl            string                 `protobuf:"bytes,4,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
-	PublicScore       *int32                 `protobuf:"varint,5,opt,name=public_score,json=publicScore,proto3,oneof" json:"public_score,omitempty"`
-	Likes             *float64               `protobuf:"fixed64,6,opt,name=likes,proto3,oneof" json:"likes,omitempty"`
-	Language          *Language              `protobuf:"bytes,7,opt,name=language,proto3" json:"language,omitempty"`
-	LastActivityAt    *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
-	LowConfidence     *bool                  `protobuf:"varint,9,opt,name=low_confidence,json=lowConfidence,proto3,oneof" json:"low_confidence,omitempty"`
-	ConfidenceReasons []*ConfidenceReason    `protobuf:"bytes,10,rep,name=confidence_reasons,json=confidenceReasons,proto3" json:"confidence_reasons,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Position within the current filtered and sorted list: (page-1)*page_size + index + 1.
+	Place           int32  `protobuf:"varint,1,opt,name=place,proto3" json:"place,omitempty"`
+	SourcecraftUuid string `protobuf:"bytes,2,opt,name=sourcecraft_uuid,json=sourcecraftUuid,proto3" json:"sourcecraft_uuid,omitempty"`
+	// Currently repo_slug — repos has no display name column yet.
+	Name string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	// Empty when unknown.
+	WebUrl string `protobuf:"bytes,4,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
+	// Unset when the repo has not been graded yet ("нет данных").
+	PublicScore *int32 `protobuf:"varint,5,opt,name=public_score,json=publicScore,proto3,oneof" json:"public_score,omitempty"`
+	// SourceCraft rating value (likes). Unset when unknown.
+	Likes *float64 `protobuf:"fixed64,6,opt,name=likes,proto3,oneof" json:"likes,omitempty"`
+	// Always set; name and color are empty strings when unknown.
+	Language *Language `protobuf:"bytes,7,opt,name=language,proto3" json:"language,omitempty"`
+	// Unset when unknown.
+	LastActivityAt *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
+	// Low-confidence flag of the public grade. Unset when unknown (grade stored before the flag).
+	LowConfidence *bool `protobuf:"varint,9,opt,name=low_confidence,json=lowConfidence,proto3,oneof" json:"low_confidence,omitempty"`
+	// Generic pre-written reasons; empty unless low_confidence is true.
+	ConfidenceReasons []*ConfidenceReason `protobuf:"bytes,10,rep,name=confidence_reasons,json=confidenceReasons,proto3" json:"confidence_reasons,omitempty"`
+	// Score now minus the score dynamics_days ago. Unset when the repo had no grade that long ago.
+	ScoreChange *int32 `protobuf:"varint,11,opt,name=score_change,json=scoreChange,proto3,oneof" json:"score_change,omitempty"`
+	// Places gained (positive) or lost (negative) in this list since dynamics_days ago, among the
+	// same filtered list. Only set when sorting by score and when the repo was graded back then.
+	PlaceChange   *int32 `protobuf:"varint,12,opt,name=place_change,json=placeChange,proto3,oneof" json:"place_change,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RankingEntry) Reset() {
@@ -263,6 +285,20 @@ func (x *RankingEntry) GetConfidenceReasons() []*ConfidenceReason {
 	return nil
 }
 
+func (x *RankingEntry) GetScoreChange() int32 {
+	if x != nil && x.ScoreChange != nil {
+		return *x.ScoreChange
+	}
+	return 0
+}
+
+func (x *RankingEntry) GetPlaceChange() int32 {
+	if x != nil && x.PlaceChange != nil {
+		return *x.PlaceChange
+	}
+	return 0
+}
+
 type Language struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -316,11 +352,15 @@ func (x *Language) GetColor() string {
 }
 
 type GetRankingResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Entries       []*RankingEntry        `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
-	TotalCount    int32                  `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
-	Page          int32                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
-	PageSize      int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Entries []*RankingEntry        `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
+	// Number of repos matching the filter across all pages.
+	TotalCount int32 `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
+	// Effective page and page_size after defaults were applied.
+	Page     int32 `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize int32 `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	// The window of score_change/place_change in days (RANKING_DYNAMICS_DAYS).
+	DynamicsDays  int32 `protobuf:"varint,5,opt,name=dynamics_days,json=dynamicsDays,proto3" json:"dynamics_days,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -383,6 +423,13 @@ func (x *GetRankingResponse) GetPageSize() int32 {
 	return 0
 }
 
+func (x *GetRankingResponse) GetDynamicsDays() int32 {
+	if x != nil {
+		return x.DynamicsDays
+	}
+	return 0
+}
+
 type GetPublicScoreRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OrgSlug       string                 `protobuf:"bytes,1,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
@@ -436,8 +483,9 @@ func (x *GetPublicScoreRequest) GetRepoSlug() string {
 }
 
 type GetPublicScoreResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PublicScore   *int32                 `protobuf:"varint,1,opt,name=public_score,json=publicScore,proto3,oneof" json:"public_score,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Unset when the repo has not been graded yet.
+	PublicScore   *int32 `protobuf:"varint,1,opt,name=public_score,json=publicScore,proto3,oneof" json:"public_score,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -532,9 +580,11 @@ func (x *GetPublicSummaryRequest) GetRepoSlug() string {
 }
 
 type CategoryScore struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Score         *int32                 `protobuf:"varint,2,opt,name=score,proto3,oneof" json:"score,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Category ID as stored by grade-service (activity, issues, documentation, code_health).
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// 0-100. Unset when the category has no data ("нет данных"), which is not a bad score.
+	Score         *int32 `protobuf:"varint,2,opt,name=score,proto3,oneof" json:"score,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -584,15 +634,21 @@ func (x *CategoryScore) GetScore() int32 {
 }
 
 type GetPublicSummaryResponse struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Name              string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	WebUrl            string                 `protobuf:"bytes,2,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
-	PublicScore       *int32                 `protobuf:"varint,3,opt,name=public_score,json=publicScore,proto3,oneof" json:"public_score,omitempty"`
-	Categories        []*CategoryScore       `protobuf:"bytes,4,rep,name=categories,proto3" json:"categories,omitempty"`
-	MissingData       []string               `protobuf:"bytes,5,rep,name=missing_data,json=missingData,proto3" json:"missing_data,omitempty"`
-	GradedAt          *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=graded_at,json=gradedAt,proto3" json:"graded_at,omitempty"`
-	LowConfidence     *bool                  `protobuf:"varint,7,opt,name=low_confidence,json=lowConfidence,proto3,oneof" json:"low_confidence,omitempty"`
-	ConfidenceReasons []*ConfidenceReason    `protobuf:"bytes,8,rep,name=confidence_reasons,json=confidenceReasons,proto3" json:"confidence_reasons,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Currently repo_slug.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Empty when unknown.
+	WebUrl string `protobuf:"bytes,2,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
+	// Unset when the repo has not been graded yet.
+	PublicScore *int32 `protobuf:"varint,3,opt,name=public_score,json=publicScore,proto3,oneof" json:"public_score,omitempty"`
+	// Sorted by id; empty when the repo has not been graded yet.
+	Categories  []*CategoryScore `protobuf:"bytes,4,rep,name=categories,proto3" json:"categories,omitempty"`
+	MissingData []string         `protobuf:"bytes,5,rep,name=missing_data,json=missingData,proto3" json:"missing_data,omitempty"`
+	// Unset when the repo has not been graded yet.
+	GradedAt *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=graded_at,json=gradedAt,proto3" json:"graded_at,omitempty"`
+	// Unset when unknown (no flag row).
+	LowConfidence     *bool               `protobuf:"varint,7,opt,name=low_confidence,json=lowConfidence,proto3,oneof" json:"low_confidence,omitempty"`
+	ConfidenceReasons []*ConfidenceReason `protobuf:"bytes,8,rep,name=confidence_reasons,json=confidenceReasons,proto3" json:"confidence_reasons,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -735,6 +791,476 @@ func (x *ConfidenceReason) GetText() string {
 	return ""
 }
 
+type GetScoreHistoryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OrgSlug       string                 `protobuf:"bytes,1,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
+	RepoSlug      string                 `protobuf:"bytes,2,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetScoreHistoryRequest) Reset() {
+	*x = GetScoreHistoryRequest{}
+	mi := &file_rate_client_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetScoreHistoryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetScoreHistoryRequest) ProtoMessage() {}
+
+func (x *GetScoreHistoryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetScoreHistoryRequest.ProtoReflect.Descriptor instead.
+func (*GetScoreHistoryRequest) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetScoreHistoryRequest) GetOrgSlug() string {
+	if x != nil {
+		return x.OrgSlug
+	}
+	return ""
+}
+
+func (x *GetScoreHistoryRequest) GetRepoSlug() string {
+	if x != nil {
+		return x.RepoSlug
+	}
+	return ""
+}
+
+type HistoryPoint struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	GradedAt *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=graded_at,json=gradedAt,proto3" json:"graded_at,omitempty"`
+	Score    int32                  `protobuf:"varint,2,opt,name=score,proto3" json:"score,omitempty"`
+	// Sorted by id; a no-data category keeps its score unset.
+	Categories []*CategoryScore `protobuf:"bytes,3,rep,name=categories,proto3" json:"categories,omitempty"`
+	// Unset when the flag was unknown for that grading.
+	LowConfidence *bool `protobuf:"varint,4,opt,name=low_confidence,json=lowConfidence,proto3,oneof" json:"low_confidence,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HistoryPoint) Reset() {
+	*x = HistoryPoint{}
+	mi := &file_rate_client_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HistoryPoint) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HistoryPoint) ProtoMessage() {}
+
+func (x *HistoryPoint) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HistoryPoint.ProtoReflect.Descriptor instead.
+func (*HistoryPoint) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *HistoryPoint) GetGradedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.GradedAt
+	}
+	return nil
+}
+
+func (x *HistoryPoint) GetScore() int32 {
+	if x != nil {
+		return x.Score
+	}
+	return 0
+}
+
+func (x *HistoryPoint) GetCategories() []*CategoryScore {
+	if x != nil {
+		return x.Categories
+	}
+	return nil
+}
+
+func (x *HistoryPoint) GetLowConfidence() bool {
+	if x != nil && x.LowConfidence != nil {
+		return *x.LowConfidence
+	}
+	return false
+}
+
+type GetScoreHistoryResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Oldest first; empty when the repo has no history.
+	Points        []*HistoryPoint `protobuf:"bytes,1,rep,name=points,proto3" json:"points,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetScoreHistoryResponse) Reset() {
+	*x = GetScoreHistoryResponse{}
+	mi := &file_rate_client_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetScoreHistoryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetScoreHistoryResponse) ProtoMessage() {}
+
+func (x *GetScoreHistoryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetScoreHistoryResponse.ProtoReflect.Descriptor instead.
+func (*GetScoreHistoryResponse) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GetScoreHistoryResponse) GetPoints() []*HistoryPoint {
+	if x != nil {
+		return x.Points
+	}
+	return nil
+}
+
+type GetPositionExplanationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OrgSlug       string                 `protobuf:"bytes,1,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
+	RepoSlug      string                 `protobuf:"bytes,2,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPositionExplanationRequest) Reset() {
+	*x = GetPositionExplanationRequest{}
+	mi := &file_rate_client_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPositionExplanationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPositionExplanationRequest) ProtoMessage() {}
+
+func (x *GetPositionExplanationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPositionExplanationRequest.ProtoReflect.Descriptor instead.
+func (*GetPositionExplanationRequest) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetPositionExplanationRequest) GetOrgSlug() string {
+	if x != nil {
+		return x.OrgSlug
+	}
+	return ""
+}
+
+func (x *GetPositionExplanationRequest) GetRepoSlug() string {
+	if x != nil {
+		return x.RepoSlug
+	}
+	return ""
+}
+
+// A repo next to the explained one in the ranking.
+type Neighbour struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Place   int32                  `protobuf:"varint,1,opt,name=place,proto3" json:"place,omitempty"`
+	OrgSlug string                 `protobuf:"bytes,2,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
+	Name    string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Score   int32                  `protobuf:"varint,4,opt,name=score,proto3" json:"score,omitempty"`
+	// Points between the two scores (the neighbour above is ahead by this much, the one below is
+	// behind by this much); 0 means a tie broken by recent activity.
+	Points        int32 `protobuf:"varint,5,opt,name=points,proto3" json:"points,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Neighbour) Reset() {
+	*x = Neighbour{}
+	mi := &file_rate_client_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Neighbour) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Neighbour) ProtoMessage() {}
+
+func (x *Neighbour) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Neighbour.ProtoReflect.Descriptor instead.
+func (*Neighbour) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *Neighbour) GetPlace() int32 {
+	if x != nil {
+		return x.Place
+	}
+	return 0
+}
+
+func (x *Neighbour) GetOrgSlug() string {
+	if x != nil {
+		return x.OrgSlug
+	}
+	return ""
+}
+
+func (x *Neighbour) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Neighbour) GetScore() int32 {
+	if x != nil {
+		return x.Score
+	}
+	return 0
+}
+
+func (x *Neighbour) GetPoints() int32 {
+	if x != nil {
+		return x.Points
+	}
+	return 0
+}
+
+type CategoryComparison struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Score int32                  `protobuf:"varint,2,opt,name=score,proto3" json:"score,omitempty"`
+	// Median of this category over the top 10 repos that have it; unset with fewer than 3 values.
+	Top10Median *int32 `protobuf:"varint,3,opt,name=top10_median,json=top10Median,proto3,oneof" json:"top10_median,omitempty"`
+	// score - top10_median; unset when top10_median is.
+	Gap           *int32 `protobuf:"varint,4,opt,name=gap,proto3,oneof" json:"gap,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CategoryComparison) Reset() {
+	*x = CategoryComparison{}
+	mi := &file_rate_client_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CategoryComparison) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CategoryComparison) ProtoMessage() {}
+
+func (x *CategoryComparison) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CategoryComparison.ProtoReflect.Descriptor instead.
+func (*CategoryComparison) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *CategoryComparison) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *CategoryComparison) GetScore() int32 {
+	if x != nil {
+		return x.Score
+	}
+	return 0
+}
+
+func (x *CategoryComparison) GetTop10Median() int32 {
+	if x != nil && x.Top10Median != nil {
+		return *x.Top10Median
+	}
+	return 0
+}
+
+func (x *CategoryComparison) GetGap() int32 {
+	if x != nil && x.Gap != nil {
+		return *x.Gap
+	}
+	return 0
+}
+
+type GetPositionExplanationResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// False when the repo has no public grade yet (nothing else is set then).
+	Ranked     bool                  `protobuf:"varint,1,opt,name=ranked,proto3" json:"ranked,omitempty"`
+	Place      int32                 `protobuf:"varint,2,opt,name=place,proto3" json:"place,omitempty"`
+	Total      int32                 `protobuf:"varint,3,opt,name=total,proto3" json:"total,omitempty"`
+	Score      int32                 `protobuf:"varint,4,opt,name=score,proto3" json:"score,omitempty"`
+	Above      *Neighbour            `protobuf:"bytes,5,opt,name=above,proto3,oneof" json:"above,omitempty"`
+	Below      *Neighbour            `protobuf:"bytes,6,opt,name=below,proto3,oneof" json:"below,omitempty"`
+	Categories []*CategoryComparison `protobuf:"bytes,7,rep,name=categories,proto3" json:"categories,omitempty"`
+	// The category with the most negative gap to the top-10 median; empty when none is below it.
+	WeakestCategory string `protobuf:"bytes,8,opt,name=weakest_category,json=weakestCategory,proto3" json:"weakest_category,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *GetPositionExplanationResponse) Reset() {
+	*x = GetPositionExplanationResponse{}
+	mi := &file_rate_client_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPositionExplanationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPositionExplanationResponse) ProtoMessage() {}
+
+func (x *GetPositionExplanationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPositionExplanationResponse.ProtoReflect.Descriptor instead.
+func (*GetPositionExplanationResponse) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *GetPositionExplanationResponse) GetRanked() bool {
+	if x != nil {
+		return x.Ranked
+	}
+	return false
+}
+
+func (x *GetPositionExplanationResponse) GetPlace() int32 {
+	if x != nil {
+		return x.Place
+	}
+	return 0
+}
+
+func (x *GetPositionExplanationResponse) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+func (x *GetPositionExplanationResponse) GetScore() int32 {
+	if x != nil {
+		return x.Score
+	}
+	return 0
+}
+
+func (x *GetPositionExplanationResponse) GetAbove() *Neighbour {
+	if x != nil {
+		return x.Above
+	}
+	return nil
+}
+
+func (x *GetPositionExplanationResponse) GetBelow() *Neighbour {
+	if x != nil {
+		return x.Below
+	}
+	return nil
+}
+
+func (x *GetPositionExplanationResponse) GetCategories() []*CategoryComparison {
+	if x != nil {
+		return x.Categories
+	}
+	return nil
+}
+
+func (x *GetPositionExplanationResponse) GetWeakestCategory() string {
+	if x != nil {
+		return x.WeakestCategory
+	}
+	return ""
+}
+
 var File_rate_client_proto protoreflect.FileDescriptor
 
 const file_rate_client_proto_rawDesc = "" +
@@ -745,7 +1271,7 @@ const file_rate_client_proto_rawDesc = "" +
 	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x1a\n" +
 	"\blanguage\x18\x03 \x01(\tR\blanguage\x12'\n" +
 	"\asort_by\x18\x04 \x01(\x0e2\x0e.rating.SortByR\x06sortBy\x12.\n" +
-	"\x13hide_low_confidence\x18\x05 \x01(\bR\x11hideLowConfidence\"\xd6\x03\n" +
+	"\x13hide_low_confidence\x18\x05 \x01(\bR\x11hideLowConfidence\"\xc8\x04\n" +
 	"\fRankingEntry\x12\x14\n" +
 	"\x05place\x18\x01 \x01(\x05R\x05place\x12)\n" +
 	"\x10sourcecraft_uuid\x18\x02 \x01(\tR\x0fsourcecraftUuid\x12\x12\n" +
@@ -757,19 +1283,24 @@ const file_rate_client_proto_rawDesc = "" +
 	"\x10last_activity_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x0elastActivityAt\x12*\n" +
 	"\x0elow_confidence\x18\t \x01(\bH\x02R\rlowConfidence\x88\x01\x01\x12G\n" +
 	"\x12confidence_reasons\x18\n" +
-	" \x03(\v2\x18.rating.ConfidenceReasonR\x11confidenceReasonsB\x0f\n" +
+	" \x03(\v2\x18.rating.ConfidenceReasonR\x11confidenceReasons\x12&\n" +
+	"\fscore_change\x18\v \x01(\x05H\x03R\vscoreChange\x88\x01\x01\x12&\n" +
+	"\fplace_change\x18\f \x01(\x05H\x04R\vplaceChange\x88\x01\x01B\x0f\n" +
 	"\r_public_scoreB\b\n" +
 	"\x06_likesB\x11\n" +
-	"\x0f_low_confidence\"4\n" +
+	"\x0f_low_confidenceB\x0f\n" +
+	"\r_score_changeB\x0f\n" +
+	"\r_place_change\"4\n" +
 	"\bLanguage\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05color\x18\x02 \x01(\tR\x05color\"\x96\x01\n" +
+	"\x05color\x18\x02 \x01(\tR\x05color\"\xbb\x01\n" +
 	"\x12GetRankingResponse\x12.\n" +
 	"\aentries\x18\x01 \x03(\v2\x14.rating.RankingEntryR\aentries\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
 	"totalCount\x12\x12\n" +
 	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
-	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"O\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\x12#\n" +
+	"\rdynamics_days\x18\x05 \x01(\x05R\fdynamicsDays\"O\n" +
 	"\x15GetPublicScoreRequest\x12\x19\n" +
 	"\borg_slug\x18\x01 \x01(\tR\aorgSlug\x12\x1b\n" +
 	"\trepo_slug\x18\x02 \x01(\tR\brepoSlug\"Q\n" +
@@ -798,16 +1329,60 @@ const file_rate_client_proto_rawDesc = "" +
 	"\x0f_low_confidence\":\n" +
 	"\x10ConfidenceReason\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
-	"\x04text\x18\x02 \x01(\tR\x04text*I\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\"P\n" +
+	"\x16GetScoreHistoryRequest\x12\x19\n" +
+	"\borg_slug\x18\x01 \x01(\tR\aorgSlug\x12\x1b\n" +
+	"\trepo_slug\x18\x02 \x01(\tR\brepoSlug\"\xd3\x01\n" +
+	"\fHistoryPoint\x127\n" +
+	"\tgraded_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\bgradedAt\x12\x14\n" +
+	"\x05score\x18\x02 \x01(\x05R\x05score\x125\n" +
+	"\n" +
+	"categories\x18\x03 \x03(\v2\x15.rating.CategoryScoreR\n" +
+	"categories\x12*\n" +
+	"\x0elow_confidence\x18\x04 \x01(\bH\x00R\rlowConfidence\x88\x01\x01B\x11\n" +
+	"\x0f_low_confidence\"G\n" +
+	"\x17GetScoreHistoryResponse\x12,\n" +
+	"\x06points\x18\x01 \x03(\v2\x14.rating.HistoryPointR\x06points\"W\n" +
+	"\x1dGetPositionExplanationRequest\x12\x19\n" +
+	"\borg_slug\x18\x01 \x01(\tR\aorgSlug\x12\x1b\n" +
+	"\trepo_slug\x18\x02 \x01(\tR\brepoSlug\"~\n" +
+	"\tNeighbour\x12\x14\n" +
+	"\x05place\x18\x01 \x01(\x05R\x05place\x12\x19\n" +
+	"\borg_slug\x18\x02 \x01(\tR\aorgSlug\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x14\n" +
+	"\x05score\x18\x04 \x01(\x05R\x05score\x12\x16\n" +
+	"\x06points\x18\x05 \x01(\x05R\x06points\"\x92\x01\n" +
+	"\x12CategoryComparison\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05score\x18\x02 \x01(\x05R\x05score\x12&\n" +
+	"\ftop10_median\x18\x03 \x01(\x05H\x00R\vtop10Median\x88\x01\x01\x12\x15\n" +
+	"\x03gap\x18\x04 \x01(\x05H\x01R\x03gap\x88\x01\x01B\x0f\n" +
+	"\r_top10_medianB\x06\n" +
+	"\x04_gap\"\xd1\x02\n" +
+	"\x1eGetPositionExplanationResponse\x12\x16\n" +
+	"\x06ranked\x18\x01 \x01(\bR\x06ranked\x12\x14\n" +
+	"\x05place\x18\x02 \x01(\x05R\x05place\x12\x14\n" +
+	"\x05total\x18\x03 \x01(\x05R\x05total\x12\x14\n" +
+	"\x05score\x18\x04 \x01(\x05R\x05score\x12,\n" +
+	"\x05above\x18\x05 \x01(\v2\x11.rating.NeighbourH\x00R\x05above\x88\x01\x01\x12,\n" +
+	"\x05below\x18\x06 \x01(\v2\x11.rating.NeighbourH\x01R\x05below\x88\x01\x01\x12:\n" +
+	"\n" +
+	"categories\x18\a \x03(\v2\x1a.rating.CategoryComparisonR\n" +
+	"categories\x12)\n" +
+	"\x10weakest_category\x18\b \x01(\tR\x0fweakestCategoryB\b\n" +
+	"\x06_aboveB\b\n" +
+	"\x06_below*I\n" +
 	"\x06SortBy\x12\x11\n" +
 	"\rSORT_BY_SCORE\x10\x00\x12\x19\n" +
 	"\x15SORT_BY_LAST_ACTIVITY\x10\x01\x12\x11\n" +
-	"\rSORT_BY_LIKES\x10\x022\xf5\x01\n" +
+	"\rSORT_BY_LIKES\x10\x022\xb2\x03\n" +
 	"\x06Rating\x12C\n" +
 	"\n" +
 	"GetRanking\x12\x19.rating.GetRankingRequest\x1a\x1a.rating.GetRankingResponse\x12O\n" +
 	"\x0eGetPublicScore\x12\x1d.rating.GetPublicScoreRequest\x1a\x1e.rating.GetPublicScoreResponse\x12U\n" +
-	"\x10GetPublicSummary\x12\x1f.rating.GetPublicSummaryRequest\x1a .rating.GetPublicSummaryResponseB6Z4gateway-service/internal/transport/rpc/gen/rank;rankb\x06proto3"
+	"\x10GetPublicSummary\x12\x1f.rating.GetPublicSummaryRequest\x1a .rating.GetPublicSummaryResponse\x12R\n" +
+	"\x0fGetScoreHistory\x12\x1e.rating.GetScoreHistoryRequest\x1a\x1f.rating.GetScoreHistoryResponse\x12g\n" +
+	"\x16GetPositionExplanation\x12%.rating.GetPositionExplanationRequest\x1a&.rating.GetPositionExplanationResponseB6Z4gateway-service/internal/transport/rpc/gen/rank;rankb\x06proto3"
 
 var (
 	file_rate_client_proto_rawDescOnce sync.Once
@@ -822,41 +1397,58 @@ func file_rate_client_proto_rawDescGZIP() []byte {
 }
 
 var file_rate_client_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_rate_client_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_rate_client_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_rate_client_proto_goTypes = []any{
-	(SortBy)(0),                      // 0: rating.SortBy
-	(*GetRankingRequest)(nil),        // 1: rating.GetRankingRequest
-	(*RankingEntry)(nil),             // 2: rating.RankingEntry
-	(*Language)(nil),                 // 3: rating.Language
-	(*GetRankingResponse)(nil),       // 4: rating.GetRankingResponse
-	(*GetPublicScoreRequest)(nil),    // 5: rating.GetPublicScoreRequest
-	(*GetPublicScoreResponse)(nil),   // 6: rating.GetPublicScoreResponse
-	(*GetPublicSummaryRequest)(nil),  // 7: rating.GetPublicSummaryRequest
-	(*CategoryScore)(nil),            // 8: rating.CategoryScore
-	(*GetPublicSummaryResponse)(nil), // 9: rating.GetPublicSummaryResponse
-	(*ConfidenceReason)(nil),         // 10: rating.ConfidenceReason
-	(*timestamppb.Timestamp)(nil),    // 11: google.protobuf.Timestamp
+	(SortBy)(0),                            // 0: rating.SortBy
+	(*GetRankingRequest)(nil),              // 1: rating.GetRankingRequest
+	(*RankingEntry)(nil),                   // 2: rating.RankingEntry
+	(*Language)(nil),                       // 3: rating.Language
+	(*GetRankingResponse)(nil),             // 4: rating.GetRankingResponse
+	(*GetPublicScoreRequest)(nil),          // 5: rating.GetPublicScoreRequest
+	(*GetPublicScoreResponse)(nil),         // 6: rating.GetPublicScoreResponse
+	(*GetPublicSummaryRequest)(nil),        // 7: rating.GetPublicSummaryRequest
+	(*CategoryScore)(nil),                  // 8: rating.CategoryScore
+	(*GetPublicSummaryResponse)(nil),       // 9: rating.GetPublicSummaryResponse
+	(*ConfidenceReason)(nil),               // 10: rating.ConfidenceReason
+	(*GetScoreHistoryRequest)(nil),         // 11: rating.GetScoreHistoryRequest
+	(*HistoryPoint)(nil),                   // 12: rating.HistoryPoint
+	(*GetScoreHistoryResponse)(nil),        // 13: rating.GetScoreHistoryResponse
+	(*GetPositionExplanationRequest)(nil),  // 14: rating.GetPositionExplanationRequest
+	(*Neighbour)(nil),                      // 15: rating.Neighbour
+	(*CategoryComparison)(nil),             // 16: rating.CategoryComparison
+	(*GetPositionExplanationResponse)(nil), // 17: rating.GetPositionExplanationResponse
+	(*timestamppb.Timestamp)(nil),          // 18: google.protobuf.Timestamp
 }
 var file_rate_client_proto_depIdxs = []int32{
 	0,  // 0: rating.GetRankingRequest.sort_by:type_name -> rating.SortBy
 	3,  // 1: rating.RankingEntry.language:type_name -> rating.Language
-	11, // 2: rating.RankingEntry.last_activity_at:type_name -> google.protobuf.Timestamp
+	18, // 2: rating.RankingEntry.last_activity_at:type_name -> google.protobuf.Timestamp
 	10, // 3: rating.RankingEntry.confidence_reasons:type_name -> rating.ConfidenceReason
 	2,  // 4: rating.GetRankingResponse.entries:type_name -> rating.RankingEntry
 	8,  // 5: rating.GetPublicSummaryResponse.categories:type_name -> rating.CategoryScore
-	11, // 6: rating.GetPublicSummaryResponse.graded_at:type_name -> google.protobuf.Timestamp
+	18, // 6: rating.GetPublicSummaryResponse.graded_at:type_name -> google.protobuf.Timestamp
 	10, // 7: rating.GetPublicSummaryResponse.confidence_reasons:type_name -> rating.ConfidenceReason
-	1,  // 8: rating.Rating.GetRanking:input_type -> rating.GetRankingRequest
-	5,  // 9: rating.Rating.GetPublicScore:input_type -> rating.GetPublicScoreRequest
-	7,  // 10: rating.Rating.GetPublicSummary:input_type -> rating.GetPublicSummaryRequest
-	4,  // 11: rating.Rating.GetRanking:output_type -> rating.GetRankingResponse
-	6,  // 12: rating.Rating.GetPublicScore:output_type -> rating.GetPublicScoreResponse
-	9,  // 13: rating.Rating.GetPublicSummary:output_type -> rating.GetPublicSummaryResponse
-	11, // [11:14] is the sub-list for method output_type
-	8,  // [8:11] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	18, // 8: rating.HistoryPoint.graded_at:type_name -> google.protobuf.Timestamp
+	8,  // 9: rating.HistoryPoint.categories:type_name -> rating.CategoryScore
+	12, // 10: rating.GetScoreHistoryResponse.points:type_name -> rating.HistoryPoint
+	15, // 11: rating.GetPositionExplanationResponse.above:type_name -> rating.Neighbour
+	15, // 12: rating.GetPositionExplanationResponse.below:type_name -> rating.Neighbour
+	16, // 13: rating.GetPositionExplanationResponse.categories:type_name -> rating.CategoryComparison
+	1,  // 14: rating.Rating.GetRanking:input_type -> rating.GetRankingRequest
+	5,  // 15: rating.Rating.GetPublicScore:input_type -> rating.GetPublicScoreRequest
+	7,  // 16: rating.Rating.GetPublicSummary:input_type -> rating.GetPublicSummaryRequest
+	11, // 17: rating.Rating.GetScoreHistory:input_type -> rating.GetScoreHistoryRequest
+	14, // 18: rating.Rating.GetPositionExplanation:input_type -> rating.GetPositionExplanationRequest
+	4,  // 19: rating.Rating.GetRanking:output_type -> rating.GetRankingResponse
+	6,  // 20: rating.Rating.GetPublicScore:output_type -> rating.GetPublicScoreResponse
+	9,  // 21: rating.Rating.GetPublicSummary:output_type -> rating.GetPublicSummaryResponse
+	13, // 22: rating.Rating.GetScoreHistory:output_type -> rating.GetScoreHistoryResponse
+	17, // 23: rating.Rating.GetPositionExplanation:output_type -> rating.GetPositionExplanationResponse
+	19, // [19:24] is the sub-list for method output_type
+	14, // [14:19] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_rate_client_proto_init() }
@@ -868,13 +1460,16 @@ func file_rate_client_proto_init() {
 	file_rate_client_proto_msgTypes[5].OneofWrappers = []any{}
 	file_rate_client_proto_msgTypes[7].OneofWrappers = []any{}
 	file_rate_client_proto_msgTypes[8].OneofWrappers = []any{}
+	file_rate_client_proto_msgTypes[11].OneofWrappers = []any{}
+	file_rate_client_proto_msgTypes[15].OneofWrappers = []any{}
+	file_rate_client_proto_msgTypes[16].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rate_client_proto_rawDesc), len(file_rate_client_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   10,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

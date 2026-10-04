@@ -9,6 +9,8 @@ import (
 type Config struct {
 	GRPC     GRPCConfig
 	Database DatabaseConfig
+	// DynamicsDays is the window of the score and place change in the ranking (RANKING_DYNAMICS_DAYS).
+	DynamicsDays int
 }
 
 type GRPCConfig struct {
@@ -44,7 +46,14 @@ func (dbc DatabaseConfig) DSN() string {
 }
 
 func LoadConfig() *Config {
+	dynamicsDays, err := strconv.Atoi(getEnvDefault("RANKING_DYNAMICS_DAYS", "7"))
+	if err != nil || dynamicsDays < 1 {
+		dynamicsDays = 7
+	}
+
 	return &Config{
+		DynamicsDays: dynamicsDays,
+
 		GRPC: GRPCConfig{
 			Address: getEnvDefault("GRPC_ADDRESS", ":8086"),
 		},

@@ -729,3 +729,32 @@ func (r *RepoRepository) ReleaseRepositoryLock(ctx context.Context, id uuid.UUID
 
 	return mapRepositoryError(err)
 }
+
+// AppendPublicHistory adds a public grade to repo_grade_history. Re-sending the same grading
+// (same repo and graded_at) changes nothing.
+func (r *GradesRepository) AppendPublicHistory(ctx context.Context, grade domain.RepoGrade) error {
+	if grade.Score == nil || grade.GradedAt == nil {
+		return nil
+	}
+
+	var lowConfidence *bool
+	if grade.Confidence != nil {
+		lowConfidence = &grade.Confidence.LowConfidence
+	}
+
+	_, err := r.db.Exec(
+		ctx,
+		`
+		INSERT INTO repo_grade_history (sourcecraft_uuid, graded_at, score, category_scores, low_confidence)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (sourcecraft_uuid, graded_at) DO NOTHING
+		`,
+		grade.SourcecraftUUID,
+		grade.GradedAt,
+		*grade.Score,
+		grade.CategoryScores,
+		lowConfidence,
+	)
+
+	return err
+}

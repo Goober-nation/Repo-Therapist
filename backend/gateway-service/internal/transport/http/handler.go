@@ -75,6 +75,20 @@ type GatewayService interface {
 		repoSlug string,
 	) (domain.RepoAnalytics, error)
 
+	GetScoreHistory(
+		ctx context.Context,
+		clientIP string,
+		orgSlug string,
+		repoSlug string,
+	) ([]domain.HistoryPoint, error)
+
+	GetPositionExplanation(
+		ctx context.Context,
+		clientIP string,
+		orgSlug string,
+		repoSlug string,
+	) (domain.PositionExplanation, error)
+
 	LoginWithYandex(
 		ctx context.Context,
 		clientIP string,
@@ -126,6 +140,8 @@ func (h *Handler) Register(mux *stdhttp.ServeMux) {
 	mux.HandleFunc("GET /badge/{org}/{repo}/{category}", h.GetCategoryBadge)
 	mux.HandleFunc("GET /widget/{org}/{repo}", h.GetWidget)
 	mux.HandleFunc("GET /score/{org}/{repo}", h.GetScore)
+	mux.HandleFunc("GET /history/{org}/{repo}", h.GetHistory)
+	mux.HandleFunc("GET /position/{org}/{repo}", h.GetPosition)
 }
 
 func (h *Handler) LoginWithYandex(
@@ -525,6 +541,8 @@ type getRankingResponse struct {
 	TotalCount int32                  `json:"total_count"`
 	Page       int32                  `json:"page"`
 	PageSize   int32                  `json:"page_size"`
+	// DynamicsDays is the window of the entries' score_change and place_change.
+	DynamicsDays int32 `json:"dynamics_days"`
 }
 
 type rankingEntryResponse struct {
@@ -539,6 +557,10 @@ type rankingEntryResponse struct {
 	// LowConfidence is null when the flag is unknown; the reasons are empty unless it is true.
 	LowConfidence     *bool                      `json:"low_confidence"`
 	ConfidenceReasons []confidenceReasonResponse `json:"confidence_reasons"`
+	// ScoreChange and PlaceChange are null when the repo was not graded dynamics_days ago ("new");
+	// PlaceChange is also null unless the list is sorted by score. Positive PlaceChange = moved up.
+	ScoreChange *int32 `json:"score_change"`
+	PlaceChange *int32 `json:"place_change"`
 }
 
 type confidenceReasonResponse struct {
@@ -671,6 +693,8 @@ func mapGetRankingResponse(
 		TotalCount: result.TotalCount,
 		Page:       result.Page,
 		PageSize:   result.PageSize,
+
+		DynamicsDays: result.DynamicsDays,
 	}
 }
 
@@ -696,6 +720,7 @@ func mapRankingEntryResponse(
 	}
 
 	result.LowConfidence, result.ConfidenceReasons = mapConfidenceResponse(entry.Confidence)
+	result.ScoreChange, result.PlaceChange = entry.ScoreChange, entry.PlaceChange
 
 	return result
 }
