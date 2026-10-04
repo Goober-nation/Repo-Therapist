@@ -198,6 +198,9 @@ CALIB_DIR=<каталог> go test -tags=manual ./internal/app/ -run TestHardeni
 curl -s "localhost:8081/api/analytics/<org>/<repo>"      # status FINISHED и объект analytics; NO_DATA, если ещё нет
 docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select sourcecraft_uuid, graded_at from repo_analytics_public"
 (cd backend/grade-service && go test ./internal/analytics/ -v)
+# Ревью PR (этап B): после повторной оценки в объекте analytics есть блок reviews (status ok или no_data с reason);
+# выгрузка лежит в S3: <prefix>/_meta/pulls.json (при S3_KEEP_REPO_DATA=true)
+# Репозиторий с PR и ревьюерами для проверки: imbok/uims-portal (8 из 10 последних PR влиты)
 ```
 
 В браузере на странице репозитория раздел «Углублённая аналитика»: карточка фактора автобуса с

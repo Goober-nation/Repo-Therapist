@@ -5,16 +5,21 @@
 > - **Обёртка SourceCraft** (`sourcecraft-wrapper-service/internal/transport/rpc/service.proto`,
 >   сервис `CodeHealth`): `GetRepoIdByOrgRepoSlug` не существует — вместо него
 >   `GetRepositoryBySlugs` и `GetRepoIDBySlugs`; `GetGitUrl` → `GetGitURL`;
->   `GetCiCdRuns` → `GetCiCDRuns`; добавлен `GetMyRepos`.
+>   `GetCiCdRuns` → `GetCiCDRuns`; добавлены `GetMyRepos`, `GetMyOrgs`
+>   (`GET /me/orgs` + `GET /user`: организации пользователя и организация по умолчанию —
+>   личная, чей slug совпадает с `username`, иначе первая) и `GetOrgRepos` (`GET
+>   /orgs/{org_slug}/repos`: одна порция до 100 репозиториев; новые страницы запрашиваются не
+>   дольше 5 с, остаток — через `next_page_token`; 404 → `NOT_FOUND`, 403 → `PERMISSION_DENIED`).
 > - **Обёртка AppSec** (`security-wrapper-service`, сервис `SecurityWrapper`): `StartReport`,
 >   `GetReportStatus` и `GetReportLink` не существуют; единственный RPC — `GetAppsecResult`.
 > - **Агрегатор** (`aggregator-service/internal/transport/rpc/server.proto`): RPC — `GetMyRepos`,
+>   `GetMyOrgs`, `GetOrgRepos` (проксируют одноимённые RPC обёртки с токеном пользователя),
 >   `GetGrading`, `RequestLLMRecommendations` (не `GetReccomendations`), `GetAnalytics`
 >   (запрос `{org_slug, repo_slug}`, ответ `{analytics: bytes (JSON), graded_at}`; только чтение).
 > - **Рейтинг** (`rating-service/internal/transport/rpc/service.proto`, сервис `Rating`, только
 >   чтение БД): `GetRanking`, `GetPublicScore`, `GetPublicSummary`; для неизвестного или не
 >   публичного репозитория последние два отвечают `NOT_FOUND`. В разделах ниже не описаны.
-> - **API Gateway**: реальные маршруты — `POST /auth/yandex`, `GET /repos`,
+> - **API Gateway**: реальные маршруты — `POST /auth/yandex`, `GET /orgs`, `GET /repos[?org=&page_token=]`,
 >   `GET /grading/{org}/{repo}` (не `/grade/...`), `GET /recommendations/{org}/{repo}`,
 >   `GET /ranking`, `GET /analytics/{org}/{repo}`, а также публичные `GET /score/{org}/{repo}`,
 >   `GET /badge/{org}/{repo}[.svg|.json]`, `GET /badge/{org}/{repo}/{category}.svg`,
@@ -612,11 +617,13 @@ rpc GetReccomendations(GetReccomendationsRequest) returns (GetReccomendationsRes
 | Маршрут | Заголовки | Ответ |
 |---|---|---|
 | `POST /auth/yandex` | `Authorization: OAuth <token>` | `{session_id}` + cookie `session_id` |
-| `GET /repos` | `PAT` (обязателен) | `{repositories: [{sourcecraft_uuid, org_slug, repo_slug, web_url, visibility, last_activity_at, rating, language: {name, color}}], next_page_token}` |
+| `GET /orgs` | `PAT` (обязателен) | `{organizations: [{slug, display_name, personal}], default_org_slug}` — организации владельца токена; `default_org_slug` — личная организация, иначе первая |
+| `GET /repos?org={slug}&page_token=` | `PAT` (обязателен) | репозитории одной организации, видимые токену (в том числе закрытые), одной порцией того же формата, что ниже; непустой `next_page_token` передаётся обратно как `page_token` для следующей порции. Нет организации или нет доступа — `404`/`403`, интерфейс показывает одно общее сообщение |
+| `GET /repos` | `PAT` (обязателен) | без `org` — прежний список по всем организациям (`GET /me/repos`, может не уложиться в таймаут для больших организаций): `{repositories: [{sourcecraft_uuid, org_slug, repo_slug, web_url, visibility, last_activity_at, rating, language: {name, color}}], next_page_token}` |
 | `GET /grading/{org}/{repo}` | `PAT` (опционален) | `{status, grade: {sourcecraft_uuid, score, category_scores, advice, missing_data, graded_at}}` |
 | `GET /recommendations/{org}/{repo}` | `PAT` (опционален) | `{status, raw_response: {summary, recommendations: [{priority, category, text}]}, model_used, evaluated_at}` |
 | `GET /ranking?page=&page_size=&sortby=&filter=&hide_low_confidence=` | — | `{entries: [{place, sourcecraft_uuid, name, web_url, public_score, likes, language, last_activity_at, low_confidence, confidence_reasons}], total_count, page, page_size}` |
-| `GET /analytics/{org}/{repo}` | `PAT` (опционален) | `{status, analytics, graded_at}`: справочные показатели (фактор автобуса, карта владельцев); с токеном владельца — приватные |
+| `GET /analytics/{org}/{repo}` | `PAT` (опционален) | `{status, analytics, graded_at}`: справочные показатели (фактор автобуса, карта владельцев, ревью pull request); с токеном владельца — приватные |
 | `GET /badge/{org}/{repo}.svg` | — | SVG-бейдж с сохранённой публичной оценкой (`image/svg+xml`, `Cache-Control: max-age=300`); оценку не запускает, лимит по IP не применяется; неизвестный или не оценённый репозиторий — серый `n/a` |
 | `GET /badge/{org}/{repo}/{category}.svg` | — | SVG-бейдж одной публичной категории: `activity`, `issues`, `documentation`, `code_health`; категория без данных — серый `n/a`, любой другой ID (в том числе `security` и `ci_cd`) — `404` |
 | `GET /badge/{org}/{repo}.json` | — | JSON для shields.io endpoint-бейджа: `{schemaVersion: 1, label, message, color}`; неизвестный или не оценённый репозиторий — `n/a` и `lightgrey` |
@@ -659,7 +666,7 @@ README. `GET /score/...` ограничен отдельно, `PUBLIC_API_RATE_L
 ```
 
 `GET /analytics/{org}/{repo}` только читает: оценку не запускает. `status`: `FINISHED` (в `analytics`
-объект версии 1, формат — `docs/grading/analytics.md`) или `NO_DATA` (`analytics: null`, у репозитория
+объект версии 2 (версия 1 — без блока `reviews`), формат — `docs/grading/analytics.md`) или `NO_DATA` (`analytics: null`, у репозитория
 ещё нет аналитики, например он оценён до её появления). Приватный репозиторий без токена владельца —
 `403`, неизвестный — `404`. CORS не включён: ответ зависит от токена.
 

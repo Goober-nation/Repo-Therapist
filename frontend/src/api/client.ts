@@ -2,6 +2,7 @@ import type {
   AnalyticsResponse,
   GatewayRankingResponse,
   GradingResponse,
+  MyOrganizationsResponse,
   MyRepositoriesResponse,
   PublicScoreResponse,
   RecommendationsResponse,
@@ -107,12 +108,29 @@ export class HttpRepoHealthApi {
     return this.request(`/analytics/${repoPath(orgSlug, repoSlug)}`, { headers: patHeader(pat) })
   }
 
-  getMyRepositories(sourceCraftPat: string): Promise<MyRepositoriesResponse> {
+  /**
+   * Repositories visible to the token. With orgSlug only that organization's repos are
+   * returned, one batch at a time: pass next_page_token back as pageToken for the next batch.
+   */
+  getMyRepositories(sourceCraftPat: string, orgSlug?: string, pageToken?: string): Promise<MyRepositoriesResponse> {
     const headers = patHeader(sourceCraftPat)
     if (!headers.PAT) {
       return Promise.reject(new ApiRequestError("Введите SourceCraft PAT.", 401))
     }
-    return this.request("/repos", { headers })
+    const query = new URLSearchParams()
+    if (orgSlug) query.set("org", orgSlug)
+    if (orgSlug && pageToken) query.set("page_token", pageToken)
+    const search = query.toString()
+    return this.request(search ? `/repos?${search}` : "/repos", { headers })
+  }
+
+  /** Organizations the token owner belongs to and the one to open first. */
+  getMyOrganizations(sourceCraftPat: string): Promise<MyOrganizationsResponse> {
+    const headers = patHeader(sourceCraftPat)
+    if (!headers.PAT) {
+      return Promise.reject(new ApiRequestError("Введите SourceCraft PAT.", 401))
+    }
+    return this.request("/orgs", { headers })
   }
 
   async loginWithYandex(oauthToken: string): Promise<void> {

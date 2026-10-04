@@ -213,6 +213,11 @@ type fakeWrapper struct {
 	myRepos     map[string][]*client.Repository
 	publicRepos []*client.Repository
 	authSeen    []string
+
+	myOrgs       *client.GetMyOrgsResponse
+	orgRepos     *client.GetOrgReposResponse
+	orgReposErr  error
+	orgReposSeen []*client.GetOrgReposRequest
 }
 
 func (f *fakeWrapper) record(ctx context.Context) string {
@@ -242,6 +247,23 @@ func (f *fakeWrapper) GetMyRepos(ctx context.Context, in *client.GetMyReposReque
 		return nil, status.Error(codes.Unauthenticated, "bad token")
 	}
 	return &client.GetMyReposResponse{Repositories: repos}, nil
+}
+
+func (f *fakeWrapper) GetMyOrgs(ctx context.Context, in *client.GetMyOrgsRequest, opts ...grpc.CallOption) (*client.GetMyOrgsResponse, error) {
+	f.record(ctx)
+	if f.myOrgs == nil {
+		return nil, status.Error(codes.Unauthenticated, "bad token")
+	}
+	return f.myOrgs, nil
+}
+
+func (f *fakeWrapper) GetOrgRepos(ctx context.Context, in *client.GetOrgReposRequest, opts ...grpc.CallOption) (*client.GetOrgReposResponse, error) {
+	f.record(ctx)
+	f.orgReposSeen = append(f.orgReposSeen, in)
+	if f.orgReposErr != nil {
+		return nil, f.orgReposErr
+	}
+	return f.orgRepos, nil
 }
 
 type fakeGradingPublisher struct {
@@ -417,6 +439,32 @@ func TestGetGradingRegradesWhenAnalyticsMissing(t *testing.T) {
 	}
 }
 
+func TestGetGradingRegradesWhenAnalyticsVersionIsOld(t *testing.T) {
+	for _, tc := range []struct {
+		name, body string
+		want       bool
+	}{
+		{"version 1", `{"version":1}`, true},
+		{"no version", `{"bus_factor":{}}`, true},
+		{"not json", `oops`, true},
+		{"version 2", `{"version":2}`, false},
+		{"newer", `{"version":3}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture("public")
+			f.svc.RegradeMissingAnalytics = true
+			score := int16(80)
+			f.grades.public[testRepoID] = domain.RepoGrade{SourcecraftUUID: testRepoID, Score: &score, GradedAt: gradedAt(testNow)}
+			_ = f.grades.putAnalytics(true, testRepoID, json.RawMessage(tc.body), gradedAt(testNow))
+
+			_, err := f.svc.GetGrading(userCtx(""), "org", "repo")
+			if got := errors.Is(err, domain.GradingPending); got != tc.want {
+				t.Errorf("regrade = %v (err %v), want %v", got, err, tc.want)
+			}
+		})
+	}
+}
+
 func TestGetGradingKeepsGradeWhenAnalyticsPresentOrCheckOff(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -429,7 +477,7 @@ func TestGetGradingKeepsGradeWhenAnalyticsPresentOrCheckOff(t *testing.T) {
 			score := int16(80)
 			f.grades.public[testRepoID] = domain.RepoGrade{SourcecraftUUID: testRepoID, Score: &score, GradedAt: gradedAt(testNow)}
 			if tc.present {
-				_ = f.grades.putAnalytics(true, testRepoID, json.RawMessage(`{"version":1}`), gradedAt(testNow))
+				_ = f.grades.putAnalytics(true, testRepoID, json.RawMessage(`{"version":2}`), gradedAt(testNow))
 			}
 
 			if _, err := f.svc.GetGrading(userCtx(""), "org", "repo"); err != nil {

@@ -296,8 +296,13 @@ func needsGrading(repo domain.Repo, grade domain.RepoGrade) bool {
 	return repo.LastActivityAt.After(*grade.GradedAt)
 }
 
-// needsRegrade is needsGrading plus the data check: a grade whose analytics row is missing is
-// outdated too. Only a definite "no row" counts; a failed lookup never starts a grading.
+// MinAnalyticsVersion is the oldest analytics schema version that counts as current: version 2
+// added the pull request review block, so a stored version 1 object is regraded.
+const MinAnalyticsVersion = 2
+
+// needsRegrade is needsGrading plus the data check: a grade whose analytics row is missing, or
+// stored with an older schema version, is outdated too. Only a definite answer counts; a failed
+// lookup never starts a grading.
 func (as *AggregatorService) needsRegrade(ctx context.Context, repo domain.Repo, private bool, grade domain.RepoGrade) bool {
 	if needsGrading(repo, grade) {
 		return true
@@ -307,14 +312,33 @@ func (as *AggregatorService) needsRegrade(ctx context.Context, repo domain.Repo,
 		return false
 	}
 
-	var err error
+	var (
+		analytics domain.RepoAnalytics
+		err       error
+	)
 	if private {
-		_, err = as.GradesRepo.GetPrivateAnalytics(ctx, repo.SourcecraftUUID)
+		analytics, err = as.GradesRepo.GetPrivateAnalytics(ctx, repo.SourcecraftUUID)
 	} else {
-		_, err = as.GradesRepo.GetPublicAnalytics(ctx, repo.SourcecraftUUID)
+		analytics, err = as.GradesRepo.GetPublicAnalytics(ctx, repo.SourcecraftUUID)
 	}
 
-	return errors.Is(err, domain.ErrGradeNotFound)
+	if errors.Is(err, domain.ErrGradeNotFound) {
+		return true
+	}
+
+	return err == nil && analyticsVersion(analytics.Analytics) < MinAnalyticsVersion
+}
+
+// analyticsVersion reads the schema version of a stored analytics object; 0 when it has none.
+func analyticsVersion(raw json.RawMessage) int {
+	var head struct {
+		Version int `json:"version"`
+	}
+	if json.Unmarshal(raw, &head) != nil {
+		return 0
+	}
+
+	return head.Version
 }
 
 // resolveView looks the repo up and decides which grade the caller may see: private when the

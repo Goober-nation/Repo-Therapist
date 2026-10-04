@@ -25,8 +25,20 @@ function plural(value: number, forms: [string, string, string]): string {
   return forms[2]
 }
 
+const REVIEW_NO_DATA: Record<string, string> = {
+  few_merged: "Нет данных: среди последних pull request'ов слишком мало влитых, чтобы судить о ревью.",
+  imported: "Нет данных: pull request'ы созданы почти одновременно, похоже на импорт истории.",
+  unavailable: "Нет данных: pull request'ы этого репозитория получить не удалось.",
+}
+
+function formatHours(hours: number): string {
+  if (hours < 1) return "менее часа"
+  if (hours < 48) return `${Math.round(hours)} ч`
+  return `${Math.round(hours / 24)} дн.`
+}
+
 /**
- * Bus factor and the ownership map. Informational: they never change the score, and a block the
+ * Bus factor, review habits and the ownership map. Informational: they never change the score, and a block the
  * backend could not compute says so instead of showing zeros.
  * analytics: undefined while loading, null when the repository has none yet.
  */
@@ -40,7 +52,7 @@ export default function AnalyticsSection({
   const heading = (
     <SectionHeading
       title="Углублённая аналитика"
-      description="Фактор автобуса и карта владельцев кода по истории коммитов. Справочные показатели: на оценку не влияют."
+      description="Фактор автобуса, ревью pull request'ов и карта владельцев кода. Справочные показатели: на оценку не влияют."
     />
   )
 
@@ -66,7 +78,7 @@ export default function AnalyticsSection({
     )
   }
 
-  const { busFactor, ownership } = analytics
+  const { busFactor, ownership, reviews } = analytics
   const { codeowners } = ownership
 
   return (
@@ -105,6 +117,27 @@ export default function AnalyticsSection({
               Нет данных: за период слишком мало коммитов, чтобы судить о
               распределении работы.
             </p>
+          )}
+        </Card>
+
+        <Card className="analytics-card">
+          <Label>Ревью pull request&apos;ов</Label>
+          {reviews.available && reviews.unreviewedShare !== undefined ? (
+            <>
+              <div className="analytics-card__value">{percent(reviews.unreviewedShare)}</div>
+              <p>
+                влитых pull request&apos;ов без ревью: {reviews.unreviewed} из {reviews.merged} среди последних{" "}
+                {reviews.sampled}. Ревью — решение или комментарий не автора и не бота.
+              </p>
+              {reviews.medianMergeHours !== undefined ? (
+                <p className="muted-copy">
+                  Медианное время до слияния: {formatHours(reviews.medianMergeHours)} (приблизительно: у SourceCraft
+                  нет времени слияния).
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <p className="muted-copy">{REVIEW_NO_DATA[reviews.reason ?? ""] ?? REVIEW_NO_DATA.unavailable}</p>
           )}
         </Card>
 

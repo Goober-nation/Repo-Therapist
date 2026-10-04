@@ -34,6 +34,14 @@ service CodeHealth {
 
   rpc GetMyRepos(GetMyReposRequest)
       returns (GetMyReposResponse);
+
+  // GetPullRequests returns the newest pull requests of a repository (any status), newest first.
+  rpc GetPullRequests(GetPullRequestsRequest)
+      returns (GetPullRequestsResponse);
+
+  // GetPullRequestActivity returns the reviewers and comments of one pull request (first page).
+  rpc GetPullRequestActivity(GetPullRequestActivityRequest)
+      returns (GetPullRequestActivityResponse);
 }
 
 message GetRepoIDBySlugsRequest {
@@ -306,4 +314,55 @@ message GetRepositoryBySlugsResponse {
   string last_activity_at = 9;
   Rating rating = 10;
   Language language = 11;
+}
+
+message GetPullRequestsRequest {
+  string repo_id = 1;
+  // How many of the newest pull requests to return; 0 or above 100 means 100.
+  int32 limit = 2;
+}
+
+message GetPullRequestsResponse {
+  repeated PullRequest pull_requests = 1;
+}
+
+message PullRequest {
+  string id = 1;
+  string slug = 2;
+  // draft, open, discarded, merging or merged.
+  string status = 3;
+  PullRequestUser author = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message PullRequestUser {
+  string id = 1;
+  string slug = 2;
+}
+
+message GetPullRequestActivityRequest {
+  string pull_request_id = 1;
+}
+
+message GetPullRequestActivityResponse {
+  repeated PullRequestReviewer reviewers = 1;
+  repeated PullRequestComment comments = 2;
+}
+
+message PullRequestReviewer {
+  PullRequestUser user = 1;
+  // approve, trust, block or abstain.
+  string review_decision = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+// Metadata only: the comment text is never requested into the export.
+message PullRequestComment {
+  PullRequestUser author = 1;
+  google.protobuf.Timestamp created_at = 2;
+  // default or appsec.
+  string type = 3;
+  bool is_deleted = 4;
+  bool is_published = 5;
 }

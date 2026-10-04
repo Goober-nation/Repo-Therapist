@@ -34,6 +34,10 @@ type fakeService struct {
 
 	analyticsOut domain.RepoAnalytics
 	analyticsFor string
+
+	orgsOut     domain.GetMyOrgsDTO
+	orgReposOut domain.GetMyReposDTO
+	orgReposFor string
 }
 
 func (f *fakeService) GetAnalytics(ctx context.Context, clientIP, pat, orgSlug, repoSlug string) (domain.RepoAnalytics, error) {
@@ -59,6 +63,16 @@ func (f *fakeService) GetPublicScore(ctx context.Context, orgSlug, repoSlug stri
 func (f *fakeService) GetMyRepos(ctx context.Context, clientIP, pat string) (domain.GetMyReposDTO, error) {
 	f.called, f.pat = true, pat
 	return domain.GetMyReposDTO{}, f.err
+}
+
+func (f *fakeService) GetMyOrgs(ctx context.Context, clientIP, pat string) (domain.GetMyOrgsDTO, error) {
+	f.called, f.pat = true, pat
+	return f.orgsOut, f.err
+}
+
+func (f *fakeService) GetOrgRepos(ctx context.Context, clientIP, pat, orgSlug, pageToken string) (domain.GetMyReposDTO, error) {
+	f.called, f.pat, f.orgReposFor = true, pat, orgSlug+"|"+pageToken
+	return f.orgReposOut, f.err
 }
 
 func (f *fakeService) GetGrading(ctx context.Context, clientIP, pat string, request domain.GetGradingDTO) (domain.GetGradingResponse, error) {

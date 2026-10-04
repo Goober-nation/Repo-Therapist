@@ -10,6 +10,14 @@ service Aggregator {
   rpc GetMyRepos(GetMyReposRequest)
       returns (GetMyReposResponse);
 
+  // GetMyOrgs lists the caller's organizations and the one to open first.
+  rpc GetMyOrgs(GetMyOrgsRequest)
+      returns (GetMyOrgsResponse);
+
+  // GetOrgRepos returns one batch of an organization's repos visible to the caller.
+  rpc GetOrgRepos(GetOrgReposRequest)
+      returns (GetOrgReposResponse);
+
   rpc GetGrading(GetGradingRequest)
       returns (GetGradingResponse);
 
@@ -23,6 +31,29 @@ service Aggregator {
 message GetMyReposRequest {}
 
 message GetMyReposResponse {
+  repeated Repository repositories = 1;
+  string next_page_token = 2;
+}
+
+message GetMyOrgsRequest {}
+
+message GetMyOrgsResponse {
+  repeated UserOrganization organizations = 1;
+  string default_org_slug = 2;
+}
+
+message UserOrganization {
+  string slug = 1;
+  string display_name = 2;
+  bool personal = 3;
+}
+
+message GetOrgReposRequest {
+  string org_slug = 1;
+  string page_token = 2;
+}
+
+message GetOrgReposResponse {
   repeated Repository repositories = 1;
   string next_page_token = 2;
 }

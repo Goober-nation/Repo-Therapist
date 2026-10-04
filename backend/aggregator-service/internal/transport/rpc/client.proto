@@ -13,6 +13,12 @@ service CodeHealth {
 
   rpc GetMyRepos(GetMyReposRequest)
       returns (GetMyReposResponse);
+
+  rpc GetMyOrgs(GetMyOrgsRequest)
+      returns (GetMyOrgsResponse);
+
+  rpc GetOrgRepos(GetOrgReposRequest)
+      returns (GetOrgReposResponse);
 }
 
 message GetRepositoryBySlugsRequest {
@@ -43,6 +49,30 @@ message ListAllPublicReposResponse {
 message GetMyReposRequest {}
 
 message GetMyReposResponse {
+  repeated Repository repositories = 1;
+  string next_page_token = 2;
+}
+
+message GetMyOrgsRequest {}
+
+message GetMyOrgsResponse {
+  repeated UserOrganization organizations = 1;
+  string default_org_slug = 2;
+}
+
+message UserOrganization {
+  string id = 1;
+  string slug = 2;
+  string display_name = 3;
+  bool personal = 4;
+}
+
+message GetOrgReposRequest {
+  string org_slug = 1;
+  string page_token = 2;
+}
+
+message GetOrgReposResponse {
   repeated Repository repositories = 1;
   string next_page_token = 2;
 }

@@ -112,9 +112,26 @@ export interface CodeownersInfo {
   coveredShare?: number
 }
 
+/** Review habits over the newest sampled pull requests; informational only. */
+export interface ReviewStats {
+  available: boolean
+  /** Why it is unavailable: unavailable | few_merged | imported. */
+  reason?: string
+  sampled: number
+  /** Merged pull requests with readable reviews that were judged. */
+  merged: number
+  /** Of those, merged with no review by anyone but the author (bots excluded). */
+  unreviewed: number
+  /** 0–1; undefined unless available. */
+  unreviewedShare?: number
+  /** Approximate: SourceCraft has no merge time, so this is updated_at - created_at. */
+  medianMergeHours?: number
+}
+
 export interface RepoAnalytics {
   windowDays: number
   busFactor: BusFactor
+  reviews: ReviewStats
   ownership: { available: boolean; areas: OwnershipArea[]; codeowners: CodeownersInfo }
 }
 

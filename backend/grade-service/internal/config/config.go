@@ -37,6 +37,11 @@ type AnalyticsConfig struct {
 	// TopAuthors / TopAreas cap how many authors and directories are listed.
 	TopAuthors int `yaml:"top_authors"`
 	TopAreas   int `yaml:"top_areas"`
+	// MinMergedPRs: fewer merged pull requests with readable reviews in the sample make the
+	// reviews block "no data". ImportShare: when this share or more of the sampled pull requests
+	// were created on one day the history is treated as imported and the block is "no data".
+	MinMergedPRs int     `yaml:"min_merged_prs"`
+	ImportShare  float64 `yaml:"import_share"`
 }
 
 // Low-confidence reason codes; ConfidenceConfig.Reasons must have a text for each.
@@ -236,6 +241,12 @@ func validateAnalytics(a AnalyticsConfig) error {
 	}
 	if a.MinCommits < 0 {
 		return fmt.Errorf("min_commits must not be negative, got %d", a.MinCommits)
+	}
+	if a.MinMergedPRs < 1 {
+		return fmt.Errorf("min_merged_prs must be at least 1, got %d", a.MinMergedPRs)
+	}
+	if a.ImportShare <= 0 || a.ImportShare > 1 {
+		return fmt.Errorf("import_share must be in (0, 1], got %v", a.ImportShare)
 	}
 	return nil
 }

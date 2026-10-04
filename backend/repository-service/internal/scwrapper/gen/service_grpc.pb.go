@@ -23,14 +23,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CodeHealth_GetRepositoryBySlugs_FullMethodName = "/code_health.CodeHealth/GetRepositoryBySlugs"
-	CodeHealth_GetRepoIDBySlugs_FullMethodName     = "/code_health.CodeHealth/GetRepoIDBySlugs"
-	CodeHealth_GetGitURL_FullMethodName            = "/code_health.CodeHealth/GetGitURL"
-	CodeHealth_GetCiCDRuns_FullMethodName          = "/code_health.CodeHealth/GetCiCDRuns"
-	CodeHealth_GetIssues_FullMethodName            = "/code_health.CodeHealth/GetIssues"
-	CodeHealth_GetMilestones_FullMethodName        = "/code_health.CodeHealth/GetMilestones"
-	CodeHealth_ListAllPublicRepos_FullMethodName   = "/code_health.CodeHealth/ListAllPublicRepos"
-	CodeHealth_GetMyRepos_FullMethodName           = "/code_health.CodeHealth/GetMyRepos"
+	CodeHealth_GetRepositoryBySlugs_FullMethodName   = "/code_health.CodeHealth/GetRepositoryBySlugs"
+	CodeHealth_GetRepoIDBySlugs_FullMethodName       = "/code_health.CodeHealth/GetRepoIDBySlugs"
+	CodeHealth_GetGitURL_FullMethodName              = "/code_health.CodeHealth/GetGitURL"
+	CodeHealth_GetCiCDRuns_FullMethodName            = "/code_health.CodeHealth/GetCiCDRuns"
+	CodeHealth_GetIssues_FullMethodName              = "/code_health.CodeHealth/GetIssues"
+	CodeHealth_GetMilestones_FullMethodName          = "/code_health.CodeHealth/GetMilestones"
+	CodeHealth_ListAllPublicRepos_FullMethodName     = "/code_health.CodeHealth/ListAllPublicRepos"
+	CodeHealth_GetMyRepos_FullMethodName             = "/code_health.CodeHealth/GetMyRepos"
+	CodeHealth_GetPullRequests_FullMethodName        = "/code_health.CodeHealth/GetPullRequests"
+	CodeHealth_GetPullRequestActivity_FullMethodName = "/code_health.CodeHealth/GetPullRequestActivity"
 )
 
 // CodeHealthClient is the client API for CodeHealth service.
@@ -45,6 +47,10 @@ type CodeHealthClient interface {
 	GetMilestones(ctx context.Context, in *GetMilestonesRequest, opts ...grpc.CallOption) (*GetMilestonesResponse, error)
 	ListAllPublicRepos(ctx context.Context, in *ListAllPublicReposRequest, opts ...grpc.CallOption) (*ListAllPublicReposResponse, error)
 	GetMyRepos(ctx context.Context, in *GetMyReposRequest, opts ...grpc.CallOption) (*GetMyReposResponse, error)
+	// GetPullRequests returns the newest pull requests of a repository (any status), newest first.
+	GetPullRequests(ctx context.Context, in *GetPullRequestsRequest, opts ...grpc.CallOption) (*GetPullRequestsResponse, error)
+	// GetPullRequestActivity returns the reviewers and comments of one pull request (first page).
+	GetPullRequestActivity(ctx context.Context, in *GetPullRequestActivityRequest, opts ...grpc.CallOption) (*GetPullRequestActivityResponse, error)
 }
 
 type codeHealthClient struct {
@@ -135,6 +141,26 @@ func (c *codeHealthClient) GetMyRepos(ctx context.Context, in *GetMyReposRequest
 	return out, nil
 }
 
+func (c *codeHealthClient) GetPullRequests(ctx context.Context, in *GetPullRequestsRequest, opts ...grpc.CallOption) (*GetPullRequestsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPullRequestsResponse)
+	err := c.cc.Invoke(ctx, CodeHealth_GetPullRequests_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *codeHealthClient) GetPullRequestActivity(ctx context.Context, in *GetPullRequestActivityRequest, opts ...grpc.CallOption) (*GetPullRequestActivityResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPullRequestActivityResponse)
+	err := c.cc.Invoke(ctx, CodeHealth_GetPullRequestActivity_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CodeHealthServer is the server API for CodeHealth service.
 // All implementations must embed UnimplementedCodeHealthServer
 // for forward compatibility.
@@ -147,6 +173,10 @@ type CodeHealthServer interface {
 	GetMilestones(context.Context, *GetMilestonesRequest) (*GetMilestonesResponse, error)
 	ListAllPublicRepos(context.Context, *ListAllPublicReposRequest) (*ListAllPublicReposResponse, error)
 	GetMyRepos(context.Context, *GetMyReposRequest) (*GetMyReposResponse, error)
+	// GetPullRequests returns the newest pull requests of a repository (any status), newest first.
+	GetPullRequests(context.Context, *GetPullRequestsRequest) (*GetPullRequestsResponse, error)
+	// GetPullRequestActivity returns the reviewers and comments of one pull request (first page).
+	GetPullRequestActivity(context.Context, *GetPullRequestActivityRequest) (*GetPullRequestActivityResponse, error)
 	mustEmbedUnimplementedCodeHealthServer()
 }
 
@@ -180,6 +210,12 @@ func (UnimplementedCodeHealthServer) ListAllPublicRepos(context.Context, *ListAl
 }
 func (UnimplementedCodeHealthServer) GetMyRepos(context.Context, *GetMyReposRequest) (*GetMyReposResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMyRepos not implemented")
+}
+func (UnimplementedCodeHealthServer) GetPullRequests(context.Context, *GetPullRequestsRequest) (*GetPullRequestsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPullRequests not implemented")
+}
+func (UnimplementedCodeHealthServer) GetPullRequestActivity(context.Context, *GetPullRequestActivityRequest) (*GetPullRequestActivityResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPullRequestActivity not implemented")
 }
 func (UnimplementedCodeHealthServer) mustEmbedUnimplementedCodeHealthServer() {}
 func (UnimplementedCodeHealthServer) testEmbeddedByValue()                    {}
@@ -346,6 +382,42 @@ func _CodeHealth_GetMyRepos_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CodeHealth_GetPullRequests_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPullRequestsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CodeHealthServer).GetPullRequests(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CodeHealth_GetPullRequests_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CodeHealthServer).GetPullRequests(ctx, req.(*GetPullRequestsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CodeHealth_GetPullRequestActivity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPullRequestActivityRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CodeHealthServer).GetPullRequestActivity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CodeHealth_GetPullRequestActivity_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CodeHealthServer).GetPullRequestActivity(ctx, req.(*GetPullRequestActivityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CodeHealth_ServiceDesc is the grpc.ServiceDesc for CodeHealth service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -384,6 +456,14 @@ var CodeHealth_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMyRepos",
 			Handler:    _CodeHealth_GetMyRepos_Handler,
+		},
+		{
+			MethodName: "GetPullRequests",
+			Handler:    _CodeHealth_GetPullRequests_Handler,
+		},
+		{
+			MethodName: "GetPullRequestActivity",
+			Handler:    _CodeHealth_GetPullRequestActivity_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

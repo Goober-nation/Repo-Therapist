@@ -1761,8 +1761,9 @@ const analyticsBody = {
   status: "FINISHED",
   graded_at: "2026-10-01T12:00:00Z",
   analytics: {
-    version: 1,
+    version: 2,
     window_days: 180,
+    reviews: { status: "ok", sampled: 10, merged: 8, unreviewed: 3, unreviewed_share: 0.38, median_merge_hours: 30 },
     bus_factor: {
       status: "ok",
       value: 2,
@@ -1800,6 +1801,15 @@ test("analytics: the response is read defensively and no-data blocks stay unavai
       { name: "Bob", commits: 8, share: 0.2 },
     ],
   })
+  assert.deepEqual(mapped.reviews, {
+    available: true,
+    reason: "unavailable",
+    sampled: 10,
+    merged: 8,
+    unreviewed: 3,
+    unreviewedShare: 0.38,
+    medianMergeHours: 30,
+  })
   assert.equal(mapped.ownership.areas.length, 1)
   assert.deepEqual(mapped.ownership.codeowners, { present: true, path: ".github/CODEOWNERS", rules: 3, coveredShare: 0.75 })
 
@@ -1811,6 +1821,9 @@ test("analytics: the response is read defensively and no-data blocks stay unavai
       ownership: { status: "no_data", areas: [], codeowners: { present: false, rules: 0, covered_share: null } },
     },
   })
+  // Analytics stored before the reviews block existed show it as unavailable, never as zeros.
+  assert.equal(noData.reviews.available, false)
+  assert.equal("unreviewedShare" in noData.reviews, false)
   assert.equal(noData.busFactor.available, false)
   assert.equal(noData.busFactor.value, 0)
   assert.equal(noData.ownership.available, false)
@@ -1854,6 +1867,16 @@ test("analytics section: renders bus factor, owners and CODEOWNERS, and every em
   assert.match(full, />75%</)
   assert.match(full, /3 правила/)
   assert.match(full, /на оценку не влияют/)
+  assert.match(full, />38%</)
+  assert.match(full, /влитых pull request&#x27;ов без ревью: 3 из 8 среди последних 10/)
+  assert.match(full, /Медианное время до слияния: 30 ч/)
+
+  const reviewReason = (reason) =>
+    render(analyticsFromResponse({ status: "FINISHED", analytics: { window_days: 180, reviews: { status: "no_data", reason } } }))
+  assert.match(reviewReason("few_merged"), /слишком мало влитых/)
+  assert.match(reviewReason("imported"), /импорт истории/)
+  assert.match(reviewReason("unavailable"), /получить не удалось/)
+  assert.match(reviewReason("something-new"), /получить не удалось/)
 
   const single = analyticsFromResponse({ status: "FINISHED", analytics: { window_days: 90, bus_factor: { status: "ok", value: 1, commits: 20, authors: 1, top_authors: [{ name: "Solo", commits: 20, share: 1 }] } } })
   assert.match(render(single), /Проект сильно зависит от одного человека/)

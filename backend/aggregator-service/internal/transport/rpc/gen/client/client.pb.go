@@ -7,12 +7,11 @@
 package client
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -77,16 +76,16 @@ func (x *GetRepositoryBySlugsRequest) GetOrgSlug() string {
 type GetRepositoryBySlugsResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name           string        `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Organization   *Organization `protobuf:"bytes,3,opt,name=organization,proto3" json:"organization,omitempty"`
-	Slug           string        `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
-	Description    string        `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
-	Logo           *Logo         `protobuf:"bytes,6,opt,name=logo,proto3" json:"logo,omitempty"`
-	WebUrl         string        `protobuf:"bytes,7,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
+	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Organization   *Organization          `protobuf:"bytes,3,opt,name=organization,proto3" json:"organization,omitempty"`
+	Slug           string                 `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
+	Description    string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	Logo           *Logo                  `protobuf:"bytes,6,opt,name=logo,proto3" json:"logo,omitempty"`
+	WebUrl         string                 `protobuf:"bytes,7,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
 	Visibility     string                 `protobuf:"bytes,8,opt,name=visibility,proto3" json:"visibility,omitempty"`
-	LastActivityAt string        `protobuf:"bytes,9,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
-	Rating         *Rating       `protobuf:"bytes,10,opt,name=rating,proto3" json:"rating,omitempty"`
-	Language       *Language     `protobuf:"bytes,11,opt,name=language,proto3" json:"language,omitempty"`
+	LastActivityAt string                 `protobuf:"bytes,9,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
+	Rating         *Rating                `protobuf:"bytes,10,opt,name=rating,proto3" json:"rating,omitempty"`
+	Language       *Language              `protobuf:"bytes,11,opt,name=language,proto3" json:"language,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -366,26 +365,286 @@ func (x *GetMyReposResponse) GetNextPageToken() string {
 	return ""
 }
 
+type GetMyOrgsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMyOrgsRequest) Reset() {
+	*x = GetMyOrgsRequest{}
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMyOrgsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMyOrgsRequest) ProtoMessage() {}
+
+func (x *GetMyOrgsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMyOrgsRequest.ProtoReflect.Descriptor instead.
+func (*GetMyOrgsRequest) Descriptor() ([]byte, []int) {
+	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{6}
+}
+
+type GetMyOrgsResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Organizations  []*UserOrganization    `protobuf:"bytes,1,rep,name=organizations,proto3" json:"organizations,omitempty"`
+	DefaultOrgSlug string                 `protobuf:"bytes,2,opt,name=default_org_slug,json=defaultOrgSlug,proto3" json:"default_org_slug,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetMyOrgsResponse) Reset() {
+	*x = GetMyOrgsResponse{}
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMyOrgsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMyOrgsResponse) ProtoMessage() {}
+
+func (x *GetMyOrgsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMyOrgsResponse.ProtoReflect.Descriptor instead.
+func (*GetMyOrgsResponse) Descriptor() ([]byte, []int) {
+	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetMyOrgsResponse) GetOrganizations() []*UserOrganization {
+	if x != nil {
+		return x.Organizations
+	}
+	return nil
+}
+
+func (x *GetMyOrgsResponse) GetDefaultOrgSlug() string {
+	if x != nil {
+		return x.DefaultOrgSlug
+	}
+	return ""
+}
+
+type UserOrganization struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Slug          string                 `protobuf:"bytes,2,opt,name=slug,proto3" json:"slug,omitempty"`
+	DisplayName   string                 `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Personal      bool                   `protobuf:"varint,4,opt,name=personal,proto3" json:"personal,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserOrganization) Reset() {
+	*x = UserOrganization{}
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserOrganization) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserOrganization) ProtoMessage() {}
+
+func (x *UserOrganization) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserOrganization.ProtoReflect.Descriptor instead.
+func (*UserOrganization) Descriptor() ([]byte, []int) {
+	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *UserOrganization) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *UserOrganization) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
+func (x *UserOrganization) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *UserOrganization) GetPersonal() bool {
+	if x != nil {
+		return x.Personal
+	}
+	return false
+}
+
+type GetOrgReposRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OrgSlug       string                 `protobuf:"bytes,1,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
+	PageToken     string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetOrgReposRequest) Reset() {
+	*x = GetOrgReposRequest{}
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetOrgReposRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetOrgReposRequest) ProtoMessage() {}
+
+func (x *GetOrgReposRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetOrgReposRequest.ProtoReflect.Descriptor instead.
+func (*GetOrgReposRequest) Descriptor() ([]byte, []int) {
+	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetOrgReposRequest) GetOrgSlug() string {
+	if x != nil {
+		return x.OrgSlug
+	}
+	return ""
+}
+
+func (x *GetOrgReposRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type GetOrgReposResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Repositories  []*Repository          `protobuf:"bytes,1,rep,name=repositories,proto3" json:"repositories,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetOrgReposResponse) Reset() {
+	*x = GetOrgReposResponse{}
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetOrgReposResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetOrgReposResponse) ProtoMessage() {}
+
+func (x *GetOrgReposResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetOrgReposResponse.ProtoReflect.Descriptor instead.
+func (*GetOrgReposResponse) Descriptor() ([]byte, []int) {
+	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetOrgReposResponse) GetRepositories() []*Repository {
+	if x != nil {
+		return x.Repositories
+	}
+	return nil
+}
+
+func (x *GetOrgReposResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
 type Repository struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name           string        `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Organization   *Organization `protobuf:"bytes,3,opt,name=organization,proto3" json:"organization,omitempty"`
-	Slug           string        `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
-	Description    string        `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
-	Logo           *Logo         `protobuf:"bytes,6,opt,name=logo,proto3" json:"logo,omitempty"`
-	WebUrl         string        `protobuf:"bytes,7,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
+	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Organization   *Organization          `protobuf:"bytes,3,opt,name=organization,proto3" json:"organization,omitempty"`
+	Slug           string                 `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
+	Description    string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	Logo           *Logo                  `protobuf:"bytes,6,opt,name=logo,proto3" json:"logo,omitempty"`
+	WebUrl         string                 `protobuf:"bytes,7,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
 	Visibility     string                 `protobuf:"bytes,8,opt,name=visibility,proto3" json:"visibility,omitempty"`
-	LastActivityAt string        `protobuf:"bytes,9,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
-	Rating         *Rating       `protobuf:"bytes,10,opt,name=rating,proto3" json:"rating,omitempty"`
-	Language       *Language     `protobuf:"bytes,11,opt,name=language,proto3" json:"language,omitempty"`
+	LastActivityAt string                 `protobuf:"bytes,9,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
+	Rating         *Rating                `protobuf:"bytes,10,opt,name=rating,proto3" json:"rating,omitempty"`
+	Language       *Language              `protobuf:"bytes,11,opt,name=language,proto3" json:"language,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Repository) Reset() {
 	*x = Repository{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[6]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -397,7 +656,7 @@ func (x *Repository) String() string {
 func (*Repository) ProtoMessage() {}
 
 func (x *Repository) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[6]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -410,7 +669,7 @@ func (x *Repository) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Repository.ProtoReflect.Descriptor instead.
 func (*Repository) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{6}
+	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Repository) GetId() string {
@@ -500,7 +759,7 @@ type Language struct {
 
 func (x *Language) Reset() {
 	*x = Language{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[7]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -512,7 +771,7 @@ func (x *Language) String() string {
 func (*Language) ProtoMessage() {}
 
 func (x *Language) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[7]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -525,7 +784,7 @@ func (x *Language) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Language.ProtoReflect.Descriptor instead.
 func (*Language) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{7}
+	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *Language) GetName() string {
@@ -552,7 +811,7 @@ type Organization struct {
 
 func (x *Organization) Reset() {
 	*x = Organization{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[8]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -564,7 +823,7 @@ func (x *Organization) String() string {
 func (*Organization) ProtoMessage() {}
 
 func (x *Organization) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[8]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -577,7 +836,7 @@ func (x *Organization) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Organization.ProtoReflect.Descriptor instead.
 func (*Organization) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{8}
+	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *Organization) GetId() string {
@@ -603,7 +862,7 @@ type Logo struct {
 
 func (x *Logo) Reset() {
 	*x = Logo{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[9]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -615,7 +874,7 @@ func (x *Logo) String() string {
 func (*Logo) ProtoMessage() {}
 
 func (x *Logo) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[9]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -628,7 +887,7 @@ func (x *Logo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Logo.ProtoReflect.Descriptor instead.
 func (*Logo) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{9}
+	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *Logo) GetUrl() string {
@@ -641,15 +900,15 @@ func (x *Logo) GetUrl() string {
 type Rating struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Value          float64                `protobuf:"fixed64,1,opt,name=value,proto3" json:"value,omitempty"`
-	Percentile     float64          `protobuf:"fixed64,2,opt,name=percentile,proto3" json:"percentile,omitempty"`
-	ReactionCounts []*ReactionCount `protobuf:"bytes,3,rep,name=reaction_counts,json=reactionCounts,proto3" json:"reaction_counts,omitempty"`
+	Percentile     float64                `protobuf:"fixed64,2,opt,name=percentile,proto3" json:"percentile,omitempty"`
+	ReactionCounts []*ReactionCount       `protobuf:"bytes,3,rep,name=reaction_counts,json=reactionCounts,proto3" json:"reaction_counts,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Rating) Reset() {
 	*x = Rating{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[10]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -661,7 +920,7 @@ func (x *Rating) String() string {
 func (*Rating) ProtoMessage() {}
 
 func (x *Rating) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[10]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -674,7 +933,7 @@ func (x *Rating) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Rating.ProtoReflect.Descriptor instead.
 func (*Rating) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{10}
+	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Rating) GetValue() float64 {
@@ -708,7 +967,7 @@ type ReactionCount struct {
 
 func (x *ReactionCount) Reset() {
 	*x = ReactionCount{}
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[11]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -720,7 +979,7 @@ func (x *ReactionCount) String() string {
 func (*ReactionCount) ProtoMessage() {}
 
 func (x *ReactionCount) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_client_proto_msgTypes[11]
+	mi := &file_internal_transport_rpc_client_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -733,7 +992,7 @@ func (x *ReactionCount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReactionCount.ProtoReflect.Descriptor instead.
 func (*ReactionCount) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{11}
+	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ReactionCount) GetType() string {
@@ -779,6 +1038,22 @@ const file_internal_transport_rpc_client_proto_rawDesc = "" +
 	"\x11GetMyReposRequest\"y\n" +
 	"\x12GetMyReposResponse\x12;\n" +
 	"\frepositories\x18\x01 \x03(\v2\x17.code_health.RepositoryR\frepositories\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x12\n" +
+	"\x10GetMyOrgsRequest\"\x82\x01\n" +
+	"\x11GetMyOrgsResponse\x12C\n" +
+	"\rorganizations\x18\x01 \x03(\v2\x1d.code_health.UserOrganizationR\rorganizations\x12(\n" +
+	"\x10default_org_slug\x18\x02 \x01(\tR\x0edefaultOrgSlug\"u\n" +
+	"\x10UserOrganization\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04slug\x18\x02 \x01(\tR\x04slug\x12!\n" +
+	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\x12\x1a\n" +
+	"\bpersonal\x18\x04 \x01(\bR\bpersonal\"N\n" +
+	"\x12GetOrgReposRequest\x12\x19\n" +
+	"\borg_slug\x18\x01 \x01(\tR\aorgSlug\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x02 \x01(\tR\tpageToken\"z\n" +
+	"\x13GetOrgReposResponse\x12;\n" +
+	"\frepositories\x18\x01 \x03(\v2\x17.code_health.RepositoryR\frepositories\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x8f\x03\n" +
 	"\n" +
 	"Repository\x12\x0e\n" +
@@ -812,13 +1087,15 @@ const file_internal_transport_rpc_client_proto_rawDesc = "" +
 	"\x0freaction_counts\x18\x03 \x03(\v2\x1a.code_health.ReactionCountR\x0ereactionCounts\"9\n" +
 	"\rReactionCount\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x14\n" +
-	"\x05count\x18\x02 \x01(\tR\x05count2\xaf\x02\n" +
+	"\x05count\x18\x02 \x01(\tR\x05count2\xcd\x03\n" +
 	"\n" +
 	"CodeHealth\x12k\n" +
 	"\x14GetRepositoryBySlugs\x12(.code_health.GetRepositoryBySlugsRequest\x1a).code_health.GetRepositoryBySlugsResponse\x12e\n" +
 	"\x12ListAllPublicRepos\x12&.code_health.ListAllPublicReposRequest\x1a'.code_health.ListAllPublicReposResponse\x12M\n" +
 	"\n" +
-	"GetMyRepos\x12\x1e.code_health.GetMyReposRequest\x1a\x1f.code_health.GetMyReposResponseB2Z0aggregator-service/internal/transport/rpc/gen;pbb\x06proto3"
+	"GetMyRepos\x12\x1e.code_health.GetMyReposRequest\x1a\x1f.code_health.GetMyReposResponse\x12J\n" +
+	"\tGetMyOrgs\x12\x1d.code_health.GetMyOrgsRequest\x1a\x1e.code_health.GetMyOrgsResponse\x12P\n" +
+	"\vGetOrgRepos\x12\x1f.code_health.GetOrgReposRequest\x1a .code_health.GetOrgReposResponseB2Z0aggregator-service/internal/transport/rpc/gen;pbb\x06proto3"
 
 var (
 	file_internal_transport_rpc_client_proto_rawDescOnce sync.Once
@@ -832,7 +1109,7 @@ func file_internal_transport_rpc_client_proto_rawDescGZIP() []byte {
 	return file_internal_transport_rpc_client_proto_rawDescData
 }
 
-var file_internal_transport_rpc_client_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_internal_transport_rpc_client_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_internal_transport_rpc_client_proto_goTypes = []any{
 	(*GetRepositoryBySlugsRequest)(nil),  // 0: code_health.GetRepositoryBySlugsRequest
 	(*GetRepositoryBySlugsResponse)(nil), // 1: code_health.GetRepositoryBySlugsResponse
@@ -840,36 +1117,47 @@ var file_internal_transport_rpc_client_proto_goTypes = []any{
 	(*ListAllPublicReposResponse)(nil),   // 3: code_health.ListAllPublicReposResponse
 	(*GetMyReposRequest)(nil),            // 4: code_health.GetMyReposRequest
 	(*GetMyReposResponse)(nil),           // 5: code_health.GetMyReposResponse
-	(*Repository)(nil),                   // 6: code_health.Repository
-	(*Language)(nil),                     // 7: code_health.Language
-	(*Organization)(nil),                 // 8: code_health.Organization
-	(*Logo)(nil),                         // 9: code_health.Logo
-	(*Rating)(nil),                       // 10: code_health.Rating
-	(*ReactionCount)(nil),                // 11: code_health.ReactionCount
+	(*GetMyOrgsRequest)(nil),             // 6: code_health.GetMyOrgsRequest
+	(*GetMyOrgsResponse)(nil),            // 7: code_health.GetMyOrgsResponse
+	(*UserOrganization)(nil),             // 8: code_health.UserOrganization
+	(*GetOrgReposRequest)(nil),           // 9: code_health.GetOrgReposRequest
+	(*GetOrgReposResponse)(nil),          // 10: code_health.GetOrgReposResponse
+	(*Repository)(nil),                   // 11: code_health.Repository
+	(*Language)(nil),                     // 12: code_health.Language
+	(*Organization)(nil),                 // 13: code_health.Organization
+	(*Logo)(nil),                         // 14: code_health.Logo
+	(*Rating)(nil),                       // 15: code_health.Rating
+	(*ReactionCount)(nil),                // 16: code_health.ReactionCount
 }
 var file_internal_transport_rpc_client_proto_depIdxs = []int32{
-	8,  // 0: code_health.GetRepositoryBySlugsResponse.organization:type_name -> code_health.Organization
-	9,  // 1: code_health.GetRepositoryBySlugsResponse.logo:type_name -> code_health.Logo
-	10, // 2: code_health.GetRepositoryBySlugsResponse.rating:type_name -> code_health.Rating
-	7,  // 3: code_health.GetRepositoryBySlugsResponse.language:type_name -> code_health.Language
-	6,  // 4: code_health.ListAllPublicReposResponse.repos:type_name -> code_health.Repository
-	6,  // 5: code_health.GetMyReposResponse.repositories:type_name -> code_health.Repository
-	8,  // 6: code_health.Repository.organization:type_name -> code_health.Organization
-	9,  // 7: code_health.Repository.logo:type_name -> code_health.Logo
-	10, // 8: code_health.Repository.rating:type_name -> code_health.Rating
-	7,  // 9: code_health.Repository.language:type_name -> code_health.Language
-	11, // 10: code_health.Rating.reaction_counts:type_name -> code_health.ReactionCount
-	0,  // 11: code_health.CodeHealth.GetRepositoryBySlugs:input_type -> code_health.GetRepositoryBySlugsRequest
-	2,  // 12: code_health.CodeHealth.ListAllPublicRepos:input_type -> code_health.ListAllPublicReposRequest
-	4,  // 13: code_health.CodeHealth.GetMyRepos:input_type -> code_health.GetMyReposRequest
-	1,  // 14: code_health.CodeHealth.GetRepositoryBySlugs:output_type -> code_health.GetRepositoryBySlugsResponse
-	3,  // 15: code_health.CodeHealth.ListAllPublicRepos:output_type -> code_health.ListAllPublicReposResponse
-	5,  // 16: code_health.CodeHealth.GetMyRepos:output_type -> code_health.GetMyReposResponse
-	14, // [14:17] is the sub-list for method output_type
-	11, // [11:14] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	13, // 0: code_health.GetRepositoryBySlugsResponse.organization:type_name -> code_health.Organization
+	14, // 1: code_health.GetRepositoryBySlugsResponse.logo:type_name -> code_health.Logo
+	15, // 2: code_health.GetRepositoryBySlugsResponse.rating:type_name -> code_health.Rating
+	12, // 3: code_health.GetRepositoryBySlugsResponse.language:type_name -> code_health.Language
+	11, // 4: code_health.ListAllPublicReposResponse.repos:type_name -> code_health.Repository
+	11, // 5: code_health.GetMyReposResponse.repositories:type_name -> code_health.Repository
+	8,  // 6: code_health.GetMyOrgsResponse.organizations:type_name -> code_health.UserOrganization
+	11, // 7: code_health.GetOrgReposResponse.repositories:type_name -> code_health.Repository
+	13, // 8: code_health.Repository.organization:type_name -> code_health.Organization
+	14, // 9: code_health.Repository.logo:type_name -> code_health.Logo
+	15, // 10: code_health.Repository.rating:type_name -> code_health.Rating
+	12, // 11: code_health.Repository.language:type_name -> code_health.Language
+	16, // 12: code_health.Rating.reaction_counts:type_name -> code_health.ReactionCount
+	0,  // 13: code_health.CodeHealth.GetRepositoryBySlugs:input_type -> code_health.GetRepositoryBySlugsRequest
+	2,  // 14: code_health.CodeHealth.ListAllPublicRepos:input_type -> code_health.ListAllPublicReposRequest
+	4,  // 15: code_health.CodeHealth.GetMyRepos:input_type -> code_health.GetMyReposRequest
+	6,  // 16: code_health.CodeHealth.GetMyOrgs:input_type -> code_health.GetMyOrgsRequest
+	9,  // 17: code_health.CodeHealth.GetOrgRepos:input_type -> code_health.GetOrgReposRequest
+	1,  // 18: code_health.CodeHealth.GetRepositoryBySlugs:output_type -> code_health.GetRepositoryBySlugsResponse
+	3,  // 19: code_health.CodeHealth.ListAllPublicRepos:output_type -> code_health.ListAllPublicReposResponse
+	5,  // 20: code_health.CodeHealth.GetMyRepos:output_type -> code_health.GetMyReposResponse
+	7,  // 21: code_health.CodeHealth.GetMyOrgs:output_type -> code_health.GetMyOrgsResponse
+	10, // 22: code_health.CodeHealth.GetOrgRepos:output_type -> code_health.GetOrgReposResponse
+	18, // [18:23] is the sub-list for method output_type
+	13, // [13:18] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_internal_transport_rpc_client_proto_init() }
@@ -883,7 +1171,7 @@ func file_internal_transport_rpc_client_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_transport_rpc_client_proto_rawDesc), len(file_internal_transport_rpc_client_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

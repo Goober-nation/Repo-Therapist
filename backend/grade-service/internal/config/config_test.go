@@ -122,11 +122,24 @@ func TestShippedAnalyticsConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Analytics != (AnalyticsConfig{Enabled: true, WindowDays: 180, MinCommits: 5, TopAuthors: 5, TopAreas: 8}) {
+	if cfg.Analytics != (AnalyticsConfig{Enabled: true, WindowDays: 180, MinCommits: 5, TopAuthors: 5, TopAreas: 8, MinMergedPRs: 3, ImportShare: 0.8}) {
 		t.Errorf("analytics = %+v", cfg.Analytics)
 	}
-	if err := validateAnalytics(AnalyticsConfig{Enabled: true, WindowDays: 0, TopAuthors: 1, TopAreas: 1}); err == nil {
+	if err := validateAnalytics(AnalyticsConfig{Enabled: true, WindowDays: 0, TopAuthors: 1, TopAreas: 1, MinMergedPRs: 3, ImportShare: 0.8}); err == nil {
 		t.Error("a zero window must be rejected")
+	}
+	ok := AnalyticsConfig{Enabled: true, WindowDays: 1, TopAuthors: 1, TopAreas: 1, MinMergedPRs: 3, ImportShare: 0.8}
+	if err := validateAnalytics(ok); err != nil {
+		t.Errorf("valid config rejected: %v", err)
+	}
+	for name, bad := range map[string]AnalyticsConfig{
+		"no merged PR minimum": {Enabled: true, WindowDays: 1, TopAuthors: 1, TopAreas: 1, ImportShare: 0.8},
+		"zero import share":    {Enabled: true, WindowDays: 1, TopAuthors: 1, TopAreas: 1, MinMergedPRs: 3},
+		"import share above 1": {Enabled: true, WindowDays: 1, TopAuthors: 1, TopAreas: 1, MinMergedPRs: 3, ImportShare: 1.5},
+	} {
+		if validateAnalytics(bad) == nil {
+			t.Errorf("%s must be rejected", name)
+		}
 	}
 	if err := validateAnalytics(AnalyticsConfig{}); err != nil {
 		t.Errorf("disabled analytics must not be validated: %v", err)

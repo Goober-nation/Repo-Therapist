@@ -20,6 +20,8 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	Aggregator_GetMyRepos_FullMethodName                = "/aggregator.Aggregator/GetMyRepos"
+	Aggregator_GetMyOrgs_FullMethodName                 = "/aggregator.Aggregator/GetMyOrgs"
+	Aggregator_GetOrgRepos_FullMethodName               = "/aggregator.Aggregator/GetOrgRepos"
 	Aggregator_GetGrading_FullMethodName                = "/aggregator.Aggregator/GetGrading"
 	Aggregator_RequestLLMRecommendations_FullMethodName = "/aggregator.Aggregator/RequestLLMRecommendations"
 	Aggregator_GetAnalytics_FullMethodName              = "/aggregator.Aggregator/GetAnalytics"
@@ -30,6 +32,10 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AggregatorClient interface {
 	GetMyRepos(ctx context.Context, in *GetMyReposRequest, opts ...grpc.CallOption) (*GetMyReposResponse, error)
+	// GetMyOrgs lists the caller's organizations and the one to open first.
+	GetMyOrgs(ctx context.Context, in *GetMyOrgsRequest, opts ...grpc.CallOption) (*GetMyOrgsResponse, error)
+	// GetOrgRepos returns one batch of an organization's repos visible to the caller.
+	GetOrgRepos(ctx context.Context, in *GetOrgReposRequest, opts ...grpc.CallOption) (*GetOrgReposResponse, error)
 	GetGrading(ctx context.Context, in *GetGradingRequest, opts ...grpc.CallOption) (*GetGradingResponse, error)
 	RequestLLMRecommendations(ctx context.Context, in *RequestLLMRecommendationsRequest, opts ...grpc.CallOption) (*RequestLLMRecommendationsResponse, error)
 	GetAnalytics(ctx context.Context, in *GetAnalyticsRequest, opts ...grpc.CallOption) (*GetAnalyticsResponse, error)
@@ -47,6 +53,26 @@ func (c *aggregatorClient) GetMyRepos(ctx context.Context, in *GetMyReposRequest
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetMyReposResponse)
 	err := c.cc.Invoke(ctx, Aggregator_GetMyRepos_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aggregatorClient) GetMyOrgs(ctx context.Context, in *GetMyOrgsRequest, opts ...grpc.CallOption) (*GetMyOrgsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMyOrgsResponse)
+	err := c.cc.Invoke(ctx, Aggregator_GetMyOrgs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aggregatorClient) GetOrgRepos(ctx context.Context, in *GetOrgReposRequest, opts ...grpc.CallOption) (*GetOrgReposResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetOrgReposResponse)
+	err := c.cc.Invoke(ctx, Aggregator_GetOrgRepos_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -88,6 +114,10 @@ func (c *aggregatorClient) GetAnalytics(ctx context.Context, in *GetAnalyticsReq
 // for forward compatibility.
 type AggregatorServer interface {
 	GetMyRepos(context.Context, *GetMyReposRequest) (*GetMyReposResponse, error)
+	// GetMyOrgs lists the caller's organizations and the one to open first.
+	GetMyOrgs(context.Context, *GetMyOrgsRequest) (*GetMyOrgsResponse, error)
+	// GetOrgRepos returns one batch of an organization's repos visible to the caller.
+	GetOrgRepos(context.Context, *GetOrgReposRequest) (*GetOrgReposResponse, error)
 	GetGrading(context.Context, *GetGradingRequest) (*GetGradingResponse, error)
 	RequestLLMRecommendations(context.Context, *RequestLLMRecommendationsRequest) (*RequestLLMRecommendationsResponse, error)
 	GetAnalytics(context.Context, *GetAnalyticsRequest) (*GetAnalyticsResponse, error)
@@ -103,6 +133,12 @@ type UnimplementedAggregatorServer struct{}
 
 func (UnimplementedAggregatorServer) GetMyRepos(context.Context, *GetMyReposRequest) (*GetMyReposResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMyRepos not implemented")
+}
+func (UnimplementedAggregatorServer) GetMyOrgs(context.Context, *GetMyOrgsRequest) (*GetMyOrgsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMyOrgs not implemented")
+}
+func (UnimplementedAggregatorServer) GetOrgRepos(context.Context, *GetOrgReposRequest) (*GetOrgReposResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetOrgRepos not implemented")
 }
 func (UnimplementedAggregatorServer) GetGrading(context.Context, *GetGradingRequest) (*GetGradingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetGrading not implemented")
@@ -148,6 +184,42 @@ func _Aggregator_GetMyRepos_Handler(srv interface{}, ctx context.Context, dec fu
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AggregatorServer).GetMyRepos(ctx, req.(*GetMyReposRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Aggregator_GetMyOrgs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMyOrgsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregatorServer).GetMyOrgs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Aggregator_GetMyOrgs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregatorServer).GetMyOrgs(ctx, req.(*GetMyOrgsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Aggregator_GetOrgRepos_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOrgReposRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregatorServer).GetOrgRepos(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Aggregator_GetOrgRepos_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregatorServer).GetOrgRepos(ctx, req.(*GetOrgReposRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -216,6 +288,14 @@ var Aggregator_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMyRepos",
 			Handler:    _Aggregator_GetMyRepos_Handler,
+		},
+		{
+			MethodName: "GetMyOrgs",
+			Handler:    _Aggregator_GetMyOrgs_Handler,
+		},
+		{
+			MethodName: "GetOrgRepos",
+			Handler:    _Aggregator_GetOrgRepos_Handler,
 		},
 		{
 			MethodName: "GetGrading",

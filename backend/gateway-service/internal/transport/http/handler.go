@@ -33,6 +33,20 @@ type GatewayService interface {
 		pat string,
 	) (domain.GetMyReposDTO, error)
 
+	GetMyOrgs(
+		ctx context.Context,
+		clientIP string,
+		pat string,
+	) (domain.GetMyOrgsDTO, error)
+
+	GetOrgRepos(
+		ctx context.Context,
+		clientIP string,
+		pat string,
+		orgSlug string,
+		pageToken string,
+	) (domain.GetMyReposDTO, error)
+
 	GetGrading(
 		ctx context.Context,
 		clientIP string,
@@ -103,6 +117,7 @@ func NewHandler(service GatewayService) *Handler {
 func (h *Handler) Register(mux *stdhttp.ServeMux) {
 	mux.HandleFunc("POST /auth/yandex", h.LoginWithYandex)
 	mux.HandleFunc("GET /repos", h.GetMyRepos)
+	mux.HandleFunc("GET /orgs", h.GetMyOrgs)
 	mux.HandleFunc("GET /grading/{org}/{repo}", h.GetGrading)
 	mux.HandleFunc("GET /recommendations/{org}/{repo}", h.RequestLLMRecommendations)
 	mux.HandleFunc("GET /analytics/{org}/{repo}", h.GetAnalytics)
@@ -201,11 +216,27 @@ func (h *Handler) GetMyRepos(
 		return
 	}
 
-	result, err := h.service.GetMyRepos(
-		r.Context(),
-		clientIP(r),
-		pat,
+	var (
+		result domain.GetMyReposDTO
+		err    error
 	)
+	// ?org= limits the list to one organization (one batch, continued via ?page_token=);
+	// without it the legacy all-orgs /me/repos listing is returned.
+	if org := strings.TrimSpace(r.URL.Query().Get("org")); org != "" {
+		result, err = h.service.GetOrgRepos(
+			r.Context(),
+			clientIP(r),
+			pat,
+			org,
+			r.URL.Query().Get("page_token"),
+		)
+	} else {
+		result, err = h.service.GetMyRepos(
+			r.Context(),
+			clientIP(r),
+			pat,
+		)
+	}
 	if err != nil {
 		writeError(w, err)
 		return

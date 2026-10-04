@@ -17,6 +17,7 @@ import (
 
 	"repo-therapist/repository-service/internal/cidata"
 	"repo-therapist/repository-service/internal/gitlog"
+	"repo-therapist/repository-service/internal/prdata"
 	"repo-therapist/repository-service/internal/scwrapper"
 	"repo-therapist/repository-service/internal/storage"
 	"repo-therapist/repository-service/internal/todomarkers"
@@ -191,6 +192,18 @@ func CloneAndUpload(ctx context.Context, org, repo, jobID, token string) (res *R
 		return nil, fmt.Errorf("uploading milestones: %w", err)
 	}
 
+	// Review analytics sample: the newest PR_SAMPLE_LIMIT pull requests with reviewers and comment
+	// metadata. Informational only, so a fetch failure never fails the export (available=false).
+	sampleLimit := prSampleLimit()
+	log.Printf("fetching %d newest pull requests for %s/%s", sampleLimit, org, repo)
+	pullsJSON, err := json.Marshal(prdata.Collect(ctx, scClient, repoID, sampleLimit))
+	if err != nil {
+		return nil, fmt.Errorf("marshaling pull requests: %w", err)
+	}
+	if err := s3Client.PutObject(ctx, keyPrefix+"/_meta/pulls.json", pullsJSON, "application/json"); err != nil {
+		return nil, fmt.Errorf("uploading pull requests: %w", err)
+	}
+
 	return &Result{
 		SourcecraftUUID: repoID,
 		S3Prefix:        keyPrefix,
@@ -341,6 +354,21 @@ func redactURL(args []string) []string {
 		}
 	}
 	return out
+}
+
+// prSampleLimit returns PR_SAMPLE_LIMIT (0 switches the pull request sample off); an invalid or
+// negative value falls back to prdata.DefaultSampleLimit.
+func prSampleLimit() int {
+	v := os.Getenv("PR_SAMPLE_LIMIT")
+	if v == "" {
+		return prdata.DefaultSampleLimit
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		log.Printf("ignoring invalid PR_SAMPLE_LIMIT=%q, using %d", v, prdata.DefaultSampleLimit)
+		return prdata.DefaultSampleLimit
+	}
+	return n
 }
 
 func envOrDefault(key, def string) string {

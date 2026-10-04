@@ -13,7 +13,7 @@ import (
 var now = time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
 
 func testConfig() config.AnalyticsConfig {
-	return config.AnalyticsConfig{Enabled: true, WindowDays: 180, MinCommits: 5, TopAuthors: 5, TopAreas: 8}
+	return config.AnalyticsConfig{Enabled: true, WindowDays: 180, MinCommits: 5, TopAuthors: 5, TopAreas: 8, MinMergedPRs: 3, ImportShare: 0.8}
 }
 
 type spec struct {

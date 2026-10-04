@@ -376,6 +376,12 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .my-repository-list { margin: 0; padding: 0; list-style: none; }
 .my-repository-list li { display: flex; align-items: center; gap: 12px; padding: 12px 17px; border-top: 1px solid var(--border); font-size: var(--fs-sm); }
 .my-repository-list .repository-cell { flex: 1; min-width: 0; }
+.filter-field--org select { min-width: 180px; max-width: 320px; }
+@media (max-width: 780px) {
+  .filter-field--org { flex-basis: 100%; }
+  .filter-field--org select { width: 100%; min-width: 0; max-width: none; }
+}
+.my-repository-more { display: flex; justify-content: center; padding: 12px 17px; border-top: 1px solid var(--border); }
 @media (max-width: 780px) {
   .two-column { grid-template-columns: 1fr; }
 }

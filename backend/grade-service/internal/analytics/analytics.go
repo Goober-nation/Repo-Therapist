@@ -17,7 +17,7 @@ import (
 )
 
 // Version is the schema version of the analytics object in grading.results.
-const Version = 1
+const Version = 2
 
 // Statuses of one analytics block.
 const (
@@ -42,6 +42,8 @@ type Inputs struct {
 	// CodeownersPath / Codeowners: the CODEOWNERS file found in the repo ("" when none).
 	CodeownersPath string
 	Codeowners     []byte
+	// Pulls is the _meta/pulls.json export; nil when the file is missing or unreadable.
+	Pulls *PullsExport
 }
 
 type AuthorShare struct {
@@ -90,6 +92,7 @@ type Result struct {
 	WindowDays int       `json:"window_days"`
 	BusFactor  BusFactor `json:"bus_factor"`
 	Ownership  Ownership `json:"ownership"`
+	Reviews    Reviews   `json:"reviews"`
 }
 
 // Compute builds the analytics, or nil when they are switched off in config.
@@ -103,6 +106,7 @@ func Compute(cfg config.AnalyticsConfig, in Inputs, now time.Time) *Result {
 		WindowDays: cfg.WindowDays,
 		BusFactor:  BusFactor{Status: StatusNoData, TopAuthors: []AuthorShare{}},
 		Ownership:  Ownership{Status: StatusNoData, Areas: []Area{}},
+		Reviews:    reviewStats(cfg, in.Pulls),
 	}
 
 	// CODEOWNERS is reported whether or not commits are readable: its presence is a fact of the repo.

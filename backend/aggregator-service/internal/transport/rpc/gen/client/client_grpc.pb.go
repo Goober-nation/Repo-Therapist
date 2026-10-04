@@ -8,7 +8,6 @@ package client
 
 import (
 	context "context"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -23,6 +22,8 @@ const (
 	CodeHealth_GetRepositoryBySlugs_FullMethodName = "/code_health.CodeHealth/GetRepositoryBySlugs"
 	CodeHealth_ListAllPublicRepos_FullMethodName   = "/code_health.CodeHealth/ListAllPublicRepos"
 	CodeHealth_GetMyRepos_FullMethodName           = "/code_health.CodeHealth/GetMyRepos"
+	CodeHealth_GetMyOrgs_FullMethodName            = "/code_health.CodeHealth/GetMyOrgs"
+	CodeHealth_GetOrgRepos_FullMethodName          = "/code_health.CodeHealth/GetOrgRepos"
 )
 
 // CodeHealthClient is the client API for CodeHealth service.
@@ -32,6 +33,8 @@ type CodeHealthClient interface {
 	GetRepositoryBySlugs(ctx context.Context, in *GetRepositoryBySlugsRequest, opts ...grpc.CallOption) (*GetRepositoryBySlugsResponse, error)
 	ListAllPublicRepos(ctx context.Context, in *ListAllPublicReposRequest, opts ...grpc.CallOption) (*ListAllPublicReposResponse, error)
 	GetMyRepos(ctx context.Context, in *GetMyReposRequest, opts ...grpc.CallOption) (*GetMyReposResponse, error)
+	GetMyOrgs(ctx context.Context, in *GetMyOrgsRequest, opts ...grpc.CallOption) (*GetMyOrgsResponse, error)
+	GetOrgRepos(ctx context.Context, in *GetOrgReposRequest, opts ...grpc.CallOption) (*GetOrgReposResponse, error)
 }
 
 type codeHealthClient struct {
@@ -72,6 +75,26 @@ func (c *codeHealthClient) GetMyRepos(ctx context.Context, in *GetMyReposRequest
 	return out, nil
 }
 
+func (c *codeHealthClient) GetMyOrgs(ctx context.Context, in *GetMyOrgsRequest, opts ...grpc.CallOption) (*GetMyOrgsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMyOrgsResponse)
+	err := c.cc.Invoke(ctx, CodeHealth_GetMyOrgs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *codeHealthClient) GetOrgRepos(ctx context.Context, in *GetOrgReposRequest, opts ...grpc.CallOption) (*GetOrgReposResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetOrgReposResponse)
+	err := c.cc.Invoke(ctx, CodeHealth_GetOrgRepos_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CodeHealthServer is the server API for CodeHealth service.
 // All implementations must embed UnimplementedCodeHealthServer
 // for forward compatibility.
@@ -79,6 +102,8 @@ type CodeHealthServer interface {
 	GetRepositoryBySlugs(context.Context, *GetRepositoryBySlugsRequest) (*GetRepositoryBySlugsResponse, error)
 	ListAllPublicRepos(context.Context, *ListAllPublicReposRequest) (*ListAllPublicReposResponse, error)
 	GetMyRepos(context.Context, *GetMyReposRequest) (*GetMyReposResponse, error)
+	GetMyOrgs(context.Context, *GetMyOrgsRequest) (*GetMyOrgsResponse, error)
+	GetOrgRepos(context.Context, *GetOrgReposRequest) (*GetOrgReposResponse, error)
 	mustEmbedUnimplementedCodeHealthServer()
 }
 
@@ -97,6 +122,12 @@ func (UnimplementedCodeHealthServer) ListAllPublicRepos(context.Context, *ListAl
 }
 func (UnimplementedCodeHealthServer) GetMyRepos(context.Context, *GetMyReposRequest) (*GetMyReposResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMyRepos not implemented")
+}
+func (UnimplementedCodeHealthServer) GetMyOrgs(context.Context, *GetMyOrgsRequest) (*GetMyOrgsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMyOrgs not implemented")
+}
+func (UnimplementedCodeHealthServer) GetOrgRepos(context.Context, *GetOrgReposRequest) (*GetOrgReposResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetOrgRepos not implemented")
 }
 func (UnimplementedCodeHealthServer) mustEmbedUnimplementedCodeHealthServer() {}
 func (UnimplementedCodeHealthServer) testEmbeddedByValue()                    {}
@@ -173,6 +204,42 @@ func _CodeHealth_GetMyRepos_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CodeHealth_GetMyOrgs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMyOrgsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CodeHealthServer).GetMyOrgs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CodeHealth_GetMyOrgs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CodeHealthServer).GetMyOrgs(ctx, req.(*GetMyOrgsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CodeHealth_GetOrgRepos_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOrgReposRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CodeHealthServer).GetOrgRepos(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CodeHealth_GetOrgRepos_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CodeHealthServer).GetOrgRepos(ctx, req.(*GetOrgReposRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CodeHealth_ServiceDesc is the grpc.ServiceDesc for CodeHealth service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -191,6 +258,14 @@ var CodeHealth_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMyRepos",
 			Handler:    _CodeHealth_GetMyRepos_Handler,
+		},
+		{
+			MethodName: "GetMyOrgs",
+			Handler:    _CodeHealth_GetMyOrgs_Handler,
+		},
+		{
+			MethodName: "GetOrgRepos",
+			Handler:    _CodeHealth_GetOrgRepos_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

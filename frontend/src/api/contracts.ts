@@ -97,6 +97,19 @@ export interface MyRepositoriesResponse {
   next_page_token?: string
 }
 
+/** GET /orgs (requires the PAT header): organizations the token owner belongs to. */
+export interface MyOrganization {
+  slug: string
+  display_name?: string
+  /** The owner's own (personal) organization. */
+  personal?: boolean
+}
+
+export interface MyOrganizationsResponse {
+  organizations: MyOrganization[]
+  default_org_slug?: string
+}
+
 /** GET /analytics/{org}/{repo}: informational analytics (bus factor, ownership map). */
 export interface AnalyticsResponse {
   status: GradeStatus
@@ -110,6 +123,15 @@ export interface AnalyticsResponse {
       commits?: number
       authors?: number
       top_authors?: Array<{ name?: string; commits?: number; share?: number }>
+    }
+    reviews?: {
+      status?: string
+      reason?: string
+      sampled?: number
+      merged?: number
+      unreviewed?: number
+      unreviewed_share?: number | null
+      median_merge_hours?: number | null
     }
     ownership?: {
       status?: string

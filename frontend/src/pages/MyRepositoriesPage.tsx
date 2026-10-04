@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react"
 import { Badge, Button, Card, LanguageLabel, PageHeading } from "../components/Shell"
+import type { MyOrganization } from "../api/contracts"
+import { organizationLabel } from "../api/mapper"
 import { getLastActivityLabel } from "../metrics"
 import type { RepositorySummary } from "../types"
 
@@ -11,6 +13,12 @@ export default function MyRepositoriesPage({
   repositories,
   isLoading,
   error,
+  organizations = [],
+  selectedOrganization,
+  hasMore = false,
+  isLoadingMore = false,
+  onSelectOrganization,
+  onLoadMore,
   onSubmitToken,
   onForgetToken,
   onOpenRepository,
@@ -20,6 +28,12 @@ export default function MyRepositoriesPage({
   repositories: RepositorySummary[]
   isLoading: boolean
   error?: string
+  organizations?: MyOrganization[]
+  selectedOrganization?: string
+  hasMore?: boolean
+  isLoadingMore?: boolean
+  onSelectOrganization?: (slug: string) => void
+  onLoadMore?: () => void
   onSubmitToken: (token: string) => void
   onForgetToken: () => void
   onOpenRepository: (repository: RepositorySummary) => void
@@ -78,6 +92,22 @@ export default function MyRepositoriesPage({
       ) : (
         <Card className="ranking-card">
           <div className="ranking-toolbar">
+            {organizations.length > 0 && (
+              <label className="filter-field filter-field--org">
+                <span>Организация</span>
+                <select
+                  value={selectedOrganization ?? ""}
+                  disabled={isLoading}
+                  onChange={(event) => onSelectOrganization?.(event.target.value)}
+                >
+                  {organizations.map((organization) => (
+                    <option key={organization.slug} value={organization.slug}>
+                      {organizationLabel(organization)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             {repositories.length > 0 && (
               <label className="search-field">
                 <span className="visually-hidden">Поиск по моим репозиториям</span>
@@ -90,7 +120,9 @@ export default function MyRepositoriesPage({
               </label>
             )}
             <span className="ranking-count" aria-live="polite">
-              {isLoading ? "Загружаем репозитории…" : `${visibleRepositories.length} из ${repositories.length}`}
+              {isLoading
+                ? "Загружаем репозитории…"
+                : `${visibleRepositories.length} из ${repositories.length}${hasMore ? "+" : ""}`}
             </span>
             <Button variant="quiet" onClick={onForgetToken}>
               Сменить токен
@@ -114,6 +146,13 @@ export default function MyRepositoriesPage({
                 </li>
               ))}
             </ul>
+          )}
+          {hasMore && !isLoading && (
+            <div className="my-repository-more">
+              <Button variant="secondary" disabled={isLoadingMore} onClick={() => onLoadMore?.()}>
+                {isLoadingMore ? "Загружаем…" : "Показать ещё"}
+              </Button>
+            </div>
           )}
           {!isLoading && !error && repositories.length === 0 && (
             <div className="empty-state">

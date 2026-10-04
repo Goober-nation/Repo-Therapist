@@ -18,6 +18,14 @@ type AggregatorService interface {
 		ctx context.Context,
 	) (domain.MyRepositoriesResponse, error)
 
+	GetMyOrgs(ctx context.Context) (domain.MyOrganizations, error)
+
+	GetOrgRepos(
+		ctx context.Context,
+		orgSlug string,
+		pageToken string,
+	) (domain.MyRepositoriesResponse, error)
+
 	GetGrading(
 		ctx context.Context,
 		orgSlug string,
@@ -69,6 +77,58 @@ func (s *Server) GetMyRepos(
 	}
 
 	return &server.GetMyReposResponse{
+		Repositories:  repositories,
+		NextPageToken: response.NextPageToken,
+	}, nil
+}
+
+func (s *Server) GetMyOrgs(
+	ctx context.Context,
+	req *server.GetMyOrgsRequest,
+) (*server.GetMyOrgsResponse, error) {
+	response, err := s.service.GetMyOrgs(ctx)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	orgs := make([]*server.UserOrganization, 0, len(response.Organizations))
+	for _, org := range response.Organizations {
+		orgs = append(orgs, &server.UserOrganization{
+			Slug:        org.Slug,
+			DisplayName: org.DisplayName,
+			Personal:    org.Personal,
+		})
+	}
+
+	return &server.GetMyOrgsResponse{
+		Organizations:  orgs,
+		DefaultOrgSlug: response.DefaultOrgSlug,
+	}, nil
+}
+
+func (s *Server) GetOrgRepos(
+	ctx context.Context,
+	req *server.GetOrgReposRequest,
+) (*server.GetOrgReposResponse, error) {
+	if req.GetOrgSlug() == "" {
+		return nil, status.Error(codes.InvalidArgument, "org_slug is required")
+	}
+
+	response, err := s.service.GetOrgRepos(ctx, req.GetOrgSlug(), req.GetPageToken())
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	repositories := make([]*server.Repository, 0, len(response.Repositories))
+	for _, repo := range response.Repositories {
+		pbRepo, err := repoToProto(repo)
+		if err != nil {
+			return nil, err
+		}
+		repositories = append(repositories, pbRepo)
+	}
+
+	return &server.GetOrgReposResponse{
 		Repositories:  repositories,
 		NextPageToken: response.NextPageToken,
 	}, nil

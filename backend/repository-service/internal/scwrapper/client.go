@@ -200,3 +200,95 @@ func timestampRFC3339(ts *timestamppb.Timestamp) string {
 	}
 	return ts.AsTime().Format(time.RFC3339Nano)
 }
+
+// PullRequestUser identifies a pull request participant; only the slug is used for grading.
+type PullRequestUser struct {
+	ID   string `json:"id"`
+	Slug string `json:"slug"`
+}
+
+// PullRequest is the subset of the wrapper's PullRequest message the review analytics needs.
+// Status is SourceCraft's enum: draft, open, discarded, merging, merged.
+type PullRequest struct {
+	ID        string          `json:"id"`
+	Slug      string          `json:"slug"`
+	Status    string          `json:"status"`
+	Author    PullRequestUser `json:"author"`
+	CreatedAt string          `json:"created_at"`
+	UpdatedAt string          `json:"updated_at"`
+}
+
+// PullRequestReviewer is one reviewer decision (approve, trust, block, abstain).
+type PullRequestReviewer struct {
+	User      PullRequestUser `json:"user"`
+	Decision  string          `json:"decision"`
+	CreatedAt string          `json:"created_at"`
+}
+
+// PullRequestComment is comment metadata only; the text is never fetched into the export.
+type PullRequestComment struct {
+	Author      PullRequestUser `json:"author"`
+	CreatedAt   string          `json:"created_at"`
+	Type        string          `json:"type"`
+	IsDeleted   bool            `json:"is_deleted"`
+	IsPublished bool            `json:"is_published"`
+}
+
+// PullRequestActivity is the first page of a pull request's reviewers and comments.
+type PullRequestActivity struct {
+	Reviewers []PullRequestReviewer
+	Comments  []PullRequestComment
+}
+
+func pullRequestUser(u *gen.PullRequestUser) PullRequestUser {
+	return PullRequestUser{ID: u.GetId(), Slug: u.GetSlug()}
+}
+
+// GetPullRequests fetches the newest limit pull requests of a repo (any status), newest first.
+func (c *Client) GetPullRequests(ctx context.Context, repoID string, limit int) ([]PullRequest, error) {
+	resp, err := c.rpc.GetPullRequests(c.authed(ctx), &gen.GetPullRequestsRequest{RepoId: repoID, Limit: int32(limit)})
+	if err != nil {
+		return nil, err
+	}
+	prs := make([]PullRequest, 0, len(resp.GetPullRequests()))
+	for _, p := range resp.GetPullRequests() {
+		prs = append(prs, PullRequest{
+			ID:        p.GetId(),
+			Slug:      p.GetSlug(),
+			Status:    p.GetStatus(),
+			Author:    pullRequestUser(p.GetAuthor()),
+			CreatedAt: timestampRFC3339(p.GetCreatedAt()),
+			UpdatedAt: timestampRFC3339(p.GetUpdatedAt()),
+		})
+	}
+	return prs, nil
+}
+
+// GetPullRequestActivity fetches the reviewers and comments of one pull request by its ID.
+func (c *Client) GetPullRequestActivity(ctx context.Context, pullRequestID string) (PullRequestActivity, error) {
+	resp, err := c.rpc.GetPullRequestActivity(c.authed(ctx), &gen.GetPullRequestActivityRequest{PullRequestId: pullRequestID})
+	if err != nil {
+		return PullRequestActivity{}, err
+	}
+	activity := PullRequestActivity{
+		Reviewers: make([]PullRequestReviewer, 0, len(resp.GetReviewers())),
+		Comments:  make([]PullRequestComment, 0, len(resp.GetComments())),
+	}
+	for _, r := range resp.GetReviewers() {
+		activity.Reviewers = append(activity.Reviewers, PullRequestReviewer{
+			User:      pullRequestUser(r.GetUser()),
+			Decision:  r.GetReviewDecision(),
+			CreatedAt: timestampRFC3339(r.GetCreatedAt()),
+		})
+	}
+	for _, m := range resp.GetComments() {
+		activity.Comments = append(activity.Comments, PullRequestComment{
+			Author:      pullRequestUser(m.GetAuthor()),
+			CreatedAt:   timestampRFC3339(m.GetCreatedAt()),
+			Type:        m.GetType(),
+			IsDeleted:   m.GetIsDeleted(),
+			IsPublished: m.GetIsPublished(),
+		})
+	}
+	return activity, nil
+}

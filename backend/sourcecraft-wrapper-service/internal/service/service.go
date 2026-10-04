@@ -8,6 +8,7 @@ import (
 	url2 "net/url"
 	"sourcecraft-wrapper-service/internal/domain"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc/metadata"
 )
@@ -24,6 +25,10 @@ type SCService interface {
 	GetMilestones(ctx context.Context, repoID string) (domain.Milestones, error)
 	ListAllPublicRepos(ctx context.Context) ([]domain.Repository, error)
 	GetMyRepos(ctx context.Context) (domain.MyRepositoriesResponse, error)
+	GetMyOrgs(ctx context.Context) (domain.MyOrganizations, error)
+	GetOrgRepos(ctx context.Context, orgSlug, pageToken string) (domain.MyRepositoriesResponse, error)
+	GetPullRequests(ctx context.Context, repoID string, limit int) (domain.PullRequests, error)
+	GetPullRequestActivity(ctx context.Context, pullRequestID string) (domain.PullRequestActivity, error)
 }
 
 type SCWrapper struct {
@@ -31,6 +36,9 @@ type SCWrapper struct {
 	apiURL string
 	// MaxPages caps every paginated fetch (commits, runs, issues, milestones).
 	MaxPages int
+	// OrgReposBatch and OrgReposBudget bound one GetOrgRepos call (0 means the default).
+	OrgReposBatch  int
+	OrgReposBudget time.Duration
 }
 
 func NewSCWrapperService(client http.Client, apiURL string) *SCWrapper {

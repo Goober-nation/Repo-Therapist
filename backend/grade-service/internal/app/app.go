@@ -161,6 +161,7 @@ func Grade(ctx context.Context, repoID, prefix string, cfg *config.Config, token
 
 	analyticsInputs := analytics.Inputs{CommitsAvailable: confidenceInputs.CommitsAvailable, Commits: confidenceInputs.Commits}
 	analyticsInputs.CodeownersPath, analyticsInputs.Codeowners = readCodeowners(ctx, s3Client, prefix)
+	analyticsInputs.Pulls = readPulls(ctx, s3Client, prefix, repoID)
 
 	if !private {
 		return &GradeOutput{RepoID: repoID, Categories: categories, ConfidenceInputs: confidenceInputs, AnalyticsInputs: analyticsInputs}, nil
@@ -209,6 +210,25 @@ func readCodeowners(ctx context.Context, s3Client *storage.Client, prefix string
 		return p, data
 	}
 	return "", nil
+}
+
+// readPulls returns the pull request sample from the job's S3 export, or nil when pulls.json is
+// missing or unreadable (a job exported before the review analytics existed): the reviews block
+// is then "no data". It is advisory data, so a problem is logged, never returned.
+func readPulls(ctx context.Context, s3Client *storage.Client, prefix, repoID string) *analytics.PullsExport {
+	data, err := s3Client.GetObject(ctx, prefix+"/_meta/pulls.json")
+	if err != nil {
+		log.Printf("pulls.json unavailable for %s: %v (review analytics will be no-data)", repoID, err)
+		return nil
+	}
+
+	var pulls analytics.PullsExport
+	if err := json.Unmarshal(data, &pulls); err != nil {
+		log.Printf("decoding pulls.json for %s: %v (review analytics will be no-data)", repoID, err)
+		return nil
+	}
+
+	return &pulls
 }
 
 func newS3Client(ctx context.Context) (*storage.Client, error) {

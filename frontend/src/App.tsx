@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiRequestError, HttpRepoHealthApi } from "./api/client"
-import type { GradingResponse } from "./api/contracts"
+import type { GradingResponse, MyOrganization } from "./api/contracts"
 import {
   analyticsFromResponse,
   confidenceFromPayload,
+  defaultOrganization,
   mergeGradingIntoRepository,
   repositoryFromMyRepos,
   repositoryFromRanking,
@@ -35,6 +36,19 @@ interface RepositoryList {
   items: RepositorySummary[]
   isLoading: boolean
   error?: string
+}
+
+interface OrganizationList {
+  items: MyOrganization[]
+  selected?: string
+  isLoading: boolean
+}
+
+/** Repositories of one organization; nextPageToken continues the list. */
+interface MyRepositoryList extends RepositoryList {
+  org?: string
+  nextPageToken?: string
+  isLoadingMore?: boolean
 }
 
 function readTheme(): Theme {
@@ -69,7 +83,8 @@ export default function App() {
     isLoading: true,
   })
   const [languages, setLanguages] = useState<string[]>([])
-  const [mine, setMine] = useState<RepositoryList>({ items: [], isLoading: false })
+  const [orgs, setOrgs] = useState<OrganizationList>({ items: [], isLoading: false })
+  const [mine, setMine] = useState<MyRepositoryList>({ items: [], isLoading: false })
   const [gradings, setGradings] = useState<Record<string, GradingResponse>>({})
   // Repositories ("org/repo") the owner switched to the public grade.
   const [publicViews, setPublicViews] = useState<Record<string, boolean>>({})
@@ -117,24 +132,85 @@ export default function App() {
     return () => window.clearTimeout(expiry)
   }, [pat])
 
+  // Organizations of the token owner; the default one (personal, else first) opens right away.
   useEffect(() => {
     if (!pat) return
     let active = true
+    setOrgs({ items: [], isLoading: true })
     setMine({ items: [], isLoading: true })
     api
-      .getMyRepositories(pat)
+      .getMyOrganizations(pat)
       .then((response) => {
-        if (active) setMine({ items: response.repositories.map(repositoryFromMyRepos), isLoading: false })
+        if (!active) return
+        const selected = defaultOrganization(response)
+        setOrgs({ items: response.organizations ?? [], selected, isLoading: false })
+        if (!selected) setMine({ items: [], isLoading: false })
       })
       .catch((error) => {
         if (!active) return
-        setMine({ items: [], isLoading: false, error: errorText(error, "Не удалось получить список репозиториев.") })
+        setOrgs({ items: [], isLoading: false })
+        setMine({ items: [], isLoading: false, error: errorText(error, "Не удалось получить список организаций.") })
         if (error instanceof ApiRequestError && (error.status === 401 || error.status === 403)) setPat(undefined)
       })
     return () => {
       active = false
     }
   }, [pat])
+
+  // Repositories of the selected organization only, one batch at a time.
+  useEffect(() => {
+    const org = orgs.selected
+    if (!pat || !org) return
+    let active = true
+    setMine({ items: [], isLoading: true, org })
+    api
+      .getMyRepositories(pat, org)
+      .then((response) => {
+        if (!active) return
+        setMine({
+          items: response.repositories.map(repositoryFromMyRepos),
+          isLoading: false,
+          org,
+          nextPageToken: response.next_page_token || undefined,
+        })
+      })
+      .catch((error) => {
+        if (!active) return
+        setMine({ items: [], isLoading: false, org, error: errorText(error, "Не удалось получить список репозиториев.") })
+        if (error instanceof ApiRequestError && error.status === 401) setPat(undefined)
+      })
+    return () => {
+      active = false
+    }
+  }, [pat, orgs.selected])
+
+  const loadMoreRepositories = useCallback(() => {
+    const { org, nextPageToken } = mine
+    if (!pat || !org || !nextPageToken || mine.isLoadingMore) return
+    setMine((current) => ({ ...current, isLoadingMore: true, error: undefined }))
+    api
+      .getMyRepositories(pat, org, nextPageToken)
+      .then((response) => {
+        setMine((current) => {
+          if (current.org !== org || current.nextPageToken !== nextPageToken) return current
+          const known = new Set(current.items.map((item) => item.id))
+          const added = response.repositories.map(repositoryFromMyRepos).filter((item) => !known.has(item.id))
+          return {
+            ...current,
+            items: [...current.items, ...added],
+            isLoadingMore: false,
+            nextPageToken: response.next_page_token || undefined,
+          }
+        })
+      })
+      .catch((error) => {
+        setMine((current) =>
+          current.org === org
+            ? { ...current, isLoadingMore: false, error: errorText(error, "Не удалось загрузить ещё репозитории.") }
+            : current,
+        )
+      })
+  }, [pat, mine])
 
   const target = route.page === "repository" ? route : undefined
   const needsToken = Boolean(target?.private && !pat)
@@ -294,9 +370,16 @@ export default function App() {
                 repositories={mine.items}
                 isLoading={mine.isLoading}
                 error={mine.error}
+                organizations={orgs.items}
+                selectedOrganization={orgs.selected}
+                hasMore={Boolean(mine.nextPageToken)}
+                isLoadingMore={Boolean(mine.isLoadingMore)}
+                onSelectOrganization={(slug) => setOrgs((current) => ({ ...current, selected: slug }))}
+                onLoadMore={loadMoreRepositories}
                 onSubmitToken={(token) => setPat(token.trim())}
                 onForgetToken={() => {
                   setPat(undefined)
+                  setOrgs({ items: [], isLoading: false })
                   setMine({ items: [], isLoading: false })
                 }}
                 onOpenRepository={(item) => openRepository(item, true)}

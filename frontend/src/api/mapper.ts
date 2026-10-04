@@ -16,6 +16,8 @@ import type {
   ConfidenceReasonPayload,
   GatewayRankingEntry,
   GradingResponse,
+  MyOrganization,
+  MyOrganizationsResponse,
   MyRepository,
   RecommendationsResponse,
 } from "./contracts"
@@ -167,9 +169,25 @@ export function analyticsFromResponse(response: AnalyticsResponse | undefined): 
   const busAvailable = bus?.status === "ok"
   const ownership = raw.ownership
   const codeowners = ownership?.codeowners
+  // Analytics stored before version 2 have no reviews block: show it as unavailable, not as zeros.
+  const reviews = raw.reviews
+  const reviewsAvailable = reviews?.status === "ok"
 
   return {
     windowDays: finiteOr(raw.window_days, 0),
+    reviews: {
+      available: reviewsAvailable,
+      reason: typeof reviews?.reason === "string" && reviews.reason ? reviews.reason : "unavailable",
+      sampled: finiteOr(reviews?.sampled, 0),
+      merged: finiteOr(reviews?.merged, 0),
+      unreviewed: finiteOr(reviews?.unreviewed, 0),
+      ...(reviewsAvailable && typeof reviews?.unreviewed_share === "number"
+        ? { unreviewedShare: share(reviews.unreviewed_share) }
+        : {}),
+      ...(reviewsAvailable && typeof reviews?.median_merge_hours === "number" && reviews.median_merge_hours >= 0
+        ? { medianMergeHours: reviews.median_merge_hours }
+        : {}),
+    },
     busFactor: {
       available: busAvailable,
       value: busAvailable ? finiteOr(bus?.value, 0) : 0,
@@ -274,6 +292,21 @@ export function repositoryFromMyRepos(repository: MyRepository): RepositorySumma
     lastActivityDaysAgo: daysSince(repository.last_activity_at),
     categoryScores: {},
   }
+}
+
+/** The org to open first: the server's choice if listed, else the personal org, else the first. */
+export function defaultOrganization(response: MyOrganizationsResponse): string | undefined {
+  const organizations = response.organizations ?? []
+  const preferred = response.default_org_slug
+  if (preferred && organizations.some((org) => org.slug === preferred)) return preferred
+  return (organizations.find((org) => org.personal) ?? organizations[0])?.slug
+}
+
+/** Dropdown label for an organization. */
+export function organizationLabel(organization: MyOrganization): string {
+  if (organization.personal) return `${organization.slug} (личная)`
+  const name = organization.display_name?.trim()
+  return name && name !== organization.slug ? `${name} (${organization.slug})` : organization.slug
 }
 
 /** A repository known only by its slugs (pasted link, direct URL). */

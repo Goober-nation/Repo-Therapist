@@ -181,6 +181,50 @@ func (s *ServerRPC) GetMyRepos(
 	}, nil
 }
 
+func (s *ServerRPC) GetMyOrgs(
+	ctx context.Context,
+	req *pb.GetMyOrgsRequest,
+) (*pb.GetMyOrgsResponse, error) {
+	orgs, err := s.service.GetMyOrgs(ctx)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	result := make([]*pb.UserOrganization, 0, len(orgs.Organizations))
+	for _, org := range orgs.Organizations {
+		result = append(result, &pb.UserOrganization{
+			Id:          org.ID,
+			Slug:        org.Slug,
+			DisplayName: org.DisplayName,
+			Personal:    org.Personal,
+		})
+	}
+
+	return &pb.GetMyOrgsResponse{
+		Organizations:  result,
+		DefaultOrgSlug: orgs.DefaultOrgSlug,
+	}, nil
+}
+
+func (s *ServerRPC) GetOrgRepos(
+	ctx context.Context,
+	req *pb.GetOrgReposRequest,
+) (*pb.GetOrgReposResponse, error) {
+	if req.GetOrgSlug() == "" {
+		return nil, status.Error(codes.InvalidArgument, "org_slug is required")
+	}
+
+	repos, err := s.service.GetOrgRepos(ctx, req.GetOrgSlug(), req.GetPageToken())
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return &pb.GetOrgReposResponse{
+		Repositories:  mapRepositories(repos.Repositories),
+		NextPageToken: repos.NextPageToken,
+	}, nil
+}
+
 func mapError(err error) error {
 	log.Println(err)
 	switch {

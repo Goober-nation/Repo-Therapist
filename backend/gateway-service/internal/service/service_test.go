@@ -26,6 +26,10 @@ type fakeAggregator struct {
 	grade  *agg.RepoGrade
 	calls  int
 	authMD []string
+
+	myOrgs     *agg.GetMyOrgsResponse
+	orgRepos   *agg.GetOrgReposResponse
+	orgReposIn *agg.GetOrgReposRequest
 }
 
 func (f *fakeAggregator) record(ctx context.Context) {
@@ -37,6 +41,23 @@ func (f *fakeAggregator) record(ctx context.Context) {
 func (f *fakeAggregator) GetMyRepos(ctx context.Context, in *agg.GetMyReposRequest, opts ...grpc.CallOption) (*agg.GetMyReposResponse, error) {
 	f.record(ctx)
 	return &agg.GetMyReposResponse{}, f.err
+}
+
+func (f *fakeAggregator) GetMyOrgs(ctx context.Context, in *agg.GetMyOrgsRequest, opts ...grpc.CallOption) (*agg.GetMyOrgsResponse, error) {
+	f.record(ctx)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.myOrgs, nil
+}
+
+func (f *fakeAggregator) GetOrgRepos(ctx context.Context, in *agg.GetOrgReposRequest, opts ...grpc.CallOption) (*agg.GetOrgReposResponse, error) {
+	f.record(ctx)
+	f.orgReposIn = in
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.orgRepos, nil
 }
 
 func (f *fakeAggregator) GetGrading(ctx context.Context, in *agg.GetGradingRequest, opts ...grpc.CallOption) (*agg.GetGradingResponse, error) {
