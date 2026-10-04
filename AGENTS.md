@@ -39,6 +39,10 @@ Grade service, Security wrapper — not Sourcecraft wrapper or LLM service.
 - If you cannot test against the real service, say so explicitly: "unverified against real
   service, waiting for user testing"
 - Do not imply coverage you did not actually achieve
+- Every user-visible or API change is verified for real, by the agent itself: changed endpoints with
+  curl against the running stack, and every UI change by loading the page in the browser pane
+  (desktop and mobile width, console errors, real data) — not only with unit tests. Report what could
+  not be verified.
 
 ---
 

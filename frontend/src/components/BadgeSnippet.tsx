@@ -3,7 +3,12 @@ import { categoryLabel } from "../metrics"
 import { Button, Card, SectionHeading } from "./Shell"
 
 /** Categories graded in the public mode, which the category badges can show. */
-export const BADGE_CATEGORIES = ["activity", "issues", "documentation", "code_health"] as const
+export const BADGE_CATEGORIES = [
+  "activity",
+  "issues",
+  "documentation",
+  "code_health",
+] as const
 
 function repoPath(org: string, repo: string): string {
   return `${encodeURIComponent(org)}/${encodeURIComponent(repo)}`
@@ -13,19 +18,32 @@ function repoPath(org: string, repo: string): string {
  * Markdown for the Repo Health badge (Gateway GET /badge/{org}/{repo}.svg). The badge shows the
  * stored public score, so it is offered for public analyses only.
  */
-export function badgeMarkdown(origin: string, org: string, repo: string): string {
+export function badgeMarkdown(
+  origin: string,
+  org: string,
+  repo: string,
+): string {
   const path = repoPath(org, repo)
   return `[![Repo Health](${origin}/api/badge/${path}.svg)](${origin}/repo/${path})`
 }
 
 /** Badge of one public category (Gateway GET /badge/{org}/{repo}/{category}.svg). */
-export function categoryBadgeMarkdown(origin: string, org: string, repo: string, category: string): string {
+export function categoryBadgeMarkdown(
+  origin: string,
+  org: string,
+  repo: string,
+  category: string,
+): string {
   const path = repoPath(org, repo)
   return `[![Repo Health: ${category}](${origin}/api/badge/${path}/${category}.svg)](${origin}/repo/${path})`
 }
 
 /** README card with the score and the category bars (Gateway GET /widget/{org}/{repo}.svg). */
-export function widgetMarkdown(origin: string, org: string, repo: string): string {
+export function widgetMarkdown(
+  origin: string,
+  org: string,
+  repo: string,
+): string {
   const path = repoPath(org, repo)
   return `[![Repo Health](${origin}/api/widget/${path}.svg)](${origin}/repo/${path})`
 }
@@ -36,12 +54,26 @@ export function scoreApiUrl(origin: string, org: string, repo: string): string {
 }
 
 /** shields.io endpoint badge that reads the Gateway's shields JSON (GET /badge/{org}/{repo}.json). */
-export function shieldsMarkdown(origin: string, org: string, repo: string): string {
+export function shieldsMarkdown(
+  origin: string,
+  org: string,
+  repo: string,
+): string {
   const endpoint = `${origin}/api/badge/${repoPath(org, repo)}.json`
   return `[![Repo Health](https://img.shields.io/endpoint?url=${encodeURIComponent(endpoint)})](${origin}/repo/${repoPath(org, repo)})`
 }
 
-function SnippetRow({ title, previewUrl, previewHeight, text }: { title: string; previewUrl?: string; previewHeight?: number; text: string }) {
+function SnippetRow({
+  title,
+  previewUrl,
+  previewHeight,
+  text,
+}: {
+  title: string
+  previewUrl?: string
+  previewHeight?: number
+  text: string
+}) {
   const [copied, setCopied] = useState(false)
 
   const copy = async () => {
@@ -59,7 +91,11 @@ function SnippetRow({ title, previewUrl, previewHeight, text }: { title: string;
       <strong className="badge-snippet__title">{title}</strong>
       {previewUrl ? (
         <img
-          className={previewHeight ? "badge-snippet__preview badge-snippet__preview--card" : "badge-snippet__preview"}
+          className={
+            previewHeight
+              ? "badge-snippet__preview badge-snippet__preview--card"
+              : "badge-snippet__preview"
+          }
           src={previewUrl}
           alt={title}
           height={previewHeight ?? 20}
@@ -78,31 +114,69 @@ function SnippetRow({ title, previewUrl, previewHeight, text }: { title: string;
   )
 }
 
-export default function BadgeSnippet({ org, repo }: { org: string; repo: string }) {
+export default function BadgeSnippet({
+  org,
+  repo,
+}: {
+  org: string
+  repo: string
+}) {
   // Absent outside the browser (server-side rendering in tests).
   const origin = typeof window === "undefined" ? "" : window.location.origin
   const path = repoPath(org, repo)
+  // Collapsed by default: the snippets are a reference, and nothing below loads until asked for.
+  const [open, setOpen] = useState(false)
 
   return (
     <section className="section-block">
       <SectionHeading
         title="Бейджи, виджет и API для README"
         description="Вставьте в README на SourceCraft: они показывают текущую публичную оценку и ведут на эту страницу. Приватные категории (Security, CI/CD) в них не попадают."
+        action={
+          <Button
+            variant="secondary"
+            aria-expanded={open}
+            aria-controls="badge-snippets"
+            onClick={() => setOpen((value) => !value)}
+          >
+            {open ? "Скрыть" : "Показать"}
+            <span aria-hidden="true">{open ? "▴" : "▾"}</span>
+          </Button>
+        }
       />
-      <Card className="badge-snippet">
-        <SnippetRow title="Оценка репозитория" previewUrl={`${origin}/api/badge/${path}.svg`} text={badgeMarkdown(origin, org, repo)} />
-        <SnippetRow title="Виджет с категориями" previewUrl={`${origin}/api/widget/${path}.svg`} previewHeight={164} text={widgetMarkdown(origin, org, repo)} />
-        {BADGE_CATEGORIES.map((category) => (
-          <SnippetRow
-            key={category}
-            title={`Бейдж: ${categoryLabel(category)}`}
-            previewUrl={`${origin}/api/badge/${path}/${category}.svg`}
-            text={categoryBadgeMarkdown(origin, org, repo, category)}
-          />
-        ))}
-        <SnippetRow title="Бейдж через shields.io" text={shieldsMarkdown(origin, org, repo)} />
-        <SnippetRow title="JSON API (только чтение, без запуска оценки)" text={scoreApiUrl(origin, org, repo)} />
-      </Card>
+      {open && (
+        <div id="badge-snippets">
+          <Card className="badge-snippet">
+            <SnippetRow
+              title="Оценка репозитория"
+              previewUrl={`${origin}/api/badge/${path}.svg`}
+              text={badgeMarkdown(origin, org, repo)}
+            />
+            <SnippetRow
+              title="Виджет с категориями"
+              previewUrl={`${origin}/api/widget/${path}.svg`}
+              previewHeight={164}
+              text={widgetMarkdown(origin, org, repo)}
+            />
+            {BADGE_CATEGORIES.map((category) => (
+              <SnippetRow
+                key={category}
+                title={`Бейдж: ${categoryLabel(category)}`}
+                previewUrl={`${origin}/api/badge/${path}/${category}.svg`}
+                text={categoryBadgeMarkdown(origin, org, repo, category)}
+              />
+            ))}
+            <SnippetRow
+              title="Бейдж через shields.io"
+              text={shieldsMarkdown(origin, org, repo)}
+            />
+            <SnippetRow
+              title="JSON API (только чтение, без запуска оценки)"
+              text={scoreApiUrl(origin, org, repo)}
+            />
+          </Card>
+        </div>
+      )}
     </section>
   )
 }

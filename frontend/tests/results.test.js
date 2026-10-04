@@ -1748,6 +1748,15 @@ test("README snippets cover the category badges, the widget, shields and the JSO
   )
 })
 
+test("the README snippets are a dropdown that starts collapsed and loads nothing", async () => {
+  const { default: BadgeSnippet } = await vite.ssrLoadModule("/src/components/BadgeSnippet.tsx")
+  const html = renderToStaticMarkup(createElement(BadgeSnippet, { org: "org", repo: "repo" }))
+
+  assert.match(html, /aria-expanded="false"/)
+  assert.match(html, />Показать</)
+  assert.doesNotMatch(html, /badge-snippet__item|<img|api\/badge|api\/widget|api\/score/)
+})
+
 test("public grade toggle drops the token only for a public repository opened by its owner", async () => {
   const { gradingToken } = await vite.ssrLoadModule("/src/metrics.ts")
 
