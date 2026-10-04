@@ -458,8 +458,9 @@ func TestGetGradingRegradesWhenAnalyticsVersionIsOld(t *testing.T) {
 		{"version 1", `{"version":1}`, true},
 		{"no version", `{"bus_factor":{}}`, true},
 		{"not json", `oops`, true},
-		{"version 2", `{"version":2}`, false},
-		{"newer", `{"version":3}`, false},
+		{"version 2", `{"version":2}`, true},
+		{"version 3", `{"version":3}`, false},
+		{"newer", `{"version":4}`, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newFixture("public")
@@ -488,7 +489,7 @@ func TestGetGradingKeepsGradeWhenAnalyticsPresentOrCheckOff(t *testing.T) {
 			score := int16(80)
 			f.grades.public[testRepoID] = domain.RepoGrade{SourcecraftUUID: testRepoID, Score: &score, GradedAt: gradedAt(testNow)}
 			if tc.present {
-				_ = f.grades.putAnalytics(true, testRepoID, json.RawMessage(`{"version":2}`), gradedAt(testNow))
+				_ = f.grades.putAnalytics(true, testRepoID, json.RawMessage(`{"version":3}`), gradedAt(testNow))
 			}
 
 			if _, err := f.svc.GetGrading(userCtx(""), "org", "repo"); err != nil {

@@ -423,5 +423,9 @@ analytics:
   min_commits: 5    # fewer kept commits in the window -> both blocks are "no data"
   top_authors: 5
   top_areas: 8
+  top_subareas: 10 # busiest directories two levels deep (src/api/)
+  top_files: 10 # most changed files with their main owner
+  min_reviewed_prs: 3 # fewer reviewed PRs in the sample -> no median time to first review
+  waiting_days: 7 # an open PR with no review for this many days counts as waiting
   min_merged_prs: 3 # fewer merged PRs with readable reviews in the sample -> the reviews block is "no data"
   import_share: 0.8 # this share or more of the sampled PRs created on one day -> imported history, "no data"

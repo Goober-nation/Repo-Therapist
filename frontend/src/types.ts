@@ -108,6 +108,16 @@ export interface OwnershipArea {
   owners: number
 }
 
+/** One frequently changed file and who changed it most. */
+export interface OwnedFile {
+  path: string
+  lines: number
+  topOwner: string
+  /** 0–1. */
+  topOwnerShare: number
+  owners: number
+}
+
 export interface CodeownersInfo {
   present: boolean
   path?: string
@@ -130,13 +140,37 @@ export interface ReviewStats {
   unreviewedShare?: number
   /** Approximate: SourceCraft has no merge time, so this is updated_at - created_at. */
   medianMergeHours?: number
+  /** Where reviews wait; its own availability, since it needs no merged pull requests. */
+  bottlenecks: ReviewBottlenecks
+}
+
+export interface ReviewBottlenecks {
+  available: boolean
+  /** Why it is unavailable: unavailable | imported | few_reviewed. */
+  reason?: string
+  /** Pull requests with a review (the sample of the median). */
+  reviewed: number
+  /** Open pull requests judged, and how many of them have waited too long for a review. */
+  open: number
+  waiting: number
+  /** The waiting threshold in days, as configured in grade-service. */
+  waitingDays: number
+  /** Median hours from creation to the first review by someone but the author or a bot. */
+  medianFirstReviewHours?: number
 }
 
 export interface RepoAnalytics {
   windowDays: number
   busFactor: BusFactor
   reviews: ReviewStats
-  ownership: { available: boolean; areas: OwnershipArea[]; codeowners: CodeownersInfo }
+  ownership: {
+    available: boolean
+    /** Top-level directories; subareas are the busiest directories two levels deep, files the most changed files. */
+    areas: OwnershipArea[]
+    subareas: OwnershipArea[]
+    files: OwnedFile[]
+    codeowners: CodeownersInfo
+  }
 }
 
 /** AI summary produced by llm-service (`raw_response`). */

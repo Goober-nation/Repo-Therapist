@@ -122,20 +122,24 @@ func TestShippedAnalyticsConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Analytics != (AnalyticsConfig{Enabled: true, WindowDays: 180, MinCommits: 5, TopAuthors: 5, TopAreas: 8, MinMergedPRs: 3, ImportShare: 0.8}) {
+	if cfg.Analytics != (AnalyticsConfig{Enabled: true, WindowDays: 180, MinCommits: 5, TopAuthors: 5, TopAreas: 8, TopSubareas: 10, TopFiles: 10, MinMergedPRs: 3, MinReviewedPRs: 3, WaitingDays: 7, ImportShare: 0.8}) {
 		t.Errorf("analytics = %+v", cfg.Analytics)
 	}
-	if err := validateAnalytics(AnalyticsConfig{Enabled: true, WindowDays: 0, TopAuthors: 1, TopAreas: 1, MinMergedPRs: 3, ImportShare: 0.8}); err == nil {
+	if err := validateAnalytics(AnalyticsConfig{Enabled: true, WindowDays: 0, TopAuthors: 1, TopAreas: 1, TopSubareas: 1, TopFiles: 1, MinMergedPRs: 3, MinReviewedPRs: 3, WaitingDays: 7, ImportShare: 0.8}); err == nil {
 		t.Error("a zero window must be rejected")
 	}
-	ok := AnalyticsConfig{Enabled: true, WindowDays: 1, TopAuthors: 1, TopAreas: 1, MinMergedPRs: 3, ImportShare: 0.8}
+	ok := AnalyticsConfig{Enabled: true, WindowDays: 1, TopAuthors: 1, TopAreas: 1, TopSubareas: 1, TopFiles: 1, MinMergedPRs: 3, MinReviewedPRs: 3, WaitingDays: 7, ImportShare: 0.8}
 	if err := validateAnalytics(ok); err != nil {
 		t.Errorf("valid config rejected: %v", err)
 	}
 	for name, bad := range map[string]AnalyticsConfig{
-		"no merged PR minimum": {Enabled: true, WindowDays: 1, TopAuthors: 1, TopAreas: 1, ImportShare: 0.8},
-		"zero import share":    {Enabled: true, WindowDays: 1, TopAuthors: 1, TopAreas: 1, MinMergedPRs: 3},
-		"import share above 1": {Enabled: true, WindowDays: 1, TopAuthors: 1, TopAreas: 1, MinMergedPRs: 3, ImportShare: 1.5},
+		"no merged PR minimum": {Enabled: true, WindowDays: 1, TopAuthors: 1, TopAreas: 1, TopSubareas: 1, TopFiles: 1, MinReviewedPRs: 3, WaitingDays: 7, ImportShare: 0.8},
+		"zero import share":    {Enabled: true, WindowDays: 1, TopAuthors: 1, TopAreas: 1, TopSubareas: 1, TopFiles: 1, MinMergedPRs: 3, MinReviewedPRs: 3, WaitingDays: 7},
+		"import share above 1": {Enabled: true, WindowDays: 1, TopAuthors: 1, TopAreas: 1, TopSubareas: 1, TopFiles: 1, MinMergedPRs: 3, MinReviewedPRs: 3, WaitingDays: 7, ImportShare: 1.5},
+		"no reviewed minimum":  {Enabled: true, WindowDays: 1, TopAuthors: 1, TopAreas: 1, TopSubareas: 1, TopFiles: 1, MinMergedPRs: 3, WaitingDays: 7, ImportShare: 0.8},
+		"no waiting days":      {Enabled: true, WindowDays: 1, TopAuthors: 1, TopAreas: 1, TopSubareas: 1, TopFiles: 1, MinMergedPRs: 3, MinReviewedPRs: 3, ImportShare: 0.8},
+		"no subarea limit":     {Enabled: true, WindowDays: 1, TopAuthors: 1, TopAreas: 1, TopFiles: 1, MinMergedPRs: 3, MinReviewedPRs: 3, WaitingDays: 7, ImportShare: 0.8},
+		"no file limit":        {Enabled: true, WindowDays: 1, TopAuthors: 1, TopAreas: 1, TopSubareas: 1, MinMergedPRs: 3, MinReviewedPRs: 3, WaitingDays: 7, ImportShare: 0.8},
 	} {
 		if validateAnalytics(bad) == nil {
 			t.Errorf("%s must be rejected", name)

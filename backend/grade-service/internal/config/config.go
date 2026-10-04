@@ -37,11 +37,18 @@ type AnalyticsConfig struct {
 	// TopAuthors / TopAreas cap how many authors and directories are listed.
 	TopAuthors int `yaml:"top_authors"`
 	TopAreas   int `yaml:"top_areas"`
+	// TopSubareas and TopFiles cap the depth-2 directories and the most changed files listed.
+	TopSubareas int `yaml:"top_subareas"`
+	TopFiles    int `yaml:"top_files"`
 	// MinMergedPRs: fewer merged pull requests with readable reviews in the sample make the
 	// reviews block "no data". ImportShare: when this share or more of the sampled pull requests
 	// were created on one day the history is treated as imported and the block is "no data".
-	MinMergedPRs int     `yaml:"min_merged_prs"`
-	ImportShare  float64 `yaml:"import_share"`
+	MinMergedPRs int `yaml:"min_merged_prs"`
+	// MinReviewedPRs: fewer reviewed pull requests than this give no median time to first review.
+	// WaitingDays: an open pull request with no review for this long counts as waiting.
+	MinReviewedPRs int     `yaml:"min_reviewed_prs"`
+	WaitingDays    int     `yaml:"waiting_days"`
+	ImportShare    float64 `yaml:"import_share"`
 }
 
 // Low-confidence reason codes; ConfidenceConfig.Reasons must have a text for each.
@@ -236,11 +243,15 @@ func validateAnalytics(a AnalyticsConfig) error {
 	if !a.Enabled {
 		return nil
 	}
-	if a.WindowDays <= 0 || a.TopAuthors <= 0 || a.TopAreas <= 0 {
-		return fmt.Errorf("window_days, top_authors and top_areas must be positive, got %d, %d, %d", a.WindowDays, a.TopAuthors, a.TopAreas)
+	if a.WindowDays <= 0 || a.TopAuthors <= 0 || a.TopAreas <= 0 || a.TopSubareas <= 0 || a.TopFiles <= 0 {
+		return fmt.Errorf("window_days, top_authors, top_areas, top_subareas and top_files must be positive, got %d, %d, %d, %d, %d",
+			a.WindowDays, a.TopAuthors, a.TopAreas, a.TopSubareas, a.TopFiles)
 	}
 	if a.MinCommits < 0 {
 		return fmt.Errorf("min_commits must not be negative, got %d", a.MinCommits)
+	}
+	if a.MinReviewedPRs < 1 || a.WaitingDays < 1 {
+		return fmt.Errorf("min_reviewed_prs and waiting_days must be at least 1, got %d and %d", a.MinReviewedPRs, a.WaitingDays)
 	}
 	if a.MinMergedPRs < 1 {
 		return fmt.Errorf("min_merged_prs must be at least 1, got %d", a.MinMergedPRs)

@@ -675,7 +675,7 @@ README. `GET /score/...`, `GET /history/...` и `GET /position/...` ограни
 ```
 
 `GET /analytics/{org}/{repo}` только читает: оценку не запускает. `status`: `FINISHED` (в `analytics`
-объект версии 2 (версия 1 — без блока `reviews`), формат — `docs/grading/analytics.md`) или `NO_DATA` (`analytics: null`, у репозитория
+объект версии 3 (версия 1 — без блока `reviews`, версия 2 — без `reviews.bottlenecks`, подкаталогов и файлов), формат — `docs/grading/analytics.md`) или `NO_DATA` (`analytics: null`, у репозитория
 ещё нет аналитики, например он оценён до её появления). Приватный репозиторий без токена владельца —
 `403`, неизвестный — `404`. CORS не включён: ответ зависит от токена.
 

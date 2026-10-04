@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"repo-therapist/repository-service/internal/prdata"
 	"strings"
 	"testing"
 	"time"
@@ -94,7 +95,7 @@ func TestPRSampleLimit(t *testing.T) {
 	for _, tc := range []struct {
 		value string
 		want  int
-	}{{"", 10}, {"25", 25}, {"0", 0}, {"-1", 10}, {"abc", 10}} {
+	}{{"", prdata.DefaultSampleLimit}, {"25", 25}, {"0", 0}, {"-1", prdata.DefaultSampleLimit}, {"abc", prdata.DefaultSampleLimit}} {
 		t.Setenv("PR_SAMPLE_LIMIT", tc.value)
 		if got := prSampleLimit(); got != tc.want {
 			t.Errorf("PR_SAMPLE_LIMIT=%q: got %d, want %d", tc.value, got, tc.want)

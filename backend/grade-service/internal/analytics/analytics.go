@@ -17,7 +17,7 @@ import (
 )
 
 // Version is the schema version of the analytics object in grading.results.
-const Version = 2
+const Version = 3
 
 // Statuses of one analytics block.
 const (
@@ -71,6 +71,15 @@ type Area struct {
 	Owners        int     `json:"owners"`
 }
 
+// FileOwner is one frequently changed file and who changed it most.
+type FileOwner struct {
+	Path          string  `json:"path"`
+	Lines         int     `json:"lines"`
+	TopOwner      string  `json:"top_owner"`
+	TopOwnerShare float64 `json:"top_owner_share"`
+	Owners        int     `json:"owners"`
+}
+
 // Codeowners describes the repo's CODEOWNERS file against the files changed in the window.
 type Codeowners struct {
 	Present bool   `json:"present"`
@@ -82,9 +91,13 @@ type Codeowners struct {
 }
 
 type Ownership struct {
-	Status     string     `json:"status"`
-	Areas      []Area     `json:"areas"`
-	Codeowners Codeowners `json:"codeowners"`
+	Status string `json:"status"`
+	// Areas are the top-level directories, Subareas the busiest directories two levels deep
+	// ("src/api/"), Files the most changed files; each with its main owner.
+	Areas      []Area      `json:"areas"`
+	Subareas   []Area      `json:"subareas"`
+	Files      []FileOwner `json:"files"`
+	Codeowners Codeowners  `json:"codeowners"`
 }
 
 type Result struct {
@@ -105,8 +118,8 @@ func Compute(cfg config.AnalyticsConfig, in Inputs, now time.Time) *Result {
 		Version:    Version,
 		WindowDays: cfg.WindowDays,
 		BusFactor:  BusFactor{Status: StatusNoData, TopAuthors: []AuthorShare{}},
-		Ownership:  Ownership{Status: StatusNoData, Areas: []Area{}},
-		Reviews:    reviewStats(cfg, in.Pulls),
+		Ownership:  Ownership{Status: StatusNoData, Areas: []Area{}, Subareas: []Area{}, Files: []FileOwner{}},
+		Reviews:    reviewStats(cfg, in.Pulls, now),
 	}
 
 	// CODEOWNERS is reported whether or not commits are readable: its presence is a fact of the repo.
@@ -131,7 +144,9 @@ func Compute(cfg config.AnalyticsConfig, in Inputs, now time.Time) *Result {
 	if len(commits) > 0 && len(commits) >= cfg.MinCommits {
 		result.BusFactor = busFactor(commits, people, cfg.TopAuthors)
 		result.Ownership.Status = StatusOK
-		result.Ownership.Areas = ownershipAreas(commits, people, cfg.TopAreas)
+		result.Ownership.Areas = ownershipAreas(commits, people, areaOf, cfg.TopAreas)
+		result.Ownership.Subareas = ownershipAreas(commits, people, subareaOf, cfg.TopSubareas)
+		result.Ownership.Files = ownershipFiles(commits, people, cfg.TopFiles)
 		if result.Ownership.Codeowners.Present {
 			result.Ownership.Codeowners.CoveredShare = coveredShare(commits, rules)
 		}
@@ -230,7 +245,22 @@ type areaStats struct {
 	total int
 }
 
-func ownershipAreas(commits []gitlog.Commit, people directory, topN int) []Area {
+// ownershipFiles lists the topN most changed files with their main owner. Unlike the directory
+// views it needs no grouping: every file is its own area.
+func ownershipFiles(commits []gitlog.Commit, people directory, topN int) []FileOwner {
+	areas := ownershipAreas(commits, people, func(p string) string { return p }, topN)
+	files := make([]FileOwner, 0, len(areas))
+
+	for _, a := range areas {
+		files = append(files, FileOwner{Path: a.Path, Lines: a.Lines, TopOwner: a.TopOwner, TopOwnerShare: a.TopOwnerShare, Owners: a.Owners})
+	}
+
+	return files
+}
+
+// ownershipAreas groups the changed files with group (an empty name skips the file) and, per group,
+// finds who changed it most. The top topN groups by changed lines are returned.
+func ownershipAreas(commits []gitlog.Commit, people directory, group func(path string) string, topN int) []Area {
 	stats := map[string]*areaStats{}
 	for _, c := range commits {
 		key := authorKey(c)
@@ -239,7 +269,10 @@ func ownershipAreas(commits []gitlog.Commit, people directory, topN int) []Area 
 			if p == "" {
 				continue
 			}
-			name := areaOf(p)
+			name := group(p)
+			if name == "" {
+				continue
+			}
 			s := stats[name]
 			if s == nil {
 				s = &areaStats{files: map[string]struct{}{}, lines: map[string]int{}}
@@ -312,6 +345,17 @@ func areaOf(p string) string {
 		return p[:i] + "/"
 	}
 	return RootArea
+}
+
+// subareaOf is the directory two levels deep ("src/api/" for "src/api/x.go"); a file directly in a
+// top-level directory or in the root has none and is only counted in the top-level view.
+func subareaOf(p string) string {
+	parts := strings.Split(p, "/")
+	if len(parts) < 3 {
+		return ""
+	}
+
+	return parts[0] + "/" + parts[1] + "/"
 }
 
 func round2(v float64) float64 { return math.Round(v*100) / 100 }

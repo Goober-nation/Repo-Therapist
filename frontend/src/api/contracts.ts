@@ -110,6 +110,15 @@ export interface MyOrganizationsResponse {
   default_org_slug?: string
 }
 
+interface AreaPayload {
+  path?: string
+  files?: number
+  lines?: number
+  top_owner?: string
+  top_owner_share?: number
+  owners?: number
+}
+
 /** GET /analytics/{org}/{repo}: informational analytics (bus factor, ownership map). */
 export interface AnalyticsResponse {
   status: GradeStatus
@@ -132,17 +141,21 @@ export interface AnalyticsResponse {
       unreviewed?: number
       unreviewed_share?: number | null
       median_merge_hours?: number | null
+      bottlenecks?: {
+        status?: string
+        reason?: string
+        reviewed?: number
+        open?: number
+        waiting?: number
+        waiting_days?: number
+        median_first_review_hours?: number | null
+      }
     }
     ownership?: {
       status?: string
-      areas?: Array<{
-        path?: string
-        files?: number
-        lines?: number
-        top_owner?: string
-        top_owner_share?: number
-        owners?: number
-      }>
+      areas?: AreaPayload[]
+      subareas?: AreaPayload[]
+      files?: Array<{ path?: string; lines?: number; top_owner?: string; top_owner_share?: number; owners?: number }>
       codeowners?: { present?: boolean; path?: string; rules?: number; covered_share?: number | null }
     }
   } | null

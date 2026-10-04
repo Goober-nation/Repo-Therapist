@@ -13,7 +13,7 @@ import (
 
 const (
 	// DefaultSampleLimit is how many of the newest pull requests are sampled (PR_SAMPLE_LIMIT).
-	DefaultSampleLimit = 10
+	DefaultSampleLimit = 20
 	// Workers bounds the parallel per-PR activity fetches: SourceCraft answers in 1.5-5 s per
 	// call, so a sequential sample would take over a minute.
 	Workers = 4

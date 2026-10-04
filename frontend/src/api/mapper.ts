@@ -4,8 +4,10 @@ import type {
   CategoryScores,
   Confidence,
   RepoAnalytics,
+  ReviewBottlenecks,
   MetricFact,
   MetricResult,
+  OwnershipArea,
   PositionExplanation,
   PositionNeighbour,
   Priority,
@@ -192,6 +194,8 @@ export function analyticsFromResponse(response: AnalyticsResponse | undefined): 
       ...(reviewsAvailable && typeof reviews?.median_merge_hours === "number" && reviews.median_merge_hours >= 0
         ? { medianMergeHours: reviews.median_merge_hours }
         : {}),
+      // Analytics stored before version 3 have no bottlenecks: unavailable, never zeros.
+      bottlenecks: bottlenecksFromPayload(reviews?.bottlenecks),
     },
     busFactor: {
       available: busAvailable,
@@ -206,16 +210,18 @@ export function analyticsFromResponse(response: AnalyticsResponse | undefined): 
     },
     ownership: {
       available: ownership?.status === "ok",
-      areas: (Array.isArray(ownership?.areas) ? ownership.areas : []).flatMap((area) =>
-        typeof area?.path === "string" && area.path
+      areas: ownershipAreas(ownership?.areas),
+      // Analytics stored before version 3 have neither: both stay empty and the views are not offered.
+      subareas: ownershipAreas(ownership?.subareas),
+      files: (Array.isArray(ownership?.files) ? ownership.files : []).flatMap((file) =>
+        typeof file?.path === "string" && file.path
           ? [
               {
-                path: area.path,
-                files: finiteOr(area.files, 0),
-                lines: finiteOr(area.lines, 0),
-                topOwner: typeof area.top_owner === "string" ? area.top_owner : "—",
-                topOwnerShare: share(area.top_owner_share),
-                owners: finiteOr(area.owners, 0),
+                path: file.path,
+                lines: finiteOr(file.lines, 0),
+                topOwner: typeof file.top_owner === "string" ? file.top_owner : "—",
+                topOwnerShare: share(file.top_owner_share),
+                owners: finiteOr(file.owners, 0),
               },
             ]
           : [],
@@ -228,6 +234,40 @@ export function analyticsFromResponse(response: AnalyticsResponse | undefined): 
       },
     },
   }
+}
+
+function bottlenecksFromPayload(raw: unknown): ReviewBottlenecks {
+  const value = isRecord(raw) ? raw : {}
+  const available = value.status === "ok"
+  const median = value.median_first_review_hours
+  return {
+    available,
+    reason: typeof value.reason === "string" && value.reason ? value.reason : "unavailable",
+    reviewed: finiteOr(value.reviewed, 0),
+    open: finiteOr(value.open, 0),
+    waiting: finiteOr(value.waiting, 0),
+    waitingDays: finiteOr(value.waiting_days, 0),
+    ...(available && typeof median === "number" && Number.isFinite(median) && median >= 0
+      ? { medianFirstReviewHours: median }
+      : {}),
+  }
+}
+
+function ownershipAreas(raw: unknown): OwnershipArea[] {
+  return (Array.isArray(raw) ? raw : []).flatMap((area) =>
+    isRecord(area) && typeof area.path === "string" && area.path
+      ? [
+          {
+            path: area.path,
+            files: finiteOr(area.files, 0),
+            lines: finiteOr(area.lines, 0),
+            topOwner: typeof area.top_owner === "string" ? area.top_owner : "—",
+            topOwnerShare: share(area.top_owner_share),
+            owners: finiteOr(area.owners, 0),
+          },
+        ]
+      : [],
+  )
 }
 
 export function repositoryFromRanking(entry: GatewayRankingEntry): RepositorySummary | null {

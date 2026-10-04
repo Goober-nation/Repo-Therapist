@@ -9,8 +9,8 @@
     "build": "node scripts/sync-rules.mjs && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/*.test.js",
-    "check": "tsc --noEmit && node --test tests/*.test.js && node scripts/sync-rules.mjs && vite build",
+    "test": "node --test --test-concurrency=1 tests/*.test.js",
+    "check": "tsc --noEmit && node --test --test-concurrency=1 tests/*.test.js && node scripts/sync-rules.mjs && vite build",
     "format": "oxfmt",
     "sync-rules": "node scripts/sync-rules.mjs"
   },

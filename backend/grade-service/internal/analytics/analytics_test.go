@@ -13,7 +13,7 @@ import (
 var now = time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
 
 func testConfig() config.AnalyticsConfig {
-	return config.AnalyticsConfig{Enabled: true, WindowDays: 180, MinCommits: 5, TopAuthors: 5, TopAreas: 8, MinMergedPRs: 3, ImportShare: 0.8}
+	return config.AnalyticsConfig{Enabled: true, WindowDays: 180, MinCommits: 5, TopAuthors: 5, TopAreas: 8, TopSubareas: 10, TopFiles: 10, MinMergedPRs: 3, MinReviewedPRs: 3, WaitingDays: 7, ImportShare: 0.8}
 }
 
 type spec struct {
@@ -264,5 +264,69 @@ func TestPatternMatching(t *testing.T) {
 
 	if patternRegexp("/") != nil || patternRegexp("") != nil {
 		t.Error("an empty pattern must not become a match-everything rule")
+	}
+}
+
+func TestOwnershipSubareasAndTopFiles(t *testing.T) {
+	var specs []spec
+	specs = append(specs, repeat(3, spec{name: "Ann", email: "ann@x", files: []gitlog.FileChange{file("src/api/handler.go", 20), file("src/main.go", 4)}})...)
+	specs = append(specs, repeat(2, spec{name: "Bob", email: "bob@x", daysAgo: 10, files: []gitlog.FileChange{file("src/api/handler.go", 5), file("src/ui/view.go", 30)}})...)
+	specs = append(specs, spec{name: "Bob", email: "bob@x", daysAgo: 20, files: []gitlog.FileChange{file("README.md", 2)}})
+
+	got := Compute(testConfig(), Inputs{CommitsAvailable: true, Commits: commits(specs...)}, now).Ownership
+
+	// Depth-2 directories: files directly in src/ or in the root belong to no subdirectory.
+	if len(got.Subareas) != 2 {
+		t.Fatalf("subareas = %+v, want src/api/ and src/ui/ only", got.Subareas)
+	}
+	api, ui := got.Subareas[0], got.Subareas[1]
+	if api.Path != "src/api/" || api.Lines != 70 || api.TopOwner != "Ann" || api.TopOwnerShare != 0.86 || api.Owners != 2 {
+		t.Errorf("src/api/ = %+v, want first (70 lines), Ann owning 60 of them (0.86), two owners", api)
+	}
+	if ui.Path != "src/ui/" || ui.Lines != 60 || ui.TopOwner != "Bob" || ui.TopOwnerShare != 1 || ui.Owners != 1 {
+		t.Errorf("src/ui/ = %+v, want second (60 lines), Bob owning all of it", ui)
+	}
+
+	// Files: ordered by changed lines, each with its own main owner.
+	if len(got.Files) != 4 || got.Files[0].Path != "src/api/handler.go" || got.Files[0].Lines != 70 || got.Files[0].TopOwner != "Ann" {
+		t.Fatalf("files = %+v, want the most changed file first", got.Files)
+	}
+	if got.Files[1].Path != "src/ui/view.go" || got.Files[1].TopOwner != "Bob" || got.Files[1].TopOwnerShare != 1 {
+		t.Errorf("second file = %+v", got.Files[1])
+	}
+}
+
+func TestOwnershipSubareaHelpers(t *testing.T) {
+	for in, want := range map[string]string{
+		"a/b/c.go":   "a/b/",
+		"a/b/c/d.go": "a/b/",
+		"a/b.go":     "",
+		"b.go":       "",
+	} {
+		if got := subareaOf(in); got != want {
+			t.Errorf("subareaOf(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestOwnershipTopFilesAndSubareasAreCapped(t *testing.T) {
+	cfg := testConfig()
+	cfg.TopSubareas, cfg.TopFiles = 2, 3
+
+	var specs []spec
+	for i := 0; i < 6; i++ {
+		specs = append(specs, spec{name: "Ann", email: "a@x", daysAgo: i, files: []gitlog.FileChange{file(fmt.Sprintf("d/s%d/f.go", i), 10+i)}})
+	}
+
+	got := Compute(cfg, Inputs{CommitsAvailable: true, Commits: commits(specs...)}, now).Ownership
+	if len(got.Subareas) != 2 || got.Subareas[0].Path != "d/s5/" || len(got.Files) != 3 || got.Files[0].Path != "d/s5/f.go" {
+		t.Errorf("subareas = %+v files = %+v, want the 2 / 3 busiest", got.Subareas, got.Files)
+	}
+}
+
+func TestOwnershipViewsAreEmptyListsWhenThereIsNoData(t *testing.T) {
+	got := Compute(testConfig(), Inputs{CommitsAvailable: true, Commits: nil}, now).Ownership
+	if got.Subareas == nil || got.Files == nil || len(got.Subareas) != 0 || len(got.Files) != 0 {
+		t.Errorf("subareas = %v files = %v, want empty non-nil lists (JSON [])", got.Subareas, got.Files)
 	}
 }

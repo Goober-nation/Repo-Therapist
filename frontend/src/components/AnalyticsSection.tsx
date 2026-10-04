@@ -1,4 +1,5 @@
-import type { RepoAnalytics } from "../types"
+import { useState } from "react"
+import type { OwnedFile, OwnershipArea, RepoAnalytics } from "../types"
 import { Card, Label, SectionHeading } from "./Shell"
 
 const percent = (value: number) => `${Math.round(value * 100)}%`
@@ -29,6 +30,84 @@ const REVIEW_NO_DATA: Record<string, string> = {
   few_merged: "Нет данных: среди последних pull request'ов слишком мало влитых, чтобы судить о ревью.",
   imported: "Нет данных: pull request'ы созданы почти одновременно, похоже на импорт истории.",
   unavailable: "Нет данных: pull request'ы этого репозитория получить не удалось.",
+  few_reviewed: "Нет данных: слишком мало pull request'ов с ревью, чтобы назвать типичное время ожидания.",
+}
+
+type OwnerView = "areas" | "subareas" | "files"
+
+const OWNER_VIEWS: { id: OwnerView; label: string }[] = [
+  { id: "areas", label: "Каталоги" },
+  { id: "subareas", label: "Подкаталоги" },
+  { id: "files", label: "Самые изменяемые файлы" },
+]
+
+/** Directories (top level or two deep) or the most changed files, with their main owner. */
+function OwnersCard({ ownership }: { ownership: RepoAnalytics["ownership"] }) {
+  const [view, setView] = useState<OwnerView>("areas")
+  const offered = OWNER_VIEWS.filter((item) => ownership[item.id].length > 0)
+  const current = offered.find((item) => item.id === view)?.id ?? offered[0]?.id
+
+  if (!ownership.available || !current) {
+    return (
+      <Card className="analytics-owners">
+        <Label>Карта владельцев кода</Label>
+        <p className="muted-copy">Нет данных: за период слишком мало коммитов, чтобы построить карту.</p>
+      </Card>
+    )
+  }
+
+  const rows: (OwnershipArea | OwnedFile)[] = ownership[current]
+  const isFiles = current === "files"
+
+  return (
+    <Card className="analytics-owners">
+      <Label>Карта владельцев кода</Label>
+      {offered.length > 1 && (
+        <div className="analytics-tabs" role="group" aria-label="Уровень карты владельцев">
+          {offered.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`analytics-tab ${item.id === current ? "analytics-tab--active" : ""}`}
+              aria-pressed={item.id === current}
+              onClick={() => setView(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="table-scroll">
+        <table className="analytics-table">
+          <thead>
+            <tr>
+              <th>{isFiles ? "Файл" : current === "subareas" ? "Подкаталог" : "Каталог"}</th>
+              <th>{isFiles ? "Строк" : "Файлов"}</th>
+              <th>Основной владелец</th>
+              <th>Доля изменений</th>
+              <th>Владельцев</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.path}>
+                <td>
+                  <code>{row.path}</code>
+                </td>
+                <td>{"files" in row ? row.files : row.lines}</td>
+                <td>{row.topOwner}</td>
+                <td>
+                  <ShareBar value={row.topOwnerShare} label={`${row.topOwner}: ${percent(row.topOwnerShare)} изменений`} />{" "}
+                  {percent(row.topOwnerShare)}
+                </td>
+                <td>{row.owners}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
 }
 
 function formatHours(hours: number): string {
@@ -136,9 +215,32 @@ export default function AnalyticsSection({
                 </p>
               ) : null}
             </>
-          ) : (
+          ) : reviews.bottlenecks.available ? null : (
             <p className="muted-copy">{REVIEW_NO_DATA[reviews.reason ?? ""] ?? REVIEW_NO_DATA.unavailable}</p>
           )}
+          {reviews.bottlenecks.available ? (
+            <div className="analytics-bottlenecks">
+              <strong>Где ревью ждут</strong>
+              {reviews.bottlenecks.medianFirstReviewHours !== undefined ? (
+                <p>
+                  Медианное время до первого ревью: <strong>{formatHours(reviews.bottlenecks.medianFirstReviewHours)}</strong>{" "}
+                  (по {reviews.bottlenecks.reviewed} pull request&apos;ам с ревью).
+                </p>
+              ) : (
+                <p className="muted-copy">
+                  Время до первого ревью не посчитано: pull request&apos;ов с ревью слишком мало.
+                </p>
+              )}
+              {reviews.bottlenecks.open > 0 ? (
+                <p>
+                  Открытых без ревью{reviews.bottlenecks.waitingDays > 0 ? ` дольше ${reviews.bottlenecks.waitingDays} дн.` : ""}:{" "}
+                  <strong>{reviews.bottlenecks.waiting}</strong> из {reviews.bottlenecks.open} открытых.
+                </p>
+              ) : null}
+            </div>
+          ) : reviews.available ? (
+            <p className="muted-copy">{REVIEW_NO_DATA[reviews.bottlenecks.reason ?? ""] ?? REVIEW_NO_DATA.unavailable}</p>
+          ) : null}
         </Card>
 
         <Card className="analytics-card">
@@ -168,47 +270,7 @@ export default function AnalyticsSection({
         </Card>
       </div>
 
-      <Card className="analytics-owners">
-        <Label>Карта владельцев по каталогам</Label>
-        {ownership.available && ownership.areas.length > 0 ? (
-          <div className="table-scroll">
-            <table className="analytics-table">
-              <thead>
-                <tr>
-                  <th>Каталог</th>
-                  <th>Файлов</th>
-                  <th>Основной владелец</th>
-                  <th>Доля изменений</th>
-                  <th>Владельцев</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ownership.areas.map((area) => (
-                  <tr key={area.path}>
-                    <td>
-                      <code>{area.path}</code>
-                    </td>
-                    <td>{area.files}</td>
-                    <td>{area.topOwner}</td>
-                    <td>
-                      <ShareBar
-                        value={area.topOwnerShare}
-                        label={`${area.topOwner}: ${percent(area.topOwnerShare)} изменений`}
-                      />{" "}
-                      {percent(area.topOwnerShare)}
-                    </td>
-                    <td>{area.owners}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="muted-copy">
-            Нет данных: за период слишком мало коммитов, чтобы построить карту.
-          </p>
-        )}
-      </Card>
+      <OwnersCard ownership={ownership} />
     </section>
   )
 }

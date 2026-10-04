@@ -13,6 +13,8 @@ const (
 	ReasonUnavailable = "unavailable"
 	ReasonFewMerged   = "few_merged"
 	ReasonImported    = "imported"
+	// ReasonFewReviewed: too few pull requests with a review to take a median, and no open ones.
+	ReasonFewReviewed = "few_reviewed"
 )
 
 // PullsExport is the _meta/pulls.json shape written by repository-service: the newest few pull
@@ -38,16 +40,18 @@ type Reviewer struct {
 	User struct {
 		Slug string `json:"slug"`
 	} `json:"user"`
-	Decision string `json:"decision"`
+	Decision  string    `json:"decision"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type Comment struct {
 	Author struct {
 		Slug string `json:"slug"`
 	} `json:"author"`
-	Type        string `json:"type"`
-	IsDeleted   bool   `json:"is_deleted"`
-	IsPublished bool   `json:"is_published"`
+	Type        string    `json:"type"`
+	IsDeleted   bool      `json:"is_deleted"`
+	IsPublished bool      `json:"is_published"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // Reviews describes how the sampled pull requests were reviewed. Informational only.
@@ -66,22 +70,46 @@ type Reviews struct {
 	// MedianMergeHours is the median of updated_at - created_at over merged pull requests. It is
 	// approximate: SourceCraft has no merge time, and updated_at moves on later activity.
 	MedianMergeHours *float64 `json:"median_merge_hours"`
+	// Bottlenecks is where reviews wait: the time to the first review and the open pull requests
+	// nobody has reviewed yet. It has its own status because it needs no merged pull requests.
+	Bottlenecks Bottlenecks `json:"bottlenecks"`
 }
 
-// reviewStats judges a sample. cfg.MinMergedPRs and cfg.ImportShare come from config.
-func reviewStats(cfg config.AnalyticsConfig, pulls *PullsExport) Reviews {
-	reviews := Reviews{Status: StatusNoData}
+// Bottlenecks describes the waiting side of reviews over the sampled pull requests (merged and open,
+// not drafts or discarded). Informational only.
+type Bottlenecks struct {
+	Status string `json:"status"`
+	// Reason says why Status is no_data: unavailable, imported or few_reviewed.
+	Reason string `json:"reason,omitempty"`
+	// Reviewed is how many judged pull requests got a review (the sample of the median); Open how
+	// many judged pull requests are open; Waiting how many of those have waited WaitingDays or
+	// more with no review.
+	Reviewed int `json:"reviewed"`
+	Open     int `json:"open"`
+	Waiting  int `json:"waiting"`
+	// WaitingDays is the configured waiting threshold, so a consumer can word the count truthfully.
+	WaitingDays int `json:"waiting_days"`
+	// MedianFirstReviewHours is the median time from creation to the first review by someone other
+	// than the author or a bot; nil with fewer than MinReviewedPRs reviewed pull requests.
+	MedianFirstReviewHours *float64 `json:"median_first_review_hours"`
+}
+
+// reviewStats judges a sample as of now. Thresholds come from config.
+func reviewStats(cfg config.AnalyticsConfig, pulls *PullsExport, now time.Time) Reviews {
+	reviews := Reviews{Status: StatusNoData, Bottlenecks: Bottlenecks{Status: StatusNoData}}
 	if pulls == nil || !pulls.Available {
-		reviews.Reason = ReasonUnavailable
+		reviews.Reason, reviews.Bottlenecks.Reason = ReasonUnavailable, ReasonUnavailable
 		return reviews
 	}
 
 	reviews.Sampled = len(pulls.PullRequests)
 
 	if importedSample(pulls.PullRequests, cfg.MinMergedPRs, cfg.ImportShare) {
-		reviews.Reason = ReasonImported
+		reviews.Reason, reviews.Bottlenecks.Reason = ReasonImported, ReasonImported
 		return reviews
 	}
+
+	reviews.Bottlenecks = bottlenecks(cfg, pulls.PullRequests, now)
 
 	var mergeHours []float64
 	for _, pr := range pulls.PullRequests {
@@ -118,6 +146,78 @@ func reviewStats(cfg config.AnalyticsConfig, pulls *PullsExport) Reviews {
 	}
 
 	return reviews
+}
+
+// bottlenecks measures the waiting side of reviews. Only pull requests whose reviewers and comments
+// could be read count, and drafts and discarded ones are left out: they are not waiting for review.
+func bottlenecks(cfg config.AnalyticsConfig, prs []PullRequest, now time.Time) Bottlenecks {
+	result := Bottlenecks{Status: StatusNoData, WaitingDays: cfg.WaitingDays}
+	waitFor := time.Duration(cfg.WaitingDays) * 24 * time.Hour
+
+	var hours []float64
+
+	for _, pr := range prs {
+		if !pr.ActivityAvailable || (pr.Status != "merged" && pr.Status != "open") || pr.CreatedAt.IsZero() {
+			continue
+		}
+
+		if pr.Status == "open" {
+			result.Open++
+
+			if !hasReview(pr) && now.Sub(pr.CreatedAt) >= waitFor {
+				result.Waiting++
+			}
+		}
+
+		if at, ok := firstReviewAt(pr); ok && !at.Before(pr.CreatedAt) {
+			result.Reviewed++
+			hours = append(hours, at.Sub(pr.CreatedAt).Hours())
+		}
+	}
+
+	if result.Reviewed >= cfg.MinReviewedPRs && len(hours) > 0 {
+		median := round2(medianOf(hours))
+		result.MedianFirstReviewHours = &median
+	}
+
+	if result.MedianFirstReviewHours != nil || result.Open > 0 {
+		result.Status = StatusOK
+	} else {
+		result.Reason = ReasonFewReviewed
+	}
+
+	return result
+}
+
+// firstReviewAt is the earliest time someone other than the author or a bot reviewed the pull
+// request: a reviewer decision or a published, non-deleted, non-AppSec comment. An event without a
+// time is not usable here (hasReview still counts it as a review).
+func firstReviewAt(pr PullRequest) (time.Time, bool) {
+	var first time.Time
+
+	consider := func(at time.Time) {
+		if !at.IsZero() && (first.IsZero() || at.Before(first)) {
+			first = at
+		}
+	}
+
+	for _, r := range pr.Reviewers {
+		if counts(r.User.Slug, pr.Author) {
+			consider(r.CreatedAt)
+		}
+	}
+
+	for _, c := range pr.Comments {
+		if c.Type == "appsec" || c.IsDeleted || !c.IsPublished {
+			continue
+		}
+
+		if counts(c.Author.Slug, pr.Author) {
+			consider(c.CreatedAt)
+		}
+	}
+
+	return first, !first.IsZero()
 }
 
 // hasReview: someone other than the author, and not a bot, either left a reviewer decision or a

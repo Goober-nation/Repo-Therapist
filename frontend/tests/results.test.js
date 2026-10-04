@@ -1809,6 +1809,8 @@ test("analytics: the response is read defensively and no-data blocks stay unavai
     unreviewed: 3,
     unreviewedShare: 0.38,
     medianMergeHours: 30,
+    // The fixture has no bottlenecks block (an object stored before version 3): unavailable, not zeros.
+    bottlenecks: { available: false, reason: "unavailable", reviewed: 0, open: 0, waiting: 0, waitingDays: 0 },
   })
   assert.equal(mapped.ownership.areas.length, 1)
   assert.deepEqual(mapped.ownership.codeowners, { present: true, path: ".github/CODEOWNERS", rules: 3, coveredShare: 0.75 })

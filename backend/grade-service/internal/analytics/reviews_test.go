@@ -32,7 +32,7 @@ func comment(author, typ string, deleted, published bool) Comment {
 }
 
 func stats(pulls *PullsExport) Reviews {
-	return reviewStats(testConfig(), pulls)
+	return reviewStats(testConfig(), pulls, now)
 }
 
 func TestReviewsCountsUnreviewedAndMedianMergeTime(t *testing.T) {
@@ -132,7 +132,7 @@ func TestComputeIncludesReviewsAndVersion(t *testing.T) {
 		pr("1", "merged", "a", 1, 2, true, []string{"b"}), pr("2", "merged", "a", 4, 2, true, nil), pr("3", "merged", "a", 8, 2, true, nil),
 	}}}, now)
 
-	if result.Version != 2 || result.Reviews.Status != StatusOK || result.Reviews.Unreviewed != 2 {
+	if result.Version != 3 || result.Reviews.Status != StatusOK || result.Reviews.Unreviewed != 2 {
 		t.Fatalf("result = %+v", result)
 	}
 
@@ -153,5 +153,118 @@ func TestComputeIncludesReviewsAndVersion(t *testing.T) {
 	// Without pulls the rest of the analytics is unaffected and reviews is no_data.
 	if no := Compute(testConfig(), Inputs{}, now); no.Reviews.Status != StatusNoData || no.Reviews.Reason != ReasonUnavailable {
 		t.Errorf("no pulls: %+v", no.Reviews)
+	}
+}
+
+// prReviewed builds a pull request created createdDaysAgo days ago whose first review, by "bob",
+// came reviewAfterHours later; a negative value means it has no review.
+func prReviewed(slug, status string, createdDaysAgo int, reviewAfterHours float64, activity bool) PullRequest {
+	out := pr(slug, status, "alice", createdDaysAgo, 5, activity, nil)
+	if reviewAfterHours >= 0 {
+		var rv Reviewer
+		rv.User.Slug = "bob"
+		rv.Decision = "approve"
+		rv.CreatedAt = out.CreatedAt.Add(time.Duration(reviewAfterHours * float64(time.Hour)))
+		out.Reviewers = []Reviewer{rv}
+	}
+	return out
+}
+
+func TestBottlenecksMedianFirstReviewAndWaitingPullRequests(t *testing.T) {
+	got := stats(&PullsExport{Available: true, PullRequests: []PullRequest{
+		prReviewed("a", "merged", 20, 2, true),
+		prReviewed("b", "merged", 18, 6, true),
+		prReviewed("c", "merged", 16, 10, true),
+		prReviewed("d", "open", 9, 26, true),   // open but already reviewed
+		prReviewed("e", "open", 10, -1, true),  // open, no review for 10 days: waiting
+		prReviewed("f", "open", 2, -1, true),   // open, no review but only 2 days: not waiting yet
+		prReviewed("g", "draft", 30, -1, true), // drafts are not waiting for review
+		prReviewed("h", "discarded", 25, -1, true),
+		prReviewed("i", "merged", 12, 3, false), // reviewers and comments unreadable: not judged
+	}}).Bottlenecks
+
+	if got.WaitingDays != 7 {
+		t.Errorf("waiting days = %d, want the configured 7 echoed", got.WaitingDays)
+	}
+	if got.Status != StatusOK || got.Reviewed != 4 || got.Open != 3 || got.Waiting != 1 {
+		t.Fatalf("got %+v, want ok, 4 reviewed, 3 open, 1 waiting", got)
+	}
+	// Hours 2, 6, 10, 26 -> median (6+10)/2 = 8.
+	if got.MedianFirstReviewHours == nil || *got.MedianFirstReviewHours != 8 {
+		t.Errorf("median = %v, want 8", got.MedianFirstReviewHours)
+	}
+}
+
+func TestBottlenecksNeedEnoughReviewedPullRequestsForAMedian(t *testing.T) {
+	// Two reviewed pull requests and nothing open: no median and nothing else to report.
+	got := stats(&PullsExport{Available: true, PullRequests: []PullRequest{
+		prReviewed("a", "merged", 20, 2, true),
+		prReviewed("b", "merged", 18, 6, true),
+		prReviewed("c", "merged", 16, -1, true),
+	}}).Bottlenecks
+	if got.Status != StatusNoData || got.Reason != ReasonFewReviewed || got.MedianFirstReviewHours != nil || got.Reviewed != 2 {
+		t.Errorf("got %+v, want no_data few_reviewed with no median", got)
+	}
+
+	// The same plus a waiting open pull request: still worth showing, just without the median.
+	got = stats(&PullsExport{Available: true, PullRequests: []PullRequest{
+		prReviewed("a", "merged", 20, 2, true),
+		prReviewed("b", "merged", 18, 6, true),
+		prReviewed("c", "open", 16, -1, true),
+	}}).Bottlenecks
+	if got.Status != StatusOK || got.MedianFirstReviewHours != nil || got.Open != 1 || got.Waiting != 1 {
+		t.Errorf("got %+v, want ok with no median, 1 open, 1 waiting", got)
+	}
+}
+
+func TestBottlenecksUnavailableAndImportedAreNoData(t *testing.T) {
+	if got := stats(nil).Bottlenecks; got.Status != StatusNoData || got.Reason != ReasonUnavailable {
+		t.Errorf("no export: got %+v", got)
+	}
+	if got := stats(&PullsExport{Available: false}).Bottlenecks; got.Reason != ReasonUnavailable {
+		t.Errorf("export unavailable: got %+v", got)
+	}
+
+	same := func(n int) []PullRequest {
+		var out []PullRequest
+		for i := 0; i < n; i++ {
+			out = append(out, prReviewed(string(rune('a'+i)), "open", 30, -1, true)) // all created the same day
+		}
+		return out
+	}
+	got := stats(&PullsExport{Available: true, PullRequests: same(5)}).Bottlenecks
+	if got.Status != StatusNoData || got.Reason != ReasonImported || got.Waiting != 0 {
+		t.Errorf("imported history: got %+v, want no_data imported and no waiting count", got)
+	}
+}
+
+func TestBottlenecksIgnoreSelfBotAndUntimedReviews(t *testing.T) {
+	selfReviewed := prReviewed("a", "open", 10, -1, true)
+	var own Reviewer
+	own.User.Slug = "alice" // the author approving their own pull request
+	own.CreatedAt = selfReviewed.CreatedAt.Add(time.Hour)
+	selfReviewed.Reviewers = []Reviewer{own}
+
+	botReviewed := prReviewed("b", "open", 11, -1, true)
+	botReviewed.Comments = []Comment{func() Comment {
+		c := comment("ci-bot", "default", false, true)
+		c.CreatedAt = botReviewed.CreatedAt.Add(time.Hour)
+		return c
+	}()}
+
+	untimed := prReviewed("c", "open", 12, -1, true)
+	var noTime Reviewer
+	noTime.User.Slug = "bob" // a real review whose time is unknown
+	untimed.Reviewers = []Reviewer{noTime}
+
+	beforeCreation := prReviewed("d", "merged", 13, -5, true) // a review dated before the pull request
+
+	got := stats(&PullsExport{Available: true, PullRequests: []PullRequest{selfReviewed, botReviewed, untimed, beforeCreation}}).Bottlenecks
+
+	if got.Reviewed != 0 {
+		t.Errorf("reviewed = %d, want 0: self, bot, untimed and pre-creation reviews give no first-review time", got.Reviewed)
+	}
+	if got.Open != 3 || got.Waiting != 2 {
+		t.Errorf("open = %d waiting = %d, want 3 open and 2 waiting (self and bot do not count; the untimed review still does)", got.Open, got.Waiting)
 	}
 }

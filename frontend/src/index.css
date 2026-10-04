@@ -525,3 +525,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
   .history-table__row { grid-template-columns: minmax(60px, 1fr) 56px 100px; gap: 8px; }
   .compare-bar { padding: 10px 14px; }
 }
+
+.analytics-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.analytics-tab { min-height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted); font: inherit; font-size: var(--fs-xs); cursor: pointer; }
+.analytics-tab:hover { background: var(--row-hover); }
+.analytics-tab--active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+.analytics-bottlenecks { display: grid; gap: 4px; margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--border); font-size: var(--fs-sm); }
+.analytics-bottlenecks p { margin: 0; }
