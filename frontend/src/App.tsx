@@ -5,7 +5,9 @@ import {
   analyticsFromResponse,
   confidenceFromPayload,
   defaultOrganization,
+  historyFromResponse,
   mergeGradingIntoRepository,
+  positionFromResponse,
   repositoryFromMyRepos,
   repositoryFromRanking,
   repositoryStub,
@@ -14,6 +16,7 @@ import { loadSavedProfile, saveProfile, type YandexProfile } from "./api/yandexA
 import { Button, Card } from "./components/Shell"
 import Sidebar from "./components/Sidebar"
 import TopBar from "./components/TopBar"
+import CompareRoute from "./pages/CompareRoute"
 import MyRepositoriesPage from "./pages/MyRepositoriesPage"
 import RankingPage, { DEFAULT_RANKING_QUERY, type RankingQuery } from "./pages/RankingPage"
 import RepositoryOverviewPage from "./pages/RepositoryOverviewPage"
@@ -21,7 +24,7 @@ import RulesPage from "./pages/RulesPage"
 import { gradingToken } from "./metrics"
 import { loadPat, patExpiresIn, savePat } from "./patStorage"
 import { parseRepositoryLink, useRoute } from "./route"
-import type { Confidence, PageId, RepoAnalytics, RepositorySummary } from "./types"
+import type { Confidence, PageId, PositionExplanation, RepoAnalytics, RepositorySummary, ScorePoint } from "./types"
 import { useRepositoryAnalysis } from "./useRepositoryAnalysis"
 
 type Theme = "light" | "dark" | "dopamine"
@@ -76,8 +79,13 @@ export default function App() {
   const [confidences, setConfidences] = useState<Record<string, Confidence | null>>({})
   // Informational analytics per view ("my:" with the owner's token, "repo:" public); null = none yet.
   const [analyticsByKey, setAnalyticsByKey] = useState<Record<string, RepoAnalytics | null>>({})
+  // Place and score history of a public repository ("org/repo"); null = none yet, absent = loading.
+  const [historyByRepo, setHistoryByRepo] = useState<Record<string, ScorePoint[] | null>>({})
+  const [positionByRepo, setPositionByRepo] = useState<Record<string, PositionExplanation | null>>({})
+  // Repositories ticked in the ranking for comparison (at most two).
+  const [compareSelection, setCompareSelection] = useState<RepositorySummary[]>([])
   const [rankingAttempt, setRankingAttempt] = useState(0)
-  const [ranking, setRanking] = useState<RepositoryList & { total: number; loadedKey?: string }>({
+  const [ranking, setRanking] = useState<RepositoryList & { total: number; loadedKey?: string; dynamicsDays?: number }>({
     items: [],
     total: 0,
     isLoading: true,
@@ -110,7 +118,13 @@ export default function App() {
       .then((response) => {
         if (!active) return
         const items = response.entries.flatMap((entry) => repositoryFromRanking(entry) ?? [])
-        setRanking({ items, total: response.total_count, isLoading: false, loadedKey: rankingKey })
+        setRanking({
+          items,
+          total: response.total_count,
+          isLoading: false,
+          loadedKey: rankingKey,
+          dynamicsDays: typeof response.dynamics_days === "number" ? response.dynamics_days : undefined,
+        })
         const named = items.flatMap((item) => (item.language === UNKNOWN_LANGUAGE ? [] : [item.language]))
         setLanguages((current) => [...new Set([...current, ...named])])
       })
@@ -265,6 +279,32 @@ export default function App() {
     }
   }, [target?.org, target?.repo, repoName, publicGradeShown, gradedAtKey])
 
+  // The place and the score history belong to the public grade and are advisory like the flag: a
+  // failure leaves them empty ("none yet"). Refetched when the grade is new.
+  useEffect(() => {
+    if (!target || !repoName || !publicGradeShown) return
+    let active = true
+    api
+      .getHistory(target.org, target.repo)
+      .then((response) => {
+        if (active) setHistoryByRepo((current) => ({ ...current, [repoName]: historyFromResponse(response) }))
+      })
+      .catch(() => {
+        if (active) setHistoryByRepo((current) => ({ ...current, [repoName]: null }))
+      })
+    api
+      .getPosition(target.org, target.repo)
+      .then((response) => {
+        if (active) setPositionByRepo((current) => ({ ...current, [repoName]: positionFromResponse(response) }))
+      })
+      .catch(() => {
+        if (active) setPositionByRepo((current) => ({ ...current, [repoName]: null }))
+      })
+    return () => {
+      active = false
+    }
+  }, [target?.org, target?.repo, repoName, publicGradeShown, gradedAtKey])
+
   // Analytics are read separately from the grade and refetched when the grade is new; a failure
   // just leaves them out (advisory data).
   const gradeReady = Boolean(target && !needsToken && grading?.status === "FINISHED")
@@ -330,7 +370,28 @@ export default function App() {
 
   const showPage = (page: Exclude<PageId, "overview">) => navigate({ page })
 
-  const activePage: PageId = route.page === "repository" ? "overview" : route.page
+  const toggleCompare = (item: RepositorySummary) =>
+    setCompareSelection((current) =>
+      current.some((selected) => selected.id === item.id)
+        ? current.filter((selected) => selected.id !== item.id)
+        : current.length >= 2
+          ? current
+          : [...current, item],
+    )
+
+  const openCompare = () => {
+    const [first, second] = compareSelection
+    if (first?.orgSlug && first.repoSlug && second?.orgSlug && second.repoSlug) {
+      navigate({
+        page: "compare",
+        a: { org: first.orgSlug, repo: first.repoSlug },
+        b: { org: second.orgSlug, repo: second.repoSlug },
+      })
+    }
+  }
+
+  // The compare page is reached from the ranking, so the ranking stays highlighted.
+  const activePage: PageId = route.page === "repository" ? "overview" : route.page === "compare" ? "ranking" : route.page
 
   return (
     <div className="app-shell">
@@ -358,6 +419,11 @@ export default function App() {
                 languages={languages}
                 isLoading={ranking.isLoading}
                 error={ranking.error}
+                dynamicsDays={ranking.dynamicsDays}
+                compareSelection={compareSelection}
+                onToggleCompare={toggleCompare}
+                onCompare={openCompare}
+                onClearCompare={() => setCompareSelection([])}
                 onQueryChange={setRankingQuery}
                 onRetry={() => setRankingAttempt((value) => value + 1)}
                 onSelectRepository={(item) => openRepository(item, false)}
@@ -385,6 +451,16 @@ export default function App() {
                 onOpenRepository={(item) => openRepository(item, true)}
               />
             )}
+            {route.page === "compare" && (
+              <CompareRoute
+                api={api}
+                a={route.a}
+                b={route.b}
+                onNavigate={(a, b) => navigate({ page: "compare", a, b })}
+                onOpenRepository={(ref) => navigate({ page: "repository", org: ref.org, repo: ref.repo, private: false })}
+                onBack={() => showPage("ranking")}
+              />
+            )}
             {route.page === "rules" && (
               <RulesPage section={route.section} onSectionChange={(section) => navigate({ page: "rules", section })} />
             )}
@@ -403,6 +479,12 @@ export default function App() {
                     repository={repository}
                     analysis={analysis}
                     analytics={key ? analyticsByKey[key] : undefined}
+                    rankingInfo={
+                      !token && repoName
+                        ? { history: historyByRepo[repoName], position: positionByRepo[repoName] }
+                        : undefined
+                    }
+                    onOpenRepository={(org, repo) => navigate({ page: "repository", org, repo, private: false })}
                     onBackToRanking={() => showPage("ranking")}
                     publicView={
                       canViewPublicly && repoName

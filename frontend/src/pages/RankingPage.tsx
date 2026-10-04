@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { RANKING_PAGE_SIZE, type RankingSort } from "../api/client"
 import { Badge, Button, Card, LanguageLabel, PageHeading } from "../components/Shell"
-import { formatDateTime, getLastActivityLabel, HEALTHY_SCORE, healthLevel } from "../metrics"
+import { formatDateTime, getLastActivityLabel, HEALTHY_SCORE, healthLevel, signed } from "../metrics"
 import type { RepositorySummary } from "../types"
 
 export interface RankingQuery {
@@ -22,6 +22,11 @@ export default function RankingPage({
   languages = [],
   isLoading = false,
   error,
+  dynamicsDays,
+  compareSelection = [],
+  onToggleCompare = () => {},
+  onCompare = () => {},
+  onClearCompare = () => {},
   onQueryChange = () => {},
   onRetry = () => {},
 }: {
@@ -34,6 +39,13 @@ export default function RankingPage({
   languages?: string[]
   isLoading?: boolean
   error?: string
+  /** Window of the shown score and place changes in days; undefined while the ranking is not loaded. */
+  dynamicsDays?: number
+  /** Repositories ticked for comparison (at most two). */
+  compareSelection?: RepositorySummary[]
+  onToggleCompare?: (repository: RepositorySummary) => void
+  onCompare?: () => void
+  onClearCompare?: () => void
   onQueryChange?: (query: RankingQuery) => void
   onRetry?: () => void
 }) {
@@ -150,6 +162,12 @@ export default function RankingPage({
             {visibleRepositories.length} проектов{visibleRepositories.length !== repositories.length ? " на странице" : ""}
           </span>
         </div>
+        {dynamicsDays !== undefined && (
+          <p className="ranking-note">
+            Рядом с местом и Score — изменение за {dynamicsDays} дн.: ▲ выше, ▼ ниже, «новый» — оценки неделю назад ещё не
+            было. Изменение места показывается при сортировке по Score.
+          </p>
+        )}
 
         <div className="table-scroll">
           <div className="ranking-table" role="table" aria-label="Рейтинг репозиториев">
@@ -174,6 +192,15 @@ export default function RankingPage({
                 >
                   <span className="table-rank" role="cell">
                     {repository.place ?? (query.page - 1) * RANKING_PAGE_SIZE + index + 1}
+                    {repository.placeChange !== undefined && repository.placeChange !== 0 && (
+                      <small
+                        className={`delta ${repository.placeChange > 0 ? "delta--up" : "delta--down"}`}
+                        title={`${repository.placeChange > 0 ? "Поднялся" : "Опустился"} на ${Math.abs(repository.placeChange)} за ${dynamicsDays ?? ""} дн.`}
+                      >
+                        {repository.placeChange > 0 ? "▲" : "▼"}
+                        {Math.abs(repository.placeChange)}
+                      </small>
+                    )}
                   </span>
                   <span className="repository-cell" role="cell">
                     <button
@@ -182,6 +209,20 @@ export default function RankingPage({
                       onClick={() => onSelectRepository(repository)}
                       aria-label={`Открыть анализ ${repository.fullName}`}
                     />
+                    {repository.healthScore !== null && repository.orgSlug && repository.repoSlug && (
+                      <label className="compare-check" title="Выберите два репозитория для сравнения">
+                        <input
+                          type="checkbox"
+                          checked={compareSelection.some((item) => item.id === repository.id)}
+                          disabled={
+                            compareSelection.length >= 2 && !compareSelection.some((item) => item.id === repository.id)
+                          }
+                          onChange={() => onToggleCompare(repository)}
+                          aria-label={`Сравнить ${repository.fullName}`}
+                        />
+                        <span aria-hidden="true">Сравнить</span>
+                      </label>
+                    )}
                     <strong>{repository.name}</strong>
                     {repository.webUrl ? (
                       <a
@@ -202,6 +243,23 @@ export default function RankingPage({
                   </span>
                   <strong className="table-score" role="cell">
                     {repository.healthScore ?? "Нет данных"}
+                    {repository.scoreChange !== undefined ? (
+                      repository.scoreChange !== 0 && (
+                        <small
+                          className={`delta ${repository.scoreChange > 0 ? "delta--up" : "delta--down"}`}
+                          title={`Score за ${dynamicsDays ?? ""} дн.: ${signed(repository.scoreChange)}`}
+                        >
+                          {signed(repository.scoreChange)}
+                        </small>
+                      )
+                    ) : (
+                      repository.healthScore !== null &&
+                      dynamicsDays !== undefined && (
+                        <small className="delta delta--new" title={`Оценки ${dynamicsDays} дн. назад ещё не было`}>
+                          новый
+                        </small>
+                      )
+                    )}
                   </strong>
                   <span role="cell">{repository.likes?.toLocaleString("ru-RU") ?? "—"}</span>
                   <span role="cell" title={formatDateTime(repository.lastUpdated)}>
@@ -252,6 +310,23 @@ export default function RankingPage({
             </Button>
           </div>
         ) : null}
+
+        {compareSelection.length > 0 && (
+          <div className="compare-bar" role="region" aria-label="Сравнение репозиториев">
+            <span>
+              Сравнение: {compareSelection.map((item) => item.fullName).join(" и ")}
+              {compareSelection.length < 2 && " — выберите ещё один репозиторий"}
+            </span>
+            <span className="compare-bar__actions">
+              <Button variant="primary" disabled={compareSelection.length !== 2} onClick={onCompare}>
+                Сравнить
+              </Button>
+              <Button variant="quiet" onClick={onClearCompare}>
+                Сбросить
+              </Button>
+            </span>
+          </div>
+        )}
 
         {pageCount > 1 && !error && (
           <nav className="ranking-pagination" aria-label="Страницы рейтинга">

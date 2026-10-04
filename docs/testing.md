@@ -200,7 +200,7 @@ docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "sele
 (cd backend/grade-service && go test ./internal/analytics/ -v)
 # Ревью PR (этап B): после повторной оценки в объекте analytics есть блок reviews (status ok или no_data с reason);
 # выгрузка лежит в S3: <prefix>/_meta/pulls.json (при S3_KEEP_REPO_DATA=true)
-# Репозиторий с PR и ревьюерами для проверки: imbok/uims-portal (8 из 10 последних PR влиты)
+# Репозиторий с ревью от других людей для проверки: team23/mobile-ios (5 из 10 последних PR); у imbok/uims-portal ревьюер — сам автор
 ```
 
 В браузере на странице репозитория раздел «Углублённая аналитика»: карточка фактора автобуса с
@@ -257,3 +257,23 @@ go run ./backend/grade-service/cmd/grade-service --repo-id=01a0dd5d-d258-7af2-9b
 уже есть содержимое; `--force` пушит заново и добавляет новые запуски, что меняет ожидаемые
 оценки). Свежие запуски несколько минут стоят в очереди SourceCraft — живой тест быстро падает,
 пока хоть один запуск ещё в состоянии `prepared`/`processing`.
+
+## История оценок, динамика и сравнение
+
+Предусловие: стек запущен, у публичных репозиториев есть оценки. Описание: [ranking.md](ranking.md).
+
+```bash
+curl -s "localhost:8081/api/history/<org>/<repo>"     # points от старых к новым; NO_DATA без истории
+curl -s "localhost:8081/api/position/<org>/<repo>"    # place, total, above/below, categories, weakest_category
+curl -s "localhost:8081/api/ranking?page_size=5"      # score_change, place_change, dynamics_days
+docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select count(*) from repo_grade_history"
+(cd backend/rating-service && POSTGRES_DSN="$POSTGRES_DSN" go test ./... -v)    # включая SQL динамики на реальном Postgres
+(cd backend/aggregator-service && POSTGRES_DSN="$POSTGRES_DSN" go test ./internal/database/... -v)
+```
+
+Динамика появляется, когда у репозитория есть оценка старше `RANKING_DYNAMICS_DAYS` дней. Для
+локальной проверки интерфейса можно вручную добавить в `repo_grade_history` строки со старыми
+`graded_at` (только в локальной базе) и удалить их после проверки. В браузере: `/` (стрелки и ±Score
+у строк, галочки «Сравнить» у двух репозиториев и кнопка «Сравнить»), `/compare/<орг>/<репо>/<орг>/<репо>`
+и `/repo/<орг>/<репо>` (карточки «Почему это место» и «История оценки»), в том числе в ширине 375 px.
+

@@ -178,3 +178,18 @@ export function formatDateTime(value?: string): string | undefined {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? undefined : date.toLocaleString("ru-RU")
 }
+
+/** "4 окт." for a chart axis or a history row; undefined for a missing or invalid date. */
+export function formatShortDate(value?: string): string | undefined {
+  const time = value ? new Date(value) : undefined
+  return time && Number.isFinite(time.getTime())
+    ? time.toLocaleDateString("ru-RU", { day: "numeric", month: "short" })
+    : undefined
+}
+
+/** A change with an explicit sign: +4, −2 (a real minus sign) or 0. */
+export function signed(value: number): string {
+  if (value > 0) return `+${value}`
+  if (value < 0) return `\u2212${Math.abs(value)}`
+  return "0"
+}

@@ -2,8 +2,10 @@ import type {
   AnalyticsResponse,
   GatewayRankingResponse,
   GradingResponse,
+  HistoryResponse,
   MyOrganizationsResponse,
   MyRepositoriesResponse,
+  PositionResponse,
   PublicScoreResponse,
   RecommendationsResponse,
 } from "./contracts"
@@ -101,6 +103,16 @@ export class HttpRepoHealthApi {
   /** The stored public grade with its low-confidence flag; read-only, never starts a grading. */
   getPublicScore(orgSlug: string, repoSlug: string): Promise<PublicScoreResponse> {
     return this.request(`/score/${repoPath(orgSlug, repoSlug)}`)
+  }
+
+  /** Stored public score history, oldest first; read-only, never starts a grading. */
+  getHistory(orgSlug: string, repoSlug: string): Promise<HistoryResponse> {
+    return this.request(`/history/${repoPath(orgSlug, repoSlug)}`)
+  }
+
+  /** Why the repository has its place in the default ranking; read-only. */
+  getPosition(orgSlug: string, repoSlug: string): Promise<PositionResponse> {
+    return this.request(`/position/${repoPath(orgSlug, repoSlug)}`)
   }
 
   /** Stored bus factor and ownership map; read-only, never starts a grading. */

@@ -163,6 +163,11 @@ export interface PublicScoreResponse {
   /** null/absent when unknown (grade stored before the flag existed). */
   low_confidence?: boolean | null
   confidence_reasons?: ConfidenceReasonPayload[]
+  /** Present on GET /score: the four public categories, a null score meaning no data. */
+  name?: string
+  web_url?: string
+  level?: string
+  categories?: { id: string; score?: number | null; no_data?: boolean }[]
 }
 
 export interface GatewayRankingEntry {
@@ -176,6 +181,10 @@ export interface GatewayRankingEntry {
   last_activity_at?: string
   low_confidence?: boolean | null
   confidence_reasons?: ConfidenceReasonPayload[]
+  /** Null when the repo had no grade a window ago ("new"). */
+  score_change?: number | null
+  /** Null unless the list is sorted by score and the repo was graded a window ago. */
+  place_change?: number | null
 }
 
 export interface GatewayRankingResponse {
@@ -183,4 +192,29 @@ export interface GatewayRankingResponse {
   total_count: number
   page: number
   page_size: number
+  /** Window of score_change / place_change in days (RANKING_DYNAMICS_DAYS). */
+  dynamics_days?: number
+}
+
+/** GET /history/{org}/{repo}: stored public gradings, oldest first. */
+export interface HistoryResponse {
+  status: GradeStatus
+  points?: {
+    graded_at: string
+    score: number
+    categories?: { id: string; score?: number | null; no_data?: boolean }[]
+    low_confidence?: boolean | null
+  }[]
+}
+
+/** GET /position/{org}/{repo}: why the repository has its place in the default ranking. */
+export interface PositionResponse {
+  status: GradeStatus
+  place?: number
+  total?: number
+  score?: number
+  above?: { place: number; org: string; name: string; score: number; points: number } | null
+  below?: { place: number; org: string; name: string; score: number; points: number } | null
+  categories?: { id: string; score: number; top10_median?: number | null; gap?: number | null }[]
+  weakest_category?: string
 }

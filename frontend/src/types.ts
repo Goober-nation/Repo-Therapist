@@ -73,6 +73,10 @@ export interface RepositorySummary {
   advice?: Recommendation[]
   /** Public grades only; undefined when unknown. */
   confidence?: Confidence
+  /** Score now minus the score a week ago (the ranking's window); undefined for a repo without an older grade. */
+  scoreChange?: number
+  /** Places gained (positive) or lost (negative) in the ranking over the same window; only when sorted by score. */
+  placeChange?: number
 }
 
 /** One author's share of the commits in the analytics window. */
@@ -145,3 +149,57 @@ export interface AiReport {
 }
 
 export type PageId = "ranking" | "my" | "rules" | "overview"
+
+/** One stored public grading; a null category score means that category had no data. */
+export interface ScorePoint {
+  gradedAt: string
+  score: number
+  categories: { id: string; score: number | null }[]
+  lowConfidence: boolean | null
+}
+
+/** The neighbour of a repository in the ranking; points is the gap between the two scores. */
+export interface PositionNeighbour {
+  place: number
+  org: string
+  name: string
+  score: number
+  points: number
+}
+
+/** One category against the median of the top 10; median and gap are absent when too few top repos have it. */
+export interface PositionCategory {
+  id: string
+  score: number
+  top10Median?: number
+  gap?: number
+}
+
+/** Why a repository has its place in the default ranking. */
+export interface PositionExplanation {
+  place: number
+  total: number
+  score: number
+  above?: PositionNeighbour
+  below?: PositionNeighbour
+  categories: PositionCategory[]
+  weakestCategory?: string
+}
+
+/** One side of the compare page: the public grade and history of a repository. */
+export interface CompareSide {
+  org: string
+  repo: string
+  state: "loading" | "ready" | "error"
+  error?: string
+  /** Display name and link, once the grade is known. */
+  name?: string
+  webUrl?: string
+  score: number | null
+  level?: string
+  gradedAt?: string
+  /** Null score = no data for that category. */
+  categories: { id: string; score: number | null }[]
+  confidence?: Confidence
+  history: ScorePoint[]
+}

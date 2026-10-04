@@ -6,9 +6,12 @@ import type {
   RepoAnalytics,
   MetricFact,
   MetricResult,
+  PositionExplanation,
+  PositionNeighbour,
   Priority,
   Recommendation,
   RepositorySummary,
+  ScorePoint,
 } from "../types"
 import type {
   AdvicePayload,
@@ -16,9 +19,11 @@ import type {
   ConfidenceReasonPayload,
   GatewayRankingEntry,
   GradingResponse,
+  HistoryResponse,
   MyOrganization,
   MyOrganizationsResponse,
   MyRepository,
+  PositionResponse,
   RecommendationsResponse,
 } from "./contracts"
 
@@ -256,6 +261,8 @@ export function repositoryFromRanking(entry: GatewayRankingEntry): RepositorySum
       ...(confidenceFromPayload(entry.low_confidence, entry.confidence_reasons)
         ? { confidence: confidenceFromPayload(entry.low_confidence, entry.confidence_reasons) }
         : {}),
+      ...(wholeNumber(entry.score_change) !== undefined ? { scoreChange: wholeNumber(entry.score_change) } : {}),
+      ...(wholeNumber(entry.place_change) !== undefined ? { placeChange: wholeNumber(entry.place_change) } : {}),
       lastActivityDaysAgo: daysSince(entry.last_activity_at),
       categoryScores: {},
       gradeStatus: "FINISHED",
@@ -263,6 +270,76 @@ export function repositoryFromRanking(entry: GatewayRankingEntry): RepositorySum
     }
   } catch {
     return null
+  }
+}
+
+/** A change shown in the ranking: a finite whole number, anything else (null, text) is "no change data". */
+function wholeNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) ? value : undefined
+}
+
+/**
+ * Stored gradings from GET /history, oldest first. A point without a valid time or score is dropped;
+ * a category without a valid score becomes null ("no data"), never 0.
+ */
+export function historyFromResponse(response: HistoryResponse | undefined): ScorePoint[] {
+  if (!response || response.status !== "FINISHED" || !Array.isArray(response.points)) return []
+  const points = response.points.flatMap((point) => {
+    const score = scoreValue(point?.score)
+    if (!isRecord(point) || score === null || typeof point.graded_at !== "string" || !Number.isFinite(Date.parse(point.graded_at))) {
+      return []
+    }
+    return [
+      {
+        gradedAt: point.graded_at,
+        score,
+        categories: (Array.isArray(point.categories) ? point.categories : []).flatMap((category) =>
+          isRecord(category) && typeof category.id === "string"
+            ? [{ id: category.id, score: category.no_data ? null : scoreValue(category.score) }]
+            : [],
+        ),
+        lowConfidence: typeof point.low_confidence === "boolean" ? point.low_confidence : null,
+      },
+    ]
+  })
+  return points.sort((a, b) => Date.parse(a.gradedAt) - Date.parse(b.gradedAt))
+}
+
+function neighbourFromPayload(value: unknown): PositionNeighbour | undefined {
+  if (!isRecord(value)) return undefined
+  const place = wholeNumber(value.place)
+  const score = scoreValue(value.score)
+  const points = wholeNumber(value.points)
+  if (place === undefined || score === null || points === undefined || typeof value.name !== "string") return undefined
+  return { place, org: typeof value.org === "string" ? value.org : "", name: value.name, score, points }
+}
+
+/** The explanation from GET /position, or null when the repository is not ranked or the answer is malformed. */
+export function positionFromResponse(response: PositionResponse | undefined): PositionExplanation | null {
+  if (!response || response.status !== "FINISHED") return null
+  const place = wholeNumber(response.place)
+  const total = wholeNumber(response.total)
+  const score = scoreValue(response.score)
+  if (place === undefined || place < 1 || total === undefined || total < place || score === null) return null
+  const above = neighbourFromPayload(response.above)
+  const below = neighbourFromPayload(response.below)
+  const categories = (Array.isArray(response.categories) ? response.categories : []).flatMap((category) => {
+    const categoryScore = scoreValue(category?.score)
+    if (!isRecord(category) || typeof category.id !== "string" || categoryScore === null) return []
+    const median = scoreValue(category.top10_median)
+    const gap = wholeNumber(category.gap)
+    return [{ id: category.id, score: categoryScore, ...(median !== null && gap !== undefined ? { top10Median: median, gap } : {}) }]
+  })
+  return {
+    place,
+    total,
+    score,
+    ...(above ? { above } : {}),
+    ...(below ? { below } : {}),
+    categories,
+    ...(typeof response.weakest_category === "string" && response.weakest_category
+      ? { weakestCategory: response.weakest_category }
+      : {}),
   }
 }
 

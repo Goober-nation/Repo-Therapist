@@ -2,7 +2,9 @@ import { useRef, useState } from "react"
 import AnalysisResults from "../components/AnalysisResults"
 import AnalyticsSection from "../components/AnalyticsSection"
 import BadgeSnippet from "../components/BadgeSnippet"
+import PositionCard from "../components/PositionCard"
 import ReportDownloadMenu from "../components/ReportDownloadMenu"
+import ScoreHistorySection from "../components/ScoreHistorySection"
 import { Badge, Button, Card, Label, LanguageLabel, PageHeading, ScoreBar, SectionHeading } from "../components/Shell"
 import {
   categoryWeight,
@@ -16,7 +18,7 @@ import {
   scoredCategories,
   splitStrengths,
 } from "../metrics"
-import type { Priority, RepoAnalytics, RepositorySummary } from "../types"
+import type { PositionExplanation, Priority, RepoAnalytics, RepositorySummary, ScorePoint } from "../types"
 import type { RepositoryAnalysis } from "../useRepositoryAnalysis"
 
 const PRIORITY_TONES = { critical: "critical", high: "critical", medium: "warning", low: "neutral" } as const satisfies Record<Priority, string>
@@ -65,6 +67,8 @@ export default function RepositoryOverviewPage({
   repository,
   analysis,
   analytics,
+  rankingInfo,
+  onOpenRepository = () => {},
   onBackToRanking,
   publicView,
 }: {
@@ -72,6 +76,12 @@ export default function RepositoryOverviewPage({
   analysis: RepositoryAnalysis
   /** undefined while loading, null when the repository has no analytics yet. */
   analytics?: RepoAnalytics | null
+  /**
+   * Place and score history of a PUBLIC grade; absent for the owner's private view. Inside, undefined
+   * means loading and null means nothing yet.
+   */
+  rankingInfo?: { history?: ScorePoint[] | null; position?: PositionExplanation | null }
+  onOpenRepository?: (org: string, repo: string) => void
   onBackToRanking: () => void
   /** Present only for a public repository opened with the owner's token. */
   publicView?: { checked: boolean; onChange: (checked: boolean) => void }
@@ -371,6 +381,13 @@ export default function RepositoryOverviewPage({
           </Card>
         )}
       </section>
+
+      {rankingInfo && !isPrivate && (
+        <>
+          <PositionCard position={rankingInfo.position} onOpenRepository={onOpenRepository} />
+          <ScoreHistorySection points={rankingInfo.history} />
+        </>
+      )}
 
       <AnalyticsSection analytics={analytics} isRunning={analysis.isRunning} />
 

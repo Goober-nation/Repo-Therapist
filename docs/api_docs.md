@@ -22,6 +22,7 @@
 > - **API Gateway**: реальные маршруты — `POST /auth/yandex`, `GET /orgs`, `GET /repos[?org=&page_token=]`,
 >   `GET /grading/{org}/{repo}` (не `/grade/...`), `GET /recommendations/{org}/{repo}`,
 >   `GET /ranking`, `GET /analytics/{org}/{repo}`, а также публичные `GET /score/{org}/{repo}`,
+>   `GET /history/{org}/{repo}`, `GET /position/{org}/{repo}`,
 >   `GET /badge/{org}/{repo}[.svg|.json]`, `GET /badge/{org}/{repo}/{category}.svg`,
 >   `GET /widget/{org}/{repo}.svg`. PAT передаётся заголовком `PAT` (не `user_token`).
 > - JSON-примеры ниже местами синтаксически некорректны (пропущенные запятые, точки вместо
@@ -629,14 +630,22 @@ rpc GetReccomendations(GetReccomendationsRequest) returns (GetReccomendationsRes
 | `GET /badge/{org}/{repo}.json` | — | JSON для shields.io endpoint-бейджа: `{schemaVersion: 1, label, message, color}`; неизвестный или не оценённый репозиторий — `n/a` и `lightgrey` |
 | `GET /widget/{org}/{repo}.svg` | — | SVG-карточка для README: оценка, уровень здоровья и четыре публичные категории (`image/svg+xml`, `Cache-Control: max-age=300`); без данных — серая карточка «Нет данных» |
 | `GET /score/{org}/{repo}` | — | публичный JSON API: `{org, repo, name, web_url, status, score, level, categories: [{id, score, no_data}], missing_data, graded_at}`; только чтение |
+| `GET /history/{org}/{repo}` | — | история публичных оценок: `{org, repo, status, points: [{graded_at, score, categories: [{id, score, no_data}], low_confidence}]}`, от старых к новым, последние 200 точек; `NO_DATA` без истории, `404` для неизвестного или непубличного репозитория |
+| `GET /position/{org}/{repo}` | — | почему такое место: `{org, repo, status, place, total, score, above, below, categories: [{id, score, top10_median, gap}], weakest_category}`; `above`/`below` — `{place, org, name, score, points}` или `null` на краях; `NO_DATA`, если репозиторий не оценён |
 
 `GET /ranking` принимает `hide_low_confidence=true|false` (по умолчанию `false`): при `true` из
 списка и из `total_count` убираются репозитории с флагом `low_confidence: true`; порядок остальных
 не меняется, репозитории без флага («неизвестно») не скрываются. Недопустимое значение — `400`.
 
-Публичные маршруты `/ranking`, `/score`, `/badge` и `/widget` отдают `Access-Control-Allow-Origin: *`,
+Каждая запись `/ranking` содержит `score_change` (Score сейчас минус Score `dynamics_days` дней назад)
+и `place_change` (на сколько мест поднялся, отрицательное — опустился); `dynamics_days` — поле ответа
+(`RANKING_DYNAMICS_DAYS`, по умолчанию 7). Оба `null`, если репозиторий не был оценён тогда
+(«новый»); `place_change` также `null`, если сортировка не по Score. Методика и ограничения —
+[ranking.md](ranking.md).
+
+Публичные маршруты `/ranking`, `/score`, `/history`, `/position`, `/badge` и `/widget` отдают `Access-Control-Allow-Origin: *`,
 остальные — нет. Картинки и shields-JSON не ограничиваются по IP: `429` сломал бы изображение в
-README. `GET /score/...` ограничен отдельно, `PUBLIC_API_RATE_LIMIT` запросов на IP за
+README. `GET /score/...`, `GET /history/...` и `GET /position/...` ограничены отдельно, `PUBLIC_API_RATE_LIMIT` запросов на IP за
 `PUBLIC_API_RATE_LIMIT_WINDOW` (по умолчанию 300 в минуту, свой ключ в Redis; в docker-compose те же
 переменные); при превышении — `429 {"error":"rate limit exceeded"}`.
 
