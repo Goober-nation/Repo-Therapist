@@ -161,7 +161,7 @@ func TestBuildGradingResult_SendsEveryRecommendationInCategoryOrder(t *testing.T
 	for _, r := range recs {
 		got = append(got, r.Text)
 	}
-	if strings.Join(got, ",") != "[low] A1,[low] A2,[low] I1,[low] I2,[low] C1" {
+	if strings.Join(got, ",") != "A1,A2,I1,I2,C1" {
 		t.Fatalf("recommendations = %v, want all 5 in category order", got)
 	}
 }
@@ -187,9 +187,9 @@ func TestBuildGradingResult_DocsAdviceJoinsThePool(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []contracts.Recommendation{
-		{CategoryID: "activity", MetricID: "a1", Priority: "critical", Text: "[critical] A1"},
-		{CategoryID: "documentation", MetricID: "DOC_TESTING_INSTRUCTIONS_MISSING", Priority: "medium", Text: "[medium] D1"},
-		{CategoryID: "documentation", MetricID: "DOC_README_MISSING", Priority: "high", Text: "[high] D2"},
+		{CategoryID: "activity", MetricID: "a1", Priority: "critical", Text: "A1"},
+		{CategoryID: "documentation", MetricID: "DOC_TESTING_INSTRUCTIONS_MISSING", Priority: "medium", Text: "D1"},
+		{CategoryID: "documentation", MetricID: "DOC_README_MISSING", Priority: "high", Text: "D2"},
 	}
 	if len(recs) != len(want) {
 		t.Fatalf("got %+v, want %+v", recs, want)

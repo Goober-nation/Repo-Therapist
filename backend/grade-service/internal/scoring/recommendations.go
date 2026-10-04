@@ -19,13 +19,6 @@ type Recommendation struct {
 	Text       string `json:"text"`
 }
 
-// TaggedText prefixes text with "[priority] ". Transitional (2026-10): Recommendation.Text keeps
-// the tag for one release so consumers that still parse it keep working; Priority is the
-// authoritative field.
-func TaggedText(priority, text string) string {
-	return "[" + priority + "] " + text
-}
-
 // BuildRecommendations walks every category in categoryIDs and appends one Recommendation for
 // every metric that's !NoData and scored below perfect (Score < 1.0) — "below healthy," not just
 // "at critical," per 2026-09-25 decision: catches early warning signs, not just outright failures.
@@ -48,7 +41,7 @@ func BuildRecommendations(categories map[string]CategoryResult, categoryIDs []st
 			if !ok {
 				continue
 			}
-			recs = append(recs, Recommendation{CategoryID: catID, MetricID: m.ID, Priority: entry.Priority, Text: TaggedText(entry.Priority, entry.Text)})
+			recs = append(recs, Recommendation{CategoryID: catID, MetricID: m.ID, Priority: entry.Priority, Text: entry.Text})
 		}
 	}
 	return recs
@@ -84,7 +77,7 @@ func DocsRecommendations(categories map[string]CategoryResult, categoryIDs []str
 		if !config.ValidPriority(priority) {
 			priority = DocsAdvicePriority
 		}
-		recs = append(recs, Recommendation{CategoryID: "documentation", MetricID: metricID, Priority: priority, Text: TaggedText(priority, text)})
+		recs = append(recs, Recommendation{CategoryID: "documentation", MetricID: metricID, Priority: priority, Text: text})
 	}
 	return recs
 }

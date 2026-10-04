@@ -71,9 +71,8 @@ LLM-сервис по-прежнему принимает старые `LLM_SUMM
   оценённый владельцем, приходит как `private`). Других значений нет; по нему Aggregator выбирает
   таблицу `repo_grades_public` или `repo_grades_private`. До 2026-10 поле называлось `visibility`.
   `advice` — все рекомендации `{category_id, metric_id, priority, text}` по порядку категорий.
-  `priority` — `critical` | `high` | `medium` | `low`. Переходный период (один релиз): `text`
-  по-прежнему начинается с той же метки `"[priority] "`, чтобы старые потребители работали; новые
-  читают `priority`, а метку из текста убирают. Для документации это элементы `advice` из
+  `priority` — `critical` | `high` | `medium` | `low`; `text` — без метки приоритета
+  (до 2026-10 начинался с `"[priority] "`). Для документации это элементы `advice` из
   `repo.docs.graded`: `metric_id` — их `code`, `priority` — их `priority` (без кода —
   `llm_advice`, с неизвестным приоритетом — `medium`). `error` при успехе — `""`.
   При сбое это код — `REPO_FETCH_FAILED` (repo.ready со статусом failed), `GRADING_FAILED`,
@@ -146,9 +145,9 @@ LLM-сервис по-прежнему принимает старые `LLM_SUMM
   },
   "advice": [
     {"category_id": "ci_cd", "metric_id": "has_ci", "priority": "critical",
-     "text": "[critical] CI-пайплайн не найден. …"},
+     "text": "CI-пайплайн не найден. …"},
     {"category_id": "documentation", "metric_id": "DOC_README_MISSING", "priority": "high",
-     "text": "[high] Добавьте в README описание проекта и ссылки на основные инструкции."}
+     "text": "Добавьте в README описание проекта и ссылки на основные инструкции."}
   ],
   "missing_data": [],
   "graded_at": "2026-09-27T11:59:00.123456Z",

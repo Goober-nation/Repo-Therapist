@@ -618,5 +618,5 @@ rpc GetReccomendations(GetReccomendationsRequest) returns (GetReccomendationsRes
 `category_scores` — объект по ID категории: `{id, no_data, score (0–100), metrics: [{id, no_data,
 raw_value, score (0–1)}]}`; у `documentation` дополнительно может быть `method` (`"llm"` или
 `"algorithmic"` — упрощённая оценка). `advice` — `[{category_id, metric_id, priority, text}]`,
-`priority` — `critical|high|medium|low` (`config/recommendations.yaml`); в переходный период текст
-ещё начинается с той же метки `[priority]`, у оценок, сохранённых раньше, есть только метка.
+`priority` — `critical|high|medium|low` (`config/recommendations.yaml`); текст без метки. У оценок,
+сохранённых до 2026-10, поля нет, а текст начинается с метки `[priority]`.

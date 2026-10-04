@@ -24,8 +24,7 @@ var Priorities = []string{PriorityCritical, PriorityHigh, PriorityMedium, Priori
 func ValidPriority(p string) bool { return slices.Contains(Priorities, p) }
 
 // RecommendationEntry is one catalog entry: the recommendation's priority and its Russian text
-// (without a "[priority]" tag — scoring adds that during the transition, see
-// scoring.TaggedText).
+// (without a "[priority]" tag).
 type RecommendationEntry struct {
 	Priority string `yaml:"priority"`
 	Text     string `yaml:"text"`

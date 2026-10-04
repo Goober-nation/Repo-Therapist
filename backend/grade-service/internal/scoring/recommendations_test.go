@@ -84,7 +84,7 @@ func TestBuildRecommendations_SkipsHealthyNoDataAndUncataloged(t *testing.T) {
 	if len(recs) != 1 {
 		t.Fatalf("got %d recommendations, want 1: %+v", len(recs), recs)
 	}
-	want := Recommendation{CategoryID: "activity", MetricID: "bad_metric", Priority: "high", Text: "[high] fix the bad thing"}
+	want := Recommendation{CategoryID: "activity", MetricID: "bad_metric", Priority: "high", Text: "fix the bad thing"}
 	if recs[0] != want {
 		t.Errorf("recommendation = %+v, want %+v", recs[0], want)
 	}
@@ -103,9 +103,9 @@ func TestDocsRecommendations_ForwardsAdviceInOrderWithLabel(t *testing.T) {
 
 	got := DocsRecommendations(cats, ids, advice)
 	want := []Recommendation{
-		{CategoryID: "documentation", MetricID: "DOC_TESTING_INSTRUCTIONS_MISSING", Priority: "high", Text: "[high] Добавьте команды тестов."},
-		{CategoryID: "documentation", MetricID: "DOC_ALGORITHMIC_NOTICE", Priority: "low", Text: "[low] Документация оценена упрощённо, без LLM."},
-		{CategoryID: "documentation", MetricID: "llm_advice", Priority: "medium", Text: "[medium] Старый формат."},
+		{CategoryID: "documentation", MetricID: "DOC_TESTING_INSTRUCTIONS_MISSING", Priority: "high", Text: "Добавьте команды тестов."},
+		{CategoryID: "documentation", MetricID: "DOC_ALGORITHMIC_NOTICE", Priority: "low", Text: "Документация оценена упрощённо, без LLM."},
+		{CategoryID: "documentation", MetricID: "llm_advice", Priority: "medium", Text: "Старый формат."},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %v, want %v", got, want)
