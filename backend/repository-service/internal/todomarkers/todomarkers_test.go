@@ -194,3 +194,31 @@ func TestScanNoMarkers(t *testing.T) {
 		t.Error("TotalLOC = 0, want > 0 for a non-empty repo")
 	}
 }
+
+// A dangling symlink or a symlink to a directory is skipped; it must not fail the scan.
+func TestScanSkipsBrokenSymlinks(t *testing.T) {
+	dir := t.TempDir()
+	runGit(t, dir, nil, "init", "-q", "-b", "main")
+	runGit(t, dir, nil, "config", "user.email", "test@example.com")
+	runGit(t, dir, nil, "config", "user.name", "Test")
+	writeFile(t, dir, "clean.go", "package main\n\nfunc main() {}\n")
+	if err := os.Mkdir(filepath.Join(dir, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("missing/target", filepath.Join(dir, "dangling")); err != nil {
+		t.Skip("symlinks unavailable")
+	}
+	if err := os.Symlink("sub", filepath.Join(dir, "todir")); err != nil {
+		t.Skip("symlinks unavailable")
+	}
+	runGit(t, dir, nil, "add", "clean.go")
+	commitAt(t, dir, time.Now(), "clean commit")
+
+	export, err := Scan(context.Background(), dir, 365)
+	if err != nil {
+		t.Fatalf("Scan failed on a broken symlink: %v", err)
+	}
+	if export.ScannedFiles != 1 {
+		t.Errorf("ScannedFiles = %d, want 1 (clean.go only)", export.ScannedFiles)
+	}
+}

@@ -4,9 +4,11 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/url"
 	"os"
@@ -255,12 +257,82 @@ func gitClone(ctx context.Context, cloneURL string, since time.Time, destDir str
 		cloneURL, destDir,
 	}
 	cmd := exec.CommandContext(ctx, "git", args...)
+	var stderr bytes.Buffer
 	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stderr = io.MultiWriter(os.Stderr, &stderr)
 	if err := cmd.Run(); err != nil {
+		if checkoutOnlyFailed(ctx, stderr.String(), destDir) {
+			skipped, restoreErr := restoreCheckout(ctx, destDir)
+			if restoreErr != nil {
+				return fmt.Errorf("restoring working tree after failed checkout: %w", restoreErr)
+			}
+			log.Printf("warning: git could not check out the working tree; restored it without %d file(s) whose names exceed the %d-byte limit", skipped, maxNameBytes)
+			return nil
+		}
 		return fmt.Errorf("git %s: %w", strings.Join(redactURL(args), " "), err)
 	}
 	return nil
+}
+
+// maxNameBytes is the longest file name (one path component) the filesystems we clone onto
+// accept: Linux NAME_MAX. Cyrillic letters take two bytes each, so such names are easy to hit.
+const maxNameBytes = 255
+
+// checkoutOnlyFailed reports a clone whose objects were fetched but whose working-tree checkout
+// failed ("Clone succeeded, but checkout failed", exit 128). The commit history is then complete,
+// so the clone is worth keeping; any other failure still fails the clone. HEAD must resolve in
+// destDir, so a clone that never fetched anything is not mistaken for this case.
+func checkoutOnlyFailed(ctx context.Context, stderr, destDir string) bool {
+	if !strings.Contains(stderr, "Clone succeeded, but checkout failed") {
+		return false
+	}
+	return exec.CommandContext(ctx, "git", "-C", destDir, "rev-parse", "--verify", "HEAD").Run() == nil
+}
+
+// restoreCheckout rebuilds the working tree after a failed checkout, which leaves it empty. It
+// refills the index and checks out every file of HEAD except those with a path component over maxNameBytes, and returns
+// how many files were skipped. Skipped files are simply absent from the later scans.
+func restoreCheckout(ctx context.Context, destDir string) (int, error) {
+	out, err := exec.CommandContext(ctx, "git", "-C", destDir, "ls-tree", "-r", "-z", "--name-only", "HEAD").Output()
+	if err != nil {
+		return 0, fmt.Errorf("listing files: %w", err)
+	}
+
+	var keep bytes.Buffer
+	skipped := 0
+	for _, path := range strings.Split(string(out), "\x00") {
+		if path == "" {
+			continue
+		}
+		if hasLongName(path) {
+			skipped++
+			continue
+		}
+		keep.WriteString(path)
+		keep.WriteByte(0)
+	}
+
+	// The failed checkout also leaves the index empty; refill it so checkout-index finds the files.
+	if out, err := exec.CommandContext(ctx, "git", "-C", destDir, "read-tree", "HEAD").CombinedOutput(); err != nil {
+		return 0, fmt.Errorf("reading tree: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+
+	cmd := exec.CommandContext(ctx, "git", "-C", destDir, "checkout-index", "-f", "-z", "--stdin")
+	cmd.Stdin = &keep
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return 0, fmt.Errorf("checking out files: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+
+	return skipped, nil
+}
+
+func hasLongName(path string) bool {
+	for _, part := range strings.Split(path, "/") {
+		if len(part) > maxNameBytes {
+			return true
+		}
+	}
+	return false
 }
 
 // defaultMinShmFreeBytes is the free-space floor cloneTempBase requires on /dev/shm before using

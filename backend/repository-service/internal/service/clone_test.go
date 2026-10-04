@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestResolvePAT(t *testing.T) {
@@ -96,5 +99,61 @@ func TestPRSampleLimit(t *testing.T) {
 		if got := prSampleLimit(); got != tc.want {
 			t.Errorf("PR_SAMPLE_LIMIT=%q: got %d, want %d", tc.value, got, tc.want)
 		}
+	}
+}
+
+// gitIn runs git in dir and returns its trimmed stdout.
+func gitIn(t *testing.T, dir string, stdin string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-C", dir, "-c", "user.name=t", "-c", "user.email=t@example.com"}, args...)...)
+	cmd.Stdin = strings.NewReader(stdin)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// A repo tracking a file name over the 255-byte limit clones fine but cannot be checked out;
+// gitClone must keep the clone and restore every file that can be written instead of failing.
+func TestGitCloneKeepsCloneWhenCheckoutFails(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	src := t.TempDir()
+	gitIn(t, src, "", "init", "-q")
+	if err := os.WriteFile(filepath.Join(src, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, src, "", "add", "README.md")
+	blob := gitIn(t, src, "x\n", "hash-object", "-w", "--stdin")
+	tooLong := strings.Repeat("a", 300) + ".txt"
+	gitIn(t, src, "", "update-index", "--add", "--cacheinfo", "100644,"+blob+","+tooLong)
+	gitIn(t, src, "", "commit", "-q", "-m", "init")
+
+	dest := filepath.Join(t.TempDir(), "clone")
+	err := gitClone(context.Background(), "file://"+src, time.Now().AddDate(0, 0, -30), dest)
+	if err != nil {
+		t.Fatalf("gitClone failed on a checkout-only failure: %v", err)
+	}
+	if got := gitIn(t, dest, "", "rev-list", "--count", "HEAD"); got != "1" {
+		t.Errorf("commits in clone = %s, want 1", got)
+	}
+	if _, err := os.Stat(filepath.Join(dest, "README.md")); err != nil {
+		t.Errorf("README.md was not restored: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dest, tooLong)); err == nil {
+		t.Errorf("over-long file name should have been skipped")
+	}
+}
+
+func TestGitCloneStillFailsWhenNothingWasCloned(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	dest := filepath.Join(t.TempDir(), "clone")
+	err := gitClone(context.Background(), "file://"+filepath.Join(t.TempDir(), "missing"), time.Now().AddDate(0, 0, -30), dest)
+	if err == nil {
+		t.Fatal("cloning a missing repo should still fail")
 	}
 }

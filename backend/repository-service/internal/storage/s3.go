@@ -6,9 +6,11 @@ package storage
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -72,16 +74,15 @@ func (c *Client) UploadDir(ctx context.Context, localDir, keyPrefix string) (int
 		}
 		key := keyPrefix + "/" + filepath.ToSlash(rel)
 
-		f, err := os.Open(path)
+		f, info, err := openUploadable(path, d)
 		if err != nil {
-			return fmt.Errorf("opening %s: %w", path, err)
+			return err
+		}
+		if f == nil {
+			log.Printf("skipping %s: dangling symlink or symlink to a directory", path)
+			return nil
 		}
 		defer f.Close()
-
-		info, err := f.Stat()
-		if err != nil {
-			return fmt.Errorf("stat %s: %w", path, err)
-		}
 
 		if _, err := c.mc.PutObject(ctx, c.bucket, key, f, info.Size(), minio.PutObjectOptions{}); err != nil {
 			return fmt.Errorf("uploading %s to %s: %w", path, key, err)
@@ -93,6 +94,31 @@ func (c *Client) UploadDir(ctx context.Context, localDir, keyPrefix string) (int
 		return uploaded, err
 	}
 	return uploaded, nil
+}
+
+// openUploadable opens path for upload. A symlink that points nowhere or at a directory is not
+// something to export and returns a nil file without an error: one broken link in a repo must
+// not fail its whole export. A symlink to a file is followed, as before.
+func openUploadable(path string, d fs.DirEntry) (*os.File, fs.FileInfo, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		if d.Type()&fs.ModeSymlink != 0 && errors.Is(err, fs.ErrNotExist) {
+			return nil, nil, nil
+		}
+		return nil, nil, fmt.Errorf("opening %s: %w", path, err)
+	}
+
+	info, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return nil, nil, fmt.Errorf("stat %s: %w", path, err)
+	}
+	if info.IsDir() {
+		f.Close()
+		return nil, nil, nil
+	}
+
+	return f, info, nil
 }
 
 // PutObject uploads a single in-memory blob (e.g. the git-history JSON export) at key.

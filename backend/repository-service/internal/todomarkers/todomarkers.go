@@ -85,6 +85,14 @@ func Scan(ctx context.Context, repoDir string, historyDays int) (Export, error) 
 			return nil
 		}
 
+		// A symlink that points nowhere or at a directory has no text to scan; one broken link must
+		// not fail the whole export. A symlink to a file is scanned as before.
+		if d.Type()&fs.ModeSymlink != 0 {
+			if info, statErr := os.Stat(path); statErr != nil || info.IsDir() {
+				return nil
+			}
+		}
+
 		isText, lines, err := scanFile(path)
 		if err != nil {
 			return fmt.Errorf("scanning %s: %w", path, err)

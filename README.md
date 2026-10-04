@@ -26,7 +26,7 @@
 | ★ Защита рейтинга от накрутки | ✅ |
 | ★ AI-summary и рекомендации | ✅ |
 | ★ Публичный API и badge для README | ✅ |
-| ★ Углублённая аналитика: фактор автобуса, карта владельцев кода, ревью pull request | ✅ частично: аналитика задач и время до первого ревью не реализованы |
+| ★ Углублённая аналитика: фактор автобуса, карта владельцев кода, ревью pull request | ✅ |
 
 ## Архитектура
 
@@ -36,7 +36,7 @@
 | `aggregator-service` | Оркестрирует задачи оценки, единственный сервис с доступом к БД на запись, управляет `repo_lock` |
 | `repository-service` | Клонирует репозитории и выгружает дерево файлов, git-историю, issues и milestones в S3 |
 | `grade-service` | Считает оценки категорий по выгрузкам из S3 |
-| `llm-service` | Оценка документации и AI-summary (Python, модель Яндекса) |
+| `llm-service` | Оценка документации и AI-summary (Python, модель Яндекса); в Docker Compose работает двумя контейнерами: `llm-service` (документация) и `llm-summary-service` (summary) |
 | `security-wrapper-service` | Читает результаты AppSec SourceCraft (SAST/SCA/секреты) |
 | `sourcecraft-wrapper-service` | gRPC-обёртка над REST API SourceCraft |
 | `rating-service` | Публичный рейтинг, только чтение |
@@ -55,7 +55,8 @@ docker compose up -d        # Postgres, S3 (RustFS), Redis, Kafka, миграц�
 ```
 
 - Фронтенд: http://localhost:8081 (рейтинг — `/`, анализ — `/repo/<org>/<repo>`,
-  собственные репозитории — `/my`). Подробнее: [frontend/README.md](frontend/README.md).
+  собственные репозитории — `/my`, правила оценки — `/rules`). Подробнее:
+  [frontend/README.md](frontend/README.md).
 - Консоль S3 (RustFS): http://localhost:8055/rustfs/console/index.html
 - Redis (`8052`) и Kafka (`8053`) опубликованы только на `127.0.0.1` — для сервисов, запущенных на
   хосте, и отладки; Redis требует пароль `REDIS_PASSWORD` из `.env`.
@@ -164,7 +165,8 @@ HTTP API Gateway доступен по адресу `https://repo-therapist.alo.
 | `GET /api/badge/{org}/{repo}.json` | — | JSON для shields.io endpoint-бейджа |
 | `GET /api/widget/{org}/{repo}.svg` | — | SVG-карточка для README: оценка, уровень и категории |
 | `GET /api/score/{org}/{repo}` | — | публичная оценка в JSON (в том числе `low_confidence` и `confidence_reasons`); только чтение, оценку не запускает |
-| `GET /api/repos` | `PAT` обязателен | репозитории владельца токена |
+| `GET /api/orgs` | `PAT` обязателен | организации владельца токена и организация по умолчанию |
+| `GET /api/repos?org=&page_token=` | `PAT` обязателен | репозитории одной организации, видимые токену, порциями; без `org` — прежний список по всем организациям |
 | `POST /api/auth/yandex` | `Authorization: OAuth <token>` | вход через Яндекс ID, cookie сессии |
 
 ```bash
@@ -213,8 +215,8 @@ curl -s "https://repo-therapist.alo.quest/api/score/likosov-ilia/vidpulse"
   429 с `Retry-After`. Плановый пересчёт в лимит не входит.
 - Клонирование идёт в `/dev/shm`, при нехватке места — на диск; `CLONE_TIMEOUT` и `GRADE_TIMEOUT`
   ограничивают время на один репозиторий.
-- Периодический пересчёт (`GRADING_REGRADE_INTERVAL`) можно ограничить топом N репозиториев
-  (`GRADING_REGRADE_LIMIT`).
+- Периодический пересчёт (`GRADING_REGRADE_INTERVAL`, по умолчанию 72 часа) ограничен топом N
+  публичных репозиториев по рейтингу SourceCraft (`GRADING_REGRADE_LIMIT`, по умолчанию 20; 0 — все).
 - Запросы к SourceCraft и AppSec повторяются при ответах 429/5xx и сетевых ошибках.
 
 ## Ограничения
@@ -225,6 +227,9 @@ curl -s "https://repo-therapist.alo.quest/api/score/likosov-ilia/vidpulse"
   или URL от пользователя.
 - Security и CI/CD доступны только владельцам репозитория.
 - Документация оценивается по выборке, а не целиком.
+- Файлы с именем длиннее 255 байт (например, длинные кириллические названия) и битые символические
+  ссылки не попадают в анализ: если git не может записать часть файлов при клонировании, сервис
+  восстанавливает остальное дерево и продолжает; история коммитов при этом полная.
 - Справочная аналитика (фактор автобуса, карта владельцев) считается по коммитам за 180 дней и
   CODEOWNERS, ревью — по 10 последним pull request; на оценку она не влияет. Аналитика задач и
   время до первого ревью не реализованы.
