@@ -8,7 +8,6 @@ package server
 
 import (
 	context "context"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -23,6 +22,7 @@ const (
 	Aggregator_GetMyRepos_FullMethodName                = "/aggregator.Aggregator/GetMyRepos"
 	Aggregator_GetGrading_FullMethodName                = "/aggregator.Aggregator/GetGrading"
 	Aggregator_RequestLLMRecommendations_FullMethodName = "/aggregator.Aggregator/RequestLLMRecommendations"
+	Aggregator_GetAnalytics_FullMethodName              = "/aggregator.Aggregator/GetAnalytics"
 )
 
 // AggregatorClient is the client API for Aggregator service.
@@ -32,6 +32,9 @@ type AggregatorClient interface {
 	GetMyRepos(ctx context.Context, in *GetMyReposRequest, opts ...grpc.CallOption) (*GetMyReposResponse, error)
 	GetGrading(ctx context.Context, in *GetGradingRequest, opts ...grpc.CallOption) (*GetGradingResponse, error)
 	RequestLLMRecommendations(ctx context.Context, in *RequestLLMRecommendationsRequest, opts ...grpc.CallOption) (*RequestLLMRecommendationsResponse, error)
+	// GetAnalytics returns the stored informational analytics (bus factor, ownership map) of the
+	// view the caller may see. Read-only: it never starts a grading. Empty analytics means none yet.
+	GetAnalytics(ctx context.Context, in *GetAnalyticsRequest, opts ...grpc.CallOption) (*GetAnalyticsResponse, error)
 }
 
 type aggregatorClient struct {
@@ -72,6 +75,16 @@ func (c *aggregatorClient) RequestLLMRecommendations(ctx context.Context, in *Re
 	return out, nil
 }
 
+func (c *aggregatorClient) GetAnalytics(ctx context.Context, in *GetAnalyticsRequest, opts ...grpc.CallOption) (*GetAnalyticsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAnalyticsResponse)
+	err := c.cc.Invoke(ctx, Aggregator_GetAnalytics_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AggregatorServer is the server API for Aggregator service.
 // All implementations must embed UnimplementedAggregatorServer
 // for forward compatibility.
@@ -79,6 +92,9 @@ type AggregatorServer interface {
 	GetMyRepos(context.Context, *GetMyReposRequest) (*GetMyReposResponse, error)
 	GetGrading(context.Context, *GetGradingRequest) (*GetGradingResponse, error)
 	RequestLLMRecommendations(context.Context, *RequestLLMRecommendationsRequest) (*RequestLLMRecommendationsResponse, error)
+	// GetAnalytics returns the stored informational analytics (bus factor, ownership map) of the
+	// view the caller may see. Read-only: it never starts a grading. Empty analytics means none yet.
+	GetAnalytics(context.Context, *GetAnalyticsRequest) (*GetAnalyticsResponse, error)
 	mustEmbedUnimplementedAggregatorServer()
 }
 
@@ -97,6 +113,9 @@ func (UnimplementedAggregatorServer) GetGrading(context.Context, *GetGradingRequ
 }
 func (UnimplementedAggregatorServer) RequestLLMRecommendations(context.Context, *RequestLLMRecommendationsRequest) (*RequestLLMRecommendationsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RequestLLMRecommendations not implemented")
+}
+func (UnimplementedAggregatorServer) GetAnalytics(context.Context, *GetAnalyticsRequest) (*GetAnalyticsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAnalytics not implemented")
 }
 func (UnimplementedAggregatorServer) mustEmbedUnimplementedAggregatorServer() {}
 func (UnimplementedAggregatorServer) testEmbeddedByValue()                    {}
@@ -173,6 +192,24 @@ func _Aggregator_RequestLLMRecommendations_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Aggregator_GetAnalytics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAnalyticsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregatorServer).GetAnalytics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Aggregator_GetAnalytics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregatorServer).GetAnalytics(ctx, req.(*GetAnalyticsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Aggregator_ServiceDesc is the grpc.ServiceDesc for Aggregator service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -191,6 +228,10 @@ var Aggregator_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RequestLLMRecommendations",
 			Handler:    _Aggregator_RequestLLMRecommendations_Handler,
+		},
+		{
+			MethodName: "GetAnalytics",
+			Handler:    _Aggregator_GetAnalytics_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

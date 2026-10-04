@@ -23,6 +23,20 @@ type Config struct {
 	Version    int                       `yaml:"version"`
 	Categories map[string]CategoryConfig `yaml:"categories"`
 	Confidence ConfidenceConfig          `yaml:"confidence"`
+	Analytics  AnalyticsConfig           `yaml:"analytics"`
+}
+
+// AnalyticsConfig drives the informational analytics (internal/analytics, docs/grading/analytics.md).
+// They never change a score. Absent or enabled:false turns them off.
+type AnalyticsConfig struct {
+	Enabled bool `yaml:"enabled"`
+	// WindowDays is how far back commits count for the bus factor and the ownership map.
+	WindowDays int `yaml:"window_days"`
+	// MinCommits: fewer kept commits in the window make both blocks "no data".
+	MinCommits int `yaml:"min_commits"`
+	// TopAuthors / TopAreas cap how many authors and directories are listed.
+	TopAuthors int `yaml:"top_authors"`
+	TopAreas   int `yaml:"top_areas"`
 }
 
 // Low-confidence reason codes; ConfidenceConfig.Reasons must have a text for each.
@@ -136,6 +150,9 @@ func LoadConfig(path string) (*Config, error) {
 }
 
 func validate(cfg *Config) error {
+	if err := validateAnalytics(cfg.Analytics); err != nil {
+		return fmt.Errorf("analytics: %w", err)
+	}
 	if err := validateConfidence(cfg.Confidence); err != nil {
 		return fmt.Errorf("confidence: %w", err)
 	}
@@ -206,6 +223,19 @@ func validateConfidence(c ConfidenceConfig) error {
 		if c.Reasons[code] == "" {
 			return fmt.Errorf("reasons: no text for %s", code)
 		}
+	}
+	return nil
+}
+
+func validateAnalytics(a AnalyticsConfig) error {
+	if !a.Enabled {
+		return nil
+	}
+	if a.WindowDays <= 0 || a.TopAuthors <= 0 || a.TopAreas <= 0 {
+		return fmt.Errorf("window_days, top_authors and top_areas must be positive, got %d, %d, %d", a.WindowDays, a.TopAuthors, a.TopAreas)
+	}
+	if a.MinCommits < 0 {
+		return fmt.Errorf("min_commits must not be negative, got %d", a.MinCommits)
 	}
 	return nil
 }

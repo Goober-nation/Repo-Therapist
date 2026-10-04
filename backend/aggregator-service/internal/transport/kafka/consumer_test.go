@@ -53,3 +53,24 @@ func TestHandleMessageWithoutConfidenceIsNil(t *testing.T) {
 		})
 	}
 }
+
+func TestHandleMessageCarriesAnalyticsUntouched(t *testing.T) {
+	saver := &recordingSaver{}
+	payload := []byte(`{"sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e", "grade_mode": "private", "graded_at": "2026-09-27T11:59:00Z",
+		"analytics": {"version": 1, "bus_factor": {"status": "ok", "value": 2}}}`)
+
+	if err := (&GradeConsumer{service: saver}).handleMessage(context.Background(), payload); err != nil {
+		t.Fatal(err)
+	}
+	if string(saver.grade.Analytics) != `{"version": 1, "bus_factor": {"status": "ok", "value": 2}}` {
+		t.Errorf("analytics = %s, want the object passed through as is", saver.grade.Analytics)
+	}
+
+	saver = &recordingSaver{}
+	if err := (&GradeConsumer{service: saver}).handleMessage(context.Background(), []byte(`{"sourcecraft_uuid": "019b2102-fa21-7ab7-8ce1-116af406fb5e", "grade_mode": "public", "analytics": null, "graded_at": "2026-09-27T11:59:00Z"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if string(saver.grade.Analytics) != "null" {
+		t.Errorf("analytics = %q, want the JSON null the service treats as none", saver.grade.Analytics)
+	}
+}

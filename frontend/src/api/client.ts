@@ -1,4 +1,5 @@
 import type {
+  AnalyticsResponse,
   GatewayRankingResponse,
   GradingResponse,
   MyRepositoriesResponse,
@@ -99,6 +100,11 @@ export class HttpRepoHealthApi {
   /** The stored public grade with its low-confidence flag; read-only, never starts a grading. */
   getPublicScore(orgSlug: string, repoSlug: string): Promise<PublicScoreResponse> {
     return this.request(`/score/${repoPath(orgSlug, repoSlug)}`)
+  }
+
+  /** Stored bus factor and ownership map; read-only, never starts a grading. */
+  getAnalytics(orgSlug: string, repoSlug: string, pat?: string): Promise<AnalyticsResponse> {
+    return this.request(`/analytics/${repoPath(orgSlug, repoSlug)}`, { headers: patHeader(pat) })
   }
 
   getMyRepositories(sourceCraftPat: string): Promise<MyRepositoriesResponse> {

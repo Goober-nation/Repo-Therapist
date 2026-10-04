@@ -59,13 +59,14 @@ func TestFilterCommits(t *testing.T) {
 	}
 }
 
-// The shipped config/grading.yaml turns on future/empty/bots and leaves merges off.
+// The shipped config/grading.yaml turns on future/empty/bots, drops commits under 4 changed lines
+// (calibrated, see docs/grading/00-overview.md) and leaves merges off.
 func TestShippedCommitFilterDefaults(t *testing.T) {
 	cfg, err := config.LoadConfig(filepath.Join("..", "..", "..", "..", "config", "grading.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := config.CommitFilters{FutureDated: true, Empty: true, Bots: true, Merges: false}
+	want := config.CommitFilters{FutureDated: true, Empty: true, Bots: true, Merges: false, MinChangedLines: 4}
 	if got := cfg.Categories["activity"].CommitFilters; got != want {
 		t.Errorf("activity commit_filters = %+v, want %+v", got, want)
 	}

@@ -46,6 +46,16 @@ type RepoGrade struct {
 	// Confidence travels with a public grade into repo_confidence_public; it is not a column of
 	// the grade tables.
 	Confidence *GradeConfidence `db:"-"`
+	// Analytics travels with a grade into repo_analytics_*; not a column of the grade tables.
+	Analytics json.RawMessage `db:"-"`
+}
+
+// RepoAnalytics is a stored analytics object with the time of the grade it describes. Analytics
+// is nil when there is none.
+type RepoAnalytics struct {
+	SourcecraftUUID uuid.UUID
+	Analytics       json.RawMessage
+	GradedAt        *time.Time
 }
 
 // GradeConfidence is the low-confidence flag of a public grade (grading.results "confidence").

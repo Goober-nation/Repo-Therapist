@@ -6,8 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"repo-therapist/grade-service/internal/analytics"
 	"repo-therapist/grade-service/internal/config"
 	"repo-therapist/grade-service/internal/contracts"
+	"repo-therapist/grade-service/internal/gitlog"
 	"repo-therapist/grade-service/internal/scoring"
 )
 
@@ -325,5 +327,60 @@ func TestBuildGradingResult_ConfidenceDisabledIsNull(t *testing.T) {
 	raw, _ := json.Marshal(result)
 	if result.Confidence != nil || !strings.Contains(string(raw), `"confidence":null`) {
 		t.Errorf("confidence = %+v wire = %s, want null", result.Confidence, raw)
+	}
+}
+
+func analyticsTestOutput() *GradeOutput {
+	now := time.Now()
+	var commits []gitlog.Commit
+	for i := 0; i < 8; i++ {
+		commits = append(commits, gitlog.Commit{
+			Hash: "h", AuthorName: "Ann", AuthorEmail: "ann@x.dev", AuthoredAt: now.AddDate(0, 0, -i-1),
+			Parents: []string{"p"}, FilesChanged: []gitlog.FileChange{{Path: "src/a.go", Added: 5}},
+		})
+	}
+	return &GradeOutput{
+		RepoID:     "r",
+		Categories: map[string]scoring.CategoryResult{"activity": {ID: "activity", Score: 80}},
+		AnalyticsInputs: analytics.Inputs{
+			CommitsAvailable: true, Commits: commits, CodeownersPath: "CODEOWNERS", Codeowners: []byte("* @ann"),
+		},
+	}
+}
+
+// The analytics ride on both grade modes and never touch the score.
+func TestBuildGradingResult_AnalyticsForBothModesWithoutChangingTheScore(t *testing.T) {
+	cfg := confidenceTestConfig()
+	cfg.Analytics = config.AnalyticsConfig{Enabled: true, WindowDays: 180, MinCommits: 5, TopAuthors: 5, TopAreas: 8}
+
+	var scores []int16
+	for _, mode := range []string{contracts.VisibilityPublic, contracts.VisibilityPrivate} {
+		result, err := BuildGradingResult(analyticsTestOutput(), cfg, map[string]config.RecommendationEntry{}, mode, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got analytics.Result
+		if err := json.Unmarshal(result.Analytics, &got); err != nil {
+			t.Fatalf("%s: analytics is not the analytics object: %v (%s)", mode, err, result.Analytics)
+		}
+		if got.BusFactor.Status != analytics.StatusOK || got.BusFactor.Value != 1 || got.Ownership.Areas[0].Path != "src/" || !got.Ownership.Codeowners.Present {
+			t.Errorf("%s: analytics = %+v", mode, got)
+		}
+		scores = append(scores, *result.Score)
+	}
+	if scores[0] != 80 || scores[1] != 80 {
+		t.Errorf("scores = %v, want 80 in both modes: analytics must not change them", scores)
+	}
+}
+
+func TestBuildGradingResult_AnalyticsDisabledIsNull(t *testing.T) {
+	cfg := confidenceTestConfig() // analytics left off
+	result, err := BuildGradingResult(analyticsTestOutput(), cfg, map[string]config.RecommendationEntry{}, contracts.VisibilityPublic, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(result)
+	if result.Analytics != nil || !strings.Contains(string(raw), `"analytics":null`) {
+		t.Errorf("analytics = %s, want null on the wire", result.Analytics)
 	}
 }

@@ -31,6 +31,14 @@ type fakeService struct {
 	scoreIP    string
 	summaryFor string
 	rankingOut domain.GetRankingResponse
+
+	analyticsOut domain.RepoAnalytics
+	analyticsFor string
+}
+
+func (f *fakeService) GetAnalytics(ctx context.Context, clientIP, pat, orgSlug, repoSlug string) (domain.RepoAnalytics, error) {
+	f.called, f.pat, f.analyticsFor = true, pat, orgSlug+"/"+repoSlug
+	return f.analyticsOut, f.err
 }
 
 func (f *fakeService) GetPublicSummary(ctx context.Context, orgSlug, repoSlug string) (domain.PublicSummary, error) {

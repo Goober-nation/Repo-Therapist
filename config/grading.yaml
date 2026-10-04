@@ -413,3 +413,13 @@ confidence:
     LOW_CODE: "В репозитории мало кода, поэтому оценка может быть неполной."
     LOW_HISTORY: "В репозитории мало истории изменений за последний период, поэтому оценка может быть неполной."
     LOW_COVERAGE: "Для оценки доступно мало категорий, поэтому итог опирается на небольшую часть данных."
+
+# Informational analytics shown next to the score (docs/grading/analytics.md). They never change a
+# score. Bus factor and the ownership map read the same commit history as Activity, after the same
+# commit filters.
+analytics:
+  enabled: true
+  window_days: 180
+  min_commits: 5    # fewer kept commits in the window -> both blocks are "no data"
+  top_authors: 5
+  top_areas: 8

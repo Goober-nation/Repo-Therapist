@@ -3,6 +3,7 @@ import type {
   AiReport,
   CategoryScores,
   Confidence,
+  RepoAnalytics,
   MetricFact,
   MetricResult,
   Priority,
@@ -11,6 +12,7 @@ import type {
 } from "../types"
 import type {
   AdvicePayload,
+  AnalyticsResponse,
   ConfidenceReasonPayload,
   GatewayRankingEntry,
   GradingResponse,
@@ -146,6 +148,63 @@ export function confidenceFromPayload(
     typeof reason?.text === "string" && reason.text.trim() ? [reason.text.trim()] : [],
   )
   return { low, reasons: low ? texts : [] }
+}
+
+const finiteOr = (value: unknown, fallback: number) =>
+  typeof value === "number" && Number.isFinite(value) ? value : fallback
+
+const share = (value: unknown) => Math.min(1, Math.max(0, finiteOr(value, 0)))
+
+/**
+ * Reads the analytics response. null means the repo has none (status NO_DATA or an unusable body);
+ * a block the backend marked as no data keeps `available: false` rather than showing zeros.
+ */
+export function analyticsFromResponse(response: AnalyticsResponse | undefined): RepoAnalytics | null {
+  const raw = response?.analytics
+  if (!raw || typeof raw !== "object") return null
+
+  const bus = raw.bus_factor
+  const busAvailable = bus?.status === "ok"
+  const ownership = raw.ownership
+  const codeowners = ownership?.codeowners
+
+  return {
+    windowDays: finiteOr(raw.window_days, 0),
+    busFactor: {
+      available: busAvailable,
+      value: busAvailable ? finiteOr(bus?.value, 0) : 0,
+      commits: finiteOr(bus?.commits, 0),
+      authors: finiteOr(bus?.authors, 0),
+      topAuthors: (Array.isArray(bus?.top_authors) ? bus.top_authors : []).flatMap((author) =>
+        typeof author?.name === "string" && author.name
+          ? [{ name: author.name, commits: finiteOr(author.commits, 0), share: share(author.share) }]
+          : [],
+      ),
+    },
+    ownership: {
+      available: ownership?.status === "ok",
+      areas: (Array.isArray(ownership?.areas) ? ownership.areas : []).flatMap((area) =>
+        typeof area?.path === "string" && area.path
+          ? [
+              {
+                path: area.path,
+                files: finiteOr(area.files, 0),
+                lines: finiteOr(area.lines, 0),
+                topOwner: typeof area.top_owner === "string" ? area.top_owner : "—",
+                topOwnerShare: share(area.top_owner_share),
+                owners: finiteOr(area.owners, 0),
+              },
+            ]
+          : [],
+      ),
+      codeowners: {
+        present: codeowners?.present === true,
+        ...(typeof codeowners?.path === "string" && codeowners.path ? { path: codeowners.path } : {}),
+        rules: finiteOr(codeowners?.rules, 0),
+        ...(typeof codeowners?.covered_share === "number" ? { coveredShare: share(codeowners.covered_share) } : {}),
+      },
+    },
+  }
 }
 
 export function repositoryFromRanking(entry: GatewayRankingEntry): RepositorySummary | null {

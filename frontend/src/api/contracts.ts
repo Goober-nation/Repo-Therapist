@@ -97,6 +97,36 @@ export interface MyRepositoriesResponse {
   next_page_token?: string
 }
 
+/** GET /analytics/{org}/{repo}: informational analytics (bus factor, ownership map). */
+export interface AnalyticsResponse {
+  status: GradeStatus
+  /** null when the repo has none yet. */
+  analytics: {
+    version?: number
+    window_days?: number
+    bus_factor?: {
+      status?: string
+      value?: number
+      commits?: number
+      authors?: number
+      top_authors?: Array<{ name?: string; commits?: number; share?: number }>
+    }
+    ownership?: {
+      status?: string
+      areas?: Array<{
+        path?: string
+        files?: number
+        lines?: number
+        top_owner?: string
+        top_owner_share?: number
+        owners?: number
+      }>
+      codeowners?: { present?: boolean; path?: string; rules?: number; covered_share?: number | null }
+    }
+  } | null
+  graded_at?: string | null
+}
+
 /** A generic, pre-written reason a public grade is flagged low-confidence (it names no thresholds). */
 export interface ConfidenceReasonPayload {
   code: string

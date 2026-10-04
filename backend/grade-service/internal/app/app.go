@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"repo-therapist/grade-service/internal/analytics"
 	"repo-therapist/grade-service/internal/appsecwrapper"
 	"repo-therapist/grade-service/internal/config"
 	"repo-therapist/grade-service/internal/contracts"
@@ -42,6 +43,8 @@ type GradeOutput struct {
 	// ConfidenceInputs are the repo-level facts the low-confidence flag needs; BuildGradingResult
 	// combines them with the final categories. Not part of the printed result.
 	ConfidenceInputs scoring.ConfidenceInputs `json:"-"`
+	// AnalyticsInputs feed the informational analytics; also not part of the printed result.
+	AnalyticsInputs analytics.Inputs `json:"-"`
 }
 
 // CategoryIDs returns the categories graded for a visibility: the private view is a superset
@@ -156,8 +159,11 @@ func Grade(ctx context.Context, repoID, prefix string, cfg *config.Config, token
 		confidenceInputs.Commits = scoring.FilterCommits(inputs.Commits, activityCfg.CommitFilters, time.Now())
 	}
 
+	analyticsInputs := analytics.Inputs{CommitsAvailable: confidenceInputs.CommitsAvailable, Commits: confidenceInputs.Commits}
+	analyticsInputs.CodeownersPath, analyticsInputs.Codeowners = readCodeowners(ctx, s3Client, prefix)
+
 	if !private {
-		return &GradeOutput{RepoID: repoID, Categories: categories, ConfidenceInputs: confidenceInputs}, nil
+		return &GradeOutput{RepoID: repoID, Categories: categories, ConfidenceInputs: confidenceInputs, AnalyticsInputs: analyticsInputs}, nil
 	}
 
 	ciInputs := scoring.CICDInputs{}
@@ -186,7 +192,23 @@ func Grade(ctx context.Context, repoID, prefix string, cfg *config.Config, token
 
 	categories["security"] = securityResult
 	categories["ci_cd"] = ciResult
-	return &GradeOutput{RepoID: repoID, Categories: categories, ConfidenceInputs: confidenceInputs}, nil
+	return &GradeOutput{RepoID: repoID, Categories: categories, ConfidenceInputs: confidenceInputs, AnalyticsInputs: analyticsInputs}, nil
+}
+
+// codeownersPaths are the places CODEOWNERS may live, in the order platforms look for it.
+var codeownersPaths = []string{"CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"}
+
+// readCodeowners returns the repo's CODEOWNERS file from the job's S3 export, or "" and nil when
+// there is none. A read error is logged and treated as "none": it is advisory data.
+func readCodeowners(ctx context.Context, s3Client *storage.Client, prefix string) (string, []byte) {
+	for _, p := range codeownersPaths {
+		data, err := s3Client.GetObject(ctx, prefix+"/"+p)
+		if err != nil || len(data) == 0 {
+			continue
+		}
+		return p, data
+	}
+	return "", nil
 }
 
 func newS3Client(ctx context.Context) (*storage.Client, error) {
@@ -268,6 +290,14 @@ func BuildGradingResult(out *GradeOutput, cfg *config.Config, catalog map[string
 		Advice:          recsJSON,
 		MissingData:     scoring.MissingCategories(out.Categories, ids),
 		GradedAt:        now,
+	}
+	// Analytics are informational and computed for either mode; a marshal failure only drops them.
+	if computed := analytics.Compute(cfg.Analytics, out.AnalyticsInputs, now); computed != nil {
+		if raw, err := json.Marshal(computed); err != nil {
+			log.Printf("marshaling analytics for %s: %v", out.RepoID, err)
+		} else {
+			result.Analytics = raw
+		}
 	}
 	// The flag is a property of public grades only: a private grade is the owner's own view.
 	if visibility == contracts.VisibilityPublic {

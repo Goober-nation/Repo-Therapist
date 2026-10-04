@@ -116,3 +116,19 @@ func TestShippedHardeningFilters(t *testing.T) {
 		t.Errorf("issues issue_filters = %+v, want only instant_close_seconds: 30", issues.IssueFilters)
 	}
 }
+
+func TestShippedAnalyticsConfig(t *testing.T) {
+	cfg, err := LoadConfig(filepath.Join("..", "..", "..", "..", "config", "grading.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Analytics != (AnalyticsConfig{Enabled: true, WindowDays: 180, MinCommits: 5, TopAuthors: 5, TopAreas: 8}) {
+		t.Errorf("analytics = %+v", cfg.Analytics)
+	}
+	if err := validateAnalytics(AnalyticsConfig{Enabled: true, WindowDays: 0, TopAuthors: 1, TopAreas: 1}); err == nil {
+		t.Error("a zero window must be rejected")
+	}
+	if err := validateAnalytics(AnalyticsConfig{}); err != nil {
+		t.Errorf("disabled analytics must not be validated: %v", err)
+	}
+}

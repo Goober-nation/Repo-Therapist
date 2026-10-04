@@ -53,6 +53,14 @@ type GatewayService interface {
 		request domain.GetRankingDTO,
 	) (domain.GetRankingResponse, error)
 
+	GetAnalytics(
+		ctx context.Context,
+		clientIP string,
+		pat string,
+		orgSlug string,
+		repoSlug string,
+	) (domain.RepoAnalytics, error)
+
 	LoginWithYandex(
 		ctx context.Context,
 		clientIP string,
@@ -97,6 +105,7 @@ func (h *Handler) Register(mux *stdhttp.ServeMux) {
 	mux.HandleFunc("GET /repos", h.GetMyRepos)
 	mux.HandleFunc("GET /grading/{org}/{repo}", h.GetGrading)
 	mux.HandleFunc("GET /recommendations/{org}/{repo}", h.RequestLLMRecommendations)
+	mux.HandleFunc("GET /analytics/{org}/{repo}", h.GetAnalytics)
 	mux.HandleFunc("GET /ranking", h.GetRanking)
 	mux.HandleFunc("GET /badge/{org}/{repo}", h.GetBadge)
 	mux.HandleFunc("GET /badge/{org}/{repo}/{category}", h.GetCategoryBadge)
@@ -232,6 +241,46 @@ func (h *Handler) GetGrading(
 		stdhttp.StatusOK,
 		mapGetGradingResponse(result),
 	)
+}
+
+// analyticsResponse is GET /analytics: the informational analytics object as stored (bus factor,
+// ownership map), or NO_DATA with a null object when the repo has none yet.
+type analyticsResponse struct {
+	Status    string          `json:"status"`
+	Analytics json.RawMessage `json:"analytics"`
+	GradedAt  *string         `json:"graded_at"`
+}
+
+// GetAnalytics serves GET /analytics/{org}/{repo}. Like /score it is read-only and never starts a
+// grading; with the owner's PAT it returns the private view's analytics, otherwise the public one.
+func (h *Handler) GetAnalytics(
+	w stdhttp.ResponseWriter,
+	r *stdhttp.Request,
+) {
+	result, err := h.service.GetAnalytics(
+		r.Context(),
+		clientIP(r),
+		patFromRequest(r),
+		strings.TrimSpace(r.PathValue("org")),
+		strings.TrimSpace(r.PathValue("repo")),
+	)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	response := analyticsResponse{Status: statusNoData, Analytics: json.RawMessage("null")}
+	// Anything that is not a valid JSON object counts as no analytics: a broken stored value must
+	// not turn the whole response into invalid JSON.
+	if stored := rawJSON(result.Analytics); stored != nil && strings.TrimSpace(string(stored)) != "null" {
+		response.Status, response.Analytics = statusFinished, stored
+	}
+	if result.GradedAt != nil {
+		value := result.GradedAt.Format(time.RFC3339Nano)
+		response.GradedAt = &value
+	}
+
+	writeJSON(w, stdhttp.StatusOK, response)
 }
 
 func (h *Handler) RequestLLMRecommendations(

@@ -3,6 +3,7 @@ package postgres_repositories
 import (
 	"aggregator-service/internal/domain"
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -354,6 +355,74 @@ func (r *GradesRepository) DeletePublicConfidence(ctx context.Context, repoID uu
 	_, err := r.db.Exec(ctx, `DELETE FROM repo_confidence_public WHERE sourcecraft_uuid = $1`, repoID)
 
 	return mapGradeError(err)
+}
+
+// analyticsTable is the only source of the table name in the analytics queries.
+func analyticsTable(public bool) string {
+	if public {
+		return "repo_analytics_public"
+	}
+	return "repo_analytics_private"
+}
+
+func (r *GradesRepository) upsertAnalytics(ctx context.Context, public bool, repoID uuid.UUID, analytics json.RawMessage, gradedAt *time.Time) error {
+	_, err := r.db.Exec(
+		ctx,
+		`INSERT INTO `+analyticsTable(public)+` (sourcecraft_uuid, analytics, graded_at)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (sourcecraft_uuid)
+		DO UPDATE SET analytics = EXCLUDED.analytics, graded_at = EXCLUDED.graded_at`,
+		repoID,
+		analytics,
+		gradedAt,
+	)
+
+	return mapGradeError(err)
+}
+
+func (r *GradesRepository) deleteAnalytics(ctx context.Context, public bool, repoID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM `+analyticsTable(public)+` WHERE sourcecraft_uuid = $1`, repoID)
+
+	return mapGradeError(err)
+}
+
+func (r *GradesRepository) getAnalytics(ctx context.Context, public bool, repoID uuid.UUID) (domain.RepoAnalytics, error) {
+	result := domain.RepoAnalytics{SourcecraftUUID: repoID}
+
+	err := r.db.QueryRow(
+		ctx,
+		`SELECT analytics, graded_at FROM `+analyticsTable(public)+` WHERE sourcecraft_uuid = $1`,
+		repoID,
+	).Scan(&result.Analytics, &result.GradedAt)
+	if err != nil {
+		return domain.RepoAnalytics{}, mapGradeError(err)
+	}
+
+	return result, nil
+}
+
+func (r *GradesRepository) UpsertPublicAnalytics(ctx context.Context, repoID uuid.UUID, analytics json.RawMessage, gradedAt *time.Time) error {
+	return r.upsertAnalytics(ctx, true, repoID, analytics, gradedAt)
+}
+
+func (r *GradesRepository) UpsertPrivateAnalytics(ctx context.Context, repoID uuid.UUID, analytics json.RawMessage, gradedAt *time.Time) error {
+	return r.upsertAnalytics(ctx, false, repoID, analytics, gradedAt)
+}
+
+func (r *GradesRepository) DeletePublicAnalytics(ctx context.Context, repoID uuid.UUID) error {
+	return r.deleteAnalytics(ctx, true, repoID)
+}
+
+func (r *GradesRepository) DeletePrivateAnalytics(ctx context.Context, repoID uuid.UUID) error {
+	return r.deleteAnalytics(ctx, false, repoID)
+}
+
+func (r *GradesRepository) GetPublicAnalytics(ctx context.Context, repoID uuid.UUID) (domain.RepoAnalytics, error) {
+	return r.getAnalytics(ctx, true, repoID)
+}
+
+func (r *GradesRepository) GetPrivateAnalytics(ctx context.Context, repoID uuid.UUID) (domain.RepoAnalytics, error) {
+	return r.getAnalytics(ctx, false, repoID)
 }
 
 func (r *GradesRepository) GetPublicGradeByRepoID(ctx context.Context, repoID uuid.UUID) (domain.RepoGrade, error) {

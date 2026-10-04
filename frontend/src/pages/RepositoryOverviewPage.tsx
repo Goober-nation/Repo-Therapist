@@ -1,5 +1,6 @@
 import { useRef, useState } from "react"
 import AnalysisResults from "../components/AnalysisResults"
+import AnalyticsSection from "../components/AnalyticsSection"
 import BadgeSnippet from "../components/BadgeSnippet"
 import ReportDownloadMenu from "../components/ReportDownloadMenu"
 import { Badge, Button, Card, Label, LanguageLabel, PageHeading, ScoreBar, SectionHeading } from "../components/Shell"
@@ -15,7 +16,7 @@ import {
   scoredCategories,
   splitStrengths,
 } from "../metrics"
-import type { Priority, RepositorySummary } from "../types"
+import type { Priority, RepoAnalytics, RepositorySummary } from "../types"
 import type { RepositoryAnalysis } from "../useRepositoryAnalysis"
 
 const PRIORITY_TONES = { critical: "critical", high: "critical", medium: "warning", low: "neutral" } as const satisfies Record<Priority, string>
@@ -63,11 +64,14 @@ const ADVICE_PAGE_SIZE = 5
 export default function RepositoryOverviewPage({
   repository,
   analysis,
+  analytics,
   onBackToRanking,
   publicView,
 }: {
   repository: RepositorySummary
   analysis: RepositoryAnalysis
+  /** undefined while loading, null when the repository has no analytics yet. */
+  analytics?: RepoAnalytics | null
   onBackToRanking: () => void
   /** Present only for a public repository opened with the owner's token. */
   publicView?: { checked: boolean; onChange: (checked: boolean) => void }
@@ -367,6 +371,8 @@ export default function RepositoryOverviewPage({
           </Card>
         )}
       </section>
+
+      <AnalyticsSection analytics={analytics} isRunning={analysis.isRunning} />
 
       {!isPrivate && repository.orgSlug && repository.repoSlug && (
         <BadgeSnippet org={repository.orgSlug} repo={repository.repoSlug} />

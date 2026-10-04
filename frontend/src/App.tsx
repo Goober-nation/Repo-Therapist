@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiRequestError, HttpRepoHealthApi } from "./api/client"
 import type { GradingResponse } from "./api/contracts"
 import {
+  analyticsFromResponse,
   confidenceFromPayload,
   mergeGradingIntoRepository,
   repositoryFromMyRepos,
@@ -19,7 +20,7 @@ import RulesPage from "./pages/RulesPage"
 import { gradingToken } from "./metrics"
 import { loadPat, patExpiresIn, savePat } from "./patStorage"
 import { parseRepositoryLink, useRoute } from "./route"
-import type { Confidence, PageId, RepositorySummary } from "./types"
+import type { Confidence, PageId, RepoAnalytics, RepositorySummary } from "./types"
 import { useRepositoryAnalysis } from "./useRepositoryAnalysis"
 
 type Theme = "light" | "dark" | "dopamine"
@@ -59,6 +60,8 @@ export default function App() {
   const [rankingQuery, setRankingQuery] = useState<RankingQuery>(DEFAULT_RANKING_QUERY)
   // Low-confidence flag of the public grade of the opened repository (GET /score); null = unknown.
   const [confidences, setConfidences] = useState<Record<string, Confidence | null>>({})
+  // Informational analytics per view ("my:" with the owner's token, "repo:" public); null = none yet.
+  const [analyticsByKey, setAnalyticsByKey] = useState<Record<string, RepoAnalytics | null>>({})
   const [rankingAttempt, setRankingAttempt] = useState(0)
   const [ranking, setRanking] = useState<RepositoryList & { total: number; loadedKey?: string }>({
     items: [],
@@ -186,6 +189,26 @@ export default function App() {
     }
   }, [target?.org, target?.repo, repoName, publicGradeShown, gradedAtKey])
 
+  // Analytics are read separately from the grade and refetched when the grade is new; a failure
+  // just leaves them out (advisory data).
+  const gradeReady = Boolean(target && !needsToken && grading?.status === "FINISHED")
+  const analyticsGradedAt = grading?.grade?.graded_at
+  useEffect(() => {
+    if (!target || !key || !gradeReady) return
+    let active = true
+    api
+      .getAnalytics(target.org, target.repo, token)
+      .then((response) => {
+        if (active) setAnalyticsByKey((current) => ({ ...current, [key]: analyticsFromResponse(response) }))
+      })
+      .catch(() => {
+        if (active) setAnalyticsByKey((current) => ({ ...current, [key]: null }))
+      })
+    return () => {
+      active = false
+    }
+  }, [target?.org, target?.repo, key, token, gradeReady, analyticsGradedAt])
+
   const handleGrading = useCallback(
     (response: GradingResponse) => {
       if (!key) return
@@ -296,6 +319,7 @@ export default function App() {
                   <RepositoryOverviewPage
                     repository={repository}
                     analysis={analysis}
+                    analytics={key ? analyticsByKey[key] : undefined}
                     onBackToRanking={() => showPage("ranking")}
                     publicView={
                       canViewPublicly && repoName

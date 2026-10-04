@@ -50,6 +50,10 @@ type AggregatorService struct {
 	// GradeLimiter caps new gradings started by users across the service; the scheduled public
 	// regrade is not counted. nil means no limit.
 	GradeLimiter *GradeLimiter
+	// RegradeMissingAnalytics makes a grade without a stored analytics row count as outdated, so
+	// a repo graded before analytics existed is regraded even when it has no new activity. Turn
+	// it off when grade-service has analytics disabled, or every request would start a regrade.
+	RegradeMissingAnalytics bool
 	// TokenStore receives the caller's PAT for a private grading, keyed by job id.
 	TokenStore domain.GradingTokenStore
 	// TokenTTL bounds how long a stored PAT lives; keep it equal to the repo lock timeout.
@@ -156,7 +160,7 @@ func (as *AggregatorService) RequestLLMRecommendations(
 		)
 	}
 
-	if err != nil || needsGrading(repo, grade) {
+	if err != nil || as.needsRegrade(ctx, repo, private, grade) {
 		return domain.RepoLLMResponse{}, as.requestGrading(ctx, repo, private, true)
 	}
 
@@ -258,7 +262,7 @@ func (as *AggregatorService) GetGrading(
 	}
 
 	hasGrade := err == nil
-	if hasGrade && !needsGrading(repo, grade) {
+	if hasGrade && !as.needsRegrade(ctx, repo, private, grade) {
 		return &grade, nil
 	}
 
@@ -290,6 +294,27 @@ func needsGrading(repo domain.Repo, grade domain.RepoGrade) bool {
 	}
 
 	return repo.LastActivityAt.After(*grade.GradedAt)
+}
+
+// needsRegrade is needsGrading plus the data check: a grade whose analytics row is missing is
+// outdated too. Only a definite "no row" counts; a failed lookup never starts a grading.
+func (as *AggregatorService) needsRegrade(ctx context.Context, repo domain.Repo, private bool, grade domain.RepoGrade) bool {
+	if needsGrading(repo, grade) {
+		return true
+	}
+
+	if !as.RegradeMissingAnalytics {
+		return false
+	}
+
+	var err error
+	if private {
+		_, err = as.GradesRepo.GetPrivateAnalytics(ctx, repo.SourcecraftUUID)
+	} else {
+		_, err = as.GradesRepo.GetPublicAnalytics(ctx, repo.SourcecraftUUID)
+	}
+
+	return errors.Is(err, domain.ErrGradeNotFound)
 }
 
 // resolveView looks the repo up and decides which grade the caller may see: private when the
@@ -569,6 +594,8 @@ func (as *AggregatorService) SaveGradingResult(ctx context.Context,
 			return err
 		}
 
+		as.saveAnalytics(ctx, grade, true)
+
 	case domain.VisibilityPrivate:
 		if err := as.GradesRepo.UpsertPrivateGrade(ctx, grade); err != nil {
 			return fmt.Errorf(
@@ -577,6 +604,8 @@ func (as *AggregatorService) SaveGradingResult(ctx context.Context,
 				err,
 			)
 		}
+
+		as.saveAnalytics(ctx, grade, false)
 
 	default:
 		return fmt.Errorf(
@@ -606,6 +635,54 @@ func (as *AggregatorService) savePublicConfidence(ctx context.Context, grade dom
 	}
 
 	return nil
+}
+
+// saveAnalytics stores the informational analytics next to a grade, or removes a stale row when
+// grade-service sent none. The analytics are advisory and the grade is already saved, so a failure
+// here is only logged and never fails the grading.
+func (as *AggregatorService) saveAnalytics(ctx context.Context, grade domain.RepoGrade, public bool) {
+	var err error
+
+	switch {
+	case isJSONEmpty(grade.Analytics) && public:
+		err = as.GradesRepo.DeletePublicAnalytics(ctx, grade.SourcecraftUUID)
+	case isJSONEmpty(grade.Analytics):
+		err = as.GradesRepo.DeletePrivateAnalytics(ctx, grade.SourcecraftUUID)
+	case public:
+		err = as.GradesRepo.UpsertPublicAnalytics(ctx, grade.SourcecraftUUID, grade.Analytics, grade.GradedAt)
+	default:
+		err = as.GradesRepo.UpsertPrivateAnalytics(ctx, grade.SourcecraftUUID, grade.Analytics, grade.GradedAt)
+	}
+
+	if err != nil {
+		log.Printf("save analytics of %s (public=%v): %v", grade.SourcecraftUUID, public, err)
+	}
+}
+
+// GetAnalytics returns the stored analytics of the repo for the view the caller may see (private
+// with the owner's token, public otherwise). It never starts a grading; Analytics is nil when the
+// repo has none yet.
+func (as *AggregatorService) GetAnalytics(ctx context.Context, orgSlug, repoSlug string) (domain.RepoAnalytics, error) {
+	repo, private, err := as.resolveView(ctx, orgSlug, repoSlug)
+	if err != nil {
+		return domain.RepoAnalytics{}, err
+	}
+
+	var analytics domain.RepoAnalytics
+	if private {
+		analytics, err = as.GradesRepo.GetPrivateAnalytics(ctx, repo.SourcecraftUUID)
+	} else {
+		analytics, err = as.GradesRepo.GetPublicAnalytics(ctx, repo.SourcecraftUUID)
+	}
+
+	if errors.Is(err, domain.ErrGradeNotFound) {
+		return domain.RepoAnalytics{SourcecraftUUID: repo.SourcecraftUUID}, nil
+	}
+	if err != nil {
+		return domain.RepoAnalytics{}, fmt.Errorf("%w: get analytics: %v", domain.ErrGradingFailed, err)
+	}
+
+	return analytics, nil
 }
 
 // normalizeGrade replaces JSON nulls and nil slices with empty values: the grade columns are
@@ -719,7 +796,7 @@ func (as *AggregatorService) regradeRepo(ctx context.Context, pbRepo *client.Rep
 		return fmt.Errorf("get grade: %w", err)
 	}
 
-	if err == nil && !needsGrading(repo, grade) {
+	if err == nil && !as.needsRegrade(ctx, repo, false, grade) {
 		return nil
 	}
 

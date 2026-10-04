@@ -188,6 +188,23 @@ CALIB_DIR=<каталог> go test -tags=manual ./internal/app/ -run TestHardeni
 `docs/grading/00-overview.md` и ожидаемые значения в `TestGamingScenariosTable` и
 `TestShippedHardeningFilters`.
 
+## Справочная аналитика (фактор автобуса, карта владельцев)
+
+Нужен полный стек (`docker compose up -d --build`). Аналитика считается при оценке (публичной и
+приватной), поэтому репозиторий нужно оценить заново; ручной прогон без изменения других оценок
+описан в разделе «Флаг низкой достоверности». Затем:
+
+```bash
+curl -s "localhost:8081/api/analytics/<org>/<repo>"      # status FINISHED и объект analytics; NO_DATA, если ещё нет
+docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select sourcecraft_uuid, graded_at from repo_analytics_public"
+(cd backend/grade-service && go test ./internal/analytics/ -v)
+```
+
+В браузере на странице репозитория раздел «Углублённая аналитика»: карточка фактора автобуса с
+долями авторов, карточка CODEOWNERS и таблица каталогов. Репозиторий с малым числом коммитов
+показывает «Нет данных…», а не нули; у владельца приватного репозитория (вход по токену) данные
+приватные.
+
 ## Проверки сборки/линтера
 
 Каждый Go-сервис бэкенда — отдельный модуль (связаны через корневой `go.work`), поэтому запускайте

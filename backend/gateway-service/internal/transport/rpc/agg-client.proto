@@ -15,6 +15,7 @@ service Aggregator {
 
   rpc RequestLLMRecommendations(RequestLLMRecommendationsRequest)
       returns (RequestLLMRecommendationsResponse);
+  rpc GetAnalytics(GetAnalyticsRequest) returns (GetAnalyticsResponse);
 }
 
 message GetMyReposRequest {}
@@ -80,4 +81,14 @@ message RepoGrade {
 
   repeated string missing_data = 5;
   google.protobuf.Timestamp graded_at = 6;
+}
+
+message GetAnalyticsRequest {
+  string org_slug = 1;
+  string repo_slug = 2;
+}
+
+message GetAnalyticsResponse {
+  bytes analytics = 1;
+  google.protobuf.Timestamp graded_at = 2;
 }

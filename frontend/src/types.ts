@@ -75,6 +75,49 @@ export interface RepositorySummary {
   confidence?: Confidence
 }
 
+/** One author's share of the commits in the analytics window. */
+export interface AuthorShare {
+  name: string
+  commits: number
+  /** 0–1. */
+  share: number
+}
+
+/** Smallest group of authors with at least half of the commits; informational, never scored. */
+export interface BusFactor {
+  /** false = not enough commits to say (a "нет данных" state, not a bad one). */
+  available: boolean
+  value: number
+  commits: number
+  authors: number
+  topAuthors: AuthorShare[]
+}
+
+/** A top-level directory and who changed it. */
+export interface OwnershipArea {
+  path: string
+  files: number
+  lines: number
+  topOwner: string
+  /** 0–1. */
+  topOwnerShare: number
+  owners: number
+}
+
+export interface CodeownersInfo {
+  present: boolean
+  path?: string
+  rules: number
+  /** 0–1; undefined when there is no file or nothing to compare with. */
+  coveredShare?: number
+}
+
+export interface RepoAnalytics {
+  windowDays: number
+  busFactor: BusFactor
+  ownership: { available: boolean; areas: OwnershipArea[]; codeowners: CodeownersInfo }
+}
+
 /** AI summary produced by llm-service (`raw_response`). */
 export interface AiReport {
   status?: GradeStatus

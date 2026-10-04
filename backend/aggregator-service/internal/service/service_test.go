@@ -85,6 +85,57 @@ type fakeGrades struct {
 	confidence       map[uuid.UUID]domain.GradeConfidence
 	confidenceDelete []uuid.UUID
 	confidenceErr    error
+
+	analyticsPublic, analyticsPrivate map[uuid.UUID]domain.RepoAnalytics
+	analyticsDeleted                  []string
+	analyticsErr                      error
+}
+
+func (f *fakeGrades) putAnalytics(public bool, repoID uuid.UUID, analytics json.RawMessage, gradedAt *time.Time) error {
+	if f.analyticsErr != nil {
+		return f.analyticsErr
+	}
+	target := &f.analyticsPrivate
+	if public {
+		target = &f.analyticsPublic
+	}
+	if *target == nil {
+		*target = map[uuid.UUID]domain.RepoAnalytics{}
+	}
+	(*target)[repoID] = domain.RepoAnalytics{SourcecraftUUID: repoID, Analytics: analytics, GradedAt: gradedAt}
+	return nil
+}
+
+func (f *fakeGrades) UpsertPublicAnalytics(ctx context.Context, repoID uuid.UUID, analytics json.RawMessage, gradedAt *time.Time) error {
+	return f.putAnalytics(true, repoID, analytics, gradedAt)
+}
+
+func (f *fakeGrades) UpsertPrivateAnalytics(ctx context.Context, repoID uuid.UUID, analytics json.RawMessage, gradedAt *time.Time) error {
+	return f.putAnalytics(false, repoID, analytics, gradedAt)
+}
+
+func (f *fakeGrades) DeletePublicAnalytics(ctx context.Context, repoID uuid.UUID) error {
+	f.analyticsDeleted = append(f.analyticsDeleted, "public")
+	return f.analyticsErr
+}
+
+func (f *fakeGrades) DeletePrivateAnalytics(ctx context.Context, repoID uuid.UUID) error {
+	f.analyticsDeleted = append(f.analyticsDeleted, "private")
+	return f.analyticsErr
+}
+
+func (f *fakeGrades) GetPublicAnalytics(ctx context.Context, repoID uuid.UUID) (domain.RepoAnalytics, error) {
+	if a, ok := f.analyticsPublic[repoID]; ok {
+		return a, nil
+	}
+	return domain.RepoAnalytics{}, domain.ErrGradeNotFound
+}
+
+func (f *fakeGrades) GetPrivateAnalytics(ctx context.Context, repoID uuid.UUID) (domain.RepoAnalytics, error) {
+	if a, ok := f.analyticsPrivate[repoID]; ok {
+		return a, nil
+	}
+	return domain.RepoAnalytics{}, domain.ErrGradeNotFound
 }
 
 func (f *fakeGrades) UpsertPublicConfidence(ctx context.Context, repoID uuid.UUID, confidence domain.GradeConfidence, gradedAt *time.Time) error {
@@ -348,6 +399,46 @@ func TestGetGradingReturnsCurrentGrade(t *testing.T) {
 	}
 	if len(f.grading.events) != 0 {
 		t.Errorf("current grade should not trigger grading")
+	}
+}
+
+func TestGetGradingRegradesWhenAnalyticsMissing(t *testing.T) {
+	f := newFixture("public")
+	f.svc.RegradeMissingAnalytics = true
+	score := int16(80)
+	f.grades.public[testRepoID] = domain.RepoGrade{SourcecraftUUID: testRepoID, Score: &score, GradedAt: gradedAt(testNow)}
+
+	// Up-to-date grade, but no analytics row yet: regrade even though the repo is unchanged.
+	if _, err := f.svc.GetGrading(userCtx(""), "org", "repo"); !errors.Is(err, domain.GradingPending) {
+		t.Fatalf("err = %v, want GradingPending", err)
+	}
+	if len(f.grading.events) != 1 {
+		t.Fatalf("published %d grading requests, want 1", len(f.grading.events))
+	}
+}
+
+func TestGetGradingKeepsGradeWhenAnalyticsPresentOrCheckOff(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		check   bool
+		present bool
+	}{{"present", true, true}, {"check off", false, false}} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture("public")
+			f.svc.RegradeMissingAnalytics = tc.check
+			score := int16(80)
+			f.grades.public[testRepoID] = domain.RepoGrade{SourcecraftUUID: testRepoID, Score: &score, GradedAt: gradedAt(testNow)}
+			if tc.present {
+				_ = f.grades.putAnalytics(true, testRepoID, json.RawMessage(`{"version":1}`), gradedAt(testNow))
+			}
+
+			if _, err := f.svc.GetGrading(userCtx(""), "org", "repo"); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(f.grading.events) != 0 {
+				t.Errorf("published %d grading requests, want 0", len(f.grading.events))
+			}
+		})
 	}
 }
 
@@ -805,5 +896,107 @@ func TestSaveGradingResultReportsConfidenceFailureAndStillReleasesLock(t *testin
 	}
 	if len(f.grades.savedPublic) != 1 || len(f.repos.released) != 1 {
 		t.Errorf("grade saved %d times, lock released %d times: the grade must stay and the lock must be released", len(f.grades.savedPublic), len(f.repos.released))
+	}
+}
+
+func TestSaveGradingResultStoresAnalyticsPerMode(t *testing.T) {
+	analytics := json.RawMessage(`{"version":1}`)
+	for _, mode := range []string{"public", "private"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newFixture(mode)
+			if err := f.svc.SaveGradingResult(context.Background(), domain.RepoGrade{SourcecraftUUID: testRepoID, Analytics: analytics, GradedAt: gradedAt(testNow)}, mode, ""); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			stored, other := f.grades.analyticsPublic, f.grades.analyticsPrivate
+			if mode == "private" {
+				stored, other = other, stored
+			}
+			if got := stored[testRepoID]; string(got.Analytics) != `{"version":1}` || got.GradedAt == nil {
+				t.Errorf("%s analytics = %+v", mode, got)
+			}
+			if len(other) != 0 {
+				t.Errorf("the %s grade also wrote to the other mode's table: %v", mode, other)
+			}
+		})
+	}
+}
+
+func TestSaveGradingResultDropsStaleAnalyticsWhenNoneSent(t *testing.T) {
+	for _, none := range []json.RawMessage{nil, json.RawMessage("null"), json.RawMessage("")} {
+		f := newFixture("public")
+		if err := f.svc.SaveGradingResult(context.Background(), domain.RepoGrade{SourcecraftUUID: testRepoID, Analytics: none}, "public", ""); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(f.grades.analyticsDeleted) != 1 || f.grades.analyticsDeleted[0] != "public" || len(f.grades.analyticsPublic) != 0 {
+			t.Errorf("analytics %q: deleted=%v stored=%v, want the stale public row deleted", none, f.grades.analyticsDeleted, f.grades.analyticsPublic)
+		}
+	}
+}
+
+// Analytics are advisory: failing to store them must neither fail the grading nor lose the grade.
+func TestSaveGradingResultSurvivesAnalyticsFailure(t *testing.T) {
+	f := newFixture("public")
+	f.grades.analyticsErr = errors.New("db down")
+	f.repos.lockFree = false
+
+	err := f.svc.SaveGradingResult(context.Background(), domain.RepoGrade{SourcecraftUUID: testRepoID, Analytics: json.RawMessage(`{"version":1}`)}, "public", "")
+	if err != nil {
+		t.Fatalf("err = %v, want nil: the grade is saved and analytics are advisory", err)
+	}
+	if len(f.grades.savedPublic) != 1 || len(f.repos.released) != 1 {
+		t.Errorf("grade saved %d times, lock released %d times", len(f.grades.savedPublic), len(f.repos.released))
+	}
+}
+
+func TestGetAnalyticsPublicViewNeverStartsAGrading(t *testing.T) {
+	f := newFixture("public")
+	f.grades.analyticsPublic = map[uuid.UUID]domain.RepoAnalytics{testRepoID: {SourcecraftUUID: testRepoID, Analytics: json.RawMessage(`{"version":1}`), GradedAt: gradedAt(testNow)}}
+
+	got, err := f.svc.GetAnalytics(userCtx(""), "org", "repo")
+	if err != nil || string(got.Analytics) != `{"version":1}` {
+		t.Fatalf("got %+v err %v", got, err)
+	}
+	if len(f.grading.events) != 0 || !f.repos.lockFree {
+		t.Error("reading analytics must never start a grading or take the lock")
+	}
+}
+
+func TestGetAnalyticsWithoutRowIsEmptyNotAnError(t *testing.T) {
+	f := newFixture("public")
+
+	got, err := f.svc.GetAnalytics(userCtx(""), "org", "repo")
+	if err != nil || got.Analytics != nil || got.GradedAt != nil {
+		t.Errorf("got %+v err %v, want empty analytics and no error", got, err)
+	}
+}
+
+func TestGetAnalyticsOwnerSeesPrivateOthersSeePublic(t *testing.T) {
+	f := newFixture("public")
+	f.grades.analyticsPublic = map[uuid.UUID]domain.RepoAnalytics{testRepoID: {Analytics: json.RawMessage(`{"who":"public"}`)}}
+	f.grades.analyticsPrivate = map[uuid.UUID]domain.RepoAnalytics{testRepoID: {Analytics: json.RawMessage(`{"who":"private"}`)}}
+
+	owner, err := f.svc.GetAnalytics(userCtx("owner-pat"), "org", "repo")
+	if err != nil || string(owner.Analytics) != `{"who":"private"}` {
+		t.Errorf("owner got %s err %v, want the private analytics", owner.Analytics, err)
+	}
+
+	for _, token := range []string{"", "other-pat"} {
+		got, err := f.svc.GetAnalytics(userCtx(token), "org", "repo")
+		if err != nil || string(got.Analytics) != `{"who":"public"}` {
+			t.Errorf("token %q got %s err %v, want the public analytics", token, got.Analytics, err)
+		}
+	}
+}
+
+func TestGetAnalyticsPrivateRepoWithoutAccessIsRefused(t *testing.T) {
+	f := newFixture("private")
+	f.grades.analyticsPrivate = map[uuid.UUID]domain.RepoAnalytics{testRepoID: {Analytics: json.RawMessage(`{"secret":true}`)}}
+
+	for _, token := range []string{"", "other-pat"} {
+		got, err := f.svc.GetAnalytics(userCtx(token), "org", "repo")
+		if !errors.Is(err, domain.ErrNoAccess) || got.Analytics != nil {
+			t.Errorf("token %q: got %s err %v, want ErrNoAccess and nothing leaked", token, got.Analytics, err)
+		}
 	}
 }

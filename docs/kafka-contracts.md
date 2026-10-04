@@ -66,7 +66,7 @@ LLM-сервис по-прежнему принимает старые `LLM_SUMM
   ```
 
 - `grading.results`: `{sourcecraft_uuid, grade_mode, score, category_scores, advice,
-  missing_data, graded_at, confidence, error}`. `grade_mode` — режим оценки, а не видимость репозитория:
+  missing_data, graded_at, confidence, analytics, error}`. `grade_mode` — режим оценки, а не видимость репозитория:
   `private`, если в запросе был токен пользователя, иначе `public` (публичный репозиторий,
   оценённый владельцем, приходит как `private`). Других значений нет; по нему Aggregator выбирает
   таблицу `repo_grades_public` или `repo_grades_private`. До 2026-10 поле называлось `visibility`.
@@ -140,6 +140,13 @@ LLM-сервис по-прежнему принимает старые `LLM_SUMM
 флаг не пережил отключение. Отсутствие записи значит «неизвестно» и никогда не «низкая
 достоверность». Методика: `docs/grading/00-overview.md`.
 
+`analytics` (2026-10-04) — справочные показатели (фактор автобуса, карта владельцев кода) для
+любого `grade_mode`, объект версии 1; `null` при сбое и если аналитика выключена в
+`config/grading.yaml`. Не влияет на `score`. Aggregator хранит его без разбора в
+`repo_analytics_public`/`repo_analytics_private` (по `grade_mode`) и удаляет старую запись, если
+пришёл `null`; сбой записи только логируется и оценку не отменяет. Формат и методика:
+`docs/grading/analytics.md`.
+
 Пример успешного `grading.results` (сокращён):
 
 ```json
@@ -161,6 +168,7 @@ LLM-сервис по-прежнему принимает старые `LLM_SUMM
   "missing_data": [],
   "graded_at": "2026-09-27T11:59:00.123456Z",
   "confidence": null,
+  "analytics": null,
   "error": ""
 }
 ```

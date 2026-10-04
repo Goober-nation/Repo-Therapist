@@ -1,4 +1,4 @@
-> **Проверка актуальности (по коду, 2026-09-28).** Это ранний черновик API; реальные контракты
+> **Проверка актуальности (по коду, 2026-10-04).** Это ранний черновик API; реальные контракты
 > с тех пор изменились. Источник истины — `.proto`-файлы сервисов и
 > `backend/gateway-service/internal/transport/http/handler.go`. Расхождения:
 >
@@ -9,10 +9,16 @@
 > - **Обёртка AppSec** (`security-wrapper-service`, сервис `SecurityWrapper`): `StartReport`,
 >   `GetReportStatus` и `GetReportLink` не существуют; единственный RPC — `GetAppsecResult`.
 > - **Агрегатор** (`aggregator-service/internal/transport/rpc/server.proto`): RPC — `GetMyRepos`,
->   `GetGrading`, `RequestLLMRecommendations` (не `GetReccomendations`).
+>   `GetGrading`, `RequestLLMRecommendations` (не `GetReccomendations`), `GetAnalytics`
+>   (запрос `{org_slug, repo_slug}`, ответ `{analytics: bytes (JSON), graded_at}`; только чтение).
+> - **Рейтинг** (`rating-service/internal/transport/rpc/service.proto`, сервис `Rating`, только
+>   чтение БД): `GetRanking`, `GetPublicScore`, `GetPublicSummary`; для неизвестного или не
+>   публичного репозитория последние два отвечают `NOT_FOUND`. В разделах ниже не описаны.
 > - **API Gateway**: реальные маршруты — `POST /auth/yandex`, `GET /repos`,
 >   `GET /grading/{org}/{repo}` (не `/grade/...`), `GET /recommendations/{org}/{repo}`,
->   `GET /ranking`. PAT передаётся заголовком `PAT` (не `user_token`).
+>   `GET /ranking`, `GET /analytics/{org}/{repo}`, а также публичные `GET /score/{org}/{repo}`,
+>   `GET /badge/{org}/{repo}[.svg|.json]`, `GET /badge/{org}/{repo}/{category}.svg`,
+>   `GET /widget/{org}/{repo}.svg`. PAT передаётся заголовком `PAT` (не `user_token`).
 > - JSON-примеры ниже местами синтаксически некорректны (пропущенные запятые, точки вместо
 >   запятых) — это эскизы формы, а не точные схемы.
 
@@ -610,6 +616,7 @@ rpc GetReccomendations(GetReccomendationsRequest) returns (GetReccomendationsRes
 | `GET /grading/{org}/{repo}` | `PAT` (опционален) | `{status, grade: {sourcecraft_uuid, score, category_scores, advice, missing_data, graded_at}}` |
 | `GET /recommendations/{org}/{repo}` | `PAT` (опционален) | `{status, raw_response: {summary, recommendations: [{priority, category, text}]}, model_used, evaluated_at}` |
 | `GET /ranking?page=&page_size=&sortby=&filter=&hide_low_confidence=` | — | `{entries: [{place, sourcecraft_uuid, name, web_url, public_score, likes, language, last_activity_at, low_confidence, confidence_reasons}], total_count, page, page_size}` |
+| `GET /analytics/{org}/{repo}` | `PAT` (опционален) | `{status, analytics, graded_at}`: справочные показатели (фактор автобуса, карта владельцев); с токеном владельца — приватные |
 | `GET /badge/{org}/{repo}.svg` | — | SVG-бейдж с сохранённой публичной оценкой (`image/svg+xml`, `Cache-Control: max-age=300`); оценку не запускает, лимит по IP не применяется; неизвестный или не оценённый репозиторий — серый `n/a` |
 | `GET /badge/{org}/{repo}/{category}.svg` | — | SVG-бейдж одной публичной категории: `activity`, `issues`, `documentation`, `code_health`; категория без данных — серый `n/a`, любой другой ID (в том числе `security` и `ci_cd`) — `404` |
 | `GET /badge/{org}/{repo}.json` | — | JSON для shields.io endpoint-бейджа: `{schemaVersion: 1, label, message, color}`; неизвестный или не оценённый репозиторий — `n/a` и `lightgrey` |
@@ -651,8 +658,14 @@ README. `GET /score/...` ограничен отдельно, `PUBLIC_API_RATE_L
 [![activity](https://repo-therapist.alo.quest/api/badge/ORG/REPO/activity.svg)](https://repo-therapist.alo.quest/repo/ORG/REPO)
 ```
 
+`GET /analytics/{org}/{repo}` только читает: оценку не запускает. `status`: `FINISHED` (в `analytics`
+объект версии 1, формат — `docs/grading/analytics.md`) или `NO_DATA` (`analytics: null`, у репозитория
+ещё нет аналитики, например он оценён до её появления). Приватный репозиторий без токена владельца —
+`403`, неизвестный — `404`. CORS не включён: ответ зависит от токена.
+
 `status`: `PENDING` (оценка запущена и считается), `FINISHED`, `NO_DATA`. Запрос оценки сам
-запускает её, если оценки нет или в репозитории была активность после прошлого анализа.
+запускает её, если оценки нет, в репозитории была активность после прошлого анализа или у оценки
+нет строки аналитики (`ANALYTICS_REGRADE_MISSING`, по умолчанию включено).
 
 `category_scores` — объект по ID категории: `{id, no_data, score (0–100), metrics: [{id, no_data,
 raw_value, score (0–1)}]}`; у `documentation` дополнительно может быть `method` (`"llm"` или

@@ -71,6 +71,13 @@ type RankingEntry struct {
 	Confidence *Confidence
 }
 
+// RepoAnalytics is a repo's stored informational analytics (bus factor, ownership map) and the time
+// of the grade it describes. Analytics is empty when there are none yet.
+type RepoAnalytics struct {
+	Analytics []byte
+	GradedAt  *time.Time
+}
+
 // PublicCategory is one category of a public repo's stored grade; nil Score means no data.
 type PublicCategory struct {
 	ID    string

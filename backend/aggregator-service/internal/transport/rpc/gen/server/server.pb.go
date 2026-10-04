@@ -7,13 +7,12 @@
 package server
 
 import (
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
 )
 
 const (
@@ -322,16 +321,16 @@ func (x *RequestLLMRecommendationsResponse) GetEvaluatedAt() *timestamppb.Timest
 type Repository struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name           string        `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Organization   *Organization `protobuf:"bytes,3,opt,name=organization,proto3" json:"organization,omitempty"`
-	Slug           string        `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
-	Description    string        `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
-	Logo           *Logo         `protobuf:"bytes,6,opt,name=logo,proto3" json:"logo,omitempty"`
-	WebUrl         string        `protobuf:"bytes,7,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
+	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Organization   *Organization          `protobuf:"bytes,3,opt,name=organization,proto3" json:"organization,omitempty"`
+	Slug           string                 `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
+	Description    string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	Logo           *Logo                  `protobuf:"bytes,6,opt,name=logo,proto3" json:"logo,omitempty"`
+	WebUrl         string                 `protobuf:"bytes,7,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
 	Visibility     string                 `protobuf:"bytes,8,opt,name=visibility,proto3" json:"visibility,omitempty"`
 	LastActivityAt string                 `protobuf:"bytes,9,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
-	Rating         float64       `protobuf:"fixed64,10,opt,name=rating,proto3" json:"rating,omitempty"`
-	Language       *Language     `protobuf:"bytes,11,opt,name=language,proto3" json:"language,omitempty"`
+	Rating         float64                `protobuf:"fixed64,10,opt,name=rating,proto3" json:"rating,omitempty"`
+	Language       *Language              `protobuf:"bytes,11,opt,name=language,proto3" json:"language,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -719,6 +718,112 @@ func (x *RepoGrade) GetGradedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type GetAnalyticsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OrgSlug       string                 `protobuf:"bytes,1,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
+	RepoSlug      string                 `protobuf:"bytes,2,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAnalyticsRequest) Reset() {
+	*x = GetAnalyticsRequest{}
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAnalyticsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAnalyticsRequest) ProtoMessage() {}
+
+func (x *GetAnalyticsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAnalyticsRequest.ProtoReflect.Descriptor instead.
+func (*GetAnalyticsRequest) Descriptor() ([]byte, []int) {
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GetAnalyticsRequest) GetOrgSlug() string {
+	if x != nil {
+		return x.OrgSlug
+	}
+	return ""
+}
+
+func (x *GetAnalyticsRequest) GetRepoSlug() string {
+	if x != nil {
+		return x.RepoSlug
+	}
+	return ""
+}
+
+type GetAnalyticsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// JSON of the analytics object (docs/grading/analytics.md); empty when there are none yet.
+	Analytics []byte `protobuf:"bytes,1,opt,name=analytics,proto3" json:"analytics,omitempty"`
+	// The grade the analytics describe; unset when there are none.
+	GradedAt      *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=graded_at,json=gradedAt,proto3" json:"graded_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAnalyticsResponse) Reset() {
+	*x = GetAnalyticsResponse{}
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAnalyticsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAnalyticsResponse) ProtoMessage() {}
+
+func (x *GetAnalyticsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAnalyticsResponse.ProtoReflect.Descriptor instead.
+func (*GetAnalyticsResponse) Descriptor() ([]byte, []int) {
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetAnalyticsResponse) GetAnalytics() []byte {
+	if x != nil {
+		return x.Analytics
+	}
+	return nil
+}
+
+func (x *GetAnalyticsResponse) GetGradedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.GradedAt
+	}
+	return nil
+}
+
 var File_internal_transport_rpc_server_proto protoreflect.FileDescriptor
 
 const file_internal_transport_rpc_server_proto_rawDesc = "" +
@@ -775,14 +880,21 @@ const file_internal_transport_rpc_server_proto_rawDesc = "" +
 	"\x06advice\x18\x04 \x01(\fR\x06advice\x12!\n" +
 	"\fmissing_data\x18\x05 \x03(\tR\vmissingData\x127\n" +
 	"\tgraded_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\bgradedAtB\b\n" +
-	"\x06_score2\xa0\x02\n" +
+	"\x06_score\"M\n" +
+	"\x13GetAnalyticsRequest\x12\x19\n" +
+	"\borg_slug\x18\x01 \x01(\tR\aorgSlug\x12\x1b\n" +
+	"\trepo_slug\x18\x02 \x01(\tR\brepoSlug\"m\n" +
+	"\x14GetAnalyticsResponse\x12\x1c\n" +
+	"\tanalytics\x18\x01 \x01(\fR\tanalytics\x127\n" +
+	"\tgraded_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\bgradedAt2\xf3\x02\n" +
 	"\n" +
 	"Aggregator\x12K\n" +
 	"\n" +
 	"GetMyRepos\x12\x1d.aggregator.GetMyReposRequest\x1a\x1e.aggregator.GetMyReposResponse\x12K\n" +
 	"\n" +
 	"GetGrading\x12\x1d.aggregator.GetGradingRequest\x1a\x1e.aggregator.GetGradingResponse\x12x\n" +
-	"\x19RequestLLMRecommendations\x12,.aggregator.RequestLLMRecommendationsRequest\x1a-.aggregator.RequestLLMRecommendationsResponseB2Z0aggregator-service/internal/transport/rpc/gen;pbb\x06proto3"
+	"\x19RequestLLMRecommendations\x12,.aggregator.RequestLLMRecommendationsRequest\x1a-.aggregator.RequestLLMRecommendationsResponse\x12Q\n" +
+	"\fGetAnalytics\x12\x1f.aggregator.GetAnalyticsRequest\x1a .aggregator.GetAnalyticsResponseB2Z0aggregator-service/internal/transport/rpc/gen;pbb\x06proto3"
 
 var (
 	file_internal_transport_rpc_server_proto_rawDescOnce sync.Once
@@ -796,7 +908,7 @@ func file_internal_transport_rpc_server_proto_rawDescGZIP() []byte {
 	return file_internal_transport_rpc_server_proto_rawDescData
 }
 
-var file_internal_transport_rpc_server_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_internal_transport_rpc_server_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_internal_transport_rpc_server_proto_goTypes = []any{
 	(*GetMyReposRequest)(nil),                 // 0: aggregator.GetMyReposRequest
 	(*GetMyReposResponse)(nil),                // 1: aggregator.GetMyReposResponse
@@ -810,27 +922,32 @@ var file_internal_transport_rpc_server_proto_goTypes = []any{
 	(*Organization)(nil),                      // 9: aggregator.Organization
 	(*ReactionCount)(nil),                     // 10: aggregator.ReactionCount
 	(*RepoGrade)(nil),                         // 11: aggregator.RepoGrade
-	(*timestamppb.Timestamp)(nil),             // 12: google.protobuf.Timestamp
+	(*GetAnalyticsRequest)(nil),               // 12: aggregator.GetAnalyticsRequest
+	(*GetAnalyticsResponse)(nil),              // 13: aggregator.GetAnalyticsResponse
+	(*timestamppb.Timestamp)(nil),             // 14: google.protobuf.Timestamp
 }
 var file_internal_transport_rpc_server_proto_depIdxs = []int32{
 	6,  // 0: aggregator.GetMyReposResponse.repositories:type_name -> aggregator.Repository
 	11, // 1: aggregator.GetGradingResponse.grade:type_name -> aggregator.RepoGrade
-	12, // 2: aggregator.RequestLLMRecommendationsResponse.evaluated_at:type_name -> google.protobuf.Timestamp
+	14, // 2: aggregator.RequestLLMRecommendationsResponse.evaluated_at:type_name -> google.protobuf.Timestamp
 	9,  // 3: aggregator.Repository.organization:type_name -> aggregator.Organization
 	8,  // 4: aggregator.Repository.logo:type_name -> aggregator.Logo
 	7,  // 5: aggregator.Repository.language:type_name -> aggregator.Language
-	12, // 6: aggregator.RepoGrade.graded_at:type_name -> google.protobuf.Timestamp
-	0,  // 7: aggregator.Aggregator.GetMyRepos:input_type -> aggregator.GetMyReposRequest
-	2,  // 8: aggregator.Aggregator.GetGrading:input_type -> aggregator.GetGradingRequest
-	4,  // 9: aggregator.Aggregator.RequestLLMRecommendations:input_type -> aggregator.RequestLLMRecommendationsRequest
-	1,  // 10: aggregator.Aggregator.GetMyRepos:output_type -> aggregator.GetMyReposResponse
-	3,  // 11: aggregator.Aggregator.GetGrading:output_type -> aggregator.GetGradingResponse
-	5,  // 12: aggregator.Aggregator.RequestLLMRecommendations:output_type -> aggregator.RequestLLMRecommendationsResponse
-	10, // [10:13] is the sub-list for method output_type
-	7,  // [7:10] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	14, // 6: aggregator.RepoGrade.graded_at:type_name -> google.protobuf.Timestamp
+	14, // 7: aggregator.GetAnalyticsResponse.graded_at:type_name -> google.protobuf.Timestamp
+	0,  // 8: aggregator.Aggregator.GetMyRepos:input_type -> aggregator.GetMyReposRequest
+	2,  // 9: aggregator.Aggregator.GetGrading:input_type -> aggregator.GetGradingRequest
+	4,  // 10: aggregator.Aggregator.RequestLLMRecommendations:input_type -> aggregator.RequestLLMRecommendationsRequest
+	12, // 11: aggregator.Aggregator.GetAnalytics:input_type -> aggregator.GetAnalyticsRequest
+	1,  // 12: aggregator.Aggregator.GetMyRepos:output_type -> aggregator.GetMyReposResponse
+	3,  // 13: aggregator.Aggregator.GetGrading:output_type -> aggregator.GetGradingResponse
+	5,  // 14: aggregator.Aggregator.RequestLLMRecommendations:output_type -> aggregator.RequestLLMRecommendationsResponse
+	13, // 15: aggregator.Aggregator.GetAnalytics:output_type -> aggregator.GetAnalyticsResponse
+	12, // [12:16] is the sub-list for method output_type
+	8,  // [8:12] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_internal_transport_rpc_server_proto_init() }
@@ -845,7 +962,7 @@ func file_internal_transport_rpc_server_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_transport_rpc_server_proto_rawDesc), len(file_internal_transport_rpc_server_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

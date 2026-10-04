@@ -82,5 +82,8 @@ type GradingResultReceivedEvent struct {
 	// Confidence is the low-confidence flag of a public grade; nil for private grades, failures
 	// and when grade-service has the flag turned off.
 	Confidence *GradeConfidence `json:"confidence"`
-	Error      string           `json:"error"`
+	// Analytics is the informational analytics object, passed through untouched; null when
+	// grade-service sent none.
+	Analytics json.RawMessage `json:"analytics"`
+	Error     string          `json:"error"`
 }

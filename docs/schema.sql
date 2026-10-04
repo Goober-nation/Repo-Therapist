@@ -63,6 +63,22 @@ CREATE TABLE repo_confidence_public (
 
 CREATE INDEX ON repo_confidence_public (low_confidence);
 
+-- Informational analytics (bus factor, ownership map) of a grade, one row per repo and grade mode.
+-- Written by the Aggregator right after the grade; no row = no analytics yet.
+CREATE TABLE repo_analytics_public (
+  sourcecraft_uuid   UUID PRIMARY KEY REFERENCES repos(sourcecraft_uuid),
+
+  analytics          JSONB NOT NULL,
+  graded_at          TIMESTAMPTZ
+);
+
+CREATE TABLE repo_analytics_private (
+  sourcecraft_uuid   UUID PRIMARY KEY REFERENCES repos(sourcecraft_uuid),
+
+  analytics          JSONB NOT NULL,
+  graded_at          TIMESTAMPTZ
+);
+
 CREATE TABLE repo_llm_responses_public (
   sourcecraft_uuid   UUID PRIMARY KEY REFERENCES repos(sourcecraft_uuid),
 

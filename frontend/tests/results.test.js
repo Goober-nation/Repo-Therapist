@@ -1757,6 +1757,118 @@ test("the README snippets are a dropdown that starts collapsed and loads nothing
   assert.doesNotMatch(html, /badge-snippet__item|<img|api\/badge|api\/widget|api\/score/)
 })
 
+const analyticsBody = {
+  status: "FINISHED",
+  graded_at: "2026-10-01T12:00:00Z",
+  analytics: {
+    version: 1,
+    window_days: 180,
+    bus_factor: {
+      status: "ok",
+      value: 2,
+      commits: 40,
+      authors: 5,
+      top_authors: [
+        { name: "Ann", commits: 22, share: 0.55 },
+        { name: "Bob", commits: 8, share: 0.2 },
+        { commits: 3, share: 0.1 },
+      ],
+    },
+    ownership: {
+      status: "ok",
+      areas: [
+        { path: "src/", files: 12, lines: 900, top_owner: "Ann", top_owner_share: 0.8, owners: 2 },
+        { files: 1 },
+      ],
+      codeowners: { present: true, path: ".github/CODEOWNERS", rules: 3, covered_share: 0.75 },
+    },
+  },
+}
+
+test("analytics: the response is read defensively and no-data blocks stay unavailable, not zero", async () => {
+  const { analyticsFromResponse } = await vite.ssrLoadModule("/src/api/mapper.ts")
+
+  const mapped = analyticsFromResponse(analyticsBody)
+  assert.equal(mapped.windowDays, 180)
+  assert.deepEqual(mapped.busFactor, {
+    available: true,
+    value: 2,
+    commits: 40,
+    authors: 5,
+    topAuthors: [
+      { name: "Ann", commits: 22, share: 0.55 },
+      { name: "Bob", commits: 8, share: 0.2 },
+    ],
+  })
+  assert.equal(mapped.ownership.areas.length, 1)
+  assert.deepEqual(mapped.ownership.codeowners, { present: true, path: ".github/CODEOWNERS", rules: 3, coveredShare: 0.75 })
+
+  const noData = analyticsFromResponse({
+    status: "FINISHED",
+    analytics: {
+      window_days: 180,
+      bus_factor: { status: "no_data", commits: 2, authors: 1, top_authors: [] },
+      ownership: { status: "no_data", areas: [], codeowners: { present: false, rules: 0, covered_share: null } },
+    },
+  })
+  assert.equal(noData.busFactor.available, false)
+  assert.equal(noData.busFactor.value, 0)
+  assert.equal(noData.ownership.available, false)
+  assert.equal("coveredShare" in noData.ownership.codeowners, false)
+
+  assert.equal(analyticsFromResponse({ status: "NO_DATA", analytics: null }), null)
+  assert.equal(analyticsFromResponse(undefined), null)
+  assert.equal(analyticsFromResponse({ status: "FINISHED", analytics: "oops" }), null)
+  assert.equal(analyticsFromResponse({ status: "FINISHED", analytics: { bus_factor: { status: "ok", value: 99, top_authors: "x" } } }).busFactor.topAuthors.length, 0)
+})
+
+test("analytics: the API client reads /analytics with the owner's PAT only when given", async () => {
+  const calls = []
+  const api = new HttpRepoHealthApi({
+    fetcher: async (url, init) => {
+      calls.push([url, init.headers.PAT])
+      return Response.json(analyticsBody)
+    },
+  })
+
+  await api.getAnalytics("org", "my repo")
+  await api.getAnalytics("org", "repo", "pat-1")
+
+  assert.deepEqual(calls, [
+    ["/api/analytics/org/my%20repo", undefined],
+    ["/api/analytics/org/repo", "pat-1"],
+  ])
+})
+
+test("analytics section: renders bus factor, owners and CODEOWNERS, and every empty state in words", async () => {
+  const { default: AnalyticsSection } = await vite.ssrLoadModule("/src/components/AnalyticsSection.tsx")
+  const { analyticsFromResponse } = await vite.ssrLoadModule("/src/api/mapper.ts")
+  const render = (analytics, extra = {}) => renderToStaticMarkup(createElement(AnalyticsSection, { analytics, ...extra }))
+
+  const full = render(analyticsFromResponse(analyticsBody))
+  assert.match(full, /Углублённая аналитика/)
+  assert.match(full, /Половину коммитов за последние 180 дн\. сделали 2 автора из 5/)
+  assert.match(full, />Ann</)
+  assert.match(full, />55%</)
+  assert.match(full, /<code>src\/<\/code>/)
+  assert.match(full, />75%</)
+  assert.match(full, /3 правила/)
+  assert.match(full, /на оценку не влияют/)
+
+  const single = analyticsFromResponse({ status: "FINISHED", analytics: { window_days: 90, bus_factor: { status: "ok", value: 1, commits: 20, authors: 1, top_authors: [{ name: "Solo", commits: 20, share: 1 }] } } })
+  assert.match(render(single), /Проект сильно зависит от одного человека/)
+  assert.match(render(single), /Файл CODEOWNERS не найден/)
+
+  const noData = analyticsFromResponse({ status: "FINISHED", analytics: { window_days: 180, bus_factor: { status: "no_data" }, ownership: { status: "no_data", areas: [] } } })
+  const noDataHtml = render(noData)
+  assert.equal(noDataHtml.match(/Нет данных: за период слишком мало коммитов/g)?.length, 2)
+  assert.doesNotMatch(noDataHtml, /analytics-card__value/)
+
+  assert.match(render(undefined), /Загружаем аналитику/)
+  assert.match(render(null), /Аналитики для этого репозитория пока нет/)
+  assert.match(render(null, { isRunning: true }), /Аналитика появится после завершения анализа/)
+})
+
 test("public grade toggle drops the token only for a public repository opened by its owner", async () => {
   const { gradingToken } = await vite.ssrLoadModule("/src/metrics.ts")
 

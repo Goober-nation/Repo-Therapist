@@ -386,3 +386,59 @@ func TestScoreCarriesTheFlagWithoutTouchingTheScore(t *testing.T) {
 		t.Errorf("unknown flag = %v, want an explicit null", body["low_confidence"])
 	}
 }
+
+func TestAnalyticsReturnsTheStoredObject(t *testing.T) {
+	gradedAt := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	svc := &fakeService{analyticsOut: domain.RepoAnalytics{
+		Analytics: []byte(`{"version":1,"bus_factor":{"status":"ok","value":2}}`),
+		GradedAt:  &gradedAt,
+	}}
+
+	rec := serve(t, svc, "GET", "/analytics/org/demo", map[string]string{"PAT": "owner-pat"})
+
+	if rec.Code != stdhttp.StatusOK || svc.analyticsFor != "org/demo" || svc.pat != "owner-pat" {
+		t.Fatalf("status = %d for = %q pat = %q", rec.Code, svc.analyticsFor, svc.pat)
+	}
+	body := decode(t, rec)
+	analytics := body["analytics"].(map[string]any)
+	if body["status"] != "FINISHED" || analytics["version"] != float64(1) || body["graded_at"] != "2026-10-01T12:00:00Z" {
+		t.Errorf("body = %v", body)
+	}
+	if rec.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Error("the analytics depend on the caller's PAT and must not be readable cross-origin")
+	}
+}
+
+func TestAnalyticsWithoutDataIsNoDataNotAnError(t *testing.T) {
+	for name, stored := range map[string][]byte{"none": nil, "json null": []byte("null"), "broken": []byte("{not json")} {
+		t.Run(name, func(t *testing.T) {
+			rec := serve(t, &fakeService{analyticsOut: domain.RepoAnalytics{Analytics: stored}}, "GET", "/analytics/org/demo", nil)
+			if rec.Code != stdhttp.StatusOK {
+				t.Fatalf("status = %d, want 200", rec.Code)
+			}
+			body := decode(t, rec)
+			if body["status"] != "NO_DATA" || body["analytics"] != nil || body["graded_at"] != nil {
+				t.Errorf("body = %v, want NO_DATA with null analytics", body)
+			}
+		})
+	}
+}
+
+func TestAnalyticsErrorsAreMapped(t *testing.T) {
+	cases := map[string]struct {
+		err  error
+		want int
+	}{
+		"no access":    {fmt.Errorf("rpc: %w", domain.ErrForbidden), stdhttp.StatusForbidden},
+		"unknown repo": {fmt.Errorf("rpc: %w", domain.ErrNotFound), stdhttp.StatusNotFound},
+		"rate limited": {domain.ErrLimitExceeded, stdhttp.StatusTooManyRequests},
+		"unavailable":  {fmt.Errorf("rpc: %w", domain.ErrUnavailable), stdhttp.StatusServiceUnavailable},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if rec := serve(t, &fakeService{err: tc.err}, "GET", "/analytics/org/demo", nil); rec.Code != tc.want {
+				t.Errorf("status = %d, want %d", rec.Code, tc.want)
+			}
+		})
+	}
+}

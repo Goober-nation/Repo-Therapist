@@ -84,6 +84,8 @@ type GradingConfig struct {
 	// RegradeListTimeout bounds listing every public repo at the start of a regrade.
 	RegradeListTimeout time.Duration
 	LLMRequestTTL      time.Duration
+	// RegradeMissingAnalytics regrades a repo whose grade has no analytics row yet.
+	RegradeMissingAnalytics bool
 	// RequestLimit caps new gradings started by users within RequestWindow, service-wide;
 	// 0 disables the limit.
 	RequestLimit  int
@@ -209,6 +211,7 @@ func LoadConfig() *Config {
 				"LLM_REQUEST_TTL",
 				2*time.Minute,
 			),
+			RegradeMissingAnalytics: getEnvBool("ANALYTICS_REGRADE_MISSING", true),
 			RequestLimit: getEnvInt(
 				"GRADING_REQUEST_LIMIT",
 				10,

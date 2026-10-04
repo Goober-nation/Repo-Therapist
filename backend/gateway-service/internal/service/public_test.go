@@ -7,10 +7,12 @@ import (
 	"time"
 
 	"gateway-service/internal/domain"
+	"gateway-service/internal/transport/rpc/gen/agg"
 	"gateway-service/internal/transport/rpc/gen/rank"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -172,5 +174,67 @@ func TestGetPublicSummaryAndRankingCarryTheFlag(t *testing.T) {
 	entry, err := mapRankingEntry(&rank.RankingEntry{SourcecraftUuid: "11111111-1111-1111-1111-111111111111", LowConfidence: &yes})
 	if err != nil || entry.Confidence == nil || !entry.Confidence.Low {
 		t.Errorf("ranking entry flag = %+v err %v", entry.Confidence, err)
+	}
+}
+
+type fakeAggAnalytics struct {
+	agg.AggregatorClient
+
+	resp *agg.GetAnalyticsResponse
+	err  error
+	reqs []*agg.GetAnalyticsRequest
+	auth []string
+}
+
+func (f *fakeAggAnalytics) GetAnalytics(ctx context.Context, in *agg.GetAnalyticsRequest, opts ...grpc.CallOption) (*agg.GetAnalyticsResponse, error) {
+	f.reqs = append(f.reqs, in)
+	md, _ := metadata.FromOutgoingContext(ctx)
+	f.auth = md.Get("authorization")
+	return f.resp, f.err
+}
+
+func TestGetAnalyticsForwardsTheCallerPATAndMapsTheResponse(t *testing.T) {
+	gradedAt := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	aggregator := &fakeAggAnalytics{resp: &agg.GetAnalyticsResponse{Analytics: []byte(`{"version":1}`), GradedAt: timestamppb.New(gradedAt)}}
+	svc := NewGatewayService(aggregator, nil, nil, allowAll{}, nil, nil, time.Second, time.Second, time.Second)
+
+	got, err := svc.GetAnalytics(context.Background(), "ip", "owner-pat", "org", "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(got.Analytics) != `{"version":1}` || got.GradedAt == nil || !got.GradedAt.Equal(gradedAt) {
+		t.Errorf("got %+v", got)
+	}
+	if len(aggregator.reqs) != 1 || aggregator.reqs[0].GetOrgSlug() != "org" || aggregator.reqs[0].GetRepoSlug() != "demo" {
+		t.Errorf("request = %v", aggregator.reqs)
+	}
+	if len(aggregator.auth) != 1 || aggregator.auth[0] != "Bearer owner-pat" {
+		t.Errorf("authorization = %v, want the PAT as a bearer", aggregator.auth)
+	}
+
+	if _, err := svc.GetAnalytics(context.Background(), "ip", "", "org", "demo"); err != nil || len(aggregator.auth) != 0 {
+		t.Errorf("without a PAT: err %v auth %v, want no authorization at all", err, aggregator.auth)
+	}
+}
+
+func TestGetAnalyticsEmptyResponseIsNotAnError(t *testing.T) {
+	svc := NewGatewayService(&fakeAggAnalytics{resp: &agg.GetAnalyticsResponse{}}, nil, nil, allowAll{}, nil, nil, time.Second, time.Second, time.Second)
+
+	got, err := svc.GetAnalytics(context.Background(), "ip", "", "org", "demo")
+	if err != nil || len(got.Analytics) != 0 || got.GradedAt != nil {
+		t.Errorf("got %+v err %v, want empty analytics", got, err)
+	}
+}
+
+func TestGetAnalyticsValidatesSlugsAndMapsErrors(t *testing.T) {
+	aggregator := &fakeAggAnalytics{err: status.Error(codes.PermissionDenied, "no access")}
+	svc := NewGatewayService(aggregator, nil, nil, allowAll{}, nil, nil, time.Second, time.Second, time.Second)
+
+	if _, err := svc.GetAnalytics(context.Background(), "ip", "", "", "demo"); !errors.Is(err, domain.ErrInvalidRequest) || len(aggregator.reqs) != 0 {
+		t.Errorf("empty org: err %v calls %d, want ErrInvalidRequest without a call", err, len(aggregator.reqs))
+	}
+	if _, err := svc.GetAnalytics(context.Background(), "ip", "", "org", "demo"); !errors.Is(err, domain.ErrForbidden) {
+		t.Errorf("permission denied: err %v, want ErrForbidden", err)
 	}
 }

@@ -1,6 +1,7 @@
 # Repo Health frontend
 
-React/Vite-фронтенд сервиса оценки здоровья репозиториев. В данный момент времени используется mock
+React/Vite-фронтенд сервиса оценки здоровья репозиториев. Данные берёт только у API Gateway
+(`/api/*`); моков нет.
 
 ## Запуск
 
@@ -8,6 +9,9 @@ React/Vite-фронтенд сервиса оценки здоровья реп�
 corepack pnpm install
 corepack pnpm dev
 ```
+
+`dev` и `build` сначала копируют `docs/grading/*.md` в `src/rules` (`scripts/sync-rules.mjs`,
+кроме `frontend-results.md`); без каталога `docs/` остаётся закоммиченная копия.
 
 Проверки:
 
@@ -17,32 +21,36 @@ corepack pnpm exec tsc --noEmit
 corepack pnpm run build
 ```
 
-## Источник данных и соединение с бэкендом
+## Соединение с бэкендом
 
-Конфигурация будет находиться в `.env`(пока что все mock):
+Браузер обращается к тому же origin, путь `/api/*` проксируется на Gateway:
 
-```bash
-VITE_DATA_SOURCE=mock
-VITE_API_BASE_URL=http://localhost:8080/api
-VITE_USER_TOKEN=
-```
+- в разработке — Vite proxy, адрес задаётся `GATEWAY_URL` в `frontend/.env` (по умолчанию
+  `http://localhost:8080`, префикс `/api` отбрасывается);
+- в Docker — nginx (`nginx.conf`): `/api/` → `go-services:8080`; фронтенд на `http://localhost:8081`.
 
-Для подключения Gateway установите `VITE_DATA_SOURCE=http`. HTTP-адаптер вызывает
-задокументированные маршруты:
+Вход через Яндекс ID включается, когда при сборке задан `VITE_YANDEX_CLIENT_ID` (в Docker берётся
+из `.env` корня репозитория). Токен SourceCraft пользователь вводит на странице «Мои репозитории»;
+он хранится в `localStorage` 1 час (`src/patStorage.ts`) и передаётся заголовком `PAT`.
 
-- `GET /grade/{org_slug}/{repo_slug}`
-- `GET /reccomendations/{org_slug}/{repo_slug}`
+## Страницы
 
-Заголовок `user_token` добавляется из `VITE_USER_TOKEN`. Написание
-`reccomendations` оставлено в клиенте для совместимости с текущим контрактом;
-клиент также принимает исправленное поле `recommendations` в JSON
+| Путь | Страница |
+|---|---|
+| `/` | публичный рейтинг (фильтр по языку, сортировка, переключатель «Скрыть оценки с низкой достоверностью») |
+| `/repo/:org/:repo` | публичный анализ: оценка, категории, рекомендации, углублённая аналитика, бейджи и виджет |
+| `/my` | репозитории владельца токена |
+| `/my/:org/:repo` | приватный анализ с токеном владельца |
+| `/rules[/:section]` | правила оценки (по одному разделу на категорию) |
 
-Слои разделены так:
+## Структура
 
-- `src/api/contracts.ts` — wire DTO из документации;
-- `src/api/client.ts` — HTTP-клиент документированных Gateway маршрутов;
+- `src/api/contracts.ts` — DTO ответов Gateway;
+- `src/api/client.ts` — HTTP-клиент маршрутов Gateway (`/grading`, `/recommendations`, `/analytics`, `/ranking`, `/repos`, `/auth/yandex`);
 - `src/api/mapper.ts` — преобразование DTO в модель UI;
-- `src/data/repositoryData.ts` — переключаемый mock/HTTP data source;
-- `src/mocks/` — только локальные fixtures и скачивание отчета
-
-Каталог репозиториев пока что остается mock-источником
+- `src/api/yandexAuth.ts`, `src/components/YandexSignIn.tsx` — вход через Яндекс ID;
+- `src/useRepositoryAnalysis.ts` — запуск и опрос анализа;
+- `src/pages/`, `src/components/` — страницы и компоненты (`AnalyticsSection`, `BadgeSnippet`, `AnalysisResults`);
+- `src/reports/` — выгрузка отчёта в Markdown и PDF;
+- `src/rules/` — копии документов `docs/grading`;
+- `tests/` — тесты (`node --test`).

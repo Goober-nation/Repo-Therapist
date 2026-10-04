@@ -15,6 +15,9 @@ service Aggregator {
 
   rpc RequestLLMRecommendations(RequestLLMRecommendationsRequest)
       returns (RequestLLMRecommendationsResponse);
+  // GetAnalytics returns the stored informational analytics (bus factor, ownership map) of the
+  // view the caller may see. Read-only: it never starts a grading. Empty analytics means none yet.
+  rpc GetAnalytics(GetAnalyticsRequest) returns (GetAnalyticsResponse);
 }
 
 message GetMyReposRequest {}
@@ -86,4 +89,16 @@ message RepoGrade {
   bytes advice = 4;
   repeated string missing_data = 5;
   google.protobuf.Timestamp graded_at = 6;
+}
+
+message GetAnalyticsRequest {
+  string org_slug = 1;
+  string repo_slug = 2;
+}
+
+message GetAnalyticsResponse {
+  // JSON of the analytics object (docs/grading/analytics.md); empty when there are none yet.
+  bytes analytics = 1;
+  // The grade the analytics describe; unset when there are none.
+  google.protobuf.Timestamp graded_at = 2;
 }

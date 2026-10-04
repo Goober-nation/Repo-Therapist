@@ -332,6 +332,43 @@ func (s *GatewayService) GetGrading(
 	}, nil
 }
 
+// GetAnalytics returns the stored analytics of the repo for the view the caller may see. It never
+// starts a grading: a repo without analytics comes back empty, which the caller reports as no data.
+func (s *GatewayService) GetAnalytics(
+	ctx context.Context,
+	clientIP string,
+	pat string,
+	orgSlug string,
+	repoSlug string,
+) (domain.RepoAnalytics, error) {
+	if err := s.checkRateLimit(ctx, clientIP); err != nil {
+		return domain.RepoAnalytics{}, err
+	}
+
+	if err := validateSlugs(orgSlug, repoSlug); err != nil {
+		return domain.RepoAnalytics{}, err
+	}
+
+	rpcCtx, cancel := context.WithTimeout(withPAT(ctx, pat), s.aggregatorTimeout)
+	defer cancel()
+
+	resp, err := s.aggregatorClient.GetAnalytics(
+		rpcCtx,
+		&agg.GetAnalyticsRequest{OrgSlug: orgSlug, RepoSlug: repoSlug},
+	)
+	if err != nil {
+		return domain.RepoAnalytics{}, rpcError("get analytics", err)
+	}
+
+	result := domain.RepoAnalytics{Analytics: resp.GetAnalytics()}
+	if resp.GetGradedAt() != nil {
+		gradedAt := resp.GetGradedAt().AsTime()
+		result.GradedAt = &gradedAt
+	}
+
+	return result, nil
+}
+
 func mapRepoGrade(
 	grade *agg.RepoGrade,
 ) (domain.RepoGrade, error) {

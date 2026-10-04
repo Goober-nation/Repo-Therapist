@@ -29,6 +29,12 @@ type AggregatorService interface {
 		orgSlug string,
 		repoSlug string,
 	) (domain.RepoLLMResponse, error)
+
+	GetAnalytics(
+		ctx context.Context,
+		orgSlug string,
+		repoSlug string,
+	) (domain.RepoAnalytics, error)
 }
 
 type Server struct {
@@ -91,6 +97,30 @@ func (s *Server) GetGrading(
 	return &server.GetGradingResponse{
 		Grade: gradeToProto(*grade),
 	}, nil
+}
+
+func (s *Server) GetAnalytics(
+	ctx context.Context,
+	req *server.GetAnalyticsRequest,
+) (*server.GetAnalyticsResponse, error) {
+	if req.GetOrgSlug() == "" || req.GetRepoSlug() == "" {
+		return nil, status.Error(
+			codes.InvalidArgument,
+			"org_slug and repo_slug are required",
+		)
+	}
+
+	analytics, err := s.service.GetAnalytics(ctx, req.GetOrgSlug(), req.GetRepoSlug())
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &server.GetAnalyticsResponse{Analytics: analytics.Analytics}
+	if analytics.GradedAt != nil {
+		response.GradedAt = timestamppb.New(*analytics.GradedAt)
+	}
+
+	return response, nil
 }
 
 func (s *Server) RequestLLMRecommendations(

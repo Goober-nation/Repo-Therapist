@@ -47,6 +47,11 @@ func (f *fakeAggregator) GetGrading(ctx context.Context, in *agg.GetGradingReque
 	return &agg.GetGradingResponse{Grade: f.grade}, nil
 }
 
+func (f *fakeAggregator) GetAnalytics(ctx context.Context, in *agg.GetAnalyticsRequest, opts ...grpc.CallOption) (*agg.GetAnalyticsResponse, error) {
+	f.record(ctx)
+	return &agg.GetAnalyticsResponse{}, f.err
+}
+
 func (f *fakeAggregator) RequestLLMRecommendations(ctx context.Context, in *agg.RequestLLMRecommendationsRequest, opts ...grpc.CallOption) (*agg.RequestLLMRecommendationsResponse, error) {
 	f.record(ctx)
 	return nil, f.err

@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,6 +28,14 @@ type GradesRepository interface {
 	// DeletePublicConfidence removes it (grade-service sent none), so a stale flag never survives.
 	UpsertPublicConfidence(ctx context.Context, repoID uuid.UUID, confidence GradeConfidence, gradedAt *time.Time) error
 	DeletePublicConfidence(ctx context.Context, repoID uuid.UUID) error
+
+	// Analytics rows, per grade mode. Get returns ErrGradeNotFound when there is no row.
+	UpsertPublicAnalytics(ctx context.Context, repoID uuid.UUID, analytics json.RawMessage, gradedAt *time.Time) error
+	UpsertPrivateAnalytics(ctx context.Context, repoID uuid.UUID, analytics json.RawMessage, gradedAt *time.Time) error
+	DeletePublicAnalytics(ctx context.Context, repoID uuid.UUID) error
+	DeletePrivateAnalytics(ctx context.Context, repoID uuid.UUID) error
+	GetPublicAnalytics(ctx context.Context, repoID uuid.UUID) (RepoAnalytics, error)
+	GetPrivateAnalytics(ctx context.Context, repoID uuid.UUID) (RepoAnalytics, error)
 }
 
 type LLMRepository interface {
