@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"gateway-service/internal/domain"
 )
@@ -410,13 +411,63 @@ func mapGetRankingRequest(
 		return domain.GetRankingDTO{}, err
 	}
 
+	size := strings.TrimSpace(query.Get("size"))
+	switch size {
+	case "", "small", "medium", "large":
+	default:
+		return domain.GetRankingDTO{}, httpError{
+			status: stdhttp.StatusBadRequest,
+			err:    fmt.Errorf("%w: size must be small, medium or large", domain.ErrInvalidRequest),
+		}
+	}
+
+	hasCI, err := queryOptionalBool(query.Get("ci"), "ci")
+	if err != nil {
+		return domain.GetRankingDTO{}, err
+	}
+
+	hasSecurityPolicy, err := queryOptionalBool(query.Get("security"), "security")
+	if err != nil {
+		return domain.GetRankingDTO{}, err
+	}
+
+	topic := strings.TrimSpace(query.Get("topic"))
+	if utf8.RuneCountInString(topic) > maxTopicLength {
+		return domain.GetRankingDTO{}, httpError{
+			status: stdhttp.StatusBadRequest,
+			err:    fmt.Errorf("%w: topic must be at most %d characters", domain.ErrInvalidRequest, maxTopicLength),
+		}
+	}
+
 	return domain.GetRankingDTO{
 		Page:              page,
 		PageSize:          pageSize,
 		Language:          strings.TrimSpace(query.Get("filter")),
 		SortBy:            sortBy,
 		HideLowConfidence: hideLowConfidence,
+		Size:              size,
+		HasCI:             hasCI,
+		HasSecurityPolicy: hasSecurityPolicy,
+		Topic:             topic,
 	}, nil
+}
+
+// maxTopicLength bounds the ?topic= text of the ranking (the same limit as rating-service).
+const maxTopicLength = 64
+
+// queryOptionalBool reads a boolean query value where "not given" means "any" (nil), unlike
+// queryBool where it means false.
+func queryOptionalBool(value, name string) (*bool, error) {
+	if strings.TrimSpace(value) == "" {
+		return nil, nil
+	}
+
+	parsed, err := queryBool(value, name)
+	if err != nil {
+		return nil, err
+	}
+
+	return &parsed, nil
 }
 
 // queryBool reads an optional boolean query value; empty means false.

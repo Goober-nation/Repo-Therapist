@@ -357,3 +357,25 @@ func TestRankingEntryCarriesChanges(t *testing.T) {
 		t.Error("an entry without changes must leave both unset")
 	}
 }
+
+func TestRankingRequestCarriesTheFactFilters(t *testing.T) {
+	yes, no := true, false
+	svc := &fakeService{}
+	_, err := NewServer(svc).GetRanking(context.Background(), &pb.GetRankingRequest{Size: "large", HasCi: &yes, HasSecurityPolicy: &no, Topic: "api"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := svc.req.Extra
+	if got.Size != "large" || got.Topic != "api" || got.HasCI == nil || !*got.HasCI || got.HasSecurityPolicy == nil || *got.HasSecurityPolicy {
+		t.Errorf("extras = %+v, want large, api, ci=true and security=false", got)
+	}
+
+	svc = &fakeService{}
+	if _, err := NewServer(svc).GetRanking(context.Background(), &pb.GetRankingRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if e := svc.req.Extra; e.Size != "" || e.HasCI != nil || e.HasSecurityPolicy != nil || e.Topic != "" {
+		t.Errorf("an empty request must leave every filter off (unset is 'any', not false): %+v", e)
+	}
+}

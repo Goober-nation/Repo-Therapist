@@ -10,7 +10,7 @@ import (
 )
 
 func TestBuildCountQuery(t *testing.T) {
-	query, args := buildCountQuery("", false)
+	query, args := buildCountQuery("", false, domain.RankingExtras{})
 	if !strings.Contains(query, "WHERE r.visibility = 'public'") || strings.Contains(query, "main_language") {
 		t.Errorf("unfiltered count query = %q", query)
 	}
@@ -18,7 +18,7 @@ func TestBuildCountQuery(t *testing.T) {
 		t.Errorf("args = %v, want none", args)
 	}
 
-	query, args = buildCountQuery("Go", false)
+	query, args = buildCountQuery("Go", false, domain.RankingExtras{})
 	if !strings.Contains(query, "AND lower(r.main_language) = lower($1)") {
 		t.Errorf("filtered count query = %q", query)
 	}
@@ -89,7 +89,7 @@ func TestBuildListQueryGradedOnly(t *testing.T) {
 	}
 
 	// The count must apply the same graded-only filter so total_count matches the entries.
-	for name, q := range map[string]string{"list": query, "count": func() string { c, _ := buildCountQuery("", false); return c }()} {
+	for name, q := range map[string]string{"list": query, "count": func() string { c, _ := buildCountQuery("", false, domain.RankingExtras{}); return c }()} {
 		if !strings.Contains(q, "EXISTS (SELECT 1 FROM repo_grades_public pg") {
 			t.Errorf("%s query: expected graded-only filter:\n%s", name, q)
 		}
@@ -125,7 +125,7 @@ func TestBuildListQueryUnknownSort(t *testing.T) {
 }
 
 func TestHideLowConfidenceClauseHidesOnlyExplicitFlags(t *testing.T) {
-	count, _ := buildCountQuery("", true)
+	count, _ := buildCountQuery("", true, domain.RankingExtras{})
 	list, _, err := buildListQuery(domain.RankingQuery{SortBy: domain.SortByScore, HideLowConfidence: true, Limit: 20})
 	if err != nil {
 		t.Fatal(err)
@@ -144,7 +144,7 @@ func TestHideLowConfidenceClauseHidesOnlyExplicitFlags(t *testing.T) {
 	}
 
 	for name, query := range map[string]string{
-		"count": func() string { c, _ := buildCountQuery("", false); return c }(),
+		"count": func() string { c, _ := buildCountQuery("", false, domain.RankingExtras{}); return c }(),
 		"list": func() string {
 			l, _, _ := buildListQuery(domain.RankingQuery{SortBy: domain.SortByScore, Limit: 20})
 			return l
@@ -189,5 +189,79 @@ func TestDecodeConfidence(t *testing.T) {
 
 	if _, err := decodeConfidence(&yes, []byte(`{"bad":1}`)); err == nil {
 		t.Error("malformed reasons: want an error")
+	}
+}
+
+func boolPtr(v bool) *bool { return &v }
+
+func TestFactFiltersAreOnlyAddedWhenAsked(t *testing.T) {
+	query, args := buildCountQuery("", false, domain.RankingExtras{})
+	if strings.Contains(query, "repo_facts_public") || strings.Contains(query, "ILIKE") || len(args) != 0 {
+		t.Errorf("no extras must add nothing: %q %v", query, args)
+	}
+}
+
+func TestSizeBucketsUseTheConfiguredLimits(t *testing.T) {
+	extra := func(size string) domain.RankingExtras {
+		return domain.RankingExtras{Size: size, SmallLOC: 2000, LargeLOC: 20000}
+	}
+
+	small, args := buildCountQuery("", false, extra("small"))
+	if !strings.Contains(small, "f.loc < $1") || !reflect.DeepEqual(args, []any{2000}) {
+		t.Errorf("small: %q %v", small, args)
+	}
+
+	medium, args := buildCountQuery("", false, extra("medium"))
+	if !strings.Contains(medium, "f.loc >= $1 AND f.loc < $2") || !reflect.DeepEqual(args, []any{2000, 20000}) {
+		t.Errorf("medium: %q %v", medium, args)
+	}
+
+	large, args := buildCountQuery("", false, extra("large"))
+	if !strings.Contains(large, "f.loc >= $1") || !reflect.DeepEqual(args, []any{20000}) {
+		t.Errorf("large: %q %v", large, args)
+	}
+}
+
+func TestCIAndSecurityFiltersCompareToTheFactSoUnknownNeverMatches(t *testing.T) {
+	query, args := buildCountQuery("", false, domain.RankingExtras{HasCI: boolPtr(true), HasSecurityPolicy: boolPtr(false)})
+
+	if !strings.Contains(query, "f.has_ci = $1 AND f.has_security_policy = $2") || !reflect.DeepEqual(args, []any{true, false}) {
+		t.Errorf("ci/security: %q %v", query, args)
+	}
+	if strings.Contains(query, "IS NULL") || strings.Contains(query, "NOT EXISTS (SELECT 1 FROM repo_facts_public") {
+		t.Errorf("an unknown (NULL) fact must not be matched by 'lacks': %q", query)
+	}
+}
+
+func TestTopicIsASafeCaseInsensitiveSearchOverNameAndDescription(t *testing.T) {
+	query, args := buildCountQuery("Go", false, domain.RankingExtras{Topic: " 50%_off\\ "})
+
+	if !strings.Contains(query, "ILIKE $2") || !strings.Contains(query, "repo_slug ILIKE") || !strings.Contains(query, "COALESCE(r.description, '')") {
+		t.Errorf("topic: %q", query)
+	}
+	// The user's text never reaches the SQL string: it is one argument, with LIKE wildcards made literal.
+	if len(args) != 2 || args[1] != "%50\\%\\_off\\\\%" {
+		t.Errorf("args = %q, want the trimmed text with %%, _ and the backslash escaped", args)
+	}
+	if strings.Contains(query, "50") {
+		t.Errorf("the topic text leaked into the SQL: %q", query)
+	}
+}
+
+func TestExtrasKeepPlaceholdersConsistentWithTheListQuery(t *testing.T) {
+	query, args, err := buildListQuery(domain.RankingQuery{
+		Language: "Go", SortBy: domain.SortByScore, Limit: 20, Offset: 40, DynamicsDays: 7,
+		Extra: domain.RankingExtras{Size: "medium", SmallLOC: 2000, LargeLOC: 20000, HasCI: boolPtr(true), Topic: "api"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// language $1, size $2 $3, ci $4, topic $5, then days, limit, offset.
+	if !reflect.DeepEqual(args, []any{"Go", 2000, 20000, true, "%api%", 7, 20, 40}) {
+		t.Errorf("args = %v", args)
+	}
+	if !strings.Contains(query, "$6::int") || !strings.Contains(query, "LIMIT $7 OFFSET $8") {
+		t.Errorf("dynamics, limit and offset must follow the filter arguments:\n%s", query)
 	}
 }

@@ -19,6 +19,8 @@ type Repo struct {
 
 	RatingValue float64         `json:"rating"`
 	Language    PrimaryLanguage `json:"language"`
+	// Description is the repository description from SourceCraft (the ranking's topic search).
+	Description string `json:"description"`
 }
 
 type PrimaryLanguage struct {
@@ -48,6 +50,8 @@ type RepoGrade struct {
 	Confidence *GradeConfidence `db:"-"`
 	// Analytics travels with a grade into repo_analytics_*; not a column of the grade tables.
 	Analytics json.RawMessage `db:"-"`
+	// Facts travel with a public grade into repo_facts_public; not a column of the grade tables.
+	Facts json.RawMessage `db:"-"`
 }
 
 // RepoAnalytics is a stored analytics object with the time of the grade it describes. Analytics
@@ -148,4 +152,13 @@ type RepoLLMResponsePrivate struct {
 	EvaluatedAt *time.Time `db:"evaluated_at"`
 
 	GradedAt *time.Time `db:"graded_at"`
+}
+
+// RepoFacts are the observations the public ranking filters on. A nil member is unknown, which a
+// filter never treats as "no".
+type RepoFacts struct {
+	Files             *int32 `json:"files"`
+	LOC               *int32 `json:"loc"`
+	HasCI             *bool  `json:"has_ci"`
+	HasSecurityPolicy *bool  `json:"has_security_policy"`
 }

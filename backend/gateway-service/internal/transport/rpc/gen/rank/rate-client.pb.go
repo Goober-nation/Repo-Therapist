@@ -86,8 +86,18 @@ type GetRankingRequest struct {
 	// Leave out repos whose public grade is marked low-confidence. Repos without a flag row
 	// (unknown) are never left out.
 	HideLowConfidence bool `protobuf:"varint,5,opt,name=hide_low_confidence,json=hideLowConfidence,proto3" json:"hide_low_confidence,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Size bucket by lines of code: "small", "medium" or "large" (limits RANKING_SIZE_SMALL_LOC and
+	// RANKING_SIZE_LARGE_LOC); empty means any. Repos whose size is unknown never match.
+	Size string `protobuf:"bytes,6,opt,name=size,proto3" json:"size,omitempty"`
+	// Only repos that have (true) or lack (false) a CI config file; unset means any. Repos whose
+	// fact is unknown never match either value.
+	HasCi *bool `protobuf:"varint,7,opt,name=has_ci,json=hasCi,proto3,oneof" json:"has_ci,omitempty"`
+	// Only repos that have (true) or lack (false) a SECURITY.md; unset means any. Unknown never matches.
+	HasSecurityPolicy *bool `protobuf:"varint,8,opt,name=has_security_policy,json=hasSecurityPolicy,proto3,oneof" json:"has_security_policy,omitempty"`
+	// Case-insensitive text searched in the repository name and description; empty means any.
+	Topic         string `protobuf:"bytes,9,opt,name=topic,proto3" json:"topic,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetRankingRequest) Reset() {
@@ -153,6 +163,34 @@ func (x *GetRankingRequest) GetHideLowConfidence() bool {
 		return x.HideLowConfidence
 	}
 	return false
+}
+
+func (x *GetRankingRequest) GetSize() string {
+	if x != nil {
+		return x.Size
+	}
+	return ""
+}
+
+func (x *GetRankingRequest) GetHasCi() bool {
+	if x != nil && x.HasCi != nil {
+		return *x.HasCi
+	}
+	return false
+}
+
+func (x *GetRankingRequest) GetHasSecurityPolicy() bool {
+	if x != nil && x.HasSecurityPolicy != nil {
+		return *x.HasSecurityPolicy
+	}
+	return false
+}
+
+func (x *GetRankingRequest) GetTopic() string {
+	if x != nil {
+		return x.Topic
+	}
+	return ""
 }
 
 type RankingEntry struct {
@@ -1265,13 +1303,19 @@ var File_rate_client_proto protoreflect.FileDescriptor
 
 const file_rate_client_proto_rawDesc = "" +
 	"\n" +
-	"\x11rate-client.proto\x12\x06rating\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb9\x01\n" +
+	"\x11rate-client.proto\x12\x06rating\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd7\x02\n" +
 	"\x11GetRankingRequest\x12\x12\n" +
 	"\x04page\x18\x01 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x1a\n" +
 	"\blanguage\x18\x03 \x01(\tR\blanguage\x12'\n" +
 	"\asort_by\x18\x04 \x01(\x0e2\x0e.rating.SortByR\x06sortBy\x12.\n" +
-	"\x13hide_low_confidence\x18\x05 \x01(\bR\x11hideLowConfidence\"\xc8\x04\n" +
+	"\x13hide_low_confidence\x18\x05 \x01(\bR\x11hideLowConfidence\x12\x12\n" +
+	"\x04size\x18\x06 \x01(\tR\x04size\x12\x1a\n" +
+	"\x06has_ci\x18\a \x01(\bH\x00R\x05hasCi\x88\x01\x01\x123\n" +
+	"\x13has_security_policy\x18\b \x01(\bH\x01R\x11hasSecurityPolicy\x88\x01\x01\x12\x14\n" +
+	"\x05topic\x18\t \x01(\tR\x05topicB\t\n" +
+	"\a_has_ciB\x16\n" +
+	"\x14_has_security_policy\"\xc8\x04\n" +
 	"\fRankingEntry\x12\x14\n" +
 	"\x05place\x18\x01 \x01(\x05R\x05place\x12)\n" +
 	"\x10sourcecraft_uuid\x18\x02 \x01(\tR\x0fsourcecraftUuid\x12\x12\n" +
@@ -1456,6 +1500,7 @@ func file_rate_client_proto_init() {
 	if File_rate_client_proto != nil {
 		return
 	}
+	file_rate_client_proto_msgTypes[0].OneofWrappers = []any{}
 	file_rate_client_proto_msgTypes[1].OneofWrappers = []any{}
 	file_rate_client_proto_msgTypes[5].OneofWrappers = []any{}
 	file_rate_client_proto_msgTypes[7].OneofWrappers = []any{}

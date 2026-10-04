@@ -13,6 +13,19 @@ const (
 	SortByLikes        SortBy = "likes"
 )
 
+// RankingExtras are the filters beyond language and low-confidence: they read the repository facts
+// (docs/ranking.md). A repo whose fact is unknown never matches a filter on that fact.
+type RankingExtras struct {
+	// Size is "", "small", "medium" or "large" by lines of code; SmallLOC and LargeLOC are the limits
+	// between the buckets (small < SmallLOC <= medium < LargeLOC <= large).
+	Size               string
+	SmallLOC, LargeLOC int
+	// HasCI and HasSecurityPolicy filter on a CI config file and a SECURITY.md; nil means any.
+	HasCI, HasSecurityPolicy *bool
+	// Topic is text searched in the repository name and description (case-insensitive).
+	Topic string
+}
+
 // RankingRequest is a page request as received from the transport layer, before defaults.
 type RankingRequest struct {
 	Page     int
@@ -21,6 +34,7 @@ type RankingRequest struct {
 	SortBy   SortBy
 	// HideLowConfidence leaves out repos whose public grade is flagged low-confidence.
 	HideLowConfidence bool
+	Extra             RankingExtras
 }
 
 // RankingQuery is what the repository executes: defaults applied, page turned into limit/offset.
@@ -28,6 +42,7 @@ type RankingQuery struct {
 	Language          string
 	SortBy            SortBy
 	HideLowConfidence bool
+	Extra             RankingExtras
 	Limit             int
 	Offset            int
 	// DynamicsDays is the window of the score and place change (RANKING_DYNAMICS_DAYS).
@@ -171,7 +186,7 @@ type PositionExplanation struct {
 }
 
 type RankingRepository interface {
-	CountRanking(ctx context.Context, language string, hideLowConfidence bool) (int, error)
+	CountRanking(ctx context.Context, language string, hideLowConfidence bool, extra RankingExtras) (int, error)
 	ListRanking(ctx context.Context, query RankingQuery) ([]RankingRow, error)
 	// GetPublicScore returns the public score of a public repo (nil when not graded yet), or
 	// ErrNotFound when the repo is unknown or not public.

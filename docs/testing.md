@@ -274,6 +274,18 @@ docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "sele
 (cd backend/aggregator-service && POSTGRES_DSN="$POSTGRES_DSN" go test ./internal/database/... -v)
 ```
 
+Фильтры рейтинга (размер, CI, SECURITY.md, тематика; в браузере — на странице `/`):
+
+```bash
+curl -s "localhost:8081/api/ranking?size=large&ci=true"            # total_count и записи только с известными фактами
+curl -s "localhost:8081/api/ranking?topic=онтолог"                 # поиск по названию и описанию без учёта регистра
+curl -s -o /dev/null -w '%{http_code}\n' "localhost:8081/api/ranking?size=huge"   # 400
+docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select * from repo_facts_public"
+```
+
+Репозиторий появляется в фильтрах по фактам после первой оценки с фактами (старая оценка пересчитывается
+при открытии страницы репозитория).
+
 Динамика появляется, когда у репозитория есть оценка старше `RANKING_DYNAMICS_DAYS` дней. Для
 локальной проверки интерфейса можно вручную добавить в `repo_grade_history` строки со старыми
 `graded_at` (только в локальной базе) и удалить их после проверки. В браузере: `/` (стрелки и ±Score

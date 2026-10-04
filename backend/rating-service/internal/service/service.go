@@ -7,6 +7,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"rating-service/internal/domain"
 )
@@ -14,6 +15,12 @@ import (
 const (
 	DefaultPageSize = 20
 	MaxPageSize     = 100
+
+	// Default size-bucket limits in lines of code: small below 2000, large from 20000.
+	DefaultSizeSmallLOC = 2000
+	DefaultSizeLargeLOC = 20000
+	// MaxTopicLength bounds the topic text of a ranking filter.
+	MaxTopicLength = 64
 
 	// DefaultDynamicsDays is the default window of the score and place change.
 	DefaultDynamicsDays = 7
@@ -28,6 +35,8 @@ const (
 type RatingService struct {
 	repo         domain.RankingRepository
 	dynamicsDays int
+	sizeSmallLOC int
+	sizeLargeLOC int
 }
 
 // NewRatingService builds the service; dynamicsDays is the window of the score and place change
@@ -40,16 +49,26 @@ func NewRatingService(repo domain.RankingRepository, dynamicsDays int) *RatingSe
 	return &RatingService{
 		repo:         repo,
 		dynamicsDays: dynamicsDays,
+		sizeSmallLOC: DefaultSizeSmallLOC,
+		sizeLargeLOC: DefaultSizeLargeLOC,
+	}
+}
+
+// SetSizeBuckets sets the limits (lines of code) between the small, medium and large size filters;
+// a non-positive or inverted pair keeps the defaults.
+func (s *RatingService) SetSizeBuckets(small, large int) {
+	if small > 0 && large > small {
+		s.sizeSmallLOC, s.sizeLargeLOC = small, large
 	}
 }
 
 func (s *RatingService) GetRanking(ctx context.Context, req domain.RankingRequest) (domain.RankingPage, error) {
-	query, page, err := buildQuery(req, s.dynamicsDays)
+	query, page, err := buildQuery(req, s.dynamicsDays, s.sizeSmallLOC, s.sizeLargeLOC)
 	if err != nil {
 		return domain.RankingPage{}, err
 	}
 
-	total, err := s.repo.CountRanking(ctx, query.Language, query.HideLowConfidence)
+	total, err := s.repo.CountRanking(ctx, query.Language, query.HideLowConfidence, query.Extra)
 	if err != nil {
 		return domain.RankingPage{}, err
 	}
@@ -158,7 +177,7 @@ func decodeCategories(raw []byte) ([]domain.CategoryScore, error) {
 
 // buildQuery applies defaults and validates the request. Returns the effective page number
 // alongside the query, since the query itself only carries limit/offset.
-func buildQuery(req domain.RankingRequest, dynamicsDays int) (domain.RankingQuery, int, error) {
+func buildQuery(req domain.RankingRequest, dynamicsDays, sizeSmallLOC, sizeLargeLOC int) (domain.RankingQuery, int, error) {
 	page := req.Page
 	if page < 0 {
 		return domain.RankingQuery{}, 0, fmt.Errorf("%w: page must not be negative", domain.ErrInvalidArgument)
@@ -181,7 +200,22 @@ func buildQuery(req domain.RankingRequest, dynamicsDays int) (domain.RankingQuer
 		return domain.RankingQuery{}, 0, fmt.Errorf("%w: unknown sort %q", domain.ErrInvalidArgument, req.SortBy)
 	}
 
+	extra := req.Extra
+	switch extra.Size {
+	case "", "small", "medium", "large":
+	default:
+		return domain.RankingQuery{}, 0, fmt.Errorf("%w: size must be small, medium or large, got %q", domain.ErrInvalidArgument, extra.Size)
+	}
+
+	extra.Topic = strings.TrimSpace(extra.Topic)
+	if utf8.RuneCountInString(extra.Topic) > MaxTopicLength {
+		return domain.RankingQuery{}, 0, fmt.Errorf("%w: topic must be at most %d characters", domain.ErrInvalidArgument, MaxTopicLength)
+	}
+
+	extra.SmallLOC, extra.LargeLOC = sizeSmallLOC, sizeLargeLOC
+
 	return domain.RankingQuery{
+		Extra:             extra,
 		Language:          strings.TrimSpace(req.Language),
 		SortBy:            req.SortBy,
 		HideLowConfidence: req.HideLowConfidence,

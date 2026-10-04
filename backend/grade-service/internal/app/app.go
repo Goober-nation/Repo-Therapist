@@ -17,6 +17,7 @@ import (
 	"repo-therapist/grade-service/internal/appsecwrapper"
 	"repo-therapist/grade-service/internal/config"
 	"repo-therapist/grade-service/internal/contracts"
+	"repo-therapist/grade-service/internal/facts"
 	"repo-therapist/grade-service/internal/gitlog"
 	"repo-therapist/grade-service/internal/issuereplies"
 	"repo-therapist/grade-service/internal/scoring"
@@ -46,6 +47,8 @@ type GradeOutput struct {
 	ConfidenceInputs scoring.ConfidenceInputs `json:"-"`
 	// AnalyticsInputs feed the informational analytics; also not part of the printed result.
 	AnalyticsInputs analytics.Inputs `json:"-"`
+	// FactsInputs feed the repository facts the public ranking filters on; not printed either.
+	FactsInputs facts.Inputs `json:"-"`
 }
 
 // CategoryIDs returns the categories graded for a visibility: the private view is a superset
@@ -174,8 +177,10 @@ func Grade(ctx context.Context, repoID, prefix string, cfg *config.Config, token
 		analyticsInputs.IssueReplies = &filtered
 	}
 
+	factsInputs := readFactsInputs(ctx, s3Client, prefix, confidenceInputs)
+
 	if !private {
-		return &GradeOutput{RepoID: repoID, Categories: categories, ConfidenceInputs: confidenceInputs, AnalyticsInputs: analyticsInputs}, nil
+		return &GradeOutput{RepoID: repoID, Categories: categories, ConfidenceInputs: confidenceInputs, AnalyticsInputs: analyticsInputs, FactsInputs: factsInputs}, nil
 	}
 
 	ciInputs := scoring.CICDInputs{}
@@ -204,11 +209,39 @@ func Grade(ctx context.Context, repoID, prefix string, cfg *config.Config, token
 
 	categories["security"] = securityResult
 	categories["ci_cd"] = ciResult
-	return &GradeOutput{RepoID: repoID, Categories: categories, ConfidenceInputs: confidenceInputs, AnalyticsInputs: analyticsInputs}, nil
+	return &GradeOutput{RepoID: repoID, Categories: categories, ConfidenceInputs: confidenceInputs, AnalyticsInputs: analyticsInputs, FactsInputs: factsInputs}, nil
 }
 
 // codeownersPaths are the places CODEOWNERS may live, in the order platforms look for it.
 var codeownersPaths = []string{"CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"}
+
+// securityPolicyPaths are where a repository keeps its security policy.
+var securityPolicyPaths = []string{"SECURITY.md", "security.md", "SECURITY.rst", ".github/SECURITY.md", "docs/SECURITY.md"}
+
+// readFactsInputs reads what the ranking filters need beyond the grading inputs: which CI configs the
+// repository has (from ci-runs.json, which is exported for public gradings too) and whether it has a
+// security policy file. Advisory: an unreadable export just leaves the fact unknown.
+func readFactsInputs(ctx context.Context, s3Client *storage.Client, prefix string, confidence scoring.ConfidenceInputs) facts.Inputs {
+	in := facts.Inputs{CodeAvailable: confidence.CodeAvailable, Files: confidence.ScannedFiles, LOC: confidence.TotalLOC}
+
+	if data, err := s3Client.GetObject(ctx, prefix+"/_meta/ci-runs.json"); err == nil {
+		var export struct {
+			ConfigFiles []string `json:"config_files"`
+		}
+		if json.Unmarshal(data, &export) == nil {
+			in.CIAvailable, in.CIConfigFiles = true, export.ConfigFiles
+		}
+	}
+
+	for _, p := range securityPolicyPaths {
+		if data, err := s3Client.GetObject(ctx, prefix+"/"+p); err == nil && len(data) > 0 {
+			in.SecurityPolicyFound = true
+			break
+		}
+	}
+
+	return in
+}
 
 // readCodeowners returns the repo's CODEOWNERS file from the job's S3 export, or "" and nil when
 // there is none. A read error is logged and treated as "none": it is advisory data.
@@ -340,6 +373,14 @@ func BuildGradingResult(out *GradeOutput, cfg *config.Config, catalog map[string
 		Advice:          recsJSON,
 		MissingData:     scoring.MissingCategories(out.Categories, ids),
 		GradedAt:        now,
+	}
+	// Facts feed the public ranking's filters, so they are only sent with a public grading.
+	if visibility == contracts.VisibilityPublic {
+		if raw, err := json.Marshal(facts.Build(out.FactsInputs)); err == nil {
+			result.Facts = raw
+		} else {
+			log.Printf("marshaling facts for %s: %v (the repository is left out of facts filters)", out.RepoID, err)
+		}
 	}
 	// Analytics are informational and computed for either mode; a marshal failure only drops them.
 	if computed := analytics.Compute(cfg.Analytics, out.AnalyticsInputs, now); computed != nil {

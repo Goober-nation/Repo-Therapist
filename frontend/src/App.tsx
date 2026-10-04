@@ -18,7 +18,7 @@ import Sidebar from "./components/Sidebar"
 import TopBar from "./components/TopBar"
 import CompareRoute from "./pages/CompareRoute"
 import MyRepositoriesPage from "./pages/MyRepositoriesPage"
-import RankingPage, { DEFAULT_RANKING_QUERY, type RankingQuery } from "./pages/RankingPage"
+import RankingPage, { DEFAULT_RANKING_QUERY, rankingFilters, type RankingQuery } from "./pages/RankingPage"
 import RepositoryOverviewPage from "./pages/RepositoryOverviewPage"
 import RulesPage from "./pages/RulesPage"
 import { gradingToken } from "./metrics"
@@ -108,13 +108,19 @@ export default function App() {
 
   // One ranking page per request, loaded when the ranking is shown; a page already on screen
   // is not fetched again when the user comes back to it.
-  const rankingKey = `${rankingQuery.page}|${rankingQuery.sort}|${rankingQuery.language}|${rankingQuery.hideLowConfidence}|${rankingAttempt}`
+  const rankingKey = `${rankingQuery.page}|${rankingQuery.sort}|${rankingQuery.language}|${rankingQuery.hideLowConfidence}|${rankingQuery.size}|${rankingQuery.ci}|${rankingQuery.security}|${rankingQuery.topic}|${rankingAttempt}`
   useEffect(() => {
     if (route.page !== "ranking" || ranking.loadedKey === rankingKey) return
     let active = true
     setRanking((current) => ({ ...current, isLoading: true, error: undefined }))
     api
-      .getRanking(rankingQuery.page, rankingQuery.sort, rankingQuery.language, rankingQuery.hideLowConfidence)
+      .getRanking(
+        rankingQuery.page,
+        rankingQuery.sort,
+        rankingQuery.language,
+        rankingQuery.hideLowConfidence,
+        rankingFilters(rankingQuery),
+      )
       .then((response) => {
         if (!active) return
         const items = response.entries.flatMap((entry) => repositoryFromRanking(entry) ?? [])

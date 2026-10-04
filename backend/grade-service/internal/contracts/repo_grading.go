@@ -139,7 +139,11 @@ type GradingResultEvent struct {
 	// Analytics is the informational analytics object (docs/grading/analytics.md) for either
 	// grade mode; null on failures and when the analytics are switched off.
 	Analytics json.RawMessage `json:"analytics"`
-	Error     string          `json:"error"`
+	// Facts are the repository facts the public ranking filters on (size, a CI config, a security
+	// policy file; docs/ranking.md), sent only with a public grading; null otherwise. Nil members are
+	// unknown, never "no".
+	Facts json.RawMessage `json:"facts"`
+	Error string          `json:"error"`
 }
 
 // Grading failure codes carried in GradingResultEvent.Error.

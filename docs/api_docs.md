@@ -623,7 +623,7 @@ rpc GetReccomendations(GetReccomendationsRequest) returns (GetReccomendationsRes
 | `GET /repos` | `PAT` (обязателен) | без `org` — прежний список по всем организациям (`GET /me/repos`, может не уложиться в таймаут для больших организаций): `{repositories: [{sourcecraft_uuid, org_slug, repo_slug, web_url, visibility, last_activity_at, rating, language: {name, color}}], next_page_token}` |
 | `GET /grading/{org}/{repo}` | `PAT` (опционален) | `{status, grade: {sourcecraft_uuid, score, category_scores, advice, missing_data, graded_at}}` |
 | `GET /recommendations/{org}/{repo}` | `PAT` (опционален) | `{status, raw_response: {summary, recommendations: [{priority, category, text}]}, model_used, evaluated_at}` |
-| `GET /ranking?page=&page_size=&sortby=&filter=&hide_low_confidence=` | — | `{entries: [{place, sourcecraft_uuid, name, web_url, public_score, likes, language, last_activity_at, low_confidence, confidence_reasons}], total_count, page, page_size}` |
+| `GET /ranking?page=&page_size=&sortby=&filter=&hide_low_confidence=&size=&ci=&security=&topic=` | — | `{entries: [{place, sourcecraft_uuid, name, web_url, public_score, likes, language, last_activity_at, low_confidence, confidence_reasons}], total_count, page, page_size}` |
 | `GET /analytics/{org}/{repo}` | `PAT` (опционален) | `{status, analytics, graded_at}`: справочные показатели (фактор автобуса, карта владельцев, ревью pull request); с токеном владельца — приватные |
 | `GET /badge/{org}/{repo}.svg` | — | SVG-бейдж с сохранённой публичной оценкой (`image/svg+xml`, `Cache-Control: max-age=300`); оценку не запускает, лимит по IP не применяется; неизвестный или не оценённый репозиторий — серый `n/a` |
 | `GET /badge/{org}/{repo}/{category}.svg` | — | SVG-бейдж одной публичной категории: `activity`, `issues`, `documentation`, `code_health`; категория без данных — серый `n/a`, любой другой ID (в том числе `security` и `ci_cd`) — `404` |
@@ -632,6 +632,12 @@ rpc GetReccomendations(GetReccomendationsRequest) returns (GetReccomendationsRes
 | `GET /score/{org}/{repo}` | — | публичный JSON API: `{org, repo, name, web_url, status, score, level, categories: [{id, score, no_data}], missing_data, graded_at}`; только чтение |
 | `GET /history/{org}/{repo}` | — | история публичных оценок: `{org, repo, status, points: [{graded_at, score, categories: [{id, score, no_data}], low_confidence}]}`, от старых к новым, последние 200 точек; `NO_DATA` без истории, `404` для неизвестного или непубличного репозитория |
 | `GET /position/{org}/{repo}` | — | почему такое место: `{org, repo, status, place, total, score, above, below, categories: [{id, score, top10_median, gap}], weakest_category}`; `above`/`below` — `{place, org, name, score, points}` или `null` на краях; `NO_DATA`, если репозиторий не оценён |
+
+`GET /ranking` принимает фильтры `size=small|medium|large` (по числу строк кода), `ci=true|false`
+(есть ли файл настройки CI), `security=true|false` (есть ли `SECURITY.md`) и `topic=<текст>` (поиск по
+названию и описанию, до 64 символов); не указанный параметр означает «любой», неверное значение — `400`.
+Репозиторий, для которого факт не известен, ни под `true`, ни под `false` не попадает; `total_count`
+считается по той же выборке. Подробности — [ranking.md](ranking.md).
 
 `GET /ranking` принимает `hide_low_confidence=true|false` (по умолчанию `false`): при `true` из
 списка и из `total_count` убираются репозитории с флагом `low_confidence: true`; порядок остальных

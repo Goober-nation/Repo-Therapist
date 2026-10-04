@@ -346,3 +346,37 @@ func TestMapGetRankingResponseCarriesDynamics(t *testing.T) {
 		t.Errorf("second = %+v, want nil changes", e)
 	}
 }
+
+func TestGetRankingPassesTheFactFiltersToTheRatingService(t *testing.T) {
+	yes, no := true, false
+	rating := &captureRanking{}
+	svc := newRatingService(&fakeRating{})
+	svc.ratingClient = rating
+
+	_, err := svc.GetRanking(context.Background(), "ip", domain.GetRankingDTO{Size: "large", HasCI: &yes, HasSecurityPolicy: &no, Topic: "api"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := rating.req
+	if got.GetSize() != "large" || got.GetTopic() != "api" || got.HasCi == nil || !*got.HasCi || got.HasSecurityPolicy == nil || *got.HasSecurityPolicy {
+		t.Errorf("request = %+v, want large, api, has_ci=true and has_security_policy=false", got)
+	}
+
+	if _, err := svc.GetRanking(context.Background(), "ip", domain.GetRankingDTO{}); err != nil {
+		t.Fatal(err)
+	}
+	if rating.req.HasCi != nil || rating.req.HasSecurityPolicy != nil || rating.req.GetSize() != "" {
+		t.Errorf("an empty request must leave the filters unset: %+v", rating.req)
+	}
+}
+
+type captureRanking struct {
+	rank.RatingClient
+	req *rank.GetRankingRequest
+}
+
+func (c *captureRanking) GetRanking(ctx context.Context, in *rank.GetRankingRequest, opts ...grpc.CallOption) (*rank.GetRankingResponse, error) {
+	c.req = in
+	return &rank.GetRankingResponse{}, nil
+}

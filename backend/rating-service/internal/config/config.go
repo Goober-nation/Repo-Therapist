@@ -11,6 +11,9 @@ type Config struct {
 	Database DatabaseConfig
 	// DynamicsDays is the window of the score and place change in the ranking (RANKING_DYNAMICS_DAYS).
 	DynamicsDays int
+	// SizeSmallLOC and SizeLargeLOC are the size-filter limits in lines of code (RANKING_SIZE_SMALL_LOC,
+	// RANKING_SIZE_LARGE_LOC).
+	SizeSmallLOC, SizeLargeLOC int
 }
 
 type GRPCConfig struct {
@@ -51,8 +54,23 @@ func LoadConfig() *Config {
 		dynamicsDays = 7
 	}
 
+	sizeSmall, err := strconv.Atoi(getEnvDefault("RANKING_SIZE_SMALL_LOC", "2000"))
+	if err != nil || sizeSmall < 1 {
+		sizeSmall = 2000
+	}
+
+	sizeLarge, err := strconv.Atoi(getEnvDefault("RANKING_SIZE_LARGE_LOC", "20000"))
+	if err != nil || sizeLarge <= sizeSmall {
+		sizeLarge = 20000
+		if sizeLarge <= sizeSmall {
+			sizeSmall = 2000
+		}
+	}
+
 	return &Config{
 		DynamicsDays: dynamicsDays,
+		SizeSmallLOC: sizeSmall,
+		SizeLargeLOC: sizeLarge,
 
 		GRPC: GRPCConfig{
 			Address: getEnvDefault("GRPC_ADDRESS", ":8086"),

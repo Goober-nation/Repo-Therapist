@@ -141,3 +141,60 @@ func TestRankingResponseCarriesDynamics(t *testing.T) {
 		t.Errorf("second = %v, want null changes for a repo without a past grade", fresh)
 	}
 }
+
+func TestRankingFactFilterParameters(t *testing.T) {
+	svc := &fakeService{}
+	rec := serve(t, svc, "GET", "/ranking?size=medium&ci=true&security=false&topic=%20REST%20API%20", nil)
+	if rec.Code != stdhttp.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+
+	got := svc.ranking
+	if got.Size != "medium" || got.Topic != "REST API" || got.HasCI == nil || !*got.HasCI || got.HasSecurityPolicy == nil || *got.HasSecurityPolicy {
+		t.Errorf("filters = %+v, want medium, 'REST API' (trimmed), ci=true and security=false", got)
+	}
+
+	// Not given means any (nil), never false.
+	svc = &fakeService{}
+	serve(t, svc, "GET", "/ranking", nil)
+	if svc.ranking.Size != "" || svc.ranking.HasCI != nil || svc.ranking.HasSecurityPolicy != nil || svc.ranking.Topic != "" {
+		t.Errorf("no parameters must leave every filter off: %+v", svc.ranking)
+	}
+
+	for _, value := range []string{"true", "1", "TRUE"} {
+		svc = &fakeService{}
+		serve(t, svc, "GET", "/ranking?ci="+value, nil)
+		if svc.ranking.HasCI == nil || !*svc.ranking.HasCI {
+			t.Errorf("ci=%s: %v, want true", value, svc.ranking.HasCI)
+		}
+	}
+}
+
+func TestRankingFactFilterParametersAreValidated(t *testing.T) {
+	long := ""
+	for i := 0; i < 65; i++ {
+		long += "я"
+	}
+
+	for name, query := range map[string]string{
+		"unknown size":   "size=huge",
+		"bad ci":         "ci=maybe",
+		"bad security":   "security=2x",
+		"topic too long": "topic=" + long,
+	} {
+		svc := &fakeService{}
+		if rec := serve(t, svc, "GET", "/ranking?"+query, nil); rec.Code != stdhttp.StatusBadRequest || svc.called {
+			t.Errorf("%s: status %d called %v, want 400 without a lookup", name, rec.Code, svc.called)
+		}
+	}
+
+	exact := ""
+	for i := 0; i < 64; i++ {
+		exact += "я"
+	}
+
+	svc := &fakeService{}
+	if rec := serve(t, svc, "GET", "/ranking?topic="+exact, nil); rec.Code != stdhttp.StatusOK {
+		t.Errorf("a topic of exactly 64 characters (not bytes) must be accepted, got %d", rec.Code)
+	}
+}

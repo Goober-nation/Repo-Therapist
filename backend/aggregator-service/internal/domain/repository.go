@@ -37,6 +37,13 @@ type GradesRepository interface {
 	GetPublicAnalytics(ctx context.Context, repoID uuid.UUID) (RepoAnalytics, error)
 	GetPrivateAnalytics(ctx context.Context, repoID uuid.UUID) (RepoAnalytics, error)
 
+	// UpsertPublicFacts stores the filterable facts of a public grade; DeletePublicFacts removes
+	// them (grade-service sent none), so a stale fact never survives.
+	UpsertPublicFacts(ctx context.Context, repoID uuid.UUID, facts RepoFacts, gradedAt *time.Time) error
+	DeletePublicFacts(ctx context.Context, repoID uuid.UUID) error
+	// HasPublicFacts reports whether the repo has a facts row (even one whose members are all unknown).
+	HasPublicFacts(ctx context.Context, repoID uuid.UUID) (bool, error)
+
 	// AppendPublicHistory adds one point to the public score history (docs/ranking.md). It is
 	// append-only and idempotent: a point with the same repo and graded_at is ignored. A grade
 	// without a score or graded_at has no history point and is skipped without error.

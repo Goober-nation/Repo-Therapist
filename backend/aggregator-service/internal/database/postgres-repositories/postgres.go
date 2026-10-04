@@ -72,9 +72,10 @@ func (r *RepoRepository) CreateRepository(
 		 	main_language,
   			language_color,
   			sourcecraft_rating,
-  			web_url
+  			web_url,
+			description
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		`,
 		id,
 		repo.OrgSlug,
@@ -85,6 +86,7 @@ func (r *RepoRepository) CreateRepository(
 		repo.Language.Color,
 		repo.RatingValue,
 		repo.WebURL,
+		repo.Description,
 	)
 	if err != nil {
 		return uuid.Nil, mapRepositoryError(err)
@@ -125,7 +127,8 @@ func (r *RepoRepository) UpdateRepository(ctx context.Context, repo domain.Repo)
 			main_language = $6,
   			language_color = $7,
   			sourcecraft_rating = $8,
-  			web_url = $9
+  			web_url = $9,
+			description = $10
 		WHERE sourcecraft_uuid = $1
 		`,
 		repo.SourcecraftUUID,
@@ -137,6 +140,7 @@ func (r *RepoRepository) UpdateRepository(ctx context.Context, repo domain.Repo)
 		repo.Language.Color,
 		repo.RatingValue,
 		repo.WebURL,
+		repo.Description,
 	)
 
 	if err != nil {
@@ -757,4 +761,34 @@ func (r *GradesRepository) AppendPublicHistory(ctx context.Context, grade domain
 	)
 
 	return err
+}
+
+// UpsertPublicFacts stores the filterable facts of a public grade (one row per repo).
+func (r *GradesRepository) UpsertPublicFacts(ctx context.Context, repoID uuid.UUID, facts domain.RepoFacts, gradedAt *time.Time) error {
+	_, err := r.db.Exec(
+		ctx,
+		`INSERT INTO repo_facts_public (sourcecraft_uuid, files, loc, has_ci, has_security_policy, graded_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (sourcecraft_uuid)
+		DO UPDATE SET files = EXCLUDED.files, loc = EXCLUDED.loc, has_ci = EXCLUDED.has_ci,
+			has_security_policy = EXCLUDED.has_security_policy, graded_at = EXCLUDED.graded_at`,
+		repoID, facts.Files, facts.LOC, facts.HasCI, facts.HasSecurityPolicy, gradedAt,
+	)
+
+	return mapGradeError(err)
+}
+
+// DeletePublicFacts removes a repo's facts row.
+func (r *GradesRepository) DeletePublicFacts(ctx context.Context, repoID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM repo_facts_public WHERE sourcecraft_uuid = $1`, repoID)
+
+	return mapGradeError(err)
+}
+
+// HasPublicFacts reports whether a facts row exists for the repo.
+func (r *GradesRepository) HasPublicFacts(ctx context.Context, repoID uuid.UUID) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM repo_facts_public WHERE sourcecraft_uuid = $1)`, repoID).Scan(&exists)
+
+	return exists, err
 }

@@ -302,7 +302,7 @@ func needsGrading(repo domain.Repo, grade domain.RepoGrade) bool {
 const MinAnalyticsVersion = 4
 
 // needsRegrade is needsGrading plus the data check: a grade whose analytics row is missing, or
-// stored with an older schema version, is outdated too. Only a definite answer counts; a failed
+// stored with an older schema version, or (public view) whose facts row is missing, is outdated too. Only a definite answer counts; a failed
 // lookup never starts a grading.
 func (as *AggregatorService) needsRegrade(ctx context.Context, repo domain.Repo, private bool, grade domain.RepoGrade) bool {
 	if needsGrading(repo, grade) {
@@ -327,7 +327,17 @@ func (as *AggregatorService) needsRegrade(ctx context.Context, repo domain.Repo,
 		return true
 	}
 
-	return err == nil && analyticsVersion(analytics.Analytics) < MinAnalyticsVersion
+	if err == nil && analyticsVersion(analytics.Analytics) < MinAnalyticsVersion {
+		return true
+	}
+
+	// The ranking filters read the facts of a public grade; a grade stored before they existed has none.
+	if !private {
+		hasFacts, factsErr := as.GradesRepo.HasPublicFacts(ctx, repo.SourcecraftUUID)
+		return factsErr == nil && !hasFacts
+	}
+
+	return false
 }
 
 // analyticsVersion reads the schema version of a stored analytics object; 0 when it has none.
@@ -621,6 +631,7 @@ func (as *AggregatorService) SaveGradingResult(ctx context.Context,
 
 		as.saveAnalytics(ctx, grade, true)
 		as.saveHistory(ctx, grade)
+		as.saveFacts(ctx, grade)
 
 	case domain.VisibilityPrivate:
 		if err := as.GradesRepo.UpsertPrivateGrade(ctx, grade); err != nil {
@@ -690,6 +701,25 @@ func (as *AggregatorService) saveAnalytics(ctx context.Context, grade domain.Rep
 func (as *AggregatorService) saveHistory(ctx context.Context, grade domain.RepoGrade) {
 	if err := as.GradesRepo.AppendPublicHistory(ctx, grade); err != nil {
 		log.Printf("append score history of %s: %v", grade.SourcecraftUUID, err)
+	}
+}
+
+// saveFacts stores the filterable facts next to a public grade, or removes a stale row when
+// grade-service sent none or an unreadable object. The facts are advisory filters and the grade is
+// already saved, so a failure here is only logged and never fails the grading.
+func (as *AggregatorService) saveFacts(ctx context.Context, grade domain.RepoGrade) {
+	var facts domain.RepoFacts
+
+	if isJSONEmpty(grade.Facts) || json.Unmarshal(grade.Facts, &facts) != nil {
+		if err := as.GradesRepo.DeletePublicFacts(ctx, grade.SourcecraftUUID); err != nil {
+			log.Printf("delete facts of %s: %v", grade.SourcecraftUUID, err)
+		}
+
+		return
+	}
+
+	if err := as.GradesRepo.UpsertPublicFacts(ctx, grade.SourcecraftUUID, facts, grade.GradedAt); err != nil {
+		log.Printf("save facts of %s: %v", grade.SourcecraftUUID, err)
 	}
 }
 
@@ -851,6 +881,7 @@ type wrapperRepo interface {
 	GetLanguage() *client.Language
 	GetRating() *client.Rating
 	GetWebUrl() string
+	GetDescription() string
 }
 
 func repoFromWrapper(r wrapperRepo) (domain.Repo, error) {
@@ -892,6 +923,7 @@ func repoFromWrapper(r wrapperRepo) (domain.Repo, error) {
 		},
 		RatingValue: r.GetRating().GetValue(),
 		WebURL:      r.GetWebUrl(),
+		Description: r.GetDescription(),
 	}, nil
 }
 

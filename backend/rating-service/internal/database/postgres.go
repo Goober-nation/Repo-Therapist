@@ -32,8 +32,8 @@ func NewRankingRepository(db *pgxpool.Pool) *RankingRepository {
 	}
 }
 
-func (r *RankingRepository) CountRanking(ctx context.Context, language string, hideLowConfidence bool) (int, error) {
-	query, args := buildCountQuery(language, hideLowConfidence)
+func (r *RankingRepository) CountRanking(ctx context.Context, language string, hideLowConfidence bool, extra domain.RankingExtras) (int, error) {
+	query, args := buildCountQuery(language, hideLowConfidence, extra)
 
 	var count int
 	if err := r.db.QueryRow(ctx, query, args...).Scan(&count); err != nil {
@@ -152,7 +152,7 @@ func (r *RankingRepository) GetPublicSummary(ctx context.Context, orgSlug, repoS
 }
 
 // whereClause returns the shared filter for the count and list queries. Placeholders start at $1.
-func whereClause(language string, hideLowConfidence bool) (string, []any) {
+func whereClause(language string, hideLowConfidence bool, extra domain.RankingExtras) (string, []any) {
 	var b strings.Builder
 	var args []any
 
@@ -171,8 +171,53 @@ func whereClause(language string, hideLowConfidence bool) (string, []any) {
 			" WHERE c.sourcecraft_uuid = r.sourcecraft_uuid AND c.low_confidence)")
 	}
 
+	writeExtras(&b, &args, extra)
+
 	return b.String(), args
 }
+
+// writeExtras adds the fact filters. Facts live in repo_facts_public; comparing a NULL (unknown)
+// member to anything is never true, so an unknown fact matches neither "has" nor "lacks", and a repo
+// without a facts row is simply left out of any facts filter.
+func writeExtras(b *strings.Builder, args *[]any, extra domain.RankingExtras) {
+	var conds []string
+
+	add := func(format string, value any) {
+		*args = append(*args, value)
+		conds = append(conds, fmt.Sprintf(format, len(*args)))
+	}
+
+	switch extra.Size {
+	case "small":
+		add("f.loc < $%d", extra.SmallLOC)
+	case "medium":
+		add("f.loc >= $%d", extra.SmallLOC)
+		add("f.loc < $%d", extra.LargeLOC)
+	case "large":
+		add("f.loc >= $%d", extra.LargeLOC)
+	}
+
+	if extra.HasCI != nil {
+		add("f.has_ci = $%d", *extra.HasCI)
+	}
+
+	if extra.HasSecurityPolicy != nil {
+		add("f.has_security_policy = $%d", *extra.HasSecurityPolicy)
+	}
+
+	if len(conds) > 0 {
+		b.WriteString(" AND EXISTS (SELECT 1 FROM repo_facts_public f WHERE f.sourcecraft_uuid = r.sourcecraft_uuid AND " +
+			strings.Join(conds, " AND ") + ")")
+	}
+
+	if topic := strings.TrimSpace(extra.Topic); topic != "" {
+		*args = append(*args, "%"+likeEscaper.Replace(topic)+"%")
+		fmt.Fprintf(b, " AND (r.repo_slug ILIKE $%[1]d ESCAPE '\\' OR COALESCE(r.description, '') ILIKE $%[1]d ESCAPE '\\')", len(*args))
+	}
+}
+
+// likeEscaper makes the user's topic text literal inside a LIKE pattern.
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
 // decodeConfidence builds the flag from its columns; a nil low means there is no flag row.
 func decodeConfidence(low *bool, reasons []byte) (*domain.Confidence, error) {
@@ -190,8 +235,8 @@ func decodeConfidence(low *bool, reasons []byte) (*domain.Confidence, error) {
 	return confidence, nil
 }
 
-func buildCountQuery(language string, hideLowConfidence bool) (string, []any) {
-	where, args := whereClause(language, hideLowConfidence)
+func buildCountQuery(language string, hideLowConfidence bool, extra domain.RankingExtras) (string, []any) {
+	where, args := whereClause(language, hideLowConfidence, extra)
 
 	return "SELECT count(*) FROM repos r " + where, args
 }
@@ -202,7 +247,7 @@ func buildListQuery(q domain.RankingQuery) (string, []any, error) {
 		return "", nil, fmt.Errorf("%w: unknown sort %q", domain.ErrInvalidArgument, q.SortBy)
 	}
 
-	where, args := whereClause(q.Language, q.HideLowConfidence)
+	where, args := whereClause(q.Language, q.HideLowConfidence, q.Extra)
 
 	args = append(args, q.DynamicsDays, q.Limit, q.Offset)
 	daysArg, limitArg, offsetArg := len(args)-2, len(args)-1, len(args)

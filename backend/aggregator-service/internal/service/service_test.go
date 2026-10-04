@@ -92,6 +92,35 @@ type fakeGrades struct {
 
 	history    []domain.RepoGrade
 	historyErr error
+
+	facts        map[uuid.UUID]domain.RepoFacts
+	factsDeleted []uuid.UUID
+	factsErr     error
+	hasFactsErr  error
+}
+
+func (f *fakeGrades) UpsertPublicFacts(ctx context.Context, repoID uuid.UUID, facts domain.RepoFacts, gradedAt *time.Time) error {
+	if f.factsErr != nil {
+		return f.factsErr
+	}
+	if f.facts == nil {
+		f.facts = map[uuid.UUID]domain.RepoFacts{}
+	}
+	f.facts[repoID] = facts
+	return nil
+}
+
+func (f *fakeGrades) HasPublicFacts(ctx context.Context, repoID uuid.UUID) (bool, error) {
+	if f.hasFactsErr != nil {
+		return false, f.hasFactsErr
+	}
+	_, ok := f.facts[repoID]
+	return ok, nil
+}
+
+func (f *fakeGrades) DeletePublicFacts(ctx context.Context, repoID uuid.UUID) error {
+	f.factsDeleted = append(f.factsDeleted, repoID)
+	return f.factsErr
 }
 
 func (f *fakeGrades) AppendPublicHistory(ctx context.Context, grade domain.RepoGrade) error {
@@ -469,6 +498,7 @@ func TestGetGradingRegradesWhenAnalyticsVersionIsOld(t *testing.T) {
 			score := int16(80)
 			f.grades.public[testRepoID] = domain.RepoGrade{SourcecraftUUID: testRepoID, Score: &score, GradedAt: gradedAt(testNow)}
 			_ = f.grades.putAnalytics(true, testRepoID, json.RawMessage(tc.body), gradedAt(testNow))
+			f.grades.facts = map[uuid.UUID]domain.RepoFacts{testRepoID: {}}
 
 			_, err := f.svc.GetGrading(userCtx(""), "org", "repo")
 			if got := errors.Is(err, domain.GradingPending); got != tc.want {
@@ -491,6 +521,7 @@ func TestGetGradingKeepsGradeWhenAnalyticsPresentOrCheckOff(t *testing.T) {
 			f.grades.public[testRepoID] = domain.RepoGrade{SourcecraftUUID: testRepoID, Score: &score, GradedAt: gradedAt(testNow)}
 			if tc.present {
 				_ = f.grades.putAnalytics(true, testRepoID, json.RawMessage(`{"version":4}`), gradedAt(testNow))
+				f.grades.facts = map[uuid.UUID]domain.RepoFacts{testRepoID: {}}
 			}
 
 			if _, err := f.svc.GetGrading(userCtx(""), "org", "repo"); err != nil {
@@ -500,6 +531,46 @@ func TestGetGradingKeepsGradeWhenAnalyticsPresentOrCheckOff(t *testing.T) {
 				t.Errorf("published %d grading requests, want 0", len(f.grading.events))
 			}
 		})
+	}
+}
+
+// A public grade stored before the ranking filters existed has no facts; opening it regrades it so
+// the filters can see the repository. A facts row whose members are all unknown still counts as present.
+func TestGetGradingRegradesAPublicGradeWithoutFacts(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		facts    map[uuid.UUID]domain.RepoFacts
+		lookup   error
+		wantPend bool
+	}{
+		{"no facts row", nil, nil, true},
+		{"facts row with every member unknown", map[uuid.UUID]domain.RepoFacts{testRepoID: {}}, nil, false},
+		{"a failed lookup never starts a grading", nil, errors.New("db down"), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture("public")
+			f.svc.RegradeMissingAnalytics = true
+			score := int16(80)
+			f.grades.public[testRepoID] = domain.RepoGrade{SourcecraftUUID: testRepoID, Score: &score, GradedAt: gradedAt(testNow)}
+			_ = f.grades.putAnalytics(true, testRepoID, json.RawMessage(`{"version":4}`), gradedAt(testNow))
+			f.grades.facts, f.grades.hasFactsErr = tc.facts, tc.lookup
+
+			_, err := f.svc.GetGrading(userCtx(""), "org", "repo")
+			if got := errors.Is(err, domain.GradingPending); got != tc.wantPend {
+				t.Errorf("regrade = %v (err %v), want %v", got, err, tc.wantPend)
+			}
+		})
+	}
+
+	// The owner's private view has no facts at all and must never regrade because of them.
+	f := newFixture("private")
+	f.svc.RegradeMissingAnalytics = true
+	score := int16(80)
+	f.grades.private = map[uuid.UUID]domain.RepoGrade{testRepoID: {SourcecraftUUID: testRepoID, Score: &score, GradedAt: gradedAt(testNow)}}
+	_ = f.grades.putAnalytics(false, testRepoID, json.RawMessage(`{"version":4}`), gradedAt(testNow))
+
+	if _, err := f.svc.GetGrading(userCtx("owner-pat"), "org", "repo"); err != nil {
+		t.Errorf("a private grade without facts must not regrade: %v", err)
 	}
 }
 
@@ -1048,6 +1119,58 @@ func TestSaveGradingResultSurvivesHistoryFailure(t *testing.T) {
 	err := f.svc.SaveGradingResult(context.Background(), domain.RepoGrade{SourcecraftUUID: testRepoID, Score: &score, GradedAt: gradedAt(testNow)}, "public", "")
 	if err != nil {
 		t.Fatalf("err = %v, want nil: the grade is saved and the history is advisory", err)
+	}
+	if len(f.grades.savedPublic) != 1 || len(f.repos.released) != 1 {
+		t.Errorf("grade saved %d times, lock released %d times", len(f.grades.savedPublic), len(f.repos.released))
+	}
+}
+
+func TestSaveGradingResultStoresFactsForPublicGradesOnly(t *testing.T) {
+	facts := json.RawMessage(`{"files":14,"loc":2600,"has_ci":true,"has_security_policy":null}`)
+	grade := domain.RepoGrade{SourcecraftUUID: testRepoID, Facts: facts, GradedAt: gradedAt(testNow)}
+
+	pub := newFixture("public")
+	if err := pub.svc.SaveGradingResult(context.Background(), grade, "public", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, ok := pub.grades.facts[testRepoID]
+	if !ok || got.Files == nil || *got.Files != 14 || got.LOC == nil || *got.LOC != 2600 || got.HasCI == nil || !*got.HasCI {
+		t.Fatalf("stored facts = %+v, want 14 files, 2600 lines and a CI config", got)
+	}
+	if got.HasSecurityPolicy != nil {
+		t.Errorf("an unknown fact must stay unknown (nil), got %v", *got.HasSecurityPolicy)
+	}
+
+	priv := newFixture("private")
+	if err := priv.svc.SaveGradingResult(context.Background(), grade, "private", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(priv.grades.facts) != 0 || len(priv.grades.factsDeleted) != 0 {
+		t.Errorf("a private grade touched the public facts: %v / %v", priv.grades.facts, priv.grades.factsDeleted)
+	}
+}
+
+func TestSaveGradingResultDropsStaleFactsWhenNoneOrUnreadableSent(t *testing.T) {
+	for _, none := range []json.RawMessage{nil, json.RawMessage("null"), json.RawMessage(""), json.RawMessage(`{"files":"many"}`), json.RawMessage(`oops`)} {
+		f := newFixture("public")
+		if err := f.svc.SaveGradingResult(context.Background(), domain.RepoGrade{SourcecraftUUID: testRepoID, Facts: none}, "public", ""); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(f.grades.factsDeleted) != 1 || len(f.grades.facts) != 0 {
+			t.Errorf("facts %q: deleted=%v stored=%v, want the stale row deleted and nothing stored", none, f.grades.factsDeleted, f.grades.facts)
+		}
+	}
+}
+
+// Facts are advisory filters: failing to store them must neither fail the grading nor lose the grade.
+func TestSaveGradingResultSurvivesFactsFailure(t *testing.T) {
+	f := newFixture("public")
+	f.grades.factsErr = errors.New("db down")
+	f.repos.lockFree = false
+
+	err := f.svc.SaveGradingResult(context.Background(), domain.RepoGrade{SourcecraftUUID: testRepoID, Facts: json.RawMessage(`{"files":1}`)}, "public", "")
+	if err != nil {
+		t.Fatalf("err = %v, want nil: the grade is saved and the facts are advisory", err)
 	}
 	if len(f.grades.savedPublic) != 1 || len(f.repos.released) != 1 {
 		t.Errorf("grade saved %d times, lock released %d times", len(f.grades.savedPublic), len(f.repos.released))

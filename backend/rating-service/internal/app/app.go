@@ -47,6 +47,7 @@ func StartApp() {
 
 	rankingRepo := database.NewRankingRepository(db)
 	ratingService := service.NewRatingService(rankingRepo, cfg.DynamicsDays)
+	ratingService.SetSizeBuckets(cfg.SizeSmallLOC, cfg.SizeLargeLOC)
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterRatingServer(grpcServer, rpc.NewServer(ratingService))

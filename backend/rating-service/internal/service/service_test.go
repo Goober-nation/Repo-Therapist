@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ type fakeRepo struct {
 
 	countLanguage string
 	countHideLow  bool
+	countExtra    domain.RankingExtras
 	listQuery     *domain.RankingQuery
 
 	score    *int16
@@ -55,8 +57,8 @@ func (f *fakeRepo) GetPublicScore(ctx context.Context, orgSlug, repoSlug string)
 	return f.score, f.scoreErr
 }
 
-func (f *fakeRepo) CountRanking(ctx context.Context, language string, hideLowConfidence bool) (int, error) {
-	f.countLanguage, f.countHideLow = language, hideLowConfidence
+func (f *fakeRepo) CountRanking(ctx context.Context, language string, hideLowConfidence bool, extra domain.RankingExtras) (int, error) {
+	f.countLanguage, f.countHideLow, f.countExtra = language, hideLowConfidence, extra
 	return f.total, f.countErr
 }
 
@@ -73,7 +75,7 @@ func TestGetRankingDefaults(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	want := domain.RankingQuery{SortBy: domain.SortByScore, Limit: DefaultPageSize, Offset: 0, DynamicsDays: DefaultDynamicsDays}
+	want := domain.RankingQuery{SortBy: domain.SortByScore, Limit: DefaultPageSize, Offset: 0, DynamicsDays: DefaultDynamicsDays, Extra: domain.RankingExtras{SmallLOC: DefaultSizeSmallLOC, LargeLOC: DefaultSizeLargeLOC}}
 	if *repo.listQuery != want {
 		t.Errorf("query = %+v, want %+v", *repo.listQuery, want)
 	}
@@ -98,7 +100,7 @@ func TestGetRankingPlacesAndOffset(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	want := domain.RankingQuery{Language: "Go", SortBy: domain.SortByLikes, Limit: 10, Offset: 20, DynamicsDays: DefaultDynamicsDays}
+	want := domain.RankingQuery{Language: "Go", SortBy: domain.SortByLikes, Limit: 10, Offset: 20, DynamicsDays: DefaultDynamicsDays, Extra: domain.RankingExtras{SmallLOC: DefaultSizeSmallLOC, LargeLOC: DefaultSizeLargeLOC}}
 	if *repo.listQuery != want {
 		t.Errorf("query = %+v, want %+v", *repo.listQuery, want)
 	}
@@ -303,5 +305,53 @@ func TestGetPublicSummaryCarriesTheFlagUnchanged(t *testing.T) {
 	got, err = NewRatingService(&fakeRepo{summary: domain.PublicSummaryRow{Name: "demo"}}, 0).GetPublicSummary(context.Background(), "o", "demo")
 	if err != nil || got.Confidence != nil {
 		t.Errorf("got %+v err %v, want nil (unknown) when there is no flag row", got.Confidence, err)
+	}
+}
+
+func TestExtraFiltersAreValidatedAndPassedToCountAndList(t *testing.T) {
+	yes := true
+	repo := &fakeRepo{total: 1, rows: []domain.RankingRow{{SourcecraftUUID: "a"}}}
+	svc := NewRatingService(repo, 0)
+	svc.SetSizeBuckets(1000, 5000)
+
+	_, err := svc.GetRanking(context.Background(), domain.RankingRequest{SortBy: domain.SortByScore, Extra: domain.RankingExtras{Size: "medium", HasCI: &yes, Topic: "  api  "}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := domain.RankingExtras{Size: "medium", SmallLOC: 1000, LargeLOC: 5000, HasCI: &yes, Topic: "api"}
+	if repo.countExtra.Size != want.Size || repo.countExtra.SmallLOC != 1000 || repo.countExtra.LargeLOC != 5000 || repo.countExtra.Topic != "api" || repo.countExtra.HasCI == nil || !*repo.countExtra.HasCI {
+		t.Errorf("count extras = %+v, want %+v", repo.countExtra, want)
+	}
+	if repo.listQuery.Extra.Size != "medium" || repo.listQuery.Extra.Topic != "api" || repo.listQuery.Extra.LargeLOC != 5000 {
+		t.Errorf("list extras = %+v: the list must use the same filters as the count", repo.listQuery.Extra)
+	}
+}
+
+func TestExtraFiltersRejectBadValues(t *testing.T) {
+	long := strings.Repeat("я", MaxTopicLength+1)
+	for name, extra := range map[string]domain.RankingExtras{
+		"unknown size": {Size: "huge"},
+		"long topic":   {Topic: long},
+	} {
+		_, err := NewRatingService(&fakeRepo{}, 0).GetRanking(context.Background(), domain.RankingRequest{SortBy: domain.SortByScore, Extra: extra})
+		if !errors.Is(err, domain.ErrInvalidArgument) {
+			t.Errorf("%s: err = %v, want ErrInvalidArgument", name, err)
+		}
+	}
+
+	if _, err := NewRatingService(&fakeRepo{}, 0).GetRanking(context.Background(), domain.RankingRequest{SortBy: domain.SortByScore, Extra: domain.RankingExtras{Topic: strings.Repeat("я", MaxTopicLength)}}); err != nil {
+		t.Errorf("a topic of exactly %d characters (counted as characters, not bytes) must be accepted: %v", MaxTopicLength, err)
+	}
+}
+
+func TestSizeBucketsKeepDefaultsForInvalidLimits(t *testing.T) {
+	svc := NewRatingService(&fakeRepo{}, 0)
+	svc.SetSizeBuckets(0, 10)
+	svc.SetSizeBuckets(5000, 5000)
+	svc.SetSizeBuckets(9000, 100)
+
+	if svc.sizeSmallLOC != DefaultSizeSmallLOC || svc.sizeLargeLOC != DefaultSizeLargeLOC {
+		t.Errorf("limits = %d / %d, want the defaults for invalid pairs", svc.sizeSmallLOC, svc.sizeLargeLOC)
 	}
 }

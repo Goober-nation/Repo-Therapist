@@ -11,7 +11,9 @@ CREATE TABLE repos (
   main_language      TEXT,
   language_color     TEXT,
   sourcecraft_rating DOUBLE PRECISION,
-  web_url            TEXT
+  web_url            TEXT,
+  -- Repository description from SourceCraft, searched by the ranking's topic filter.
+  description        TEXT
 );
 
 CREATE INDEX ON repos (visibility);
@@ -97,6 +99,19 @@ CREATE TABLE repo_llm_responses_private (
   graded_at          TIMESTAMPTZ
 );
 
+
+-- Repository facts the public ranking filters on, written by the Aggregator right after a public
+-- grade. NULL member = unknown (never matched by a filter); no row = no facts yet.
+CREATE TABLE repo_facts_public (
+  sourcecraft_uuid     UUID PRIMARY KEY REFERENCES repos(sourcecraft_uuid),
+
+  files                INTEGER,
+  loc                  INTEGER,
+  has_ci               BOOLEAN,
+  has_security_policy  BOOLEAN,
+
+  graded_at            TIMESTAMPTZ
+);
 
 -- Score history of public grades: one row per public grading, append-only (written by the Aggregator
 -- right after the public grade; the composite key makes a redelivered message a no-op). Private

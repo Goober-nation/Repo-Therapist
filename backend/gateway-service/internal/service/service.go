@@ -437,6 +437,10 @@ func (s *GatewayService) GetRanking(
 			SortBy:   mapRankingSortBy(request.SortBy),
 
 			HideLowConfidence: request.HideLowConfidence,
+			Size:              request.Size,
+			HasCi:             request.HasCI,
+			HasSecurityPolicy: request.HasSecurityPolicy,
+			Topic:             request.Topic,
 		},
 	)
 	if err != nil {

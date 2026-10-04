@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { RANKING_PAGE_SIZE, type RankingSort } from "../api/client"
+import { RANKING_PAGE_SIZE, type RankingFilters, type RankingSort } from "../api/client"
 import { Badge, Button, Card, LanguageLabel, PageHeading } from "../components/Shell"
 import { formatDateTime, getLastActivityLabel, HEALTHY_SCORE, healthLevel, signed } from "../metrics"
 import type { RepositorySummary } from "../types"
@@ -10,9 +10,39 @@ export interface RankingQuery {
   language: string
   /** Leave out grades marked low-confidence; off by default, the order itself never changes. */
   hideLowConfidence: boolean
+  /** Filters on repository facts; "" is any. A repo whose fact is unknown never matches a filter. */
+  size: "" | "small" | "medium" | "large"
+  ci: "" | "yes" | "no"
+  security: "" | "yes" | "no"
+  /** Text searched in the repository name and description. */
+  topic: string
 }
 
-export const DEFAULT_RANKING_QUERY: RankingQuery = { page: 1, sort: "score", language: "", hideLowConfidence: false }
+export const DEFAULT_RANKING_QUERY: RankingQuery = {
+  page: 1,
+  sort: "score",
+  language: "",
+  hideLowConfidence: false,
+  size: "",
+  ci: "",
+  security: "",
+  topic: "",
+}
+
+/** The query's fact filters in the form the API client takes. */
+export function rankingFilters(query: RankingQuery): RankingFilters {
+  return {
+    ...(query.size ? { size: query.size } : {}),
+    ...(query.ci ? { ci: query.ci === "yes" } : {}),
+    ...(query.security ? { security: query.security === "yes" } : {}),
+    ...(query.topic?.trim() ? { topic: query.topic.trim() } : {}),
+  }
+}
+
+/** True when any filter beyond the sort is on. */
+export function hasActiveFilters(query: RankingQuery): boolean {
+  return Boolean(query.language || query.hideLowConfidence || query.size || query.ci || query.security || query.topic?.trim())
+}
 
 export default function RankingPage({
   repositories,
@@ -50,6 +80,8 @@ export default function RankingPage({
   onRetry?: () => void
 }) {
   const [searchQuery, setSearchQuery] = useState("")
+  // The topic is applied on Enter or when the field loses focus, not on every keystroke.
+  const [topicDraft, setTopicDraft] = useState(query.topic ?? "")
   const [minimumHealth, setMinimumHealth] = useState(0)
   const pageCount = Math.max(1, Math.ceil(total / RANKING_PAGE_SIZE))
 
@@ -74,10 +106,17 @@ export default function RankingPage({
 
   const change = (next: Partial<RankingQuery>) => onQueryChange({ ...query, page: 1, ...next })
 
+  const applyTopic = () => {
+    if (topicDraft.trim() !== (query.topic ?? "").trim()) change({ topic: topicDraft.trim() })
+  }
+
   const resetFilters = () => {
     setSearchQuery("")
     setMinimumHealth(0)
-    if (query.language || query.hideLowConfidence) change({ language: "", hideLowConfidence: false })
+    setTopicDraft("")
+    if (hasActiveFilters(query)) {
+      change({ language: "", hideLowConfidence: false, size: "", ci: "", security: "", topic: "" })
+    }
   }
 
   return (
@@ -150,6 +189,57 @@ export default function RankingPage({
               <option value="last_activity">Последняя активность</option>
             </select>
           </label>
+          <label className="filter-field">
+            <span>Размер</span>
+            <select
+              value={query.size ?? ""}
+              onChange={(event) => change({ size: event.target.value as RankingQuery["size"] })}
+              title="По числу строк кода (границы по умолчанию): малый — до 2000, средний — от 2000 до 20000, большой — от 20000"
+            >
+              <option value="">Любой</option>
+              <option value="small">Малый</option>
+              <option value="medium">Средний</option>
+              <option value="large">Большой</option>
+            </select>
+          </label>
+          <label className="filter-field">
+            <span>CI</span>
+            <select
+              value={query.ci ?? ""}
+              onChange={(event) => change({ ci: event.target.value as RankingQuery["ci"] })}
+              title="Есть ли в репозитории файл настройки CI. Результаты запусков для чужих репозиториев недоступны"
+            >
+              <option value="">Любой</option>
+              <option value="yes">Есть конфиг</option>
+              <option value="no">Нет конфига</option>
+            </select>
+          </label>
+          <label className="filter-field">
+            <span>Политика безопасности</span>
+            <select
+              value={query.security ?? ""}
+              onChange={(event) => change({ security: event.target.value as RankingQuery["security"] })}
+              title="Есть ли в репозитории файл SECURITY.md. Результаты проверок AppSec видит только владелец репозитория"
+            >
+              <option value="">Любая</option>
+              <option value="yes">Есть SECURITY.md</option>
+              <option value="no">Нет SECURITY.md</option>
+            </select>
+          </label>
+          <label className="filter-field filter-field--topic">
+            <span>Тематика</span>
+            <input
+              type="search"
+              placeholder="Слова из названия или описания"
+              maxLength={64}
+              value={topicDraft}
+              onChange={(event) => setTopicDraft(event.target.value)}
+              onBlur={applyTopic}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") applyTopic()
+              }}
+            />
+          </label>
           <label className="filter-check">
             <input
               type="checkbox"
@@ -162,6 +252,12 @@ export default function RankingPage({
             {visibleRepositories.length} проектов{visibleRepositories.length !== repositories.length ? " на странице" : ""}
           </span>
         </div>
+        {(query.size || query.ci || query.security) && (
+          <p className="ranking-note">
+            Фильтры по размеру, CI и SECURITY.md смотрят на сам репозиторий (число строк, файлы настроек), а не на
+            результаты проверок. Репозитории, для которых это пока не известно, в такой выборке не показываются.
+          </p>
+        )}
         {dynamicsDays !== undefined && (
           <p className="ranking-note">
             Рядом с местом и Score — изменение за {dynamicsDays} дн.: ▲ выше, ▼ ниже, «новый» — оценки неделю назад ещё не
@@ -293,9 +389,13 @@ export default function RankingPage({
           </div>
         ) : repositories.length === 0 ? (
           <div className="empty-state">
-            <strong>{query.language ? "Нет репозиториев на этом языке" : "Пока нет репозиториев в общем рейтинге"}</strong>
-            <p>Здесь появятся публичные репозитории после расчёта их рейтинга.</p>
-            {query.language && (
+            <strong>{hasActiveFilters(query) ? "Нет репозиториев с такими фильтрами" : "Пока нет репозиториев в общем рейтинге"}</strong>
+            <p>
+              {hasActiveFilters(query)
+                ? "Ослабьте фильтры: репозитории, для которых нужный факт пока не известен, в такой выборке не показываются."
+                : "Здесь появятся публичные репозитории после расчёта их рейтинга."}
+            </p>
+            {hasActiveFilters(query) && (
               <Button variant="quiet" onClick={resetFilters}>
                 Сбросить фильтры
               </Button>

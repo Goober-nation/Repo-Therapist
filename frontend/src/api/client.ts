@@ -48,6 +48,18 @@ export const RANKING_PAGE_SIZE = 100
 
 export type RankingSort = "score" | "likes" | "last_activity"
 
+/** Filters on repository facts (docs/ranking.md); unset means any. A repo whose fact is unknown never matches. */
+export interface RankingFilters {
+  /** By lines of code; the limits come from rating-service (RANKING_SIZE_SMALL_LOC / _LARGE_LOC). */
+  size?: "small" | "medium" | "large"
+  /** A CI config file exists (true) or does not (false). */
+  ci?: boolean
+  /** A SECURITY.md exists (true) or does not (false). */
+  security?: boolean
+  /** Text searched in the repository name and description. */
+  topic?: string
+}
+
 function statusMessage(status: number): string {
   // One message for "no access" and "not found": AGENTS.md forbids telling them apart in the UI.
   if (status === 401 || status === 403 || status === 404) {
@@ -93,10 +105,16 @@ export class HttpRepoHealthApi {
     sort: RankingSort = "score",
     language = "",
     hideLowConfidence = false,
+    filters: RankingFilters = {},
   ): Promise<GatewayRankingResponse> {
     const query = new URLSearchParams({ page: String(page), page_size: String(RANKING_PAGE_SIZE), sortby: sort })
     if (language) query.set("filter", language)
     if (hideLowConfidence) query.set("hide_low_confidence", "true")
+    if (filters.size) query.set("size", filters.size)
+    if (filters.ci !== undefined) query.set("ci", String(filters.ci))
+    if (filters.security !== undefined) query.set("security", String(filters.security))
+    const topic = filters.topic?.trim()
+    if (topic) query.set("topic", topic)
     return this.request(`/ranking?${query}`)
   }
 

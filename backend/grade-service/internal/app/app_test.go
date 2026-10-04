@@ -9,6 +9,7 @@ import (
 	"repo-therapist/grade-service/internal/analytics"
 	"repo-therapist/grade-service/internal/config"
 	"repo-therapist/grade-service/internal/contracts"
+	"repo-therapist/grade-service/internal/facts"
 	"repo-therapist/grade-service/internal/gitlog"
 	"repo-therapist/grade-service/internal/scoring"
 )
@@ -382,5 +383,43 @@ func TestBuildGradingResult_AnalyticsDisabledIsNull(t *testing.T) {
 	raw, _ := json.Marshal(result)
 	if result.Analytics != nil || !strings.Contains(string(raw), `"analytics":null`) {
 		t.Errorf("analytics = %s, want null on the wire", result.Analytics)
+	}
+}
+
+func TestBuildGradingResult_FactsOnlyWithAPublicGradingAndNeverChangeTheScore(t *testing.T) {
+	cfg := confidenceTestConfig()
+
+	out := func() *GradeOutput {
+		o := analyticsTestOutput()
+		o.FactsInputs = facts.Inputs{CodeAvailable: true, Files: 14, LOC: 2600, CIAvailable: true, CIConfigFiles: []string{".sourcecraft/ci.yaml"}, SecurityPolicyFound: false}
+		return o
+	}
+
+	public, err := BuildGradingResult(out(), cfg, map[string]config.RecommendationEntry{}, contracts.VisibilityPublic, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var got facts.Facts
+	if err := json.Unmarshal(public.Facts, &got); err != nil {
+		t.Fatalf("facts is not the facts object: %v (%s)", err, public.Facts)
+	}
+	if got.Files == nil || *got.Files != 14 || got.LOC == nil || *got.LOC != 2600 {
+		t.Errorf("size = %v / %v", got.Files, got.LOC)
+	}
+	if got.HasCI == nil || !*got.HasCI || got.HasSecurityPolicy == nil || *got.HasSecurityPolicy {
+		t.Errorf("ci = %v security policy = %v, want a CI config and no security policy", got.HasCI, got.HasSecurityPolicy)
+	}
+
+	private, err := BuildGradingResult(out(), cfg, map[string]config.RecommendationEntry{}, contracts.VisibilityPrivate, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(private)
+	if private.Facts != nil || !strings.Contains(string(raw), `"facts":null`) {
+		t.Errorf("a private grading must carry no facts, got %s", private.Facts)
+	}
+	if *public.Score != *private.Score {
+		t.Errorf("scores differ (%d vs %d): facts must not change them", *public.Score, *private.Score)
 	}
 }

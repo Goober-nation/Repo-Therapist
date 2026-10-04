@@ -82,6 +82,7 @@ func (c *GradeConsumer) handleMessage(
 		GradedAt:    &event.GradedAt,
 		Confidence:  event.Confidence,
 		Analytics:   event.Analytics,
+		Facts:       event.Facts,
 	}
 
 	if err := c.service.SaveGradingResult(ctx, grade, event.GradeMode, event.Error); err != nil {

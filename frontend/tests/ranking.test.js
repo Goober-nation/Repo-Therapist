@@ -21,7 +21,8 @@ const { default: HistoryChart } = await vite.ssrLoadModule("/src/components/Hist
 const { default: ScoreHistorySection } = await vite.ssrLoadModule("/src/components/ScoreHistorySection.tsx")
 const { default: PositionCard, pointsLabel } = await vite.ssrLoadModule("/src/components/PositionCard.tsx")
 const { default: ComparePage, parseRepoInput } = await vite.ssrLoadModule("/src/pages/ComparePage.tsx")
-const { default: RankingPage } = await vite.ssrLoadModule("/src/pages/RankingPage.tsx")
+const { default: RankingPage, DEFAULT_RANKING_QUERY, rankingFilters, hasActiveFilters } = await vite.ssrLoadModule("/src/pages/RankingPage.tsx")
+const { HttpRepoHealthApi } = await vite.ssrLoadModule("/src/api/client.ts")
 
 const entry = (extra = {}) => ({
   place: 1,
@@ -261,4 +262,69 @@ test("the ranking shows place and score changes, the new tag, and the compare ba
 
   const without = renderToStaticMarkup(createElement(RankingPage, { ...props, dynamicsDays: undefined }))
   assert.doesNotMatch(without, /новый/, "no 'new' tag when the backend sent no window")
+})
+
+test("the ranking request carries only the fact filters that are set", async () => {
+  const urls = []
+  const api = new HttpRepoHealthApi({
+    fetcher: async (url) => {
+      urls.push(url)
+      return Response.json({ entries: [], total_count: 0, page: 1, page_size: 100 })
+    },
+  })
+
+  await api.getRanking(1, "score", "", false, { size: "medium", ci: true, security: false, topic: "  REST API  " })
+  await api.getRanking(1, "score", "Go", true, { ci: false })
+  await api.getRanking(1, "score", "", false, {})
+  await api.getRanking(1, "score", "", false, { topic: "   " })
+
+  assert.deepEqual(urls, [
+    "/api/ranking?page=1&page_size=100&sortby=score&size=medium&ci=true&security=false&topic=REST+API",
+    "/api/ranking?page=1&page_size=100&sortby=score&filter=Go&hide_low_confidence=true&ci=false",
+    "/api/ranking?page=1&page_size=100&sortby=score",
+    "/api/ranking?page=1&page_size=100&sortby=score",
+  ])
+})
+
+test("the query's yes/no filters become real booleans and unset ones stay absent", () => {
+  assert.deepEqual(rankingFilters(DEFAULT_RANKING_QUERY), {})
+  assert.deepEqual(rankingFilters({ ...DEFAULT_RANKING_QUERY, size: "large", ci: "yes", security: "no", topic: " api " }), {
+    size: "large",
+    ci: true,
+    security: false,
+    topic: "api",
+  })
+  // "no" is a real value (false), not the same as not filtering.
+  assert.deepEqual(rankingFilters({ ...DEFAULT_RANKING_QUERY, ci: "no" }), { ci: false })
+  // Legacy queries without the new fields mean no filters.
+  assert.deepEqual(rankingFilters({ page: 1, sort: "score", language: "", hideLowConfidence: false }), {})
+
+  assert.equal(hasActiveFilters(DEFAULT_RANKING_QUERY), false)
+  for (const change of [{ language: "Go" }, { hideLowConfidence: true }, { size: "small" }, { ci: "no" }, { security: "yes" }, { topic: "x" }]) {
+    assert.equal(hasActiveFilters({ ...DEFAULT_RANKING_QUERY, ...change }), true, JSON.stringify(change))
+  }
+  assert.equal(hasActiveFilters({ ...DEFAULT_RANKING_QUERY, topic: "   " }), false, "a blank topic is no filter")
+})
+
+test("the ranking offers the fact filters, explains them, and words the empty result for filters", () => {
+  const noop = () => {}
+  const base = { repositories: [], onSelectRepository: noop }
+
+  const plain = renderToStaticMarkup(createElement(RankingPage, { ...base, query: DEFAULT_RANKING_QUERY }))
+  for (const label of ["Размер", "CI", "Политика безопасности", "Тематика"]) {
+    assert.match(plain, new RegExp(label), label)
+  }
+  assert.doesNotMatch(plain, /смотрят на сам репозиторий/, "the explanation appears only while a fact filter is on")
+
+  const filtered = renderToStaticMarkup(createElement(RankingPage, { ...base, query: { ...DEFAULT_RANKING_QUERY, ci: "yes", size: "small", topic: "api" } }))
+  assert.match(filtered, /смотрят на сам репозиторий/)
+  assert.match(filtered, /Нет репозиториев с такими фильтрами/)
+  assert.match(filtered, /Ослабьте фильтры/)
+  assert.doesNotMatch(filtered, /после расчёта их рейтинга/, "the 'ranking is still empty' text is wrong when filters caused the empty result")
+  assert.match(filtered, /Сбросить фильтры/)
+  assert.match(filtered, /value="api"/, "the topic field shows the applied text")
+  assert.match(filtered, /<option value="yes" selected="">Есть конфиг<\/option>/)
+
+  const empty = renderToStaticMarkup(createElement(RankingPage, { ...base, query: DEFAULT_RANKING_QUERY }))
+  assert.match(empty, /Пока нет репозиториев в общем рейтинге/)
 })

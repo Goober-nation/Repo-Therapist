@@ -532,3 +532,4 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .analytics-tab--active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 650; }
 .analytics-bottlenecks { display: grid; gap: 4px; margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--border); font-size: var(--fs-sm); }
 .analytics-bottlenecks p { margin: 0; }
+.filter-field--topic input { min-width: 190px; min-height: 38px; padding: 0 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-surface); color: var(--text); font: inherit; }

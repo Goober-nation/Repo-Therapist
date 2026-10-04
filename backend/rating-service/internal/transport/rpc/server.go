@@ -46,6 +46,12 @@ func (s *Server) GetRanking(ctx context.Context, req *pb.GetRankingRequest) (*pb
 		Language:          req.GetLanguage(),
 		SortBy:            sortBy,
 		HideLowConfidence: req.GetHideLowConfidence(),
+		Extra: domain.RankingExtras{
+			Size:              req.GetSize(),
+			HasCI:             req.HasCi,
+			HasSecurityPolicy: req.HasSecurityPolicy,
+			Topic:             req.GetTopic(),
+		},
 	})
 	if err != nil {
 		return nil, mapError(err)

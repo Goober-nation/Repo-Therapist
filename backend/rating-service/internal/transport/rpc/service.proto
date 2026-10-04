@@ -46,6 +46,16 @@ message GetRankingRequest {
   // Leave out repos whose public grade is marked low-confidence. Repos without a flag row
   // (unknown) are never left out.
   bool hide_low_confidence = 5;
+  // Size bucket by lines of code: "small", "medium" or "large" (limits RANKING_SIZE_SMALL_LOC and
+  // RANKING_SIZE_LARGE_LOC); empty means any. Repos whose size is unknown never match.
+  string size = 6;
+  // Only repos that have (true) or lack (false) a CI config file; unset means any. Repos whose
+  // fact is unknown never match either value.
+  optional bool has_ci = 7;
+  // Only repos that have (true) or lack (false) a SECURITY.md; unset means any. Unknown never matches.
+  optional bool has_security_policy = 8;
+  // Case-insensitive text searched in the repository name and description; empty means any.
+  string topic = 9;
 }
 
 message RankingEntry {

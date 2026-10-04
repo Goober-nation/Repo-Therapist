@@ -17,6 +17,11 @@ type GetRankingDTO struct {
 	SortBy   RankingSortBy
 	// HideLowConfidence leaves out repos whose public grade is flagged low-confidence.
 	HideLowConfidence bool
+	// Size is "", "small", "medium" or "large" (by lines of code); HasCI and HasSecurityPolicy filter
+	// on a CI config file and a SECURITY.md (nil = any); Topic is searched in the name and description.
+	Size                     string
+	HasCI, HasSecurityPolicy *bool
+	Topic                    string
 }
 type GetMyReposDTO struct {
 	Repositories  []Repo `json:"repositories"`
