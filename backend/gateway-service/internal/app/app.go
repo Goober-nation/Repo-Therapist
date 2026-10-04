@@ -146,6 +146,12 @@ func StartApp() {
 		cfg.Yandex.Timeout,
 	)
 
+	gatewayService.SetPublicAPILimiter(service.NewRedisLimiter(
+		redisClient,
+		cfg.PublicAPIRateLimit.Limit,
+		cfg.PublicAPIRateLimit.Window,
+	))
+
 	handler := httptransport.NewHandler(
 		gatewayService,
 	)

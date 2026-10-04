@@ -9,6 +9,7 @@ import "google/protobuf/timestamp.proto";
 service Rating {
   rpc GetRanking(GetRankingRequest) returns (GetRankingResponse);
   rpc GetPublicScore(GetPublicScoreRequest) returns (GetPublicScoreResponse);
+  rpc GetPublicSummary(GetPublicSummaryRequest) returns (GetPublicSummaryResponse);
 }
 
 enum SortBy {
@@ -22,6 +23,7 @@ message GetRankingRequest {
   int32 page_size = 2;
   string language = 3;
   SortBy sort_by = 4;
+  bool hide_low_confidence = 5;
 }
 
 message RankingEntry {
@@ -33,6 +35,8 @@ message RankingEntry {
   optional double likes = 6;
   Language language = 7;
   google.protobuf.Timestamp last_activity_at = 8;
+  optional bool low_confidence = 9;
+  repeated ConfidenceReason confidence_reasons = 10;
 }
 
 message Language {
@@ -54,4 +58,30 @@ message GetPublicScoreRequest {
 
 message GetPublicScoreResponse {
   optional int32 public_score = 1;
+}
+
+message GetPublicSummaryRequest {
+  string org_slug = 1;
+  string repo_slug = 2;
+}
+
+message CategoryScore {
+  string id = 1;
+  optional int32 score = 2;
+}
+
+message GetPublicSummaryResponse {
+  string name = 1;
+  string web_url = 2;
+  optional int32 public_score = 3;
+  repeated CategoryScore categories = 4;
+  repeated string missing_data = 5;
+  google.protobuf.Timestamp graded_at = 6;
+  optional bool low_confidence = 7;
+  repeated ConfidenceReason confidence_reasons = 8;
+}
+
+message ConfidenceReason {
+  string code = 1;
+  string text = 2;
 }

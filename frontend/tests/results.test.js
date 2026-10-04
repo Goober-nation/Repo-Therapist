@@ -727,6 +727,75 @@ test("ranking asks the server for one page with its sort and language", async ()
   ])
 })
 
+test("the low-confidence toggle is sent only when on, and the public score is read-only", async () => {
+  const urls = []
+  const api = new HttpRepoHealthApi({
+    fetcher: async (url) => {
+      urls.push(url)
+      return Response.json({ status: "FINISHED", score: 71, low_confidence: true, confidence_reasons: [] })
+    },
+  })
+
+  await api.getRanking(1, "score", "", true)
+  await api.getRanking(1, "score", "Go", false)
+  const score = await api.getPublicScore("org", "my repo")
+
+  assert.deepEqual(urls, [
+    "/api/ranking?page=1&page_size=100&sortby=score&hide_low_confidence=true",
+    "/api/ranking?page=1&page_size=100&sortby=score&filter=Go",
+    "/api/score/org/my%20repo",
+  ])
+  assert.equal(score.low_confidence, true)
+})
+
+test("the low-confidence flag is unknown unless the backend sent a boolean, and reasons only travel with a low flag", async () => {
+  const { confidenceFromPayload, repositoryFromRanking } = await vite.ssrLoadModule("/src/api/mapper.ts")
+  const reasons = [{ code: "LOW_CODE", text: " Мало кода. " }, { code: "X", text: "" }, { code: "Y" }]
+
+  assert.deepEqual(confidenceFromPayload(true, reasons), { low: true, reasons: ["Мало кода."] })
+  assert.deepEqual(confidenceFromPayload(false, reasons), { low: false, reasons: [] })
+  assert.equal(confidenceFromPayload(null, reasons), undefined)
+  assert.equal(confidenceFromPayload(undefined, undefined), undefined)
+  assert.deepEqual(confidenceFromPayload(true, undefined), { low: true, reasons: [] })
+
+  const entry = (extra) => ({ place: 1, sourcecraft_uuid: "u", name: "repo", web_url: "https://sourcecraft.dev/org/repo", public_score: 70, ...extra })
+  assert.deepEqual(repositoryFromRanking(entry({ low_confidence: true, confidence_reasons: reasons })).confidence, { low: true, reasons: ["Мало кода."] })
+  assert.equal("confidence" in repositoryFromRanking(entry({ low_confidence: null })), false)
+  assert.equal("confidence" in repositoryFromRanking(entry({})), false)
+  assert.equal(repositoryFromRanking(entry({ low_confidence: true })).healthScore, 70)
+})
+
+test("the ranking shows a Мало данных badge with the reasons only for flagged rows, and a toggle that is off by default", async () => {
+  const { default: RankingPage, DEFAULT_RANKING_QUERY } = await vite.ssrLoadModule("/src/pages/RankingPage.tsx")
+  const repository = (id, confidence) => ({
+    id, name: id, fullName: `org/${id}`, language: "Go", healthScore: 70, lastActivityDaysAgo: 1, categoryScores: {}, visibility: "public",
+    ...(confidence ? { confidence } : {}),
+  })
+
+  assert.equal(DEFAULT_RANKING_QUERY.hideLowConfidence, false)
+
+  const html = renderToStaticMarkup(
+    createElement(RankingPage, {
+      repositories: [repository("flagged", { low: true, reasons: ["Мало кода."] }), repository("fine", { low: false, reasons: [] }), repository("unknown")],
+      onSelectRepository: () => {},
+    }),
+  )
+
+  assert.equal(html.match(/Мало данных/g)?.length, 1)
+  assert.match(html, /title="Мало кода\."/)
+  assert.match(html, /Скрыть оценки с низкой достоверностью/)
+  assert.doesNotMatch(html, /type="checkbox"[^>]*checked/)
+
+  const hidden = renderToStaticMarkup(
+    createElement(RankingPage, {
+      repositories: [],
+      query: { ...DEFAULT_RANKING_QUERY, hideLowConfidence: true },
+      onSelectRepository: () => {},
+    }),
+  )
+  assert.match(hidden, /type="checkbox"[^>]*checked/)
+})
+
 test("my repositories request sends PAT only in the Gateway header", async () => {
   const calls = []
 
@@ -1654,6 +1723,28 @@ test("the README badge snippet links the SVG badge to the repo page", async () =
   assert.equal(
     badgeMarkdown("https://repo-therapist.alo.quest", "org", "my repo"),
     "[![Repo Health](https://repo-therapist.alo.quest/api/badge/org/my%20repo.svg)](https://repo-therapist.alo.quest/repo/org/my%20repo)",
+  )
+})
+
+test("README snippets cover the category badges, the widget, shields and the JSON API", async () => {
+  const { BADGE_CATEGORIES, categoryBadgeMarkdown, widgetMarkdown, scoreApiUrl, shieldsMarkdown } = await vite.ssrLoadModule(
+    "/src/components/BadgeSnippet.tsx",
+  )
+  const origin = "https://repo-therapist.alo.quest"
+
+  assert.deepEqual([...BADGE_CATEGORIES], ["activity", "issues", "documentation", "code_health"])
+  assert.equal(
+    categoryBadgeMarkdown(origin, "org", "my repo", "code_health"),
+    "[![Repo Health: code_health](https://repo-therapist.alo.quest/api/badge/org/my%20repo/code_health.svg)](https://repo-therapist.alo.quest/repo/org/my%20repo)",
+  )
+  assert.equal(
+    widgetMarkdown(origin, "org", "repo"),
+    "[![Repo Health](https://repo-therapist.alo.quest/api/widget/org/repo.svg)](https://repo-therapist.alo.quest/repo/org/repo)",
+  )
+  assert.equal(scoreApiUrl(origin, "org", "my repo"), "https://repo-therapist.alo.quest/api/score/org/my%20repo")
+  assert.equal(
+    shieldsMarkdown(origin, "org", "repo"),
+    "[![Repo Health](https://img.shields.io/endpoint?url=https%3A%2F%2Frepo-therapist.alo.quest%2Fapi%2Fbadge%2Forg%2Frepo.json)](https://repo-therapist.alo.quest/repo/org/repo)",
   )
 })
 

@@ -97,6 +97,22 @@ export interface MyRepositoriesResponse {
   next_page_token?: string
 }
 
+/** A generic, pre-written reason a public grade is flagged low-confidence (it names no thresholds). */
+export interface ConfidenceReasonPayload {
+  code: string
+  text: string
+}
+
+/** GET /score/{org}/{repo}: the stored public grade; read-only, never starts a grading. */
+export interface PublicScoreResponse {
+  status: GradeStatus
+  score?: number | null
+  graded_at?: string | null
+  /** null/absent when unknown (grade stored before the flag existed). */
+  low_confidence?: boolean | null
+  confidence_reasons?: ConfidenceReasonPayload[]
+}
+
 export interface GatewayRankingEntry {
   place: number
   sourcecraft_uuid: string
@@ -106,6 +122,8 @@ export interface GatewayRankingEntry {
   likes?: number
   language?: { name?: string; color?: string }
   last_activity_at?: string
+  low_confidence?: boolean | null
+  confidence_reasons?: ConfidenceReasonPayload[]
 }
 
 export interface GatewayRankingResponse {

@@ -89,6 +89,9 @@ type Issue struct {
 	StatusType string `json:"status_type"`
 	CreatedAt  string `json:"created_at"`
 	UpdatedAt  string `json:"updated_at"`
+	// MilestoneID is the milestone the issue is attached to ("" when none); Grade service counts a
+	// milestone only if an issue is attached to it (docs/grading/00-overview.md).
+	MilestoneID string `json:"milestone_id,omitempty"`
 }
 
 // GetIssues fetches every issue for a repo, following the wrapper's page tokens.
@@ -107,6 +110,8 @@ func (c *Client) GetIssues(ctx context.Context, repoID string) ([]Issue, error) 
 			StatusType: i.GetStatus().GetStatusType(),
 			CreatedAt:  timestampRFC3339(i.GetCreatedAt()),
 			UpdatedAt:  timestampRFC3339(i.GetUpdatedAt()),
+
+			MilestoneID: i.GetMilestone().GetId(),
 		})
 	}
 	return issues, nil

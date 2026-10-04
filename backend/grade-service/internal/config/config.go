@@ -22,6 +22,33 @@ const (
 type Config struct {
 	Version    int                       `yaml:"version"`
 	Categories map[string]CategoryConfig `yaml:"categories"`
+	Confidence ConfidenceConfig          `yaml:"confidence"`
+}
+
+// Low-confidence reason codes; ConfidenceConfig.Reasons must have a text for each.
+const (
+	ReasonLowCode     = "LOW_CODE"
+	ReasonLowHistory  = "LOW_HISTORY"
+	ReasonLowCoverage = "LOW_COVERAGE"
+)
+
+// ConfidenceConfig drives the low-confidence flag of public grades (internal/scoring/confidence.go).
+// The flag never changes a score. Absent or enabled:false turns the flag off entirely.
+type ConfidenceConfig struct {
+	Enabled bool `yaml:"enabled"`
+	// WindowDays is how far back commits count toward the history signal.
+	WindowDays int `yaml:"window_days"`
+	// MinFiles / MinLOC: fewer scanned files or lines than either -> little code.
+	MinFiles int `yaml:"min_files"`
+	MinLOC   int `yaml:"min_loc"`
+	// MinCommits: fewer kept commits in the window -> little history. MinCommitsSingleAuthor is the
+	// same bar when every one of them has the same author.
+	MinCommits             int `yaml:"min_commits"`
+	MinCommitsSingleAuthor int `yaml:"min_commits_single_author"`
+	// MinCategoriesWithData: fewer public categories with data than this -> little coverage.
+	MinCategoriesWithData int `yaml:"min_categories_with_data"`
+	// Reasons maps a reason code to its pre-written, deliberately generic Russian text.
+	Reasons map[string]string `yaml:"reasons"`
 }
 
 type CategoryConfig struct {
@@ -32,6 +59,19 @@ type CategoryConfig struct {
 	// CommitFilters drops commits before any commit-sourced metric sees them. Only Activity sets
 	// it (docs/grading/activity.md); absent means no filtering.
 	CommitFilters CommitFilters `yaml:"commit_filters"`
+	// IssueFilters drops issues and milestones that look manufactured before any issue-sourced
+	// metric sees them; absent means no filtering.
+	IssueFilters IssueFilters `yaml:"issue_filters"`
+}
+
+// IssueFilters toggles which issues and milestones are excluded from issues.json- and
+// milestones.json-sourced metrics (docs/grading/00-overview.md, "Устойчивость к накрутке").
+type IssueFilters struct {
+	// InstantCloseSeconds drops issues that were closed within this many seconds of being created
+	// (0 = off): an issue opened and closed in the same moment is not work that was tracked.
+	InstantCloseSeconds int `yaml:"instant_close_seconds"`
+	// MilestonesNeedIssues counts a milestone only if an issue is attached to it.
+	MilestonesNeedIssues bool `yaml:"milestones_need_issues"`
 }
 
 // CommitFilters toggles which commits are excluded from commits.json-sourced metrics.
@@ -40,6 +80,10 @@ type CommitFilters struct {
 	Empty       bool `yaml:"empty"`
 	Bots        bool `yaml:"bots"`
 	Merges      bool `yaml:"merges"`
+	// MinChangedLines drops non-merge commits that changed fewer lines than this (added +
+	// deleted, binary files count as substantial; 0 = off), so one-line filler commits do not
+	// count as activity.
+	MinChangedLines int `yaml:"min_changed_lines"`
 }
 
 type MetricConfig struct {
@@ -92,6 +136,9 @@ func LoadConfig(path string) (*Config, error) {
 }
 
 func validate(cfg *Config) error {
+	if err := validateConfidence(cfg.Confidence); err != nil {
+		return fmt.Errorf("confidence: %w", err)
+	}
 	for catID, cat := range cfg.Categories {
 		if cat.Status != StatusCalculated {
 			continue
@@ -136,6 +183,29 @@ func validateFormula(f FormulaConfig) error {
 		// (not_calculated categories skip this function entirely, see caller).
 	default:
 		return fmt.Errorf("unknown formula type %q", f.Type)
+	}
+	return nil
+}
+
+func validateConfidence(c ConfidenceConfig) error {
+	if !c.Enabled {
+		return nil
+	}
+	if c.WindowDays <= 0 {
+		return fmt.Errorf("window_days must be positive, got %d", c.WindowDays)
+	}
+	for name, value := range map[string]int{
+		"min_files": c.MinFiles, "min_loc": c.MinLOC, "min_commits": c.MinCommits,
+		"min_commits_single_author": c.MinCommitsSingleAuthor, "min_categories_with_data": c.MinCategoriesWithData,
+	} {
+		if value < 0 {
+			return fmt.Errorf("%s must not be negative, got %d", name, value)
+		}
+	}
+	for _, code := range []string{ReasonLowCode, ReasonLowHistory, ReasonLowCoverage} {
+		if c.Reasons[code] == "" {
+			return fmt.Errorf("reasons: no text for %s", code)
+		}
 	}
 	return nil
 }

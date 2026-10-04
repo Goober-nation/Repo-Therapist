@@ -609,8 +609,47 @@ rpc GetReccomendations(GetReccomendationsRequest) returns (GetReccomendationsRes
 | `GET /repos` | `PAT` (обязателен) | `{repositories: [{sourcecraft_uuid, org_slug, repo_slug, web_url, visibility, last_activity_at, rating, language: {name, color}}], next_page_token}` |
 | `GET /grading/{org}/{repo}` | `PAT` (опционален) | `{status, grade: {sourcecraft_uuid, score, category_scores, advice, missing_data, graded_at}}` |
 | `GET /recommendations/{org}/{repo}` | `PAT` (опционален) | `{status, raw_response: {summary, recommendations: [{priority, category, text}]}, model_used, evaluated_at}` |
-| `GET /ranking?page=&page_size=&sortby=&filter=` | — | `{entries: [{place, sourcecraft_uuid, name, web_url, public_score, likes, language, last_activity_at}], total_count, page, page_size}` |
+| `GET /ranking?page=&page_size=&sortby=&filter=&hide_low_confidence=` | — | `{entries: [{place, sourcecraft_uuid, name, web_url, public_score, likes, language, last_activity_at, low_confidence, confidence_reasons}], total_count, page, page_size}` |
 | `GET /badge/{org}/{repo}.svg` | — | SVG-бейдж с сохранённой публичной оценкой (`image/svg+xml`, `Cache-Control: max-age=300`); оценку не запускает, лимит по IP не применяется; неизвестный или не оценённый репозиторий — серый `n/a` |
+| `GET /badge/{org}/{repo}/{category}.svg` | — | SVG-бейдж одной публичной категории: `activity`, `issues`, `documentation`, `code_health`; категория без данных — серый `n/a`, любой другой ID (в том числе `security` и `ci_cd`) — `404` |
+| `GET /badge/{org}/{repo}.json` | — | JSON для shields.io endpoint-бейджа: `{schemaVersion: 1, label, message, color}`; неизвестный или не оценённый репозиторий — `n/a` и `lightgrey` |
+| `GET /widget/{org}/{repo}.svg` | — | SVG-карточка для README: оценка, уровень здоровья и четыре публичные категории (`image/svg+xml`, `Cache-Control: max-age=300`); без данных — серая карточка «Нет данных» |
+| `GET /score/{org}/{repo}` | — | публичный JSON API: `{org, repo, name, web_url, status, score, level, categories: [{id, score, no_data}], missing_data, graded_at}`; только чтение |
+
+`GET /ranking` принимает `hide_low_confidence=true|false` (по умолчанию `false`): при `true` из
+списка и из `total_count` убираются репозитории с флагом `low_confidence: true`; порядок остальных
+не меняется, репозитории без флага («неизвестно») не скрываются. Недопустимое значение — `400`.
+
+Публичные маршруты `/ranking`, `/score`, `/badge` и `/widget` отдают `Access-Control-Allow-Origin: *`,
+остальные — нет. Картинки и shields-JSON не ограничиваются по IP: `429` сломал бы изображение в
+README. `GET /score/...` ограничен отдельно, `PUBLIC_API_RATE_LIMIT` запросов на IP за
+`PUBLIC_API_RATE_LIMIT_WINDOW` (по умолчанию 300 в минуту, свой ключ в Redis; в docker-compose те же
+переменные); при превышении — `429 {"error":"rate limit exceeded"}`.
+
+`GET /score/{org}/{repo}` не запускает оценку, в отличие от `/grading`. Поля ответа:
+
+- `status`: `FINISHED` — есть публичная оценка; `NO_DATA` — репозиторий публичный, но ещё не
+  оценён (`score: null`, `categories: []`, `graded_at: null`). Неизвестный или не публичный
+  репозиторий — `404`; приватная оценка здесь никогда не отдаётся.
+- `level`: `excellent` (от 90), `healthy` (от 75), `attention` (от 60), `at_risk` (ниже 60),
+  `no_data`. Границы совпадают с цветами бейджей и уровнями во фронтенде.
+- `categories`: публичные категории по ID в алфавитном порядке. `no_data: true` и `score: null` —
+  данных нет (это не плохая оценка); `score: 0` — реальный ноль.
+- `missing_data`: категории публичной оценки без данных; `graded_at`: время оценки (RFC 3339).
+- `low_confidence` / `confidence_reasons` (2026-10-04): флаг низкой достоверности публичной оценки.
+  `true` — оценка опирается на мало данных, `confidence_reasons` — `[{code, text}]` с заготовленными
+  общими причинами; `false` — флага нет, список пуст; `null` — неизвестно (оценка сохранена до
+  появления флага; такой репозиторий никогда не считается низкодостоверным). Флаг не меняет
+  `score`, `level` и `status`.
+- Кэш: `Cache-Control: public, max-age=60`.
+
+Встраивание в README на SourceCraft (подставьте адрес стенда и репозиторий):
+
+```markdown
+[![Repo Health](https://repo-therapist.alo.quest/api/badge/ORG/REPO.svg)](https://repo-therapist.alo.quest/repo/ORG/REPO)
+[![Repo Health](https://repo-therapist.alo.quest/api/widget/ORG/REPO.svg)](https://repo-therapist.alo.quest/repo/ORG/REPO)
+[![activity](https://repo-therapist.alo.quest/api/badge/ORG/REPO/activity.svg)](https://repo-therapist.alo.quest/repo/ORG/REPO)
+```
 
 `status`: `PENDING` (оценка запущена и считается), `FINISHED`, `NO_DATA`. Запрос оценки сам
 запускает её, если оценки нет или в репозитории была активность после прошлого анализа.

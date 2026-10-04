@@ -13,6 +13,10 @@ service Rating {
   // GetPublicScore returns the stored public score of one public repository, for the README
   // badge. Read-only: it never starts a grading. NOT_FOUND when the repo is unknown or not public.
   rpc GetPublicScore(GetPublicScoreRequest) returns (GetPublicScoreResponse);
+  // GetPublicSummary returns the stored public grade of one public repository with its category
+  // scores, for the public score API and the README badges/widget. Read-only: it never starts a
+  // grading. NOT_FOUND when the repo is unknown or not public.
+  rpc GetPublicSummary(GetPublicSummaryRequest) returns (GetPublicSummaryResponse);
 }
 
 enum SortBy {
@@ -32,6 +36,9 @@ message GetRankingRequest {
   // Always descending, NULLs last. Ties are broken by public_score, so health stays the dominant
   // ranking factor whichever sort is chosen.
   SortBy sort_by = 4;
+  // Leave out repos whose public grade is marked low-confidence. Repos without a flag row
+  // (unknown) are never left out.
+  bool hide_low_confidence = 5;
 }
 
 message RankingEntry {
@@ -50,6 +57,10 @@ message RankingEntry {
   Language language = 7;
   // Unset when unknown.
   google.protobuf.Timestamp last_activity_at = 8;
+  // Low-confidence flag of the public grade. Unset when unknown (grade stored before the flag).
+  optional bool low_confidence = 9;
+  // Generic pre-written reasons; empty unless low_confidence is true.
+  repeated ConfidenceReason confidence_reasons = 10;
 }
 
 message Language {
@@ -74,4 +85,38 @@ message GetPublicScoreRequest {
 message GetPublicScoreResponse {
   // Unset when the repo has not been graded yet.
   optional int32 public_score = 1;
+}
+
+message GetPublicSummaryRequest {
+  string org_slug = 1;
+  string repo_slug = 2;
+}
+
+message CategoryScore {
+  // Category ID as stored by grade-service (activity, issues, documentation, code_health).
+  string id = 1;
+  // 0-100. Unset when the category has no data ("нет данных"), which is not a bad score.
+  optional int32 score = 2;
+}
+
+message GetPublicSummaryResponse {
+  // Currently repo_slug.
+  string name = 1;
+  // Empty when unknown.
+  string web_url = 2;
+  // Unset when the repo has not been graded yet.
+  optional int32 public_score = 3;
+  // Sorted by id; empty when the repo has not been graded yet.
+  repeated CategoryScore categories = 4;
+  repeated string missing_data = 5;
+  // Unset when the repo has not been graded yet.
+  google.protobuf.Timestamp graded_at = 6;
+  // Unset when unknown (no flag row).
+  optional bool low_confidence = 7;
+  repeated ConfidenceReason confidence_reasons = 8;
+}
+
+message ConfidenceReason {
+  string code = 1;
+  string text = 2;
 }

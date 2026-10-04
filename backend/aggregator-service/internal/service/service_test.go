@@ -81,6 +81,26 @@ type fakeGrades struct {
 	upsertErr       error
 	savedPublic     []domain.RepoGrade
 	savedPrivate    []domain.RepoGrade
+
+	confidence       map[uuid.UUID]domain.GradeConfidence
+	confidenceDelete []uuid.UUID
+	confidenceErr    error
+}
+
+func (f *fakeGrades) UpsertPublicConfidence(ctx context.Context, repoID uuid.UUID, confidence domain.GradeConfidence, gradedAt *time.Time) error {
+	if f.confidenceErr != nil {
+		return f.confidenceErr
+	}
+	if f.confidence == nil {
+		f.confidence = map[uuid.UUID]domain.GradeConfidence{}
+	}
+	f.confidence[repoID] = confidence
+	return nil
+}
+
+func (f *fakeGrades) DeletePublicConfidence(ctx context.Context, repoID uuid.UUID) error {
+	f.confidenceDelete = append(f.confidenceDelete, repoID)
+	return f.confidenceErr
 }
 
 func (f *fakeGrades) UpsertPublicGrade(ctx context.Context, grade domain.RepoGrade) error {
@@ -728,5 +748,62 @@ func TestGetGradingPrivateWithoutTokenStoreFails(t *testing.T) {
 	}
 	if err != nil && strings.Contains(err.Error(), "owner-pat") {
 		t.Errorf("error leaks the token: %v", err)
+	}
+}
+
+func TestSaveGradingResultStoresPublicConfidence(t *testing.T) {
+	f := newFixture("public")
+	confidence := &domain.GradeConfidence{LowConfidence: true, Reasons: []byte(`[{"code":"LOW_CODE","text":"x"}]`)}
+
+	err := f.svc.SaveGradingResult(context.Background(), domain.RepoGrade{SourcecraftUUID: testRepoID, Confidence: confidence}, "public", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got, ok := f.grades.confidence[testRepoID]
+	if !ok || !got.LowConfidence || string(got.Reasons) != string(confidence.Reasons) {
+		t.Errorf("stored confidence = %+v (found %v)", got, ok)
+	}
+	if len(f.grades.confidenceDelete) != 0 {
+		t.Error("a present flag must not be deleted")
+	}
+}
+
+func TestSaveGradingResultDropsStaleConfidenceWhenNoneSent(t *testing.T) {
+	f := newFixture("public")
+
+	if err := f.svc.SaveGradingResult(context.Background(), domain.RepoGrade{SourcecraftUUID: testRepoID}, "public", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(f.grades.confidenceDelete) != 1 || len(f.grades.confidence) != 0 {
+		t.Errorf("deleted=%v stored=%v, want the stale row deleted and nothing stored", f.grades.confidenceDelete, f.grades.confidence)
+	}
+}
+
+func TestSaveGradingResultKeepsConfidenceOutOfPrivateGrades(t *testing.T) {
+	f := newFixture("private")
+	confidence := &domain.GradeConfidence{LowConfidence: true}
+
+	if err := f.svc.SaveGradingResult(context.Background(), domain.RepoGrade{SourcecraftUUID: testRepoID, Confidence: confidence}, "private", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(f.grades.confidence) != 0 || len(f.grades.confidenceDelete) != 0 || len(f.grades.savedPrivate) != 1 {
+		t.Errorf("stored=%v deleted=%v private=%d: the flag belongs to public grades only", f.grades.confidence, f.grades.confidenceDelete, len(f.grades.savedPrivate))
+	}
+}
+
+func TestSaveGradingResultReportsConfidenceFailureAndStillReleasesLock(t *testing.T) {
+	f := newFixture("public")
+	f.grades.confidenceErr = errors.New("db down")
+	f.repos.lockFree = false
+
+	err := f.svc.SaveGradingResult(context.Background(), domain.RepoGrade{SourcecraftUUID: testRepoID, Confidence: &domain.GradeConfidence{}}, "public", "")
+	if !errors.Is(err, domain.ErrGradingFailed) {
+		t.Fatalf("err = %v, want ErrGradingFailed", err)
+	}
+	if len(f.grades.savedPublic) != 1 || len(f.repos.released) != 1 {
+		t.Errorf("grade saved %d times, lock released %d times: the grade must stay and the lock must be released", len(f.grades.savedPublic), len(f.repos.released))
 	}
 }

@@ -263,3 +263,67 @@ func TestBuildGradingResult_SecurityCap(t *testing.T) {
 		})
 	}
 }
+
+func confidenceTestConfig() *config.Config {
+	return &config.Config{
+		Categories: map[string]config.CategoryConfig{
+			"activity": {Weight: 0.5}, "issues": {Weight: 0.5}, "documentation": {Weight: 0.5}, "code_health": {Weight: 0.5},
+		},
+		Confidence: config.ConfidenceConfig{
+			Enabled: true, WindowDays: 180, MinFiles: 5, MinLOC: 200, MinCommits: 5, MinCommitsSingleAuthor: 20, MinCategoriesWithData: 2,
+			Reasons: map[string]string{config.ReasonLowCode: "code", config.ReasonLowHistory: "history", config.ReasonLowCoverage: "coverage"},
+		},
+	}
+}
+
+// The flag rides on public grades only and never touches the score.
+func TestBuildGradingResult_ConfidenceIsPublicOnlyAndKeepsTheScore(t *testing.T) {
+	cfg := confidenceTestConfig()
+	out := &GradeOutput{
+		RepoID: "r",
+		Categories: map[string]scoring.CategoryResult{
+			"activity": {ID: "activity", Score: 80}, "issues": {ID: "issues", NoData: true},
+			"documentation": {ID: "documentation", NoData: true}, "code_health": {ID: "code_health", NoData: true},
+		},
+		ConfidenceInputs: scoring.ConfidenceInputs{CodeAvailable: true, ScannedFiles: 1, TotalLOC: 10},
+	}
+
+	pub, err := BuildGradingResult(out, cfg, map[string]config.RecommendationEntry{}, contracts.VisibilityPublic, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pub.Confidence == nil || !pub.Confidence.LowConfidence || len(pub.Confidence.Reasons) != 2 {
+		t.Fatalf("public confidence = %+v, want low with LOW_CODE and LOW_COVERAGE", pub.Confidence)
+	}
+	if pub.Score == nil || *pub.Score != 80 {
+		t.Errorf("score = %v, want 80: the flag must not change it", pub.Score)
+	}
+
+	priv, err := BuildGradingResult(out, cfg, map[string]config.RecommendationEntry{}, contracts.VisibilityPrivate, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if priv.Confidence != nil {
+		t.Errorf("private confidence = %+v, want nil", priv.Confidence)
+	}
+
+	raw, _ := json.Marshal(pub)
+	if !strings.Contains(string(raw), `"confidence":{"low_confidence":true,"reasons":[{"code":"LOW_CODE","text":"code"}`) {
+		t.Errorf("wire shape = %s", raw)
+	}
+}
+
+func TestBuildGradingResult_ConfidenceDisabledIsNull(t *testing.T) {
+	cfg := confidenceTestConfig()
+	cfg.Confidence.Enabled = false
+	out := &GradeOutput{RepoID: "r", Categories: map[string]scoring.CategoryResult{"activity": {ID: "activity", Score: 80}}}
+
+	result, err := BuildGradingResult(out, cfg, map[string]config.RecommendationEntry{}, contracts.VisibilityPublic, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(result)
+	if result.Confidence != nil || !strings.Contains(string(raw), `"confidence":null`) {
+		t.Errorf("confidence = %+v wire = %s, want null", result.Confidence, raw)
+	}
+}

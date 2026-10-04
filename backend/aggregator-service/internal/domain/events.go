@@ -79,5 +79,8 @@ type GradingResultReceivedEvent struct {
 	// GradeMode is how the repo was graded: public (no user token) or private (with one).
 	// It is not the repo's SourceCraft visibility.
 	GradeMode string `json:"grade_mode"`
-	Error     string `json:"error"`
+	// Confidence is the low-confidence flag of a public grade; nil for private grades, failures
+	// and when grade-service has the flag turned off.
+	Confidence *GradeConfidence `json:"confidence"`
+	Error      string           `json:"error"`
 }

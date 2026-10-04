@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiRequestError, HttpRepoHealthApi } from "./api/client"
 import type { GradingResponse } from "./api/contracts"
-import { mergeGradingIntoRepository, repositoryFromMyRepos, repositoryFromRanking, repositoryStub } from "./api/mapper"
+import {
+  confidenceFromPayload,
+  mergeGradingIntoRepository,
+  repositoryFromMyRepos,
+  repositoryFromRanking,
+  repositoryStub,
+} from "./api/mapper"
 import { loadSavedProfile, saveProfile, type YandexProfile } from "./api/yandexAuth"
 import { Button, Card } from "./components/Shell"
 import Sidebar from "./components/Sidebar"
@@ -13,7 +19,7 @@ import RulesPage from "./pages/RulesPage"
 import { gradingToken } from "./metrics"
 import { loadPat, patExpiresIn, savePat } from "./patStorage"
 import { parseRepositoryLink, useRoute } from "./route"
-import type { PageId, RepositorySummary } from "./types"
+import type { Confidence, PageId, RepositorySummary } from "./types"
 import { useRepositoryAnalysis } from "./useRepositoryAnalysis"
 
 type Theme = "light" | "dark" | "dopamine"
@@ -51,6 +57,8 @@ export default function App() {
   // Saved in localStorage for one hour (see patStorage), then dropped.
   const [pat, setPat] = useState<string | undefined>(loadPat)
   const [rankingQuery, setRankingQuery] = useState<RankingQuery>(DEFAULT_RANKING_QUERY)
+  // Low-confidence flag of the public grade of the opened repository (GET /score); null = unknown.
+  const [confidences, setConfidences] = useState<Record<string, Confidence | null>>({})
   const [rankingAttempt, setRankingAttempt] = useState(0)
   const [ranking, setRanking] = useState<RepositoryList & { total: number; loadedKey?: string }>({
     items: [],
@@ -74,13 +82,13 @@ export default function App() {
 
   // One ranking page per request, loaded when the ranking is shown; a page already on screen
   // is not fetched again when the user comes back to it.
-  const rankingKey = `${rankingQuery.page}|${rankingQuery.sort}|${rankingQuery.language}|${rankingAttempt}`
+  const rankingKey = `${rankingQuery.page}|${rankingQuery.sort}|${rankingQuery.language}|${rankingQuery.hideLowConfidence}|${rankingAttempt}`
   useEffect(() => {
     if (route.page !== "ranking" || ranking.loadedKey === rankingKey) return
     let active = true
     setRanking((current) => ({ ...current, isLoading: true, error: undefined }))
     api
-      .getRanking(rankingQuery.page, rankingQuery.sort, rankingQuery.language)
+      .getRanking(rankingQuery.page, rankingQuery.sort, rankingQuery.language, rankingQuery.hideLowConfidence)
       .then((response) => {
         if (!active) return
         const items = response.entries.flatMap((entry) => repositoryFromRanking(entry) ?? [])
@@ -143,11 +151,40 @@ export default function App() {
   const canViewPublicly = Boolean(target?.private && pat && baseRepository?.visibility === "public")
   const key = target && `${token ? "my" : "repo"}:${repoName}`
   const grading = key ? gradings[key] : undefined
+  const publicConfidence = repoName ? confidences[repoName] : undefined
   const repository = useMemo(() => {
     if (!baseRepository) return undefined
     const merged = grading ? mergeGradingIntoRepository(baseRepository, grading) : baseRepository
-    return target?.private && !token ? { ...merged, analysisMode: "public" as const } : merged
-  }, [baseRepository, grading, target?.private, token])
+    // The flag belongs to public grades: the owner's private grade never shows it.
+    const withFlag = token
+      ? { ...merged, confidence: undefined }
+      : publicConfidence
+        ? { ...merged, confidence: publicConfidence }
+        : merged
+    return target?.private && !token ? { ...withFlag, analysisMode: "public" as const } : withFlag
+  }, [baseRepository, grading, target?.private, token, publicConfidence])
+
+  // The flag is advisory and read separately from the grade: a failure just leaves it unknown.
+  const publicGradeShown = Boolean(target && !token && grading?.status === "FINISHED")
+  const gradedAtKey = grading?.grade?.graded_at
+  useEffect(() => {
+    if (!target || !repoName || !publicGradeShown) return
+    let active = true
+    api
+      .getPublicScore(target.org, target.repo)
+      .then((response) => {
+        if (active) {
+          setConfidences((current) => ({
+            ...current,
+            [repoName]: confidenceFromPayload(response.low_confidence, response.confidence_reasons) ?? null,
+          }))
+        }
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [target?.org, target?.repo, repoName, publicGradeShown, gradedAtKey])
 
   const handleGrading = useCallback(
     (response: GradingResponse) => {

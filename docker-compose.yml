@@ -102,6 +102,9 @@ services:
       RATING_GRPC_ADDRESS: localhost:8086
       # Gateway requests per client IP per minute (code default 10 is too low for the SPA's polling).
       RATE_LIMIT: ${RATE_LIMIT:-60}
+      # Public JSON score API (GET /score/...): its own per-IP budget; badges and the widget are not limited.
+      PUBLIC_API_RATE_LIMIT: ${PUBLIC_API_RATE_LIMIT:-300}
+      PUBLIC_API_RATE_LIMIT_WINDOW: ${PUBLIC_API_RATE_LIMIT_WINDOW:-1m}
     # Clones go to /dev/shm first; repository-service retries on disk if a repo outgrows it.
     shm_size: 400m
     restart: unless-stopped

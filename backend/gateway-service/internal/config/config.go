@@ -15,7 +15,9 @@ type Config struct {
 	Redis      RedisConfig
 	Yandex     YandexConfig
 	RateLimit  RateLimitConfig
-	Session    SessionConfig
+	// PublicAPIRateLimit is the per-IP budget of the public JSON score API.
+	PublicAPIRateLimit RateLimitConfig
+	Session            SessionConfig
 }
 type HTTPConfig struct {
 	Address           string
@@ -172,6 +174,17 @@ func LoadConfig() *Config {
 			),
 			Window: getEnvDuration(
 				"RATE_LIMIT_WINDOW",
+				time.Minute,
+			),
+		},
+
+		PublicAPIRateLimit: RateLimitConfig{
+			Limit: getEnvIntDefault(
+				"PUBLIC_API_RATE_LIMIT",
+				300,
+			),
+			Window: getEnvDuration(
+				"PUBLIC_API_RATE_LIMIT_WINDOW",
 				time.Minute,
 			),
 		},

@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -31,8 +32,8 @@ func NewRankingRepository(db *pgxpool.Pool) *RankingRepository {
 	}
 }
 
-func (r *RankingRepository) CountRanking(ctx context.Context, language string) (int, error) {
-	query, args := buildCountQuery(language)
+func (r *RankingRepository) CountRanking(ctx context.Context, language string, hideLowConfidence bool) (int, error) {
+	query, args := buildCountQuery(language, hideLowConfidence)
 
 	var count int
 	if err := r.db.QueryRow(ctx, query, args...).Scan(&count); err != nil {
@@ -57,7 +58,11 @@ func (r *RankingRepository) ListRanking(ctx context.Context, q domain.RankingQue
 	result := make([]domain.RankingRow, 0, q.Limit)
 
 	for rows.Next() {
-		var row domain.RankingRow
+		var (
+			row     domain.RankingRow
+			low     *bool
+			reasons []byte
+		)
 
 		if err := rows.Scan(
 			&row.SourcecraftUUID,
@@ -68,8 +73,14 @@ func (r *RankingRepository) ListRanking(ctx context.Context, q domain.RankingQue
 			&row.Language.Name,
 			&row.Language.Color,
 			&row.LastActivityAt,
+			&low,
+			&reasons,
 		); err != nil {
 			return nil, fmt.Errorf("scan ranking row: %w", err)
+		}
+
+		if row.Confidence, err = decodeConfidence(low, reasons); err != nil {
+			return nil, err
 		}
 
 		result = append(result, row)
@@ -104,8 +115,42 @@ func (r *RankingRepository) GetPublicScore(ctx context.Context, orgSlug, repoSlu
 	return score, nil
 }
 
+// GetPublicSummary reads a public repo's stored public grade. A repo without a grade row still
+// comes back (nil score), so the caller can tell "not graded yet" from "unknown".
+func (r *RankingRepository) GetPublicSummary(ctx context.Context, orgSlug, repoSlug string) (domain.PublicSummaryRow, error) {
+	var (
+		row     domain.PublicSummaryRow
+		low     *bool
+		reasons []byte
+	)
+
+	err := r.db.QueryRow(ctx, `
+		SELECT r.repo_slug, COALESCE(r.web_url, ''), g.score, g.category_scores, g.missing_data, g.graded_at,
+			c.low_confidence, c.reasons
+		FROM repos r
+		LEFT JOIN repo_grades_public g ON g.sourcecraft_uuid = r.sourcecraft_uuid
+		LEFT JOIN repo_confidence_public c ON c.sourcecraft_uuid = r.sourcecraft_uuid
+		WHERE r.org_slug = $1 AND r.repo_slug = $2 AND r.visibility = 'public'
+		`,
+		orgSlug,
+		repoSlug,
+	).Scan(&row.Name, &row.WebURL, &row.Score, &row.CategoryScores, &row.MissingData, &row.GradedAt, &low, &reasons)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.PublicSummaryRow{}, domain.ErrNotFound
+	}
+	if err != nil {
+		return domain.PublicSummaryRow{}, fmt.Errorf("get public summary: %w", err)
+	}
+
+	if row.Confidence, err = decodeConfidence(low, reasons); err != nil {
+		return domain.PublicSummaryRow{}, err
+	}
+
+	return row, nil
+}
+
 // whereClause returns the shared filter for the count and list queries. Placeholders start at $1.
-func whereClause(language string) (string, []any) {
+func whereClause(language string, hideLowConfidence bool) (string, []any) {
 	var b strings.Builder
 	var args []any
 
@@ -118,11 +163,33 @@ func whereClause(language string) (string, []any) {
 		fmt.Fprintf(&b, " AND lower(r.main_language) = lower($%d)", len(args))
 	}
 
+	// A missing flag row is "unknown" and is never hidden: only an explicit low-confidence flag is.
+	if hideLowConfidence {
+		b.WriteString(" AND NOT EXISTS (SELECT 1 FROM repo_confidence_public c" +
+			" WHERE c.sourcecraft_uuid = r.sourcecraft_uuid AND c.low_confidence)")
+	}
+
 	return b.String(), args
 }
 
-func buildCountQuery(language string) (string, []any) {
-	where, args := whereClause(language)
+// decodeConfidence builds the flag from its columns; a nil low means there is no flag row.
+func decodeConfidence(low *bool, reasons []byte) (*domain.Confidence, error) {
+	if low == nil {
+		return nil, nil
+	}
+
+	confidence := &domain.Confidence{Low: *low, Reasons: []domain.ConfidenceReason{}}
+	if len(reasons) > 0 {
+		if err := json.Unmarshal(reasons, &confidence.Reasons); err != nil {
+			return nil, fmt.Errorf("decode confidence reasons: %w", err)
+		}
+	}
+
+	return confidence, nil
+}
+
+func buildCountQuery(language string, hideLowConfidence bool) (string, []any) {
+	where, args := whereClause(language, hideLowConfidence)
 
 	return "SELECT count(*) FROM repos r " + where, args
 }
@@ -133,7 +200,7 @@ func buildListQuery(q domain.RankingQuery) (string, []any, error) {
 		return "", nil, fmt.Errorf("%w: unknown sort %q", domain.ErrInvalidArgument, q.SortBy)
 	}
 
-	where, args := whereClause(q.Language)
+	where, args := whereClause(q.Language, q.HideLowConfidence)
 
 	args = append(args, q.Limit, q.Offset)
 
@@ -146,9 +213,12 @@ func buildListQuery(q domain.RankingQuery) (string, []any, error) {
 			r.sourcecraft_rating,
 			COALESCE(r.main_language, ''),
 			COALESCE(r.language_color, ''),
-			r.last_activity_at
+			r.last_activity_at,
+			c.low_confidence,
+			c.reasons
 		FROM repos r
 		JOIN repo_grades_public g ON g.sourcecraft_uuid = r.sourcecraft_uuid
+		LEFT JOIN repo_confidence_public c ON c.sourcecraft_uuid = r.sourcecraft_uuid
 		%s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d

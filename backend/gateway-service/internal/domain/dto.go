@@ -15,6 +15,8 @@ type GetRankingDTO struct {
 	PageSize int32
 	Language string
 	SortBy   RankingSortBy
+	// HideLowConfidence leaves out repos whose public grade is flagged low-confidence.
+	HideLowConfidence bool
 }
 type GetMyReposDTO struct {
 	Repositories  []Repo `json:"repositories"`

@@ -114,6 +114,18 @@ type Recommendation struct {
 // view's categories, in category order. MissingData names the view's categories
 // that are NoData/not_calculated. A nonempty Error means grading failed: Score, CategoryScores and
 // Advice are null and the Aggregator only releases the lock.
+// ConfidenceReason / Confidence: the low-confidence flag of a public grade. The flag never changes
+// the score; the reasons are generic pre-written Russian texts.
+type ConfidenceReason struct {
+	Code string `json:"code"`
+	Text string `json:"text"`
+}
+
+type Confidence struct {
+	LowConfidence bool               `json:"low_confidence"`
+	Reasons       []ConfidenceReason `json:"reasons"`
+}
+
 type GradingResultEvent struct {
 	SourcecraftUUID string          `json:"sourcecraft_uuid"`
 	GradeMode       string          `json:"grade_mode"` // VisibilityPublic or VisibilityPrivate: graded without or with a user token
@@ -122,7 +134,9 @@ type GradingResultEvent struct {
 	Advice          json.RawMessage `json:"advice"`
 	MissingData     []string        `json:"missing_data"`
 	GradedAt        time.Time       `json:"graded_at"`
-	Error           string          `json:"error"`
+	// Confidence is set only for grade_mode public (and null on failures and private grades).
+	Confidence *Confidence `json:"confidence"`
+	Error      string      `json:"error"`
 }
 
 // Grading failure codes carried in GradingResultEvent.Error.

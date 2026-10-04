@@ -18,11 +18,13 @@ var botSuffixes = []string{"[bot]", "-bot", "_bot"}
 //   - Merges: 2+ parents;
 //   - Empty: a non-merge commit that changed no files. Needs Parents: plain `git log --numstat`
 //     also lists no files for merges, so a commit with unknown parents (nil, old export) is kept;
-//   - Bots: author name or email local part ends with a bot suffix.
+//   - Bots: author name or email local part ends with a bot suffix;
+//   - MinChangedLines: a non-merge commit with files changed but fewer changed lines than the
+//     floor (a commit with no files is the Empty filter's business, unknown parents are kept).
 //
 // The input slice is not modified.
 func FilterCommits(commits []gitlog.Commit, f config.CommitFilters, now time.Time) []gitlog.Commit {
-	if !f.FutureDated && !f.Empty && !f.Bots && !f.Merges {
+	if !f.FutureDated && !f.Empty && !f.Bots && !f.Merges && f.MinChangedLines <= 0 {
 		return commits
 	}
 	kept := make([]gitlog.Commit, 0, len(commits))
@@ -32,11 +34,25 @@ func FilterCommits(commits []gitlog.Commit, f config.CommitFilters, now time.Tim
 		case f.Merges && len(c.Parents) > 1:
 		case f.Empty && c.Parents != nil && len(c.Parents) <= 1 && len(c.FilesChanged) == 0:
 		case f.Bots && isBotAuthor(c.AuthorName, c.AuthorEmail):
+		case f.MinChangedLines > 0 && len(c.Parents) <= 1 && changedLines(c) < f.MinChangedLines && len(c.FilesChanged) > 0:
 		default:
 			kept = append(kept, c)
 		}
 	}
 	return kept
+}
+
+// changedLines is the commit's added + deleted lines. A binary file change counts as substantial
+// (it has no line count), so a commit that changes one is never dropped as trivial.
+func changedLines(c gitlog.Commit) int {
+	total := 0
+	for _, f := range c.FilesChanged {
+		if f.Binary || f.Added < 0 || f.Deleted < 0 {
+			return int(^uint(0) >> 1)
+		}
+		total += f.Added + f.Deleted
+	}
+	return total
 }
 
 func isBotAuthor(name, email string) bool {

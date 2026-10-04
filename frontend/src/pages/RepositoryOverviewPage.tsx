@@ -170,6 +170,17 @@ export default function RepositoryOverviewPage({
             {repository.healthScore !== null && (
               <ScoreBar score={repository.healthScore} label={`Repo Health Score: ${repository.healthScore} из 100`} />
             )}
+            {repository.confidence?.low && repository.analysisMode !== "private" && (
+              <div className="confidence-notice" role="note">
+                <strong>Низкая достоверность оценки</strong>
+                <ul>
+                  {repository.confidence.reasons.map((reason) => (
+                    <li key={reason}>{reason}</li>
+                  ))}
+                </ul>
+                <small>Это пометка, а не штраф: оценка и место в рейтинге не изменены.</small>
+              </div>
+            )}
             <p className="muted-copy">Последний анализ: {gradedAt ?? "ещё не выполнялся"}</p>
           </div>
           <div className="health-card__summary">

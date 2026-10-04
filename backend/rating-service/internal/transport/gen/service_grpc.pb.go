@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Rating_GetRanking_FullMethodName     = "/rating.Rating/GetRanking"
-	Rating_GetPublicScore_FullMethodName = "/rating.Rating/GetPublicScore"
+	Rating_GetRanking_FullMethodName       = "/rating.Rating/GetRanking"
+	Rating_GetPublicScore_FullMethodName   = "/rating.Rating/GetPublicScore"
+	Rating_GetPublicSummary_FullMethodName = "/rating.Rating/GetPublicSummary"
 )
 
 // RatingClient is the client API for Rating service.
@@ -33,6 +34,10 @@ type RatingClient interface {
 	// GetPublicScore returns the stored public score of one public repository, for the README
 	// badge. Read-only: it never starts a grading. NOT_FOUND when the repo is unknown or not public.
 	GetPublicScore(ctx context.Context, in *GetPublicScoreRequest, opts ...grpc.CallOption) (*GetPublicScoreResponse, error)
+	// GetPublicSummary returns the stored public grade of one public repository with its category
+	// scores, for the public score API and the README badges/widget. Read-only: it never starts a
+	// grading. NOT_FOUND when the repo is unknown or not public.
+	GetPublicSummary(ctx context.Context, in *GetPublicSummaryRequest, opts ...grpc.CallOption) (*GetPublicSummaryResponse, error)
 }
 
 type ratingClient struct {
@@ -63,6 +68,16 @@ func (c *ratingClient) GetPublicScore(ctx context.Context, in *GetPublicScoreReq
 	return out, nil
 }
 
+func (c *ratingClient) GetPublicSummary(ctx context.Context, in *GetPublicSummaryRequest, opts ...grpc.CallOption) (*GetPublicSummaryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPublicSummaryResponse)
+	err := c.cc.Invoke(ctx, Rating_GetPublicSummary_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RatingServer is the server API for Rating service.
 // All implementations must embed UnimplementedRatingServer
 // for forward compatibility.
@@ -73,6 +88,10 @@ type RatingServer interface {
 	// GetPublicScore returns the stored public score of one public repository, for the README
 	// badge. Read-only: it never starts a grading. NOT_FOUND when the repo is unknown or not public.
 	GetPublicScore(context.Context, *GetPublicScoreRequest) (*GetPublicScoreResponse, error)
+	// GetPublicSummary returns the stored public grade of one public repository with its category
+	// scores, for the public score API and the README badges/widget. Read-only: it never starts a
+	// grading. NOT_FOUND when the repo is unknown or not public.
+	GetPublicSummary(context.Context, *GetPublicSummaryRequest) (*GetPublicSummaryResponse, error)
 	mustEmbedUnimplementedRatingServer()
 }
 
@@ -88,6 +107,9 @@ func (UnimplementedRatingServer) GetRanking(context.Context, *GetRankingRequest)
 }
 func (UnimplementedRatingServer) GetPublicScore(context.Context, *GetPublicScoreRequest) (*GetPublicScoreResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetPublicScore not implemented")
+}
+func (UnimplementedRatingServer) GetPublicSummary(context.Context, *GetPublicSummaryRequest) (*GetPublicSummaryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPublicSummary not implemented")
 }
 func (UnimplementedRatingServer) mustEmbedUnimplementedRatingServer() {}
 func (UnimplementedRatingServer) testEmbeddedByValue()                {}
@@ -146,6 +168,24 @@ func _Rating_GetPublicScore_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Rating_GetPublicSummary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPublicSummaryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RatingServer).GetPublicSummary(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Rating_GetPublicSummary_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RatingServer).GetPublicSummary(ctx, req.(*GetPublicSummaryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Rating_ServiceDesc is the grpc.ServiceDesc for Rating service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -160,6 +200,10 @@ var Rating_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPublicScore",
 			Handler:    _Rating_GetPublicScore_Handler,
+		},
+		{
+			MethodName: "GetPublicSummary",
+			Handler:    _Rating_GetPublicSummary_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

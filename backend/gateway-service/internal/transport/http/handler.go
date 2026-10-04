@@ -23,6 +23,7 @@ const (
 
 	statusPending  = "PENDING"
 	statusFinished = "FINISHED"
+	statusNoData   = "NO_DATA"
 )
 
 type GatewayService interface {
@@ -63,6 +64,21 @@ type GatewayService interface {
 		orgSlug string,
 		repoSlug string,
 	) (*int32, error)
+
+	// GetPublicSummary backs the category badges and the widget; it is never rate limited.
+	GetPublicSummary(
+		ctx context.Context,
+		orgSlug string,
+		repoSlug string,
+	) (domain.PublicSummary, error)
+
+	// GetScore backs the public JSON score API, behind its own per-IP limit.
+	GetScore(
+		ctx context.Context,
+		clientIP string,
+		orgSlug string,
+		repoSlug string,
+	) (domain.PublicSummary, error)
 }
 
 type Handler struct {
@@ -83,6 +99,9 @@ func (h *Handler) Register(mux *stdhttp.ServeMux) {
 	mux.HandleFunc("GET /recommendations/{org}/{repo}", h.RequestLLMRecommendations)
 	mux.HandleFunc("GET /ranking", h.GetRanking)
 	mux.HandleFunc("GET /badge/{org}/{repo}", h.GetBadge)
+	mux.HandleFunc("GET /badge/{org}/{repo}/{category}", h.GetCategoryBadge)
+	mux.HandleFunc("GET /widget/{org}/{repo}", h.GetWidget)
+	mux.HandleFunc("GET /score/{org}/{repo}", h.GetScore)
 }
 
 func (h *Handler) LoginWithYandex(
@@ -244,6 +263,8 @@ func (h *Handler) GetRanking(
 	w stdhttp.ResponseWriter,
 	r *stdhttp.Request,
 ) {
+	setPublicCORS(w)
+
 	dto, err := mapGetRankingRequest(r)
 	if err != nil {
 		writeError(w, err)
@@ -288,12 +309,40 @@ func mapGetRankingRequest(
 		return domain.GetRankingDTO{}, err
 	}
 
+	hideLowConfidence, err := queryBool(query.Get("hide_low_confidence"), "hide_low_confidence")
+	if err != nil {
+		return domain.GetRankingDTO{}, err
+	}
+
 	return domain.GetRankingDTO{
-		Page:     page,
-		PageSize: pageSize,
-		Language: strings.TrimSpace(query.Get("filter")),
-		SortBy:   sortBy,
+		Page:              page,
+		PageSize:          pageSize,
+		Language:          strings.TrimSpace(query.Get("filter")),
+		SortBy:            sortBy,
+		HideLowConfidence: hideLowConfidence,
 	}, nil
+}
+
+// queryBool reads an optional boolean query value; empty means false.
+func queryBool(value, name string) (bool, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false, nil
+	}
+
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, httpError{
+			status: stdhttp.StatusBadRequest,
+			err: fmt.Errorf(
+				"%w: %s must be true or false",
+				domain.ErrInvalidRequest,
+				name,
+			),
+		}
+	}
+
+	return parsed, nil
 }
 
 func queryInt32(value, name string) (int32, error) {
@@ -407,6 +456,29 @@ type rankingEntryResponse struct {
 	Likes           *float64         `json:"likes,omitempty"`
 	Language        languageResponse `json:"language"`
 	LastActivityAt  *string          `json:"last_activity_at,omitempty"`
+	// LowConfidence is null when the flag is unknown; the reasons are empty unless it is true.
+	LowConfidence     *bool                      `json:"low_confidence"`
+	ConfidenceReasons []confidenceReasonResponse `json:"confidence_reasons"`
+}
+
+type confidenceReasonResponse struct {
+	Code string `json:"code"`
+	Text string `json:"text"`
+}
+
+// mapConfidenceResponse returns the wire form of a flag: a null low_confidence when unknown and
+// always a (possibly empty) reasons list.
+func mapConfidenceResponse(confidence *domain.Confidence) (*bool, []confidenceReasonResponse) {
+	reasons := []confidenceReasonResponse{}
+	if confidence == nil {
+		return nil, reasons
+	}
+
+	for _, reason := range confidence.Reasons {
+		reasons = append(reasons, confidenceReasonResponse{Code: reason.Code, Text: reason.Text})
+	}
+
+	return &confidence.Low, reasons
 }
 
 func mapGetMyReposResponse(
@@ -542,6 +614,8 @@ func mapRankingEntryResponse(
 		value := entry.LastActivityAt.Format(time.RFC3339Nano)
 		result.LastActivityAt = &value
 	}
+
+	result.LowConfidence, result.ConfidenceReasons = mapConfidenceResponse(entry.Confidence)
 
 	return result
 }

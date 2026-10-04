@@ -39,6 +39,9 @@ type GradeOutput struct {
 	// that reply succeeded. The last item is the "graded without LLM" notice when the grade was
 	// algorithmic; it is forwarded like any other item.
 	DocsAdvice []contracts.DocsAdvice `json:"docs_advice,omitempty"`
+	// ConfidenceInputs are the repo-level facts the low-confidence flag needs; BuildGradingResult
+	// combines them with the final categories. Not part of the printed result.
+	ConfidenceInputs scoring.ConfidenceInputs `json:"-"`
 }
 
 // CategoryIDs returns the categories graded for a visibility: the private view is a superset
@@ -122,13 +125,14 @@ func Grade(ctx context.Context, repoID, prefix string, cfg *config.Config, token
 		log.Printf("todo-markers.json unavailable for %s: %v (Code health category will be no-data)", repoID, err)
 	} else {
 		var export struct {
-			Markers  []scoring.Marker `json:"markers"`
-			TotalLOC int              `json:"total_loc"`
+			Markers      []scoring.Marker `json:"markers"`
+			TotalLOC     int              `json:"total_loc"`
+			ScannedFiles int              `json:"scanned_files"`
 		}
 		if err := json.Unmarshal(data, &export); err != nil {
 			return nil, fmt.Errorf("decoding todo-markers.json: %w", err)
 		}
-		codeHealthInputs = scoring.CodeHealthInputs{Markers: export.Markers, TotalLOC: export.TotalLOC, Available: true}
+		codeHealthInputs = scoring.CodeHealthInputs{Markers: export.Markers, TotalLOC: export.TotalLOC, ScannedFiles: export.ScannedFiles, Available: true}
 	}
 
 	codeHealthResult := scoring.CategoryResult{ID: "code_health", NoData: true}
@@ -141,8 +145,19 @@ func Grade(ctx context.Context, repoID, prefix string, cfg *config.Config, token
 		"issues":      issuesResult,
 		"code_health": codeHealthResult,
 	}
+
+	confidenceInputs := scoring.ConfidenceInputs{
+		CodeAvailable: codeHealthInputs.Available,
+		ScannedFiles:  codeHealthInputs.ScannedFiles,
+		TotalLOC:      codeHealthInputs.TotalLOC,
+	}
+	if inputs.CommitsAvailable {
+		confidenceInputs.CommitsAvailable = true
+		confidenceInputs.Commits = scoring.FilterCommits(inputs.Commits, activityCfg.CommitFilters, time.Now())
+	}
+
 	if !private {
-		return &GradeOutput{RepoID: repoID, Categories: categories}, nil
+		return &GradeOutput{RepoID: repoID, Categories: categories, ConfidenceInputs: confidenceInputs}, nil
 	}
 
 	ciInputs := scoring.CICDInputs{}
@@ -171,7 +186,7 @@ func Grade(ctx context.Context, repoID, prefix string, cfg *config.Config, token
 
 	categories["security"] = securityResult
 	categories["ci_cd"] = ciResult
-	return &GradeOutput{RepoID: repoID, Categories: categories}, nil
+	return &GradeOutput{RepoID: repoID, Categories: categories, ConfidenceInputs: confidenceInputs}, nil
 }
 
 func newS3Client(ctx context.Context) (*storage.Client, error) {
@@ -254,6 +269,10 @@ func BuildGradingResult(out *GradeOutput, cfg *config.Config, catalog map[string
 		MissingData:     scoring.MissingCategories(out.Categories, ids),
 		GradedAt:        now,
 	}
+	// The flag is a property of public grades only: a private grade is the owner's own view.
+	if visibility == contracts.VisibilityPublic {
+		result.Confidence = toContractConfidence(scoring.ComputeConfidence(cfg.Confidence, out.ConfidenceInputs, out.Categories, ids, now))
+	}
 	return result, nil
 }
 
@@ -261,6 +280,17 @@ func BuildGradingResult(out *GradeOutput, cfg *config.Config, catalog map[string
 // release its lock instead of waiting on a result that will never come.
 func GradingFailure(sourcecraftUUID, visibility, code string, now time.Time) contracts.GradingResultEvent {
 	return contracts.GradingResultEvent{SourcecraftUUID: sourcecraftUUID, GradeMode: visibility, GradedAt: now, Error: code}
+}
+
+func toContractConfidence(c *scoring.Confidence) *contracts.Confidence {
+	if c == nil {
+		return nil
+	}
+	reasons := make([]contracts.ConfidenceReason, len(c.Reasons))
+	for i, r := range c.Reasons {
+		reasons[i] = contracts.ConfidenceReason{Code: r.Code, Text: r.Text}
+	}
+	return &contracts.Confidence{LowConfidence: c.LowConfidence, Reasons: reasons}
 }
 
 func toContractRecommendations(recs []scoring.Recommendation) []contracts.Recommendation {

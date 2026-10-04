@@ -324,6 +324,38 @@ func (r *GradesRepository) UpsertPrivateGrade(ctx context.Context, grade domain.
 	return nil
 }
 
+func (r *GradesRepository) UpsertPublicConfidence(ctx context.Context, repoID uuid.UUID, confidence domain.GradeConfidence, gradedAt *time.Time) error {
+	reasons := confidence.Reasons
+	if len(reasons) == 0 || string(reasons) == "null" {
+		reasons = []byte("[]")
+	}
+
+	_, err := r.db.Exec(
+		ctx,
+		`
+		INSERT INTO repo_confidence_public (sourcecraft_uuid, low_confidence, reasons, graded_at)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (sourcecraft_uuid)
+		DO UPDATE SET
+			low_confidence = EXCLUDED.low_confidence,
+			reasons = EXCLUDED.reasons,
+			graded_at = EXCLUDED.graded_at
+		`,
+		repoID,
+		confidence.LowConfidence,
+		reasons,
+		gradedAt,
+	)
+
+	return mapGradeError(err)
+}
+
+func (r *GradesRepository) DeletePublicConfidence(ctx context.Context, repoID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM repo_confidence_public WHERE sourcecraft_uuid = $1`, repoID)
+
+	return mapGradeError(err)
+}
+
 func (r *GradesRepository) GetPublicGradeByRepoID(ctx context.Context, repoID uuid.UUID) (domain.RepoGrade, error) {
 	var grade domain.RepoGrade
 

@@ -26,6 +26,21 @@ type fakeService struct {
 	gradeOut domain.GetGradingResponse
 	score    *int32
 	badgeFor string
+
+	summary    domain.PublicSummary
+	scoreIP    string
+	summaryFor string
+	rankingOut domain.GetRankingResponse
+}
+
+func (f *fakeService) GetPublicSummary(ctx context.Context, orgSlug, repoSlug string) (domain.PublicSummary, error) {
+	f.called, f.summaryFor = true, orgSlug+"/"+repoSlug
+	return f.summary, f.err
+}
+
+func (f *fakeService) GetScore(ctx context.Context, clientIP, orgSlug, repoSlug string) (domain.PublicSummary, error) {
+	f.called, f.scoreIP, f.summaryFor = true, clientIP, orgSlug+"/"+repoSlug
+	return f.summary, f.err
 }
 
 func (f *fakeService) GetPublicScore(ctx context.Context, orgSlug, repoSlug string) (*int32, error) {
@@ -50,7 +65,7 @@ func (f *fakeService) RequestLLMRecommendations(ctx context.Context, clientIP, p
 
 func (f *fakeService) GetRanking(ctx context.Context, clientIP string, request domain.GetRankingDTO) (domain.GetRankingResponse, error) {
 	f.called, f.ranking = true, request
-	return domain.GetRankingResponse{}, f.err
+	return f.rankingOut, f.err
 }
 
 func (f *fakeService) LoginWithYandex(ctx context.Context, clientIP string, request domain.YandexLoginDTO) (domain.LoginResponse, error) {

@@ -72,13 +72,14 @@ func (SortBy) EnumDescriptor() ([]byte, []int) {
 }
 
 type GetRankingRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Page          int32                  `protobuf:"varint,1,opt,name=page,proto3" json:"page,omitempty"`
-	PageSize      int32                  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	Language      string                 `protobuf:"bytes,3,opt,name=language,proto3" json:"language,omitempty"`
-	SortBy        SortBy                 `protobuf:"varint,4,opt,name=sort_by,json=sortBy,proto3,enum=rating.SortBy" json:"sort_by,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Page              int32                  `protobuf:"varint,1,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize          int32                  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	Language          string                 `protobuf:"bytes,3,opt,name=language,proto3" json:"language,omitempty"`
+	SortBy            SortBy                 `protobuf:"varint,4,opt,name=sort_by,json=sortBy,proto3,enum=rating.SortBy" json:"sort_by,omitempty"`
+	HideLowConfidence bool                   `protobuf:"varint,5,opt,name=hide_low_confidence,json=hideLowConfidence,proto3" json:"hide_low_confidence,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *GetRankingRequest) Reset() {
@@ -139,18 +140,27 @@ func (x *GetRankingRequest) GetSortBy() SortBy {
 	return SortBy_SORT_BY_SCORE
 }
 
+func (x *GetRankingRequest) GetHideLowConfidence() bool {
+	if x != nil {
+		return x.HideLowConfidence
+	}
+	return false
+}
+
 type RankingEntry struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Place           int32                  `protobuf:"varint,1,opt,name=place,proto3" json:"place,omitempty"`
-	SourcecraftUuid string                 `protobuf:"bytes,2,opt,name=sourcecraft_uuid,json=sourcecraftUuid,proto3" json:"sourcecraft_uuid,omitempty"`
-	Name            string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	WebUrl          string                 `protobuf:"bytes,4,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
-	PublicScore     *int32                 `protobuf:"varint,5,opt,name=public_score,json=publicScore,proto3,oneof" json:"public_score,omitempty"`
-	Likes           *float64               `protobuf:"fixed64,6,opt,name=likes,proto3,oneof" json:"likes,omitempty"`
-	Language        *Language              `protobuf:"bytes,7,opt,name=language,proto3" json:"language,omitempty"`
-	LastActivityAt  *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Place             int32                  `protobuf:"varint,1,opt,name=place,proto3" json:"place,omitempty"`
+	SourcecraftUuid   string                 `protobuf:"bytes,2,opt,name=sourcecraft_uuid,json=sourcecraftUuid,proto3" json:"sourcecraft_uuid,omitempty"`
+	Name              string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	WebUrl            string                 `protobuf:"bytes,4,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
+	PublicScore       *int32                 `protobuf:"varint,5,opt,name=public_score,json=publicScore,proto3,oneof" json:"public_score,omitempty"`
+	Likes             *float64               `protobuf:"fixed64,6,opt,name=likes,proto3,oneof" json:"likes,omitempty"`
+	Language          *Language              `protobuf:"bytes,7,opt,name=language,proto3" json:"language,omitempty"`
+	LastActivityAt    *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
+	LowConfidence     *bool                  `protobuf:"varint,9,opt,name=low_confidence,json=lowConfidence,proto3,oneof" json:"low_confidence,omitempty"`
+	ConfidenceReasons []*ConfidenceReason    `protobuf:"bytes,10,rep,name=confidence_reasons,json=confidenceReasons,proto3" json:"confidence_reasons,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *RankingEntry) Reset() {
@@ -235,6 +245,20 @@ func (x *RankingEntry) GetLanguage() *Language {
 func (x *RankingEntry) GetLastActivityAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.LastActivityAt
+	}
+	return nil
+}
+
+func (x *RankingEntry) GetLowConfidence() bool {
+	if x != nil && x.LowConfidence != nil {
+		return *x.LowConfidence
+	}
+	return false
+}
+
+func (x *RankingEntry) GetConfidenceReasons() []*ConfidenceReason {
+	if x != nil {
+		return x.ConfidenceReasons
 	}
 	return nil
 }
@@ -455,16 +479,273 @@ func (x *GetPublicScoreResponse) GetPublicScore() int32 {
 	return 0
 }
 
+type GetPublicSummaryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OrgSlug       string                 `protobuf:"bytes,1,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
+	RepoSlug      string                 `protobuf:"bytes,2,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPublicSummaryRequest) Reset() {
+	*x = GetPublicSummaryRequest{}
+	mi := &file_rate_client_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPublicSummaryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPublicSummaryRequest) ProtoMessage() {}
+
+func (x *GetPublicSummaryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPublicSummaryRequest.ProtoReflect.Descriptor instead.
+func (*GetPublicSummaryRequest) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetPublicSummaryRequest) GetOrgSlug() string {
+	if x != nil {
+		return x.OrgSlug
+	}
+	return ""
+}
+
+func (x *GetPublicSummaryRequest) GetRepoSlug() string {
+	if x != nil {
+		return x.RepoSlug
+	}
+	return ""
+}
+
+type CategoryScore struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Score         *int32                 `protobuf:"varint,2,opt,name=score,proto3,oneof" json:"score,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CategoryScore) Reset() {
+	*x = CategoryScore{}
+	mi := &file_rate_client_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CategoryScore) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CategoryScore) ProtoMessage() {}
+
+func (x *CategoryScore) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CategoryScore.ProtoReflect.Descriptor instead.
+func (*CategoryScore) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *CategoryScore) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *CategoryScore) GetScore() int32 {
+	if x != nil && x.Score != nil {
+		return *x.Score
+	}
+	return 0
+}
+
+type GetPublicSummaryResponse struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Name              string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	WebUrl            string                 `protobuf:"bytes,2,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
+	PublicScore       *int32                 `protobuf:"varint,3,opt,name=public_score,json=publicScore,proto3,oneof" json:"public_score,omitempty"`
+	Categories        []*CategoryScore       `protobuf:"bytes,4,rep,name=categories,proto3" json:"categories,omitempty"`
+	MissingData       []string               `protobuf:"bytes,5,rep,name=missing_data,json=missingData,proto3" json:"missing_data,omitempty"`
+	GradedAt          *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=graded_at,json=gradedAt,proto3" json:"graded_at,omitempty"`
+	LowConfidence     *bool                  `protobuf:"varint,7,opt,name=low_confidence,json=lowConfidence,proto3,oneof" json:"low_confidence,omitempty"`
+	ConfidenceReasons []*ConfidenceReason    `protobuf:"bytes,8,rep,name=confidence_reasons,json=confidenceReasons,proto3" json:"confidence_reasons,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *GetPublicSummaryResponse) Reset() {
+	*x = GetPublicSummaryResponse{}
+	mi := &file_rate_client_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPublicSummaryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPublicSummaryResponse) ProtoMessage() {}
+
+func (x *GetPublicSummaryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPublicSummaryResponse.ProtoReflect.Descriptor instead.
+func (*GetPublicSummaryResponse) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetPublicSummaryResponse) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *GetPublicSummaryResponse) GetWebUrl() string {
+	if x != nil {
+		return x.WebUrl
+	}
+	return ""
+}
+
+func (x *GetPublicSummaryResponse) GetPublicScore() int32 {
+	if x != nil && x.PublicScore != nil {
+		return *x.PublicScore
+	}
+	return 0
+}
+
+func (x *GetPublicSummaryResponse) GetCategories() []*CategoryScore {
+	if x != nil {
+		return x.Categories
+	}
+	return nil
+}
+
+func (x *GetPublicSummaryResponse) GetMissingData() []string {
+	if x != nil {
+		return x.MissingData
+	}
+	return nil
+}
+
+func (x *GetPublicSummaryResponse) GetGradedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.GradedAt
+	}
+	return nil
+}
+
+func (x *GetPublicSummaryResponse) GetLowConfidence() bool {
+	if x != nil && x.LowConfidence != nil {
+		return *x.LowConfidence
+	}
+	return false
+}
+
+func (x *GetPublicSummaryResponse) GetConfidenceReasons() []*ConfidenceReason {
+	if x != nil {
+		return x.ConfidenceReasons
+	}
+	return nil
+}
+
+type ConfidenceReason struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConfidenceReason) Reset() {
+	*x = ConfidenceReason{}
+	mi := &file_rate_client_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfidenceReason) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfidenceReason) ProtoMessage() {}
+
+func (x *ConfidenceReason) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfidenceReason.ProtoReflect.Descriptor instead.
+func (*ConfidenceReason) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ConfidenceReason) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *ConfidenceReason) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
 var File_rate_client_proto protoreflect.FileDescriptor
 
 const file_rate_client_proto_rawDesc = "" +
 	"\n" +
-	"\x11rate-client.proto\x12\x06rating\x1a\x1fgoogle/protobuf/timestamp.proto\"\x89\x01\n" +
+	"\x11rate-client.proto\x12\x06rating\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb9\x01\n" +
 	"\x11GetRankingRequest\x12\x12\n" +
 	"\x04page\x18\x01 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x1a\n" +
 	"\blanguage\x18\x03 \x01(\tR\blanguage\x12'\n" +
-	"\asort_by\x18\x04 \x01(\x0e2\x0e.rating.SortByR\x06sortBy\"\xce\x02\n" +
+	"\asort_by\x18\x04 \x01(\x0e2\x0e.rating.SortByR\x06sortBy\x12.\n" +
+	"\x13hide_low_confidence\x18\x05 \x01(\bR\x11hideLowConfidence\"\xd6\x03\n" +
 	"\fRankingEntry\x12\x14\n" +
 	"\x05place\x18\x01 \x01(\x05R\x05place\x12)\n" +
 	"\x10sourcecraft_uuid\x18\x02 \x01(\tR\x0fsourcecraftUuid\x12\x12\n" +
@@ -473,9 +754,13 @@ const file_rate_client_proto_rawDesc = "" +
 	"\fpublic_score\x18\x05 \x01(\x05H\x00R\vpublicScore\x88\x01\x01\x12\x19\n" +
 	"\x05likes\x18\x06 \x01(\x01H\x01R\x05likes\x88\x01\x01\x12,\n" +
 	"\blanguage\x18\a \x01(\v2\x10.rating.LanguageR\blanguage\x12D\n" +
-	"\x10last_activity_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x0elastActivityAtB\x0f\n" +
+	"\x10last_activity_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x0elastActivityAt\x12*\n" +
+	"\x0elow_confidence\x18\t \x01(\bH\x02R\rlowConfidence\x88\x01\x01\x12G\n" +
+	"\x12confidence_reasons\x18\n" +
+	" \x03(\v2\x18.rating.ConfidenceReasonR\x11confidenceReasonsB\x0f\n" +
 	"\r_public_scoreB\b\n" +
-	"\x06_likes\"4\n" +
+	"\x06_likesB\x11\n" +
+	"\x0f_low_confidence\"4\n" +
 	"\bLanguage\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05color\x18\x02 \x01(\tR\x05color\"\x96\x01\n" +
@@ -490,15 +775,39 @@ const file_rate_client_proto_rawDesc = "" +
 	"\trepo_slug\x18\x02 \x01(\tR\brepoSlug\"Q\n" +
 	"\x16GetPublicScoreResponse\x12&\n" +
 	"\fpublic_score\x18\x01 \x01(\x05H\x00R\vpublicScore\x88\x01\x01B\x0f\n" +
-	"\r_public_score*I\n" +
+	"\r_public_score\"Q\n" +
+	"\x17GetPublicSummaryRequest\x12\x19\n" +
+	"\borg_slug\x18\x01 \x01(\tR\aorgSlug\x12\x1b\n" +
+	"\trepo_slug\x18\x02 \x01(\tR\brepoSlug\"D\n" +
+	"\rCategoryScore\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
+	"\x05score\x18\x02 \x01(\x05H\x00R\x05score\x88\x01\x01B\b\n" +
+	"\x06_score\"\x9b\x03\n" +
+	"\x18GetPublicSummaryResponse\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x17\n" +
+	"\aweb_url\x18\x02 \x01(\tR\x06webUrl\x12&\n" +
+	"\fpublic_score\x18\x03 \x01(\x05H\x00R\vpublicScore\x88\x01\x01\x125\n" +
+	"\n" +
+	"categories\x18\x04 \x03(\v2\x15.rating.CategoryScoreR\n" +
+	"categories\x12!\n" +
+	"\fmissing_data\x18\x05 \x03(\tR\vmissingData\x127\n" +
+	"\tgraded_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\bgradedAt\x12*\n" +
+	"\x0elow_confidence\x18\a \x01(\bH\x01R\rlowConfidence\x88\x01\x01\x12G\n" +
+	"\x12confidence_reasons\x18\b \x03(\v2\x18.rating.ConfidenceReasonR\x11confidenceReasonsB\x0f\n" +
+	"\r_public_scoreB\x11\n" +
+	"\x0f_low_confidence\":\n" +
+	"\x10ConfidenceReason\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text*I\n" +
 	"\x06SortBy\x12\x11\n" +
 	"\rSORT_BY_SCORE\x10\x00\x12\x19\n" +
 	"\x15SORT_BY_LAST_ACTIVITY\x10\x01\x12\x11\n" +
-	"\rSORT_BY_LIKES\x10\x022\x9e\x01\n" +
+	"\rSORT_BY_LIKES\x10\x022\xf5\x01\n" +
 	"\x06Rating\x12C\n" +
 	"\n" +
 	"GetRanking\x12\x19.rating.GetRankingRequest\x1a\x1a.rating.GetRankingResponse\x12O\n" +
-	"\x0eGetPublicScore\x12\x1d.rating.GetPublicScoreRequest\x1a\x1e.rating.GetPublicScoreResponseB6Z4gateway-service/internal/transport/rpc/gen/rank;rankb\x06proto3"
+	"\x0eGetPublicScore\x12\x1d.rating.GetPublicScoreRequest\x1a\x1e.rating.GetPublicScoreResponse\x12U\n" +
+	"\x10GetPublicSummary\x12\x1f.rating.GetPublicSummaryRequest\x1a .rating.GetPublicSummaryResponseB6Z4gateway-service/internal/transport/rpc/gen/rank;rankb\x06proto3"
 
 var (
 	file_rate_client_proto_rawDescOnce sync.Once
@@ -513,31 +822,41 @@ func file_rate_client_proto_rawDescGZIP() []byte {
 }
 
 var file_rate_client_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_rate_client_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_rate_client_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_rate_client_proto_goTypes = []any{
-	(SortBy)(0),                    // 0: rating.SortBy
-	(*GetRankingRequest)(nil),      // 1: rating.GetRankingRequest
-	(*RankingEntry)(nil),           // 2: rating.RankingEntry
-	(*Language)(nil),               // 3: rating.Language
-	(*GetRankingResponse)(nil),     // 4: rating.GetRankingResponse
-	(*GetPublicScoreRequest)(nil),  // 5: rating.GetPublicScoreRequest
-	(*GetPublicScoreResponse)(nil), // 6: rating.GetPublicScoreResponse
-	(*timestamppb.Timestamp)(nil),  // 7: google.protobuf.Timestamp
+	(SortBy)(0),                      // 0: rating.SortBy
+	(*GetRankingRequest)(nil),        // 1: rating.GetRankingRequest
+	(*RankingEntry)(nil),             // 2: rating.RankingEntry
+	(*Language)(nil),                 // 3: rating.Language
+	(*GetRankingResponse)(nil),       // 4: rating.GetRankingResponse
+	(*GetPublicScoreRequest)(nil),    // 5: rating.GetPublicScoreRequest
+	(*GetPublicScoreResponse)(nil),   // 6: rating.GetPublicScoreResponse
+	(*GetPublicSummaryRequest)(nil),  // 7: rating.GetPublicSummaryRequest
+	(*CategoryScore)(nil),            // 8: rating.CategoryScore
+	(*GetPublicSummaryResponse)(nil), // 9: rating.GetPublicSummaryResponse
+	(*ConfidenceReason)(nil),         // 10: rating.ConfidenceReason
+	(*timestamppb.Timestamp)(nil),    // 11: google.protobuf.Timestamp
 }
 var file_rate_client_proto_depIdxs = []int32{
-	0, // 0: rating.GetRankingRequest.sort_by:type_name -> rating.SortBy
-	3, // 1: rating.RankingEntry.language:type_name -> rating.Language
-	7, // 2: rating.RankingEntry.last_activity_at:type_name -> google.protobuf.Timestamp
-	2, // 3: rating.GetRankingResponse.entries:type_name -> rating.RankingEntry
-	1, // 4: rating.Rating.GetRanking:input_type -> rating.GetRankingRequest
-	5, // 5: rating.Rating.GetPublicScore:input_type -> rating.GetPublicScoreRequest
-	4, // 6: rating.Rating.GetRanking:output_type -> rating.GetRankingResponse
-	6, // 7: rating.Rating.GetPublicScore:output_type -> rating.GetPublicScoreResponse
-	6, // [6:8] is the sub-list for method output_type
-	4, // [4:6] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	0,  // 0: rating.GetRankingRequest.sort_by:type_name -> rating.SortBy
+	3,  // 1: rating.RankingEntry.language:type_name -> rating.Language
+	11, // 2: rating.RankingEntry.last_activity_at:type_name -> google.protobuf.Timestamp
+	10, // 3: rating.RankingEntry.confidence_reasons:type_name -> rating.ConfidenceReason
+	2,  // 4: rating.GetRankingResponse.entries:type_name -> rating.RankingEntry
+	8,  // 5: rating.GetPublicSummaryResponse.categories:type_name -> rating.CategoryScore
+	11, // 6: rating.GetPublicSummaryResponse.graded_at:type_name -> google.protobuf.Timestamp
+	10, // 7: rating.GetPublicSummaryResponse.confidence_reasons:type_name -> rating.ConfidenceReason
+	1,  // 8: rating.Rating.GetRanking:input_type -> rating.GetRankingRequest
+	5,  // 9: rating.Rating.GetPublicScore:input_type -> rating.GetPublicScoreRequest
+	7,  // 10: rating.Rating.GetPublicSummary:input_type -> rating.GetPublicSummaryRequest
+	4,  // 11: rating.Rating.GetRanking:output_type -> rating.GetRankingResponse
+	6,  // 12: rating.Rating.GetPublicScore:output_type -> rating.GetPublicScoreResponse
+	9,  // 13: rating.Rating.GetPublicSummary:output_type -> rating.GetPublicSummaryResponse
+	11, // [11:14] is the sub-list for method output_type
+	8,  // [8:11] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_rate_client_proto_init() }
@@ -547,13 +866,15 @@ func file_rate_client_proto_init() {
 	}
 	file_rate_client_proto_msgTypes[1].OneofWrappers = []any{}
 	file_rate_client_proto_msgTypes[5].OneofWrappers = []any{}
+	file_rate_client_proto_msgTypes[7].OneofWrappers = []any{}
+	file_rate_client_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rate_client_proto_rawDesc), len(file_rate_client_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   6,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

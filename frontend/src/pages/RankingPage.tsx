@@ -8,9 +8,11 @@ export interface RankingQuery {
   page: number
   sort: RankingSort
   language: string
+  /** Leave out grades marked low-confidence; off by default, the order itself never changes. */
+  hideLowConfidence: boolean
 }
 
-export const DEFAULT_RANKING_QUERY: RankingQuery = { page: 1, sort: "score", language: "" }
+export const DEFAULT_RANKING_QUERY: RankingQuery = { page: 1, sort: "score", language: "", hideLowConfidence: false }
 
 export default function RankingPage({
   repositories,
@@ -63,7 +65,7 @@ export default function RankingPage({
   const resetFilters = () => {
     setSearchQuery("")
     setMinimumHealth(0)
-    if (query.language) change({ language: "" })
+    if (query.language || query.hideLowConfidence) change({ language: "", hideLowConfidence: false })
   }
 
   return (
@@ -136,6 +138,14 @@ export default function RankingPage({
               <option value="last_activity">Последняя активность</option>
             </select>
           </label>
+          <label className="filter-check">
+            <input
+              type="checkbox"
+              checked={query.hideLowConfidence}
+              onChange={(event) => change({ hideLowConfidence: event.target.checked })}
+            />
+            <span>Скрыть оценки с низкой достоверностью</span>
+          </label>
           <span className="ranking-count" aria-live="polite">
             {visibleRepositories.length} проектов{visibleRepositories.length !== repositories.length ? " на странице" : ""}
           </span>
@@ -199,6 +209,11 @@ export default function RankingPage({
                   </span>
                   <span className="ranking-status-cell" role="cell">
                     <Badge tone={level.tone}>{level.label}</Badge>
+                    {repository.confidence?.low && (
+                      <span className="confidence-badge" title={repository.confidence.reasons.join("\n")}>
+                        <Badge tone="neutral">Мало данных</Badge>
+                      </span>
+                    )}
                   </span>
                 </div>
               )

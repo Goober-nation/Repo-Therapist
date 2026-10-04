@@ -22,6 +22,16 @@ categories:
       empty: true
       bots: true
       merges: false
+      # Commits changing fewer lines than this do not count as activity (2026-10-04). Calibrated on
+      # real histories: the largest floor that moves no real repo's overall score by more than 3
+      # points is 4 (5 already costs one repo 4.3); see docs/grading/00-overview.md.
+      min_changed_lines: 4
+    issue_filters:
+      # An issue closed within this many seconds of being opened is not counted (the shortest
+      # lifetime among ~800 real closed issues was 64 s), and a milestone counts only if an issue
+      # is attached to it.
+      instant_close_seconds: 30
+      milestones_need_issues: true
     metrics:
       - id: commits_per_week
         status: calculated
@@ -232,6 +242,8 @@ categories:
     weight: 0.20  # was 0.15; 2026-09-27 re-weighting, see docs/grading/00-overview.md
     public: true
     status: calculated
+    issue_filters:
+      instant_close_seconds: 30  # same rule as in activity above
     metrics:
       # All four metrics key off StatusType (the fixed backend lifecycle enum), not the per-repo
       # customizable status slug/name — see aggregation.go's isResolved comment.
@@ -384,3 +396,20 @@ categories:
     weight: 0.15
     public: true
     status: calculated  # graded by the LLM service over Kafka; no reply within LLM_TIMEOUT -> no_data
+
+# Low-confidence flag for public grades (docs/grading/00-overview.md, "Флаг низкой достоверности").
+# It never changes the score or the ranking order: it only marks a grade that rests on little
+# data. A signal is skipped when its data could not be read (no-data is not a defect). The
+# reasons are generic on purpose: they must not reveal the thresholds.
+confidence:
+  enabled: true
+  window_days: 180
+  min_files: 5                    # fewer scanned text files than this -> little code
+  min_loc: 200                    # fewer lines of code than this -> little code
+  min_commits: 5                  # fewer kept commits in the window -> little history
+  min_commits_single_author: 20   # one author and fewer kept commits than this -> little history
+  min_categories_with_data: 2     # fewer public categories with data than this -> little coverage
+  reasons:
+    LOW_CODE: "В репозитории мало кода, поэтому оценка может быть неполной."
+    LOW_HISTORY: "В репозитории мало истории изменений за последний период, поэтому оценка может быть неполной."
+    LOW_COVERAGE: "Для оценки доступно мало категорий, поэтому итог опирается на небольшую часть данных."

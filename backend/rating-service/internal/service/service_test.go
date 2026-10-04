@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"rating-service/internal/domain"
 )
@@ -15,11 +16,21 @@ type fakeRepo struct {
 	listErr  error
 
 	countLanguage string
+	countHideLow  bool
 	listQuery     *domain.RankingQuery
 
 	score    *int16
 	scoreErr error
 	scoreFor string
+
+	summary    domain.PublicSummaryRow
+	summaryErr error
+	summaryFor string
+}
+
+func (f *fakeRepo) GetPublicSummary(ctx context.Context, orgSlug, repoSlug string) (domain.PublicSummaryRow, error) {
+	f.summaryFor = orgSlug + "/" + repoSlug
+	return f.summary, f.summaryErr
 }
 
 func (f *fakeRepo) GetPublicScore(ctx context.Context, orgSlug, repoSlug string) (*int16, error) {
@@ -27,8 +38,8 @@ func (f *fakeRepo) GetPublicScore(ctx context.Context, orgSlug, repoSlug string)
 	return f.score, f.scoreErr
 }
 
-func (f *fakeRepo) CountRanking(ctx context.Context, language string) (int, error) {
-	f.countLanguage = language
+func (f *fakeRepo) CountRanking(ctx context.Context, language string, hideLowConfidence bool) (int, error) {
+	f.countLanguage, f.countHideLow = language, hideLowConfidence
 	return f.total, f.countErr
 }
 
@@ -169,5 +180,111 @@ func TestGetPublicScoreTrimsAndValidates(t *testing.T) {
 
 	if _, err := NewRatingService(repo).GetPublicScore(context.Background(), "org", " "); !errors.Is(err, domain.ErrInvalidArgument) {
 		t.Errorf("empty repo slug err = %v, want ErrInvalidArgument", err)
+	}
+}
+
+func TestGetPublicSummaryDecodesAndSortsCategories(t *testing.T) {
+	score := int16(71)
+	gradedAt := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	repo := &fakeRepo{summary: domain.PublicSummaryRow{
+		Name:   "demo",
+		WebURL: "https://sourcecraft.dev/o/demo",
+		Score:  &score,
+		CategoryScores: []byte(`{
+			"issues": {"id": "issues", "no_data": false, "score": 64.6},
+			"activity": {"id": "activity", "no_data": false, "score": 90},
+			"code_health": {"id": "code_health", "no_data": true},
+			"documentation": {"id": "documentation", "no_data": false, "score": 0}
+		}`),
+		MissingData: []string{"code_health"},
+		GradedAt:    &gradedAt,
+	}}
+
+	got, err := NewRatingService(repo).GetPublicSummary(context.Background(), " o ", "demo ")
+	if err != nil || repo.summaryFor != "o/demo" {
+		t.Fatalf("err=%v for=%q", err, repo.summaryFor)
+	}
+
+	if got.Score == nil || *got.Score != 71 || got.Name != "demo" || !got.GradedAt.Equal(gradedAt) {
+		t.Errorf("summary = %+v", got)
+	}
+
+	wantIDs := []string{"activity", "code_health", "documentation", "issues"}
+	if len(got.Categories) != len(wantIDs) {
+		t.Fatalf("categories = %+v, want %d", got.Categories, len(wantIDs))
+	}
+	for i, id := range wantIDs {
+		if got.Categories[i].ID != id {
+			t.Errorf("categories[%d] = %q, want %q", i, got.Categories[i].ID, id)
+		}
+	}
+
+	if got.Categories[1].Score != nil {
+		t.Errorf("no-data category score = %d, want nil", *got.Categories[1].Score)
+	}
+	if got.Categories[2].Score == nil || *got.Categories[2].Score != 0 {
+		t.Errorf("real zero must stay 0, got %v", got.Categories[2].Score)
+	}
+	if got.Categories[3].Score == nil || *got.Categories[3].Score != 65 {
+		t.Errorf("rounded score = %v, want 65", got.Categories[3].Score)
+	}
+}
+
+func TestGetPublicSummaryUngraded(t *testing.T) {
+	for _, raw := range [][]byte{nil, []byte(""), []byte("null"), []byte("{}")} {
+		got, err := NewRatingService(&fakeRepo{summary: domain.PublicSummaryRow{Name: "demo", CategoryScores: raw}}).
+			GetPublicSummary(context.Background(), "o", "demo")
+		if err != nil || got.Score != nil || len(got.Categories) != 0 {
+			t.Errorf("raw=%q: got=%+v err=%v, want empty ungraded summary", raw, got, err)
+		}
+	}
+}
+
+func TestGetPublicSummaryErrors(t *testing.T) {
+	if _, err := NewRatingService(&fakeRepo{}).GetPublicSummary(context.Background(), "o", " "); !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Errorf("empty slug err = %v, want ErrInvalidArgument", err)
+	}
+
+	if _, err := NewRatingService(&fakeRepo{summaryErr: domain.ErrNotFound}).GetPublicSummary(context.Background(), "o", "r"); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("unknown repo err = %v, want ErrNotFound", err)
+	}
+
+	bad := &fakeRepo{summary: domain.PublicSummaryRow{CategoryScores: []byte("[1,2]")}}
+	if _, err := NewRatingService(bad).GetPublicSummary(context.Background(), "o", "r"); err == nil {
+		t.Error("malformed category_scores: want error")
+	}
+}
+
+func TestGetRankingPassesTheLowConfidenceToggleToCountAndList(t *testing.T) {
+	repo := &fakeRepo{total: 1, rows: []domain.RankingRow{{SourcecraftUUID: "a"}}}
+
+	if _, err := NewRatingService(repo).GetRanking(context.Background(), domain.RankingRequest{SortBy: domain.SortByScore, HideLowConfidence: true}); err != nil {
+		t.Fatal(err)
+	}
+	if !repo.countHideLow || !repo.listQuery.HideLowConfidence {
+		t.Errorf("count hide=%v list hide=%v, want both true", repo.countHideLow, repo.listQuery.HideLowConfidence)
+	}
+
+	repo = &fakeRepo{total: 1, rows: []domain.RankingRow{{SourcecraftUUID: "a"}}}
+	if _, err := NewRatingService(repo).GetRanking(context.Background(), domain.RankingRequest{SortBy: domain.SortByScore}); err != nil {
+		t.Fatal(err)
+	}
+	if repo.countHideLow || repo.listQuery.HideLowConfidence {
+		t.Error("the toggle must default to off")
+	}
+}
+
+func TestGetPublicSummaryCarriesTheFlagUnchanged(t *testing.T) {
+	confidence := &domain.Confidence{Low: true, Reasons: []domain.ConfidenceReason{{Code: "LOW_CODE", Text: "t"}}}
+	repo := &fakeRepo{summary: domain.PublicSummaryRow{Name: "demo", Confidence: confidence}}
+
+	got, err := NewRatingService(repo).GetPublicSummary(context.Background(), "o", "demo")
+	if err != nil || got.Confidence != confidence {
+		t.Errorf("got %+v err %v, want the flag passed through", got.Confidence, err)
+	}
+
+	got, err = NewRatingService(&fakeRepo{summary: domain.PublicSummaryRow{Name: "demo"}}).GetPublicSummary(context.Background(), "o", "demo")
+	if err != nil || got.Confidence != nil {
+		t.Errorf("got %+v err %v, want nil (unknown) when there is no flag row", got.Confidence, err)
 	}
 }

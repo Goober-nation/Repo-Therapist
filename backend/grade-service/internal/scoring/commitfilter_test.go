@@ -70,3 +70,56 @@ func TestShippedCommitFilterDefaults(t *testing.T) {
 		t.Errorf("activity commit_filters = %+v, want %+v", got, want)
 	}
 }
+
+func TestFilterCommitsMinChangedLines(t *testing.T) {
+	now := time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
+	past := now.Add(-24 * time.Hour)
+	commit := func(hash string, parents []string, files ...gitlog.FileChange) gitlog.Commit {
+		return gitlog.Commit{Hash: hash, AuthorName: "Ann", AuthorEmail: "ann@x.dev", AuthoredAt: past, Parents: parents, FilesChanged: files}
+	}
+	commits := []gitlog.Commit{
+		commit("one-line", []string{"p"}, gitlog.FileChange{Path: "a", Added: 1}),
+		commit("two-lines", []string{"p"}, gitlog.FileChange{Path: "a", Added: 1, Deleted: 1}),
+		commit("three-lines-over-two-files", []string{"p"}, gitlog.FileChange{Path: "a", Added: 1}, gitlog.FileChange{Path: "b", Added: 1, Deleted: 1}),
+		commit("binary-only", []string{"p"}, gitlog.FileChange{Path: "logo.png", Added: -1, Deleted: -1, Binary: true}),
+		commit("binary-plus-one-line", []string{"p"}, gitlog.FileChange{Path: "a", Added: 1}, gitlog.FileChange{Path: "logo.png", Added: -1, Deleted: -1, Binary: true}),
+		commit("merge", []string{"a", "b"}),
+		commit("empty", []string{"p"}),
+		commit("legacy-no-parents-one-line", nil, gitlog.FileChange{Path: "a", Added: 1}),
+	}
+
+	dropped := func(floor int) map[string]bool {
+		kept := map[string]bool{}
+		for _, c := range FilterCommits(commits, config.CommitFilters{MinChangedLines: floor}, now) {
+			kept[c.Hash] = true
+		}
+		out := map[string]bool{}
+		for _, c := range commits {
+			if !kept[c.Hash] {
+				out[c.Hash] = true
+			}
+		}
+		return out
+	}
+
+	if got := dropped(0); len(got) != 0 {
+		t.Errorf("floor 0 (off) dropped %v", got)
+	}
+
+	two := dropped(2)
+	if len(two) != 2 || !two["one-line"] || !two["legacy-no-parents-one-line"] {
+		t.Errorf("floor 2 dropped %v, want exactly the one-line commits", two)
+	}
+
+	three := dropped(3)
+	for _, h := range []string{"one-line", "two-lines", "legacy-no-parents-one-line"} {
+		if !three[h] {
+			t.Errorf("floor 3 kept %q", h)
+		}
+	}
+	for _, h := range []string{"three-lines-over-two-files", "binary-only", "binary-plus-one-line", "merge", "empty"} {
+		if three[h] {
+			t.Errorf("floor 3 dropped %q: lines of all files are summed, a binary change is substantial, and merges/empty commits are other filters' business", h)
+		}
+	}
+}

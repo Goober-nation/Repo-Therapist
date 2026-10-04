@@ -37,6 +37,11 @@ const badgeNoDataColor = "#9f9f9f"
 // never shows a broken picture; unknown, ungraded or unreadable repos get a gray "n/a" badge.
 func (h *Handler) GetBadge(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	org := r.PathValue("org")
+	if jsonRepo, isJSON := strings.CutSuffix(r.PathValue("repo"), ".json"); isJSON && org != "" && jsonRepo != "" {
+		h.getBadgeJSON(w, r, org, jsonRepo)
+		return
+	}
+
 	repo, ok := strings.CutSuffix(r.PathValue("repo"), ".svg")
 	if !ok || org == "" || repo == "" {
 		stdhttp.NotFound(w, r)
@@ -53,11 +58,7 @@ func (h *Handler) GetBadge(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		value, color = strconv.Itoa(int(*score)), badgeColor(*score)
 	}
 
-	w.Header().Set("Content-Type", "image/svg+xml; charset=utf-8")
-	w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", cacheSeconds))
-	// Embedded on sourcecraft.dev, so the image must be loadable cross-origin.
-	w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
+	setImageHeaders(w, cacheSeconds)
 	_, _ = w.Write([]byte(renderBadge(badgeLabel, value, color)))
 }
 

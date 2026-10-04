@@ -565,6 +565,10 @@ func (as *AggregatorService) SaveGradingResult(ctx context.Context,
 			)
 		}
 
+		if err := as.savePublicConfidence(ctx, grade); err != nil {
+			return err
+		}
+
 	case domain.VisibilityPrivate:
 		if err := as.GradesRepo.UpsertPrivateGrade(ctx, grade); err != nil {
 			return fmt.Errorf(
@@ -580,6 +584,25 @@ func (as *AggregatorService) SaveGradingResult(ctx context.Context,
 			domain.ErrInvalidGrade,
 			gradeMode,
 		)
+	}
+
+	return nil
+}
+
+// savePublicConfidence stores the low-confidence flag next to a public grade, or removes a stale
+// one when grade-service sent none (flag turned off). The flag is advisory: the grade itself is
+// already saved, so a failure here is returned but never rolls the grade back.
+func (as *AggregatorService) savePublicConfidence(ctx context.Context, grade domain.RepoGrade) error {
+	if grade.Confidence == nil {
+		if err := as.GradesRepo.DeletePublicConfidence(ctx, grade.SourcecraftUUID); err != nil {
+			return fmt.Errorf("%w: delete public confidence: %v", domain.ErrGradingFailed, err)
+		}
+
+		return nil
+	}
+
+	if err := as.GradesRepo.UpsertPublicConfidence(ctx, grade.SourcecraftUUID, *grade.Confidence, grade.GradedAt); err != nil {
+		return fmt.Errorf("%w: save public confidence: %v", domain.ErrGradingFailed, err)
 	}
 
 	return nil

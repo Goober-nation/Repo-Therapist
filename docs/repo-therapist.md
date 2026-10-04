@@ -126,9 +126,13 @@ go build ./... && go test ./... && go vet ./...
   `sleep`, не считается CI.
 - **Уязвимости ограничивают оценку.** Открытые critical-находки AppSec ограничивают приватную
   оценку значением 59, открытые high — значением 79.
+- **Флаг низкой достоверности.** Публичная оценка, которая опирается на мало данных (мало кода,
+  мало истории, мало категорий с данными), помечается «Мало данных» с заготовленными общими
+  причинами. Флаг оценку и порядок в рейтинге не меняет; в рейтинге есть переключатель «Скрыть
+  оценки с низкой достоверностью» (по умолчанию выключен).
 
-Известное ограничение: почти пустой репозиторий всё ещё может получить высокую оценку;
-запланирован флаг низкой достоверности.
+Известное ограничение (измерено сценариями, таблица в документе по ссылке): пустой репозиторий с накрученной
+активностью получает высокую оценку, а флаг обходится добавлением нескольких файлов и строк кода.
 Подробнее: [docs/grading/00-overview.md#anti-manipulation-2026-09-28](https://repo-therapist.alo.quest/rules/00-overview).
 
 ## Использование AI и внешних сервисов
@@ -148,16 +152,43 @@ HTTP API Gateway доступен по адресу `https://repo-therapist.alo.
 
 | Запрос | Авторизация | Ответ |
 |---|---|---|
-| `GET /api/ranking?page=&page_size=&sortby=&filter=` | — | страница рейтинга; `sortby`: `score`, `likes`, `last_activity`; `filter` — язык |
+| `GET /api/ranking?page=&page_size=&sortby=&filter=&hide_low_confidence=` | — | страница рейтинга; `sortby`: `score`, `likes`, `last_activity`; `filter` — язык; `hide_low_confidence=true` убирает оценки с флагом низкой достоверности |
 | `GET /api/grading/{org}/{repo}` | `PAT` необязателен | оценка; `202 PENDING` пока идёт анализ, `429` с `Retry-After` при лимите, `502` при прерванной оценке |
 | `GET /api/recommendations/{org}/{repo}` | `PAT` необязателен | AI-сводка, сильные и слабые стороны, рекомендации; `202 PENDING` пока отвечает LLM |
 | `GET /api/badge/{org}/{repo}.svg` | — | SVG-бейдж с публичной оценкой для README; оценку не запускает |
+| `GET /api/badge/{org}/{repo}/{category}.svg` | — | бейдж одной публичной категории: `activity`, `issues`, `documentation`, `code_health` |
+| `GET /api/badge/{org}/{repo}.json` | — | JSON для shields.io endpoint-бейджа |
+| `GET /api/widget/{org}/{repo}.svg` | — | SVG-карточка для README: оценка, уровень и категории |
+| `GET /api/score/{org}/{repo}` | — | публичная оценка в JSON (в том числе `low_confidence` и `confidence_reasons`); только чтение, оценку не запускает |
 | `GET /api/repos` | `PAT` обязателен | репозитории владельца токена |
 | `POST /api/auth/yandex` | `Authorization: OAuth <token>` | вход через Яндекс ID, cookie сессии |
 
 ```bash
 curl -s "https://repo-therapist.alo.quest/api/grading/likosov-ilia/vidpulse"
 ```
+
+### Публичный API, бейджи и виджет ★
+
+Публичные маршруты читают только сохранённую публичную оценку и не запускают анализ: запрос без
+данных получает `NO_DATA` или серый `n/a`, а не ошибку, и «нет данных» не считается плохой оценкой.
+Приватные категории (Security, CI/CD) и приватные репозитории в них не попадают. Они отдают
+`Access-Control-Allow-Origin: *`; бейджи, виджет и shields-JSON не ограничены по IP, а
+`/api/score/...` — 300 запросов в минуту на IP (`PUBLIC_API_RATE_LIMIT`).
+
+```bash
+curl -s "https://repo-therapist.alo.quest/api/score/likosov-ilia/vidpulse"
+# {"status":"FINISHED","score":..,"level":"healthy","categories":[{"id":"activity","score":..,"no_data":false},..],..}
+```
+
+Вставка в README (бейдж, виджет с категориями, бейдж категории):
+
+```markdown
+[![Repo Health](https://repo-therapist.alo.quest/api/badge/ORG/REPO.svg)](https://repo-therapist.alo.quest/repo/ORG/REPO)
+[![Repo Health](https://repo-therapist.alo.quest/api/widget/ORG/REPO.svg)](https://repo-therapist.alo.quest/repo/ORG/REPO)
+[![activity](https://repo-therapist.alo.quest/api/badge/ORG/REPO/activity.svg)](https://repo-therapist.alo.quest/repo/ORG/REPO)
+```
+
+Готовые фрагменты для конкретного репозитория показывает его страница анализа.
 
 Полное описание полей — в разделе «Api Gateway» файла [docs/api_docs.md](https://sourcecraft.dev/lct-hackaton-2026/case-18-repo-health-score-team-95/browse/docs/api_docs.md).
 

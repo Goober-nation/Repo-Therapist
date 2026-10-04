@@ -17,6 +17,7 @@ import (
 type RatingService interface {
 	GetRanking(ctx context.Context, req domain.RankingRequest) (domain.RankingPage, error)
 	GetPublicScore(ctx context.Context, orgSlug, repoSlug string) (*int16, error)
+	GetPublicSummary(ctx context.Context, orgSlug, repoSlug string) (domain.PublicSummary, error)
 }
 
 type Server struct {
@@ -38,10 +39,11 @@ func (s *Server) GetRanking(ctx context.Context, req *pb.GetRankingRequest) (*pb
 	}
 
 	page, err := s.service.GetRanking(ctx, domain.RankingRequest{
-		Page:     int(req.GetPage()),
-		PageSize: int(req.GetPageSize()),
-		Language: req.GetLanguage(),
-		SortBy:   sortBy,
+		Page:              int(req.GetPage()),
+		PageSize:          int(req.GetPageSize()),
+		Language:          req.GetLanguage(),
+		SortBy:            sortBy,
+		HideLowConfidence: req.GetHideLowConfidence(),
 	})
 	if err != nil {
 		return nil, mapError(err)
@@ -70,6 +72,45 @@ func (s *Server) GetPublicScore(ctx context.Context, req *pb.GetPublicScoreReque
 	if score != nil {
 		value := int32(*score)
 		result.PublicScore = &value
+	}
+
+	return result, nil
+}
+
+func (s *Server) GetPublicSummary(ctx context.Context, req *pb.GetPublicSummaryRequest) (*pb.GetPublicSummaryResponse, error) {
+	summary, err := s.service.GetPublicSummary(ctx, req.GetOrgSlug(), req.GetRepoSlug())
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	result := &pb.GetPublicSummaryResponse{
+		Name:        summary.Name,
+		WebUrl:      summary.WebURL,
+		Categories:  make([]*pb.CategoryScore, 0, len(summary.Categories)),
+		MissingData: summary.MissingData,
+	}
+
+	if summary.Score != nil {
+		score := int32(*summary.Score)
+		result.PublicScore = &score
+	}
+
+	for _, category := range summary.Categories {
+		entry := &pb.CategoryScore{Id: category.ID}
+		if category.Score != nil {
+			score := int32(*category.Score)
+			entry.Score = &score
+		}
+		result.Categories = append(result.Categories, entry)
+	}
+
+	if summary.GradedAt != nil {
+		result.GradedAt = timestamppb.New(*summary.GradedAt)
+	}
+
+	if summary.Confidence != nil {
+		result.LowConfidence = &summary.Confidence.Low
+		result.ConfidenceReasons = reasonsToProto(summary.Confidence.Reasons)
 	}
 
 	return result, nil
@@ -108,6 +149,20 @@ func entryToProto(entry domain.RankingEntry) *pb.RankingEntry {
 
 	if entry.LastActivityAt != nil {
 		result.LastActivityAt = timestamppb.New(*entry.LastActivityAt)
+	}
+
+	if entry.Confidence != nil {
+		result.LowConfidence = &entry.Confidence.Low
+		result.ConfidenceReasons = reasonsToProto(entry.Confidence.Reasons)
+	}
+
+	return result
+}
+
+func reasonsToProto(reasons []domain.ConfidenceReason) []*pb.ConfidenceReason {
+	result := make([]*pb.ConfidenceReason, 0, len(reasons))
+	for _, reason := range reasons {
+		result = append(result, &pb.ConfidenceReason{Code: reason.Code, Text: reason.Text})
 	}
 
 	return result

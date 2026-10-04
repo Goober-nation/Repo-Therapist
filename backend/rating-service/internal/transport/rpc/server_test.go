@@ -19,6 +19,13 @@ type fakeService struct {
 	err   error
 	req   *domain.RankingRequest
 	score *int16
+
+	summary    domain.PublicSummary
+	summaryErr error
+}
+
+func (f *fakeService) GetPublicSummary(ctx context.Context, orgSlug, repoSlug string) (domain.PublicSummary, error) {
+	return f.summary, f.summaryErr
 }
 
 func (f *fakeService) GetPublicScore(ctx context.Context, orgSlug, repoSlug string) (*int16, error) {
@@ -188,5 +195,88 @@ func TestGetPublicScore(t *testing.T) {
 	_, err = NewServer(&fakeService{err: domain.ErrNotFound}).GetPublicScore(context.Background(), &pb.GetPublicScoreRequest{OrgSlug: "o", RepoSlug: "r"})
 	if status.Code(err) != codes.NotFound {
 		t.Errorf("unknown repo code = %v, want NotFound", status.Code(err))
+	}
+}
+
+func TestGetPublicSummaryMapping(t *testing.T) {
+	score, activity := int16(71), 90
+	gradedAt := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	svc := &fakeService{summary: domain.PublicSummary{
+		Name:        "demo",
+		WebURL:      "https://sourcecraft.dev/o/demo",
+		Score:       &score,
+		Categories:  []domain.CategoryScore{{ID: "activity", Score: &activity}, {ID: "code_health"}},
+		MissingData: []string{"code_health"},
+		GradedAt:    &gradedAt,
+	}}
+
+	resp, err := NewServer(svc).GetPublicSummary(context.Background(), &pb.GetPublicSummaryRequest{OrgSlug: "o", RepoSlug: "demo"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resp.Name != "demo" || resp.WebUrl != "https://sourcecraft.dev/o/demo" || resp.PublicScore == nil || *resp.PublicScore != 71 {
+		t.Errorf("resp = %v", resp)
+	}
+	if len(resp.Categories) != 2 || resp.Categories[0].Score == nil || *resp.Categories[0].Score != 90 || resp.Categories[1].Score != nil {
+		t.Errorf("categories = %v, want activity=90 and code_health unset", resp.Categories)
+	}
+	if !resp.GradedAt.AsTime().Equal(gradedAt) || len(resp.MissingData) != 1 {
+		t.Errorf("graded_at=%v missing=%v", resp.GradedAt, resp.MissingData)
+	}
+}
+
+func TestGetPublicSummaryUngradedAndErrors(t *testing.T) {
+	resp, err := NewServer(&fakeService{}).GetPublicSummary(context.Background(), &pb.GetPublicSummaryRequest{OrgSlug: "o", RepoSlug: "r"})
+	if err != nil || resp.PublicScore != nil || resp.GradedAt != nil || len(resp.Categories) != 0 {
+		t.Fatalf("ungraded: resp=%v err=%v", resp, err)
+	}
+
+	_, err = NewServer(&fakeService{summaryErr: domain.ErrNotFound}).GetPublicSummary(context.Background(), &pb.GetPublicSummaryRequest{OrgSlug: "o", RepoSlug: "r"})
+	if status.Code(err) != codes.NotFound {
+		t.Errorf("unknown repo code = %v, want NotFound", status.Code(err))
+	}
+}
+
+func TestRankingEntryConfidenceMapping(t *testing.T) {
+	flagged := &domain.Confidence{Low: true, Reasons: []domain.ConfidenceReason{{Code: "LOW_CODE", Text: "t"}}}
+	clear := &domain.Confidence{Low: false, Reasons: []domain.ConfidenceReason{}}
+	svc := &fakeService{page: domain.RankingPage{Entries: []domain.RankingEntry{
+		{Place: 1, RankingRow: domain.RankingRow{SourcecraftUUID: "a", Confidence: flagged}},
+		{Place: 2, RankingRow: domain.RankingRow{SourcecraftUUID: "b", Confidence: clear}},
+		{Place: 3, RankingRow: domain.RankingRow{SourcecraftUUID: "c"}},
+	}}}
+
+	resp, err := NewServer(svc).GetRanking(context.Background(), &pb.GetRankingRequest{HideLowConfidence: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !svc.req.HideLowConfidence {
+		t.Error("hide_low_confidence was not forwarded")
+	}
+	a, b, c := resp.Entries[0], resp.Entries[1], resp.Entries[2]
+	if a.LowConfidence == nil || !*a.LowConfidence || len(a.ConfidenceReasons) != 1 || a.ConfidenceReasons[0].Code != "LOW_CODE" || a.ConfidenceReasons[0].Text != "t" {
+		t.Errorf("flagged entry = %v", a)
+	}
+	if b.LowConfidence == nil || *b.LowConfidence || len(b.ConfidenceReasons) != 0 {
+		t.Errorf("known-not-low entry = %v, want low_confidence=false", b)
+	}
+	if c.LowConfidence != nil {
+		t.Errorf("unknown entry = %v, want low_confidence unset", c)
+	}
+}
+
+func TestPublicSummaryConfidenceMapping(t *testing.T) {
+	svc := &fakeService{summary: domain.PublicSummary{Name: "demo", Confidence: &domain.Confidence{Low: true, Reasons: []domain.ConfidenceReason{{Code: "LOW_HISTORY", Text: "h"}}}}}
+
+	resp, err := NewServer(svc).GetPublicSummary(context.Background(), &pb.GetPublicSummaryRequest{OrgSlug: "o", RepoSlug: "demo"})
+	if err != nil || resp.LowConfidence == nil || !*resp.LowConfidence || len(resp.ConfidenceReasons) != 1 || resp.ConfidenceReasons[0].Code != "LOW_HISTORY" {
+		t.Fatalf("resp = %v err = %v", resp, err)
+	}
+
+	resp, err = NewServer(&fakeService{}).GetPublicSummary(context.Background(), &pb.GetPublicSummaryRequest{OrgSlug: "o", RepoSlug: "demo"})
+	if err != nil || resp.LowConfidence != nil {
+		t.Errorf("unknown flag: resp = %v err = %v, want low_confidence unset", resp, err)
 	}
 }

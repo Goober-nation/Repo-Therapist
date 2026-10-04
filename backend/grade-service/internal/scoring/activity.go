@@ -16,12 +16,15 @@ type Issue struct {
 	CreatedAt  string `json:"created_at"`
 	UpdatedAt  string `json:"updated_at"`
 	StatusType string `json:"status_type"`
+	// MilestoneID is the milestone the issue is attached to; "" when none.
+	MilestoneID string `json:"milestone_id"`
 }
 
 // Milestone is the subset of sourcecraft-wrapper-service's Milestone data Activity's
 // milestone-cadence metrics need — matches the shape repository-service writes to
 // _meta/milestones.json.
 type Milestone struct {
+	ID        string `json:"id"`
 	Deadline  string `json:"deadline"`
 	CreatedAt string `json:"created_at"`
 }
@@ -49,6 +52,8 @@ func ComputeCategory(categoryID string, cfg config.CategoryConfig, inputs Activi
 		return CategoryResult{ID: categoryID, NoData: true}
 	}
 	inputs.Commits = FilterCommits(inputs.Commits, cfg.CommitFilters, now)
+	inputs.Issues = FilterIssues(inputs.Issues, cfg.IssueFilters)
+	inputs.Milestones = FilterMilestones(inputs.Milestones, inputs.Issues, inputs.IssuesAvailable, cfg.IssueFilters)
 
 	results := make([]MetricResult, 0, len(cfg.Metrics))
 	for _, m := range cfg.Metrics {

@@ -17,9 +17,11 @@ type Marker struct {
 // todo-markers.json at all" (whole category NoData) — same pattern as ActivityInputs' *Available
 // flags.
 type CodeHealthInputs struct {
-	Markers   []Marker
-	TotalLOC  int
-	Available bool
+	Markers  []Marker
+	TotalLOC int
+	// ScannedFiles is the number of scanned text files; only the low-confidence flag reads it.
+	ScannedFiles int
+	Available    bool
 }
 
 // ComputeCodeHealth doesn't go through ComputeCategory/eventsForSource like Activity/Issues: its

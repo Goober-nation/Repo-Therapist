@@ -31,6 +31,9 @@ type GatewayService struct {
 
 	userRepository    domain.UserRepository
 	sessionRepository domain.SessionRepository
+
+	// publicAPILimiter limits the JSON score API per client IP; nil means no limit.
+	publicAPILimiter Limiter
 }
 
 func NewGatewayService(
@@ -55,6 +58,12 @@ func NewGatewayService(
 		aggregatorTimeout: aggregatorTimeout,
 		yandexTimeout:     yandexTimeout,
 	}
+}
+
+// SetPublicAPILimiter sets the limiter for the public JSON score API, which has its own, higher
+// per-IP budget than the frontend routes. Badges and the widget are never limited.
+func (s *GatewayService) SetPublicAPILimiter(limiter Limiter) {
+	s.publicAPILimiter = limiter
 }
 
 func (s *GatewayService) checkRateLimit(
@@ -389,6 +398,8 @@ func (s *GatewayService) GetRanking(
 			PageSize: request.PageSize,
 			Language: request.Language,
 			SortBy:   mapRankingSortBy(request.SortBy),
+
+			HideLowConfidence: request.HideLowConfidence,
 		},
 	)
 	if err != nil {
@@ -418,6 +429,86 @@ func (s *GatewayService) GetPublicScore(
 	}
 
 	return resp.PublicScore, nil
+}
+
+// GetPublicSummary returns the stored public grade of a public repo with its category scores.
+// It never starts a grading and skips the per-IP limit, like GetPublicScore, so badges and the
+// widget embedded in READMEs do not break under load.
+func (s *GatewayService) GetPublicSummary(
+	ctx context.Context,
+	orgSlug string,
+	repoSlug string,
+) (domain.PublicSummary, error) {
+	rpcCtx, cancel := context.WithTimeout(ctx, s.ratingTimeout)
+	defer cancel()
+
+	resp, err := s.ratingClient.GetPublicSummary(
+		rpcCtx,
+		&rank.GetPublicSummaryRequest{OrgSlug: orgSlug, RepoSlug: repoSlug},
+	)
+	if err != nil {
+		return domain.PublicSummary{}, rpcError("get public summary", err)
+	}
+
+	return mapPublicSummary(resp), nil
+}
+
+// GetScore is GetPublicSummary behind the public API's own per-IP limit.
+func (s *GatewayService) GetScore(
+	ctx context.Context,
+	clientIP string,
+	orgSlug string,
+	repoSlug string,
+) (domain.PublicSummary, error) {
+	if s.publicAPILimiter != nil {
+		allowed, err := s.publicAPILimiter.Allow(ctx, "rate_limit:gateway:public:ip:"+clientIP)
+		if err != nil {
+			return domain.PublicSummary{}, fmt.Errorf("check public api rate limit: %w", err)
+		}
+
+		if !allowed {
+			return domain.PublicSummary{}, domain.ErrLimitExceeded
+		}
+	}
+
+	return s.GetPublicSummary(ctx, orgSlug, repoSlug)
+}
+
+// mapConfidence builds the flag from the wire fields; an unset low means it is unknown.
+func mapConfidence(low *bool, reasons []*rank.ConfidenceReason) *domain.Confidence {
+	if low == nil {
+		return nil
+	}
+
+	confidence := &domain.Confidence{Low: *low, Reasons: make([]domain.ConfidenceReason, 0, len(reasons))}
+	for _, reason := range reasons {
+		confidence.Reasons = append(confidence.Reasons, domain.ConfidenceReason{Code: reason.GetCode(), Text: reason.GetText()})
+	}
+
+	return confidence
+}
+
+func mapPublicSummary(resp *rank.GetPublicSummaryResponse) domain.PublicSummary {
+	summary := domain.PublicSummary{
+		Name:        resp.GetName(),
+		WebURL:      resp.GetWebUrl(),
+		Score:       resp.PublicScore,
+		Categories:  make([]domain.PublicCategory, 0, len(resp.GetCategories())),
+		MissingData: append([]string(nil), resp.GetMissingData()...),
+	}
+
+	for _, category := range resp.GetCategories() {
+		summary.Categories = append(summary.Categories, domain.PublicCategory{ID: category.GetId(), Score: category.Score})
+	}
+
+	if resp.GetGradedAt() != nil {
+		gradedAt := resp.GetGradedAt().AsTime()
+		summary.GradedAt = &gradedAt
+	}
+
+	summary.Confidence = mapConfidence(resp.LowConfidence, resp.GetConfidenceReasons())
+
+	return summary
 }
 
 func mapRankingSortBy(
@@ -498,6 +589,8 @@ func mapRankingEntry(
 		score := entry.GetPublicScore()
 		result.PublicScore = &score
 	}
+
+	result.Confidence = mapConfidence(entry.LowConfidence, entry.GetConfidenceReasons())
 
 	if entry.Likes != nil {
 		likes := entry.GetLikes()

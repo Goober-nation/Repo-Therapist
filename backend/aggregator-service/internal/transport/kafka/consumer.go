@@ -80,6 +80,7 @@ func (c *GradeConsumer) handleMessage(
 
 		MissingData: event.MissingData,
 		GradedAt:    &event.GradedAt,
+		Confidence:  event.Confidence,
 	}
 
 	if err := c.service.SaveGradingResult(ctx, grade, event.GradeMode, event.Error); err != nil {

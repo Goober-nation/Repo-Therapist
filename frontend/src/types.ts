@@ -36,6 +36,15 @@ export interface Recommendation {
   location?: string
 }
 
+/**
+ * Low-confidence flag of a public grade: the score rests on little data. It never changes the
+ * score or the ranking order; the reasons are generic pre-written texts.
+ */
+export interface Confidence {
+  low: boolean
+  reasons: string[]
+}
+
 export interface RepositorySummary {
   id: string
   sourceCraftUuid?: string
@@ -62,6 +71,8 @@ export interface RepositorySummary {
   missingData?: string[]
   /** Rule-based recommendations computed by grade-service (`grade.advice`). */
   advice?: Recommendation[]
+  /** Public grades only; undefined when unknown. */
+  confidence?: Confidence
 }
 
 /** AI summary produced by llm-service (`raw_response`). */

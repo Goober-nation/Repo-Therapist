@@ -113,6 +113,81 @@ grade-service — `GRADE_TIMEOUT` (по умолчанию 4m) на оценив
 очереди. Временные ошибки SourceCraft/AppSec повторяются внутри обёрток
 (`HTTP_RETRY_ATTEMPTS`, `HTTP_RETRY_WAIT_SECONDS`).
 
+## Публичный API, бейджи и виджет
+
+Нужны Postgres и Redis из compose (`docker compose up -d postgres redis`), хотя бы один оценённый
+публичный репозиторий в БД, а также запущенные rating-service и gateway-service с теми же `DB_*` и
+`REDIS_*`, что и в `.env` (адрес Postgres на хосте — порт 8051, Redis — 8052). Aggregator для этих
+маршрутов не нужен.
+
+```bash
+G=localhost:8080; R=<org>/<repo>      # оценённый публичный репозиторий
+curl -si "$G/score/$R"                # 200, status FINISHED, Access-Control-Allow-Origin: *, max-age=60
+curl -s  "$G/score/nope/nope"         # 404 {"error":"not found"}
+curl -s  "$G/badge/$R.json"           # {"schemaVersion":1,"label":"repo health","message":"<score>",...}
+curl -s  "$G/badge/$R/activity.svg"   # SVG с оценкой категории; documentation без данных -> n/a
+curl -so /dev/null -w "%{http_code}\n" "$G/badge/$R/security.svg"   # 404: приватная категория
+curl -s  "$G/widget/$R.svg" > widget.svg   # откройте в браузере: карточка с оценкой и 4 категориями
+for i in $(seq 1 6); do curl -so /dev/null -w "%{http_code} " "$G/score/$R"; done   # с PUBLIC_API_RATE_LIMIT=5: 200 ... 429
+```
+
+Репозиторий, у которого нет публичной оценки, отдаёт `200` со `status: NO_DATA`; непубличный —
+`404` на JSON и серый `n/a` на картинках. Как SourceCraft показывает SVG в README, проверяется
+только вручную на самой платформе.
+
+## Флаг низкой достоверности
+
+Нужен полный стек (`docker compose up -d --build`, фронтенд на http://localhost:8081). Флаг
+считается при публичной оценке, поэтому репозитории нужно оценить заново (оценка, сохранённая до
+появления флага, остаётся без флага — «неизвестно»). Ручной прогон без изменения других оценок:
+
+```bash
+set -a; . ./.env; set +a
+(cd backend/grade-service && go build -o /tmp/grading-request ./cmd/grading-request)
+KAFKA_BROKERS=localhost:8053 REDIS_ADDRESS=localhost:8052 /tmp/grading-request --org=<org> --repo=<repo> --visibility=public
+```
+
+Печатаемый `grading.results` содержит `confidence`. Затем:
+
+```bash
+curl -s "localhost:8081/api/score/<org>/<repo>"                       # low_confidence, confidence_reasons; null = неизвестно
+curl -s "localhost:8081/api/ranking?hide_low_confidence=true"         # без помеченных; total_count уменьшился
+curl -s "localhost:8081/api/ranking?hide_low_confidence=maybe"        # 400
+docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select * from repo_confidence_public"
+```
+
+В браузере: на главной странице у помеченных строк бейдж «Мало данных» (причины во всплывающей
+подсказке), переключатель «Скрыть оценки с низкой достоверностью» выключен по умолчанию и убирает
+такие строки, не меняя порядок остальных; на странице публичного репозитория — блок «Низкая
+достоверность оценки» со списком причин; у приватного анализа владельца блока нет. Автотесты
+сценариев накрутки и самого флага:
+
+```bash
+(cd backend/grade-service && go test ./internal/app/ ./internal/scoring/ -run 'Gaming|Confidence' -v)
+```
+
+## Защита от накрутки: сценарии и калибровка порогов
+
+Сценарии накрутки (без внешних сервисов) и проверка боевых значений фильтров:
+
+```bash
+(cd backend/grade-service && go test ./internal/app/ ./internal/scoring/ ./internal/config/ -run 'Gaming|Hardening|FilterCommits|FilterIssues|FilterMilestones|ComputeCategoryFilters' -v)
+```
+
+Калибровка порогов на реальных историях (вручную, нужны клоны репозиториев и их задачи/вехи): для
+каждого репозитория в `CALIB_DIR` лежат `clones/<org>__<repo>/` (git clone с `--shallow-since`),
+`exports/<org>__<repo>/{issues,milestones}.json` и `db_categories.json` с сохранёнными оценками
+остальных категорий. Тест пересчитывает Активность и Issues без фильтров и с каждым фильтром:
+
+```bash
+CALIB_DIR=<каталог> go test -tags=manual ./internal/app/ -run TestHardeningCalibrationManual -v
+```
+
+Критерий выбора порога: ни один реальный репозиторий не сдвигается по итоговой оценке больше чем
+на 3 балла. После изменения порога в `config/grading.yaml` перезапустите тест, обновите таблицы в
+`docs/grading/00-overview.md` и ожидаемые значения в `TestGamingScenariosTable` и
+`TestShippedHardeningFilters`.
+
 ## Проверки сборки/линтера
 
 Каждый Go-сервис бэкенда — отдельный модуль (связаны через корневой `go.work`), поэтому запускайте

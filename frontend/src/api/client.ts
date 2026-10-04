@@ -2,6 +2,7 @@ import type {
   GatewayRankingResponse,
   GradingResponse,
   MyRepositoriesResponse,
+  PublicScoreResponse,
   RecommendationsResponse,
 } from "./contracts"
 
@@ -83,10 +84,21 @@ export class HttpRepoHealthApi {
   }
 
   /** One page of the public ranking; sorting and the language filter run on the server. */
-  getRanking(page = 1, sort: RankingSort = "score", language = ""): Promise<GatewayRankingResponse> {
+  getRanking(
+    page = 1,
+    sort: RankingSort = "score",
+    language = "",
+    hideLowConfidence = false,
+  ): Promise<GatewayRankingResponse> {
     const query = new URLSearchParams({ page: String(page), page_size: String(RANKING_PAGE_SIZE), sortby: sort })
     if (language) query.set("filter", language)
+    if (hideLowConfidence) query.set("hide_low_confidence", "true")
     return this.request(`/ranking?${query}`)
+  }
+
+  /** The stored public grade with its low-confidence flag; read-only, never starts a grading. */
+  getPublicScore(orgSlug: string, repoSlug: string): Promise<PublicScoreResponse> {
+    return this.request(`/score/${repoPath(orgSlug, repoSlug)}`)
   }
 
   getMyRepositories(sourceCraftPat: string): Promise<MyRepositoriesResponse> {

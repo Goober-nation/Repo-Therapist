@@ -50,6 +50,19 @@ CREATE TABLE repo_grades_private (
 
 CREATE INDEX ON repo_grades_private (score DESC);
 
+-- Low-confidence flag of a public grade. Written by the Aggregator right after the public grade;
+-- no row = unknown (never treated as low). reasons: [{code, text}] generic pre-written texts.
+CREATE TABLE repo_confidence_public (
+  sourcecraft_uuid   UUID PRIMARY KEY REFERENCES repos(sourcecraft_uuid),
+
+  low_confidence     BOOLEAN NOT NULL,
+  reasons            JSONB NOT NULL DEFAULT '[]',
+
+  graded_at          TIMESTAMPTZ
+);
+
+CREATE INDEX ON repo_confidence_public (low_confidence);
+
 CREATE TABLE repo_llm_responses_public (
   sourcecraft_uuid   UUID PRIMARY KEY REFERENCES repos(sourcecraft_uuid),
 

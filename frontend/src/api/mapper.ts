@@ -2,6 +2,7 @@ import { categoryLabel, PRIORITY_RANK } from "../metrics"
 import type {
   AiReport,
   CategoryScores,
+  Confidence,
   MetricFact,
   MetricResult,
   Priority,
@@ -10,6 +11,7 @@ import type {
 } from "../types"
 import type {
   AdvicePayload,
+  ConfidenceReasonPayload,
   GatewayRankingEntry,
   GradingResponse,
   MyRepository,
@@ -131,6 +133,21 @@ export function adviceToRecommendations(advice: AdvicePayload[] | null | undefin
     .sort(byPriority)
 }
 
+/**
+ * Reads the low-confidence flag from the wire fields. A missing or null flag is "unknown" and
+ * stays undefined: it must never be shown as low, and not as confirmed-reliable either.
+ */
+export function confidenceFromPayload(
+  low: boolean | null | undefined,
+  reasons: ConfidenceReasonPayload[] | undefined,
+): Confidence | undefined {
+  if (typeof low !== "boolean") return undefined
+  const texts = (Array.isArray(reasons) ? reasons : []).flatMap((reason) =>
+    typeof reason?.text === "string" && reason.text.trim() ? [reason.text.trim()] : [],
+  )
+  return { low, reasons: low ? texts : [] }
+}
+
 export function repositoryFromRanking(entry: GatewayRankingEntry): RepositorySummary | null {
   if (
     (entry.public_score !== undefined && entry.public_score !== null && typeof entry.public_score !== "number") ||
@@ -159,6 +176,9 @@ export function repositoryFromRanking(entry: GatewayRankingEntry): RepositorySum
       lastUpdated: entry.last_activity_at,
       healthScore: scoreValue(entry.public_score),
       ...(typeof entry.likes === "number" ? { likes: entry.likes } : {}),
+      ...(confidenceFromPayload(entry.low_confidence, entry.confidence_reasons)
+        ? { confidence: confidenceFromPayload(entry.low_confidence, entry.confidence_reasons) }
+        : {}),
       lastActivityDaysAgo: daysSince(entry.last_activity_at),
       categoryScores: {},
       gradeStatus: "FINISHED",

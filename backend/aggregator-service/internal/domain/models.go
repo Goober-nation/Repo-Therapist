@@ -42,6 +42,17 @@ type RepoGrade struct {
 	MissingData []string `db:"missing_data"`
 
 	GradedAt *time.Time `db:"graded_at"`
+
+	// Confidence travels with a public grade into repo_confidence_public; it is not a column of
+	// the grade tables.
+	Confidence *GradeConfidence `db:"-"`
+}
+
+// GradeConfidence is the low-confidence flag of a public grade (grading.results "confidence").
+// Reasons is the raw [{code, text}] JSON; the flag never changes the score.
+type GradeConfidence struct {
+	LowConfidence bool            `json:"low_confidence"`
+	Reasons       json.RawMessage `json:"reasons"`
 }
 
 type RepoAppSec struct {

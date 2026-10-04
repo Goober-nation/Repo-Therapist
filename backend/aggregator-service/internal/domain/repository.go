@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -22,6 +23,10 @@ type GradesRepository interface {
 	UpsertPrivateGrade(ctx context.Context, grade RepoGrade) error
 	GetPublicGradeByRepoID(ctx context.Context, repoID uuid.UUID) (RepoGrade, error)
 	GetPrivateGradeByRepoID(ctx context.Context, repoID uuid.UUID) (RepoGrade, error)
+	// UpsertPublicConfidence stores the low-confidence flag of a public grade;
+	// DeletePublicConfidence removes it (grade-service sent none), so a stale flag never survives.
+	UpsertPublicConfidence(ctx context.Context, repoID uuid.UUID, confidence GradeConfidence, gradedAt *time.Time) error
+	DeletePublicConfidence(ctx context.Context, repoID uuid.UUID) error
 }
 
 type LLMRepository interface {

@@ -46,6 +46,18 @@ type LLMRecommendations struct {
 	EvaluatedAt time.Time `json:"evaluated_at"`
 }
 
+// ConfidenceReason is one generic pre-written reason a public grade is low-confidence.
+type ConfidenceReason struct {
+	Code string
+	Text string
+}
+
+// Confidence is the low-confidence flag of a public grade. It never changes the score or the order.
+type Confidence struct {
+	Low     bool
+	Reasons []ConfidenceReason
+}
+
 type RankingEntry struct {
 	Place           int32
 	SourcecraftUUID uuid.UUID
@@ -55,4 +67,24 @@ type RankingEntry struct {
 	Likes           *float64
 	Language        PrimaryLanguage
 	LastActivityAt  *time.Time
+	// Confidence is nil when the flag is unknown (grade stored before the flag existed).
+	Confidence *Confidence
+}
+
+// PublicCategory is one category of a public repo's stored grade; nil Score means no data.
+type PublicCategory struct {
+	ID    string
+	Score *int32
+}
+
+// PublicSummary is a public repo's stored grade for the public score API, badges and widget.
+// A repo that has not been graded yet has a nil Score and no Categories.
+type PublicSummary struct {
+	Name        string
+	WebURL      string
+	Score       *int32
+	Categories  []PublicCategory
+	MissingData []string
+	GradedAt    *time.Time
+	Confidence  *Confidence
 }
