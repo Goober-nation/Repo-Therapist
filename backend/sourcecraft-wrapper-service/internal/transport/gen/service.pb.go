@@ -3463,6 +3463,147 @@ func (x *PullRequestComment) GetIsPublished() bool {
 	return false
 }
 
+type GetIssueCommentsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IssueId       string                 `protobuf:"bytes,1,opt,name=issue_id,json=issueId,proto3" json:"issue_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetIssueCommentsRequest) Reset() {
+	*x = GetIssueCommentsRequest{}
+	mi := &file_service_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetIssueCommentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIssueCommentsRequest) ProtoMessage() {}
+
+func (x *GetIssueCommentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIssueCommentsRequest.ProtoReflect.Descriptor instead.
+func (*GetIssueCommentsRequest) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *GetIssueCommentsRequest) GetIssueId() string {
+	if x != nil {
+		return x.IssueId
+	}
+	return ""
+}
+
+type GetIssueCommentsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Comments      []*IssueCommentMeta    `protobuf:"bytes,1,rep,name=comments,proto3" json:"comments,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetIssueCommentsResponse) Reset() {
+	*x = GetIssueCommentsResponse{}
+	mi := &file_service_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetIssueCommentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIssueCommentsResponse) ProtoMessage() {}
+
+func (x *GetIssueCommentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIssueCommentsResponse.ProtoReflect.Descriptor instead.
+func (*GetIssueCommentsResponse) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{56}
+}
+
+func (x *GetIssueCommentsResponse) GetComments() []*IssueCommentMeta {
+	if x != nil {
+		return x.Comments
+	}
+	return nil
+}
+
+// Metadata only: the comment text is never requested into the export.
+type IssueCommentMeta struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Author        *IssueUser             `protobuf:"bytes,1,opt,name=author,proto3" json:"author,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IssueCommentMeta) Reset() {
+	*x = IssueCommentMeta{}
+	mi := &file_service_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IssueCommentMeta) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IssueCommentMeta) ProtoMessage() {}
+
+func (x *IssueCommentMeta) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IssueCommentMeta.ProtoReflect.Descriptor instead.
+func (*IssueCommentMeta) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *IssueCommentMeta) GetAuthor() *IssueUser {
+	if x != nil {
+		return x.Author
+	}
+	return nil
+}
+
+func (x *IssueCommentMeta) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
 var File_service_proto protoreflect.FileDescriptor
 
 const file_service_proto_rawDesc = "" +
@@ -3741,7 +3882,15 @@ const file_service_proto_rawDesc = "" +
 	"\x04type\x18\x03 \x01(\tR\x04type\x12\x1d\n" +
 	"\n" +
 	"is_deleted\x18\x04 \x01(\bR\tisDeleted\x12!\n" +
-	"\fis_published\x18\x05 \x01(\bR\visPublished2\xc1\b\n" +
+	"\fis_published\x18\x05 \x01(\bR\visPublished\"4\n" +
+	"\x17GetIssueCommentsRequest\x12\x19\n" +
+	"\bissue_id\x18\x01 \x01(\tR\aissueId\"U\n" +
+	"\x18GetIssueCommentsResponse\x129\n" +
+	"\bcomments\x18\x01 \x03(\v2\x1d.code_health.IssueCommentMetaR\bcomments\"}\n" +
+	"\x10IssueCommentMeta\x12.\n" +
+	"\x06author\x18\x01 \x01(\v2\x16.code_health.IssueUserR\x06author\x129\n" +
+	"\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\xa2\t\n" +
 	"\n" +
 	"CodeHealth\x12k\n" +
 	"\x14GetRepositoryBySlugs\x12(.code_health.GetRepositoryBySlugsRequest\x1a).code_health.GetRepositoryBySlugsResponse\x12_\n" +
@@ -3756,7 +3905,8 @@ const file_service_proto_rawDesc = "" +
 	"\tGetMyOrgs\x12\x1d.code_health.GetMyOrgsRequest\x1a\x1e.code_health.GetMyOrgsResponse\x12P\n" +
 	"\vGetOrgRepos\x12\x1f.code_health.GetOrgReposRequest\x1a .code_health.GetOrgReposResponse\x12\\\n" +
 	"\x0fGetPullRequests\x12#.code_health.GetPullRequestsRequest\x1a$.code_health.GetPullRequestsResponse\x12q\n" +
-	"\x16GetPullRequestActivity\x12*.code_health.GetPullRequestActivityRequest\x1a+.code_health.GetPullRequestActivityResponseB7Z5sourcecraft-wrapper-service/internal/transport/gen;pbb\x06proto3"
+	"\x16GetPullRequestActivity\x12*.code_health.GetPullRequestActivityRequest\x1a+.code_health.GetPullRequestActivityResponse\x12_\n" +
+	"\x10GetIssueComments\x12$.code_health.GetIssueCommentsRequest\x1a%.code_health.GetIssueCommentsResponseB7Z5sourcecraft-wrapper-service/internal/transport/gen;pbb\x06proto3"
 
 var (
 	file_service_proto_rawDescOnce sync.Once
@@ -3770,7 +3920,7 @@ func file_service_proto_rawDescGZIP() []byte {
 	return file_service_proto_rawDescData
 }
 
-var file_service_proto_msgTypes = make([]protoimpl.MessageInfo, 55)
+var file_service_proto_msgTypes = make([]protoimpl.MessageInfo, 58)
 var file_service_proto_goTypes = []any{
 	(*GetRepoIDBySlugsRequest)(nil),        // 0: code_health.GetRepoIDBySlugsRequest
 	(*GetRepoIDBySlugsResponse)(nil),       // 1: code_health.GetRepoIDBySlugsResponse
@@ -3827,7 +3977,10 @@ var file_service_proto_goTypes = []any{
 	(*GetPullRequestActivityResponse)(nil), // 52: code_health.GetPullRequestActivityResponse
 	(*PullRequestReviewer)(nil),            // 53: code_health.PullRequestReviewer
 	(*PullRequestComment)(nil),             // 54: code_health.PullRequestComment
-	(*timestamppb.Timestamp)(nil),          // 55: google.protobuf.Timestamp
+	(*GetIssueCommentsRequest)(nil),        // 55: code_health.GetIssueCommentsRequest
+	(*GetIssueCommentsResponse)(nil),       // 56: code_health.GetIssueCommentsResponse
+	(*IssueCommentMeta)(nil),               // 57: code_health.IssueCommentMeta
+	(*timestamppb.Timestamp)(nil),          // 58: google.protobuf.Timestamp
 }
 var file_service_proto_depIdxs = []int32{
 	13, // 0: code_health.ListAllPublicReposResponse.repos:type_name -> code_health.Repository
@@ -3856,32 +4009,32 @@ var file_service_proto_depIdxs = []int32{
 	22, // 23: code_health.Progress.current_cube:type_name -> code_health.Cube
 	27, // 24: code_health.Artifact.dates:type_name -> code_health.Dates
 	26, // 25: code_health.Relations.needs:type_name -> code_health.Relation
-	55, // 26: code_health.Dates.created_at:type_name -> google.protobuf.Timestamp
-	55, // 27: code_health.Dates.started_at:type_name -> google.protobuf.Timestamp
-	55, // 28: code_health.Dates.finished_at:type_name -> google.protobuf.Timestamp
-	55, // 29: code_health.Dates.updated_at:type_name -> google.protobuf.Timestamp
+	58, // 26: code_health.Dates.created_at:type_name -> google.protobuf.Timestamp
+	58, // 27: code_health.Dates.started_at:type_name -> google.protobuf.Timestamp
+	58, // 28: code_health.Dates.finished_at:type_name -> google.protobuf.Timestamp
+	58, // 29: code_health.Dates.updated_at:type_name -> google.protobuf.Timestamp
 	32, // 30: code_health.GetIssuesResponse.issues:type_name -> code_health.Issue
 	33, // 31: code_health.Issue.status:type_name -> code_health.IssueStatus
 	34, // 32: code_health.Issue.author:type_name -> code_health.IssueUser
 	34, // 33: code_health.Issue.updated_by:type_name -> code_health.IssueUser
-	55, // 34: code_health.Issue.created_at:type_name -> google.protobuf.Timestamp
-	55, // 35: code_health.Issue.updated_at:type_name -> google.protobuf.Timestamp
+	58, // 34: code_health.Issue.created_at:type_name -> google.protobuf.Timestamp
+	58, // 35: code_health.Issue.updated_at:type_name -> google.protobuf.Timestamp
 	34, // 36: code_health.Issue.assignee:type_name -> code_health.IssueUser
 	35, // 37: code_health.Issue.labels:type_name -> code_health.Label
 	36, // 38: code_health.Issue.linked_prs:type_name -> code_health.LinkedPR
 	37, // 39: code_health.Issue.milestone:type_name -> code_health.IssueMilestone
-	55, // 40: code_health.Issue.deadline:type_name -> google.protobuf.Timestamp
-	55, // 41: code_health.Issue.started_at:type_name -> google.protobuf.Timestamp
-	55, // 42: code_health.Issue.completed_at:type_name -> google.protobuf.Timestamp
+	58, // 40: code_health.Issue.deadline:type_name -> google.protobuf.Timestamp
+	58, // 41: code_health.Issue.started_at:type_name -> google.protobuf.Timestamp
+	58, // 42: code_health.Issue.completed_at:type_name -> google.protobuf.Timestamp
 	38, // 43: code_health.Issue.repository:type_name -> code_health.RepositoryRef
 	15, // 44: code_health.RepositoryRef.organization:type_name -> code_health.Organization
 	41, // 45: code_health.GetMilestonesResponse.items:type_name -> code_health.Milestone
-	55, // 46: code_health.Milestone.start_date:type_name -> google.protobuf.Timestamp
-	55, // 47: code_health.Milestone.deadline:type_name -> google.protobuf.Timestamp
+	58, // 46: code_health.Milestone.start_date:type_name -> google.protobuf.Timestamp
+	58, // 47: code_health.Milestone.deadline:type_name -> google.protobuf.Timestamp
 	42, // 48: code_health.Milestone.author:type_name -> code_health.MilestoneUser
 	42, // 49: code_health.Milestone.updated_by:type_name -> code_health.MilestoneUser
-	55, // 50: code_health.Milestone.created_at:type_name -> google.protobuf.Timestamp
-	55, // 51: code_health.Milestone.updated_at:type_name -> google.protobuf.Timestamp
+	58, // 50: code_health.Milestone.created_at:type_name -> google.protobuf.Timestamp
+	58, // 51: code_health.Milestone.updated_at:type_name -> google.protobuf.Timestamp
 	45, // 52: code_health.Rating.reaction_counts:type_name -> code_health.ReactionCount
 	15, // 53: code_health.GetRepositoryBySlugsResponse.organization:type_name -> code_health.Organization
 	16, // 54: code_health.GetRepositoryBySlugsResponse.logo:type_name -> code_health.Logo
@@ -3889,43 +4042,48 @@ var file_service_proto_depIdxs = []int32{
 	14, // 56: code_health.GetRepositoryBySlugsResponse.language:type_name -> code_health.Language
 	49, // 57: code_health.GetPullRequestsResponse.pull_requests:type_name -> code_health.PullRequest
 	50, // 58: code_health.PullRequest.author:type_name -> code_health.PullRequestUser
-	55, // 59: code_health.PullRequest.created_at:type_name -> google.protobuf.Timestamp
-	55, // 60: code_health.PullRequest.updated_at:type_name -> google.protobuf.Timestamp
+	58, // 59: code_health.PullRequest.created_at:type_name -> google.protobuf.Timestamp
+	58, // 60: code_health.PullRequest.updated_at:type_name -> google.protobuf.Timestamp
 	53, // 61: code_health.GetPullRequestActivityResponse.reviewers:type_name -> code_health.PullRequestReviewer
 	54, // 62: code_health.GetPullRequestActivityResponse.comments:type_name -> code_health.PullRequestComment
 	50, // 63: code_health.PullRequestReviewer.user:type_name -> code_health.PullRequestUser
-	55, // 64: code_health.PullRequestReviewer.created_at:type_name -> google.protobuf.Timestamp
+	58, // 64: code_health.PullRequestReviewer.created_at:type_name -> google.protobuf.Timestamp
 	50, // 65: code_health.PullRequestComment.author:type_name -> code_health.PullRequestUser
-	55, // 66: code_health.PullRequestComment.created_at:type_name -> google.protobuf.Timestamp
-	43, // 67: code_health.CodeHealth.GetRepositoryBySlugs:input_type -> code_health.GetRepositoryBySlugsRequest
-	0,  // 68: code_health.CodeHealth.GetRepoIDBySlugs:input_type -> code_health.GetRepoIDBySlugsRequest
-	2,  // 69: code_health.CodeHealth.GetGitURL:input_type -> code_health.GetGitURLRequest
-	17, // 70: code_health.CodeHealth.GetCiCDRuns:input_type -> code_health.GetCiCDRunsRequest
-	30, // 71: code_health.CodeHealth.GetIssues:input_type -> code_health.GetIssuesRequest
-	39, // 72: code_health.CodeHealth.GetMilestones:input_type -> code_health.GetMilestonesRequest
-	4,  // 73: code_health.CodeHealth.ListAllPublicRepos:input_type -> code_health.ListAllPublicReposRequest
-	6,  // 74: code_health.CodeHealth.GetMyRepos:input_type -> code_health.GetMyReposRequest
-	8,  // 75: code_health.CodeHealth.GetMyOrgs:input_type -> code_health.GetMyOrgsRequest
-	11, // 76: code_health.CodeHealth.GetOrgRepos:input_type -> code_health.GetOrgReposRequest
-	47, // 77: code_health.CodeHealth.GetPullRequests:input_type -> code_health.GetPullRequestsRequest
-	51, // 78: code_health.CodeHealth.GetPullRequestActivity:input_type -> code_health.GetPullRequestActivityRequest
-	46, // 79: code_health.CodeHealth.GetRepositoryBySlugs:output_type -> code_health.GetRepositoryBySlugsResponse
-	1,  // 80: code_health.CodeHealth.GetRepoIDBySlugs:output_type -> code_health.GetRepoIDBySlugsResponse
-	3,  // 81: code_health.CodeHealth.GetGitURL:output_type -> code_health.GetGitURLResponse
-	18, // 82: code_health.CodeHealth.GetCiCDRuns:output_type -> code_health.GetCiCDRunsResponse
-	31, // 83: code_health.CodeHealth.GetIssues:output_type -> code_health.GetIssuesResponse
-	40, // 84: code_health.CodeHealth.GetMilestones:output_type -> code_health.GetMilestonesResponse
-	5,  // 85: code_health.CodeHealth.ListAllPublicRepos:output_type -> code_health.ListAllPublicReposResponse
-	7,  // 86: code_health.CodeHealth.GetMyRepos:output_type -> code_health.GetMyReposResponse
-	9,  // 87: code_health.CodeHealth.GetMyOrgs:output_type -> code_health.GetMyOrgsResponse
-	12, // 88: code_health.CodeHealth.GetOrgRepos:output_type -> code_health.GetOrgReposResponse
-	48, // 89: code_health.CodeHealth.GetPullRequests:output_type -> code_health.GetPullRequestsResponse
-	52, // 90: code_health.CodeHealth.GetPullRequestActivity:output_type -> code_health.GetPullRequestActivityResponse
-	79, // [79:91] is the sub-list for method output_type
-	67, // [67:79] is the sub-list for method input_type
-	67, // [67:67] is the sub-list for extension type_name
-	67, // [67:67] is the sub-list for extension extendee
-	0,  // [0:67] is the sub-list for field type_name
+	58, // 66: code_health.PullRequestComment.created_at:type_name -> google.protobuf.Timestamp
+	57, // 67: code_health.GetIssueCommentsResponse.comments:type_name -> code_health.IssueCommentMeta
+	34, // 68: code_health.IssueCommentMeta.author:type_name -> code_health.IssueUser
+	58, // 69: code_health.IssueCommentMeta.created_at:type_name -> google.protobuf.Timestamp
+	43, // 70: code_health.CodeHealth.GetRepositoryBySlugs:input_type -> code_health.GetRepositoryBySlugsRequest
+	0,  // 71: code_health.CodeHealth.GetRepoIDBySlugs:input_type -> code_health.GetRepoIDBySlugsRequest
+	2,  // 72: code_health.CodeHealth.GetGitURL:input_type -> code_health.GetGitURLRequest
+	17, // 73: code_health.CodeHealth.GetCiCDRuns:input_type -> code_health.GetCiCDRunsRequest
+	30, // 74: code_health.CodeHealth.GetIssues:input_type -> code_health.GetIssuesRequest
+	39, // 75: code_health.CodeHealth.GetMilestones:input_type -> code_health.GetMilestonesRequest
+	4,  // 76: code_health.CodeHealth.ListAllPublicRepos:input_type -> code_health.ListAllPublicReposRequest
+	6,  // 77: code_health.CodeHealth.GetMyRepos:input_type -> code_health.GetMyReposRequest
+	8,  // 78: code_health.CodeHealth.GetMyOrgs:input_type -> code_health.GetMyOrgsRequest
+	11, // 79: code_health.CodeHealth.GetOrgRepos:input_type -> code_health.GetOrgReposRequest
+	47, // 80: code_health.CodeHealth.GetPullRequests:input_type -> code_health.GetPullRequestsRequest
+	51, // 81: code_health.CodeHealth.GetPullRequestActivity:input_type -> code_health.GetPullRequestActivityRequest
+	55, // 82: code_health.CodeHealth.GetIssueComments:input_type -> code_health.GetIssueCommentsRequest
+	46, // 83: code_health.CodeHealth.GetRepositoryBySlugs:output_type -> code_health.GetRepositoryBySlugsResponse
+	1,  // 84: code_health.CodeHealth.GetRepoIDBySlugs:output_type -> code_health.GetRepoIDBySlugsResponse
+	3,  // 85: code_health.CodeHealth.GetGitURL:output_type -> code_health.GetGitURLResponse
+	18, // 86: code_health.CodeHealth.GetCiCDRuns:output_type -> code_health.GetCiCDRunsResponse
+	31, // 87: code_health.CodeHealth.GetIssues:output_type -> code_health.GetIssuesResponse
+	40, // 88: code_health.CodeHealth.GetMilestones:output_type -> code_health.GetMilestonesResponse
+	5,  // 89: code_health.CodeHealth.ListAllPublicRepos:output_type -> code_health.ListAllPublicReposResponse
+	7,  // 90: code_health.CodeHealth.GetMyRepos:output_type -> code_health.GetMyReposResponse
+	9,  // 91: code_health.CodeHealth.GetMyOrgs:output_type -> code_health.GetMyOrgsResponse
+	12, // 92: code_health.CodeHealth.GetOrgRepos:output_type -> code_health.GetOrgReposResponse
+	48, // 93: code_health.CodeHealth.GetPullRequests:output_type -> code_health.GetPullRequestsResponse
+	52, // 94: code_health.CodeHealth.GetPullRequestActivity:output_type -> code_health.GetPullRequestActivityResponse
+	56, // 95: code_health.CodeHealth.GetIssueComments:output_type -> code_health.GetIssueCommentsResponse
+	83, // [83:96] is the sub-list for method output_type
+	70, // [70:83] is the sub-list for method input_type
+	70, // [70:70] is the sub-list for extension type_name
+	70, // [70:70] is the sub-list for extension extendee
+	0,  // [0:70] is the sub-list for field type_name
 }
 
 func init() { file_service_proto_init() }
@@ -3939,7 +4097,7 @@ func file_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_proto_rawDesc), len(file_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   55,
+			NumMessages:   58,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

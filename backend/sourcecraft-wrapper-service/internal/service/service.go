@@ -29,6 +29,7 @@ type SCService interface {
 	GetOrgRepos(ctx context.Context, orgSlug, pageToken string) (domain.MyRepositoriesResponse, error)
 	GetPullRequests(ctx context.Context, repoID string, limit int) (domain.PullRequests, error)
 	GetPullRequestActivity(ctx context.Context, pullRequestID string) (domain.PullRequestActivity, error)
+	GetIssueComments(ctx context.Context, issueID string) ([]domain.IssueComment, error)
 }
 
 type SCWrapper struct {

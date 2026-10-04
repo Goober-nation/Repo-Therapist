@@ -200,6 +200,9 @@ docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "sele
 (cd backend/grade-service && go test ./internal/analytics/ -v)
 # Ревью PR (этап B): после повторной оценки в объекте analytics есть блок reviews (status ok или no_data с reason);
 # выгрузка лежит в S3: <prefix>/_meta/pulls.json (при S3_KEEP_REPO_DATA=true)
+# Время до первого ответа на задачи: объект analytics содержит issue_replies; у репозиториев с задачами от
+# трёх и более людей (libmdbx, kernel-hardening-checker) — число, у однорукого трекера (cosmos-ontology) — no_data few_authors;
+# выгрузка в S3: <prefix>/_meta/issue-replies.json; в категории Issues метрика median_first_reply_hours (вес 0.15)
 # Репозиторий с ревью от других людей для проверки: team23/mobile-ios (5 из 10 последних PR); у imbok/uims-portal ревьюер — сам автор
 ```
 

@@ -42,6 +42,10 @@ service CodeHealth {
   // GetPullRequestActivity returns the reviewers and comments of one pull request (first page).
   rpc GetPullRequestActivity(GetPullRequestActivityRequest)
       returns (GetPullRequestActivityResponse);
+
+  // GetIssueComments returns the comments of one issue (first page, metadata only).
+  rpc GetIssueComments(GetIssueCommentsRequest)
+      returns (GetIssueCommentsResponse);
 }
 
 message GetRepoIDBySlugsRequest {
@@ -365,4 +369,18 @@ message PullRequestComment {
   string type = 3;
   bool is_deleted = 4;
   bool is_published = 5;
+}
+
+message GetIssueCommentsRequest {
+  string issue_id = 1;
+}
+
+message GetIssueCommentsResponse {
+  repeated IssueCommentMeta comments = 1;
+}
+
+// Metadata only: the comment text is never requested into the export.
+message IssueCommentMeta {
+  IssueUser author = 1;
+  google.protobuf.Timestamp created_at = 2;
 }

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"repo-therapist/repository-service/internal/issuedata"
 	"repo-therapist/repository-service/internal/prdata"
 	"strings"
 	"testing"
@@ -89,6 +90,18 @@ func TestCloneWithDiskFallback(t *testing.T) {
 			t.Fatalf("got err=%v calls=%d, want error after 1 call", err, calls)
 		}
 	})
+}
+
+func TestIssueReplySampleLimit(t *testing.T) {
+	for _, tc := range []struct {
+		value string
+		want  int
+	}{{"", issuedata.DefaultSampleLimit}, {"40", 40}, {"0", 0}, {"-1", issuedata.DefaultSampleLimit}, {"abc", issuedata.DefaultSampleLimit}} {
+		t.Setenv("ISSUE_REPLY_SAMPLE_LIMIT", tc.value)
+		if got := issueReplySampleLimit(); got != tc.want {
+			t.Errorf("ISSUE_REPLY_SAMPLE_LIMIT=%q: got %d, want %d", tc.value, got, tc.want)
+		}
+	}
 }
 
 func TestPRSampleLimit(t *testing.T) {

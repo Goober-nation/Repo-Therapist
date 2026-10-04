@@ -261,7 +261,7 @@ categories:
       # pattern), decoupled from a shared creation cohort.
       - id: abandoned_share
         status: calculated
-        weight: 0.30
+        weight: 0.25
         source: issues.json
         aggregation:
           type: abandoned_share
@@ -279,7 +279,7 @@ categories:
 
       - id: median_closure_days
         status: calculated
-        weight: 0.25
+        weight: 0.20
         source: issues.json
         aggregation:
           type: median_closure_days
@@ -297,7 +297,7 @@ categories:
 
       - id: growth_ratio
         status: calculated
-        weight: 0.20
+        weight: 0.15
         source: issues.json
         aggregation:
           type: growth_ratio
@@ -323,6 +323,33 @@ categories:
           direction: "+"
           critical: 0.3
           healthy: 0.9
+          provisional: true
+
+      # Added 2026-10-05 (TZ: "время до первого ответа"). Median wait for the first reply by someone
+      # other than the issue's author or a bot, over the newest sampled issues (issue-replies.json,
+      # ISSUE_REPLY_SAMPLE_LIMIT, default 25). An unanswered issue counts as the time it waited (until
+      # closed, or until now), at most cap_days. Not applicable (no data, never a bad score) when fewer
+      # than min_issue_authors different people opened issues (a team tracking its own work: measured
+      # on 14 real repos, every one-author repo scored 3-720 h purely for having no outside reporters),
+      # when the tracker looks imported, or with fewer than min_sample_size readable issues.
+      # Thresholds from the same 14 repos: healthy 24 h, critical 14 days (336 h); libmdbx 1.5 h scores 1,
+      # yapb and divkit about 57 h score ~0.9, linux-kernel-defence-map 148 h ~0.6, kernel-hardening-checker
+      # 416 h and kernel-build-containers 720 h score 0.
+      - id: median_first_reply_hours
+        status: calculated
+        weight: 0.15
+        source: issue-replies.json
+        aggregation:
+          type: median_first_reply_hours
+          cap_days: 30
+          min_issue_authors: 3
+          import_share: 0.8
+          min_sample_size: 5
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 336
+          healthy: 24
           provisional: true
 
   ci_cd:
@@ -425,6 +452,9 @@ analytics:
   top_areas: 8
   top_subareas: 10 # busiest directories two levels deep (src/api/)
   top_files: 10 # most changed files with their main owner
+  min_issues: 5 # first-reply block: fewer readable sampled issues -> no data (keep equal to the Issues metric's min_sample_size)
+  min_issue_authors: 3 # fewer different issue authors -> no data (keep equal to the Issues metric's min_issue_authors)
+  issue_cap_days: 30 # an unanswered issue counts for at most this many days (keep equal to the Issues metric's cap_days)
   min_reviewed_prs: 3 # fewer reviewed PRs in the sample -> no median time to first review
   waiting_days: 7 # an open PR with no review for this many days counts as waiting
   min_merged_prs: 3 # fewer merged PRs with readable reviews in the sample -> the reviews block is "no data"

@@ -44,6 +44,11 @@ type AnalyticsConfig struct {
 	// reviews block "no data". ImportShare: when this share or more of the sampled pull requests
 	// were created on one day the history is treated as imported and the block is "no data".
 	MinMergedPRs int `yaml:"min_merged_prs"`
+	// MinIssues, MinIssueAuthors and IssueCapDays are the first-reply block's counterparts of the
+	// Issues metric's min_sample_size, min_issue_authors and cap_days (keep them equal).
+	MinIssues       int `yaml:"min_issues"`
+	MinIssueAuthors int `yaml:"min_issue_authors"`
+	IssueCapDays    int `yaml:"issue_cap_days"`
 	// MinReviewedPRs: fewer reviewed pull requests than this give no median time to first review.
 	// WaitingDays: an open pull request with no review for this long counts as waiting.
 	MinReviewedPRs int     `yaml:"min_reviewed_prs"`
@@ -129,6 +134,13 @@ type AggregationConfig struct {
 	// StalenessDays is abandoned_share's "untouched for N days" threshold — distinct from
 	// WindowDays (which issues to consider at all).
 	StalenessDays int `yaml:"staleness_days"`
+	// CapDays, MinIssueAuthors and ImportShare belong to median_first_reply_hours: the longest an
+	// unanswered issue counts for, the fewest different issue authors for the metric to apply (a
+	// team tracking its own work is not neglect), and the share of issues created on one day that
+	// marks an imported tracker.
+	CapDays         int     `yaml:"cap_days"`
+	MinIssueAuthors int     `yaml:"min_issue_authors"`
+	ImportShare     float64 `yaml:"import_share"`
 }
 
 type FormulaConfig struct {
@@ -177,6 +189,9 @@ func validate(cfg *Config) error {
 			if err := validateFormula(m.Formula); err != nil {
 				return fmt.Errorf("category %q metric %q: %w", catID, m.ID, err)
 			}
+			if err := validateAggregation(m); err != nil {
+				return fmt.Errorf("category %q metric %q: %w", catID, m.ID, err)
+			}
 			if m.Status == StatusCalculated {
 				weightSum += m.Weight
 			}
@@ -185,6 +200,22 @@ func validate(cfg *Config) error {
 			return fmt.Errorf("category %q: calculated metrics' weights sum to %.3f, want ~1.0", catID, weightSum)
 		}
 	}
+	return nil
+}
+
+// validateAggregation checks the settings median_first_reply_hours cannot work without; the other
+// aggregation types keep their existing, more lenient handling.
+func validateAggregation(m MetricConfig) error {
+	if m.Status != StatusCalculated || m.Aggregation.Type != "median_first_reply_hours" {
+		return nil
+	}
+
+	a := m.Aggregation
+	if a.CapDays < 1 || a.MinIssueAuthors < 1 || a.MinSampleSize < 1 || a.ImportShare <= 0 || a.ImportShare > 1 {
+		return fmt.Errorf("median_first_reply_hours needs cap_days, min_issue_authors and min_sample_size of at least 1 and import_share in (0, 1], got %d, %d, %d, %v",
+			a.CapDays, a.MinIssueAuthors, a.MinSampleSize, a.ImportShare)
+	}
+
 	return nil
 }
 
@@ -249,6 +280,9 @@ func validateAnalytics(a AnalyticsConfig) error {
 	}
 	if a.MinCommits < 0 {
 		return fmt.Errorf("min_commits must not be negative, got %d", a.MinCommits)
+	}
+	if a.MinIssues < 1 || a.MinIssueAuthors < 1 || a.IssueCapDays < 1 {
+		return fmt.Errorf("min_issues, min_issue_authors and issue_cap_days must be at least 1, got %d, %d, %d", a.MinIssues, a.MinIssueAuthors, a.IssueCapDays)
 	}
 	if a.MinReviewedPRs < 1 || a.WaitingDays < 1 {
 		return fmt.Errorf("min_reviewed_prs and waiting_days must be at least 1, got %d and %d", a.MinReviewedPRs, a.WaitingDays)

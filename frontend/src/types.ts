@@ -159,10 +159,26 @@ export interface ReviewBottlenecks {
   medianFirstReviewHours?: number
 }
 
+/** How quickly the newest sampled issues get a first reply by someone but the author or a bot. */
+export interface IssueRepliesStats {
+  available: boolean
+  /** Why it is unavailable: unavailable | few_issues | few_authors | imported. */
+  reason?: string
+  sampled: number
+  replied: number
+  unanswered: number
+  /** 0-1; undefined unless available. */
+  repliedShare?: number
+  /** Median wait in hours; an unanswered issue counts as the time it waited, at most capDays. */
+  medianFirstReplyHours?: number
+  capDays: number
+}
+
 export interface RepoAnalytics {
   windowDays: number
   busFactor: BusFactor
   reviews: ReviewStats
+  issueReplies: IssueRepliesStats
   ownership: {
     available: boolean
     /** Top-level directories; subareas are the busiest directories two levels deep, files the most changed files. */

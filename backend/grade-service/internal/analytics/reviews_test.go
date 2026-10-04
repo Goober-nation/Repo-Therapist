@@ -132,7 +132,7 @@ func TestComputeIncludesReviewsAndVersion(t *testing.T) {
 		pr("1", "merged", "a", 1, 2, true, []string{"b"}), pr("2", "merged", "a", 4, 2, true, nil), pr("3", "merged", "a", 8, 2, true, nil),
 	}}}, now)
 
-	if result.Version != 3 || result.Reviews.Status != StatusOK || result.Reviews.Unreviewed != 2 {
+	if result.Version != 4 || result.Reviews.Status != StatusOK || result.Reviews.Unreviewed != 2 {
 		t.Fatalf("result = %+v", result)
 	}
 

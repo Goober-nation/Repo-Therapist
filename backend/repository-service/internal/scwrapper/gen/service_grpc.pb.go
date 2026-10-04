@@ -33,6 +33,7 @@ const (
 	CodeHealth_GetMyRepos_FullMethodName             = "/code_health.CodeHealth/GetMyRepos"
 	CodeHealth_GetPullRequests_FullMethodName        = "/code_health.CodeHealth/GetPullRequests"
 	CodeHealth_GetPullRequestActivity_FullMethodName = "/code_health.CodeHealth/GetPullRequestActivity"
+	CodeHealth_GetIssueComments_FullMethodName       = "/code_health.CodeHealth/GetIssueComments"
 )
 
 // CodeHealthClient is the client API for CodeHealth service.
@@ -51,6 +52,8 @@ type CodeHealthClient interface {
 	GetPullRequests(ctx context.Context, in *GetPullRequestsRequest, opts ...grpc.CallOption) (*GetPullRequestsResponse, error)
 	// GetPullRequestActivity returns the reviewers and comments of one pull request (first page).
 	GetPullRequestActivity(ctx context.Context, in *GetPullRequestActivityRequest, opts ...grpc.CallOption) (*GetPullRequestActivityResponse, error)
+	// GetIssueComments returns the comments of one issue (first page, metadata only).
+	GetIssueComments(ctx context.Context, in *GetIssueCommentsRequest, opts ...grpc.CallOption) (*GetIssueCommentsResponse, error)
 }
 
 type codeHealthClient struct {
@@ -161,6 +164,16 @@ func (c *codeHealthClient) GetPullRequestActivity(ctx context.Context, in *GetPu
 	return out, nil
 }
 
+func (c *codeHealthClient) GetIssueComments(ctx context.Context, in *GetIssueCommentsRequest, opts ...grpc.CallOption) (*GetIssueCommentsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetIssueCommentsResponse)
+	err := c.cc.Invoke(ctx, CodeHealth_GetIssueComments_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CodeHealthServer is the server API for CodeHealth service.
 // All implementations must embed UnimplementedCodeHealthServer
 // for forward compatibility.
@@ -177,6 +190,8 @@ type CodeHealthServer interface {
 	GetPullRequests(context.Context, *GetPullRequestsRequest) (*GetPullRequestsResponse, error)
 	// GetPullRequestActivity returns the reviewers and comments of one pull request (first page).
 	GetPullRequestActivity(context.Context, *GetPullRequestActivityRequest) (*GetPullRequestActivityResponse, error)
+	// GetIssueComments returns the comments of one issue (first page, metadata only).
+	GetIssueComments(context.Context, *GetIssueCommentsRequest) (*GetIssueCommentsResponse, error)
 	mustEmbedUnimplementedCodeHealthServer()
 }
 
@@ -216,6 +231,9 @@ func (UnimplementedCodeHealthServer) GetPullRequests(context.Context, *GetPullRe
 }
 func (UnimplementedCodeHealthServer) GetPullRequestActivity(context.Context, *GetPullRequestActivityRequest) (*GetPullRequestActivityResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetPullRequestActivity not implemented")
+}
+func (UnimplementedCodeHealthServer) GetIssueComments(context.Context, *GetIssueCommentsRequest) (*GetIssueCommentsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetIssueComments not implemented")
 }
 func (UnimplementedCodeHealthServer) mustEmbedUnimplementedCodeHealthServer() {}
 func (UnimplementedCodeHealthServer) testEmbeddedByValue()                    {}
@@ -418,6 +436,24 @@ func _CodeHealth_GetPullRequestActivity_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CodeHealth_GetIssueComments_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetIssueCommentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CodeHealthServer).GetIssueComments(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CodeHealth_GetIssueComments_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CodeHealthServer).GetIssueComments(ctx, req.(*GetIssueCommentsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CodeHealth_ServiceDesc is the grpc.ServiceDesc for CodeHealth service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -464,6 +500,10 @@ var CodeHealth_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPullRequestActivity",
 			Handler:    _CodeHealth_GetPullRequestActivity_Handler,
+		},
+		{
+			MethodName: "GetIssueComments",
+			Handler:    _CodeHealth_GetIssueComments_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

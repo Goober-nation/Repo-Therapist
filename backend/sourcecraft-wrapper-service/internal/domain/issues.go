@@ -68,3 +68,9 @@ type Organization struct {
 	ID   string `json:"id"`
 	Slug string `json:"slug"`
 }
+
+// IssueComment is one comment of an issue; only who and when are read, never the text.
+type IssueComment struct {
+	Author    IssueUser `json:"author"`
+	CreatedAt time.Time `json:"created_at"`
+}

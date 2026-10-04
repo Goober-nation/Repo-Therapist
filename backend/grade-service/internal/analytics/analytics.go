@@ -14,10 +14,11 @@ import (
 
 	"repo-therapist/grade-service/internal/config"
 	"repo-therapist/grade-service/internal/gitlog"
+	"repo-therapist/grade-service/internal/issuereplies"
 )
 
 // Version is the schema version of the analytics object in grading.results.
-const Version = 3
+const Version = 4
 
 // Statuses of one analytics block.
 const (
@@ -44,6 +45,9 @@ type Inputs struct {
 	Codeowners     []byte
 	// Pulls is the _meta/pulls.json export; nil when the file is missing or unreadable.
 	Pulls *PullsExport
+	// IssueReplies is the _meta/issue-replies.json export after the instant-close filter; nil when
+	// the file is missing or unreadable.
+	IssueReplies *issuereplies.Export
 }
 
 type AuthorShare struct {
@@ -106,6 +110,8 @@ type Result struct {
 	BusFactor  BusFactor `json:"bus_factor"`
 	Ownership  Ownership `json:"ownership"`
 	Reviews    Reviews   `json:"reviews"`
+	// IssueReplies is the first-reply block of the newest issues.
+	IssueReplies IssueReplies `json:"issue_replies"`
 }
 
 // Compute builds the analytics, or nil when they are switched off in config.
@@ -115,11 +121,12 @@ func Compute(cfg config.AnalyticsConfig, in Inputs, now time.Time) *Result {
 	}
 
 	result := &Result{
-		Version:    Version,
-		WindowDays: cfg.WindowDays,
-		BusFactor:  BusFactor{Status: StatusNoData, TopAuthors: []AuthorShare{}},
-		Ownership:  Ownership{Status: StatusNoData, Areas: []Area{}, Subareas: []Area{}, Files: []FileOwner{}},
-		Reviews:    reviewStats(cfg, in.Pulls, now),
+		Version:      Version,
+		WindowDays:   cfg.WindowDays,
+		BusFactor:    BusFactor{Status: StatusNoData, TopAuthors: []AuthorShare{}},
+		Ownership:    Ownership{Status: StatusNoData, Areas: []Area{}, Subareas: []Area{}, Files: []FileOwner{}},
+		Reviews:      reviewStats(cfg, in.Pulls, now),
+		IssueReplies: issueReplyStats(cfg, in.IssueReplies, now),
 	}
 
 	// CODEOWNERS is reported whether or not commits are readable: its presence is a fact of the repo.

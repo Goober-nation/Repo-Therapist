@@ -110,8 +110,16 @@ function OwnersCard({ ownership }: { ownership: RepoAnalytics["ownership"] }) {
   )
 }
 
+const ISSUE_NO_DATA: Record<string, string> = {
+  few_authors: "Нет данных: задачи открыли слишком мало разных людей — похоже, команда ведёт трекер для себя, а не принимает обращения.",
+  few_issues: "Нет данных: среди последних задач слишком мало, чтобы судить о скорости ответа.",
+  imported: "Нет данных: задачи созданы почти одновременно, похоже на импорт трекера.",
+  unavailable: "Нет данных: комментарии к задачам получить не удалось.",
+}
+
 function formatHours(hours: number): string {
   if (hours < 1) return "менее часа"
+  if (hours < 10) return `${(Math.round(hours * 10) / 10).toLocaleString("ru-RU")} ч`
   if (hours < 48) return `${Math.round(hours)} ч`
   return `${Math.round(hours / 24)} дн.`
 }
@@ -131,7 +139,7 @@ export default function AnalyticsSection({
   const heading = (
     <SectionHeading
       title="Углублённая аналитика"
-      description="Фактор автобуса, ревью pull request'ов и карта владельцев кода. Справочные показатели: на оценку не влияют."
+      description="Фактор автобуса, ревью pull request'ов, ответы на задачи и карта владельцев кода. Справочные показатели: на оценку не влияют, кроме времени ответа на задачи — оно входит в категорию Issues."
     />
   )
 
@@ -157,7 +165,7 @@ export default function AnalyticsSection({
     )
   }
 
-  const { busFactor, ownership, reviews } = analytics
+  const { busFactor, ownership, reviews, issueReplies } = analytics
   const { codeowners } = ownership
 
   return (
@@ -241,6 +249,26 @@ export default function AnalyticsSection({
           ) : reviews.available ? (
             <p className="muted-copy">{REVIEW_NO_DATA[reviews.bottlenecks.reason ?? ""] ?? REVIEW_NO_DATA.unavailable}</p>
           ) : null}
+        </Card>
+
+        <Card className="analytics-card">
+          <Label>Ответы на задачи</Label>
+          {issueReplies.available && issueReplies.medianFirstReplyHours !== undefined ? (
+            <>
+              <div className="analytics-card__value">{formatHours(issueReplies.medianFirstReplyHours)}</div>
+              <p>
+                медианное время до первого ответа на задачи среди последних {issueReplies.sampled}: отвечено{" "}
+                {issueReplies.replied}, без ответа {issueReplies.unanswered}.
+              </p>
+              <p className="muted-copy">
+                Ответ — комментарий не автора и не бота. Задача без ответа считается за время ожидания (до закрытия или
+                до сегодняшнего дня, не больше {issueReplies.capDays} дн.). Это же время входит в категорию Issues, когда оно
+                применимо к репозиторию.
+              </p>
+            </>
+          ) : (
+            <p className="muted-copy">{ISSUE_NO_DATA[issueReplies.reason ?? ""] ?? ISSUE_NO_DATA.unavailable}</p>
+          )}
         </Card>
 
         <Card className="analytics-card">

@@ -6,6 +6,7 @@ import type {
   RepoAnalytics,
   ReviewBottlenecks,
   MetricFact,
+  IssueRepliesStats,
   MetricResult,
   OwnershipArea,
   PositionExplanation,
@@ -197,6 +198,8 @@ export function analyticsFromResponse(response: AnalyticsResponse | undefined): 
       // Analytics stored before version 3 have no bottlenecks: unavailable, never zeros.
       bottlenecks: bottlenecksFromPayload(reviews?.bottlenecks),
     },
+    // Analytics stored before version 4 have no issue_replies block: unavailable, never zeros.
+    issueReplies: issueRepliesFromPayload(raw.issue_replies),
     busFactor: {
       available: busAvailable,
       value: busAvailable ? finiteOr(bus?.value, 0) : 0,
@@ -233,6 +236,24 @@ export function analyticsFromResponse(response: AnalyticsResponse | undefined): 
         ...(typeof codeowners?.covered_share === "number" ? { coveredShare: share(codeowners.covered_share) } : {}),
       },
     },
+  }
+}
+
+function issueRepliesFromPayload(raw: unknown): IssueRepliesStats {
+  const value = isRecord(raw) ? raw : {}
+  const available = value.status === "ok"
+  const median = value.median_first_reply_hours
+  return {
+    available,
+    reason: typeof value.reason === "string" && value.reason ? value.reason : "unavailable",
+    sampled: finiteOr(value.sampled, 0),
+    replied: finiteOr(value.replied, 0),
+    unanswered: finiteOr(value.unanswered, 0),
+    capDays: finiteOr(value.cap_days, 0),
+    ...(available && typeof value.replied_share === "number" ? { repliedShare: share(value.replied_share) } : {}),
+    ...(available && typeof median === "number" && Number.isFinite(median) && median >= 0
+      ? { medianFirstReplyHours: median }
+      : {}),
   }
 }
 

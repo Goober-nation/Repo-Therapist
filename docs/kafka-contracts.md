@@ -141,8 +141,8 @@ LLM-сервис по-прежнему принимает старые `LLM_SUMM
 достоверность». Методика: `docs/grading/00-overview.md`.
 
 `analytics` (2026-10-04) — справочные показатели (фактор автобуса, карта владельцев кода, ревью
-pull request) для любого `grade_mode`, объект версии 3 (версия 1 — без блока `reviews`, версия 2 — без `reviews.bottlenecks`, подкаталогов и файлов); `null` при сбое и если аналитика выключена в
-`config/grading.yaml`. Не влияет на `score`. Aggregator хранит его без разбора в
+pull request) для любого `grade_mode`, объект версии 4 (версия 1 — без блока `reviews`, версия 2 — без `reviews.bottlenecks`, подкаталогов и файлов, версия 3 — без `issue_replies`); `null` при сбое и если аналитика выключена в
+`config/grading.yaml`. Не влияет на `score`, за исключением времени первого ответа на задачи, которое входит в категорию «Задачи» отдельной метрикой (см. `docs/grading/issues.md`). Aggregator хранит его без разбора в
 `repo_analytics_public`/`repo_analytics_private` (по `grade_mode`) и удаляет старую запись, если
 пришёл `null`; сбой записи только логируется и оценку не отменяет. Формат и методика:
 `docs/grading/analytics.md`.

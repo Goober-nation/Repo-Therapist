@@ -18,6 +18,7 @@ import (
 	"repo-therapist/grade-service/internal/config"
 	"repo-therapist/grade-service/internal/contracts"
 	"repo-therapist/grade-service/internal/gitlog"
+	"repo-therapist/grade-service/internal/issuereplies"
 	"repo-therapist/grade-service/internal/scoring"
 	"repo-therapist/grade-service/internal/storage"
 )
@@ -106,6 +107,11 @@ func Grade(ctx context.Context, repoID, prefix string, cfg *config.Config, token
 		inputs.Milestones, inputs.MilestonesAvailable = milestones, true
 	}
 
+	replies := readIssueReplies(ctx, s3Client, prefix, repoID)
+	if replies != nil {
+		inputs.IssueReplies = *replies
+	}
+
 	activityCfg, ok := cfg.Categories["activity"]
 	if !ok {
 		return nil, fmt.Errorf("config has no \"activity\" category")
@@ -162,6 +168,11 @@ func Grade(ctx context.Context, repoID, prefix string, cfg *config.Config, token
 	analyticsInputs := analytics.Inputs{CommitsAvailable: confidenceInputs.CommitsAvailable, Commits: confidenceInputs.Commits}
 	analyticsInputs.CodeownersPath, analyticsInputs.Codeowners = readCodeowners(ctx, s3Client, prefix)
 	analyticsInputs.Pulls = readPulls(ctx, s3Client, prefix, repoID)
+	if replies != nil {
+		// Same filter as the Issues category applies, so the block and the metric judge the same issues.
+		filtered := replies.FilterInstantClose(cfg.Categories["issues"].IssueFilters.InstantCloseSeconds)
+		analyticsInputs.IssueReplies = &filtered
+	}
 
 	if !private {
 		return &GradeOutput{RepoID: repoID, Categories: categories, ConfidenceInputs: confidenceInputs, AnalyticsInputs: analyticsInputs}, nil
@@ -210,6 +221,25 @@ func readCodeowners(ctx context.Context, s3Client *storage.Client, prefix string
 		return p, data
 	}
 	return "", nil
+}
+
+// readIssueReplies returns the issue reply sample from the job's S3 export, or nil when
+// issue-replies.json is missing or unreadable (a job exported before the first-reply metric existed):
+// the metric and the analytics block are then "no data". Advisory, so a problem is logged, never returned.
+func readIssueReplies(ctx context.Context, s3Client *storage.Client, prefix, repoID string) *issuereplies.Export {
+	data, err := s3Client.GetObject(ctx, prefix+"/_meta/issue-replies.json")
+	if err != nil {
+		log.Printf("issue-replies.json unavailable for %s: %v (the first-reply metric will be no-data)", repoID, err)
+		return nil
+	}
+
+	var export issuereplies.Export
+	if err := json.Unmarshal(data, &export); err != nil {
+		log.Printf("decoding issue-replies.json for %s: %v (the first-reply metric will be no-data)", repoID, err)
+		return nil
+	}
+
+	return &export
 }
 
 // readPulls returns the pull request sample from the job's S3 export, or nil when pulls.json is

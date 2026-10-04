@@ -151,6 +151,16 @@ export interface AnalyticsResponse {
         median_first_review_hours?: number | null
       }
     }
+    issue_replies?: {
+      status?: string
+      reason?: string
+      sampled?: number
+      replied?: number
+      unanswered?: number
+      replied_share?: number | null
+      median_first_reply_hours?: number | null
+      cap_days?: number
+    }
     ownership?: {
       status?: string
       areas?: AreaPayload[]

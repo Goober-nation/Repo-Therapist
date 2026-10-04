@@ -92,6 +92,8 @@ type Issue struct {
 	// MilestoneID is the milestone the issue is attached to ("" when none); Grade service counts a
 	// milestone only if an issue is attached to it (docs/grading/00-overview.md).
 	MilestoneID string `json:"milestone_id,omitempty"`
+	// AuthorSlug is who opened the issue; the first-reply metric ignores the author's own comments.
+	AuthorSlug string `json:"author,omitempty"`
 }
 
 // GetIssues fetches every issue for a repo, following the wrapper's page tokens.
@@ -112,9 +114,29 @@ func (c *Client) GetIssues(ctx context.Context, repoID string) ([]Issue, error) 
 			UpdatedAt:  timestampRFC3339(i.GetUpdatedAt()),
 
 			MilestoneID: i.GetMilestone().GetId(),
+			AuthorSlug:  i.GetAuthor().GetSlug(),
 		})
 	}
 	return issues, nil
+}
+
+// IssueComment is who commented on an issue and when; the text is never fetched into the export.
+type IssueComment struct {
+	Author    string `json:"author"`
+	CreatedAt string `json:"created_at"`
+}
+
+// GetIssueComments fetches the comments (first page) of one issue by its ID.
+func (c *Client) GetIssueComments(ctx context.Context, issueID string) ([]IssueComment, error) {
+	resp, err := c.rpc.GetIssueComments(c.authed(ctx), &gen.GetIssueCommentsRequest{IssueId: issueID})
+	if err != nil {
+		return nil, err
+	}
+	comments := make([]IssueComment, 0, len(resp.GetComments()))
+	for _, m := range resp.GetComments() {
+		comments = append(comments, IssueComment{Author: m.GetAuthor().GetSlug(), CreatedAt: timestampRFC3339(m.GetCreatedAt())})
+	}
+	return comments, nil
 }
 
 // Milestone is the subset of the wrapper's Milestone message Activity's release-cadence

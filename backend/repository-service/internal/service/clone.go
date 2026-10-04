@@ -19,6 +19,7 @@ import (
 
 	"repo-therapist/repository-service/internal/cidata"
 	"repo-therapist/repository-service/internal/gitlog"
+	"repo-therapist/repository-service/internal/issuedata"
 	"repo-therapist/repository-service/internal/prdata"
 	"repo-therapist/repository-service/internal/scwrapper"
 	"repo-therapist/repository-service/internal/storage"
@@ -179,6 +180,19 @@ func CloneAndUpload(ctx context.Context, org, repo, jobID, token string) (res *R
 	}
 	if err := s3Client.PutObject(ctx, keyPrefix+"/_meta/issues.json", issuesJSON, "application/json"); err != nil {
 		return nil, fmt.Errorf("uploading issues: %w", err)
+	}
+
+	// Issue replies sample: the newest ISSUE_REPLY_SAMPLE_LIMIT issues with who commented and when,
+	// for the first-reply metric. Advisory like the pull request sample: a fetch failure never fails
+	// the export (the issue's replies are marked unavailable).
+	replyLimit := issueReplySampleLimit()
+	log.Printf("fetching comments of the %d newest issues for %s/%s", replyLimit, org, repo)
+	repliesJSON, err := json.Marshal(issuedata.Collect(ctx, scClient, issues, replyLimit))
+	if err != nil {
+		return nil, fmt.Errorf("marshaling issue replies: %w", err)
+	}
+	if err := s3Client.PutObject(ctx, keyPrefix+"/_meta/issue-replies.json", repliesJSON, "application/json"); err != nil {
+		return nil, fmt.Errorf("uploading issue replies: %w", err)
 	}
 
 	log.Printf("fetching milestones for %s/%s", org, repo)
@@ -448,4 +462,19 @@ func envOrDefault(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// issueReplySampleLimit returns ISSUE_REPLY_SAMPLE_LIMIT (0 switches the issue reply sample off); an
+// invalid or negative value falls back to issuedata.DefaultSampleLimit.
+func issueReplySampleLimit() int {
+	v := os.Getenv("ISSUE_REPLY_SAMPLE_LIMIT")
+	if v == "" {
+		return issuedata.DefaultSampleLimit
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		log.Printf("ignoring invalid ISSUE_REPLY_SAMPLE_LIMIT=%q, using %d", v, issuedata.DefaultSampleLimit)
+		return issuedata.DefaultSampleLimit
+	}
+	return n
 }

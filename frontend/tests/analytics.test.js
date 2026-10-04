@@ -35,6 +35,15 @@ const payload = (over = {}) => ({
       median_merge_hours: 6,
       bottlenecks: { status: "ok", reviewed: 12, open: 3, waiting: 1, waiting_days: 7, median_first_review_hours: 5.5 },
     },
+    issue_replies: {
+      status: "ok",
+      sampled: 25,
+      replied: 19,
+      unanswered: 6,
+      replied_share: 0.76,
+      median_first_reply_hours: 30,
+      cap_days: 30,
+    },
     ownership: {
       status: "ok",
       areas: [area("src/")],
@@ -114,7 +123,7 @@ test("the review card shows the median first-review time and the waiting pull re
   const html = render(payload())
   assert.match(html, /Где ревью ждут/)
   assert.match(html, /Медианное время до первого ревью/)
-  assert.match(html, /6 ч/, "5.5 hours rounds to 6 h")
+  assert.match(html, /5,5 ч/, "5.5 hours keeps its decimal under 10 h")
   assert.match(html, /по 12 pull request/)
   assert.match(html, /дольше 7 дн\./)
   assert.match(html, /<strong>1<\/strong> из 3 открытых/)
@@ -149,4 +158,71 @@ test("an imported history says no data for both review parts", () => {
   const html = render(imported)
   assert.match(html, /похоже на импорт истории/)
   assert.doesNotMatch(html, /Где ревью ждут/)
+})
+
+test("issue replies are mapped, and older analytics show them as unavailable, never as zeros", () => {
+  const got = analyticsFromResponse(payload()).issueReplies
+  assert.deepEqual(got, {
+    available: true,
+    reason: "unavailable",
+    sampled: 25,
+    replied: 19,
+    unanswered: 6,
+    capDays: 30,
+    repliedShare: 0.76,
+    medianFirstReplyHours: 30,
+  })
+
+  const old = payload()
+  delete old.analytics.issue_replies
+  const missing = analyticsFromResponse(old).issueReplies
+  assert.equal(missing.available, false)
+  assert.equal("medianFirstReplyHours" in missing, false)
+  assert.equal("repliedShare" in missing, false)
+
+  const bad = payload()
+  bad.analytics.issue_replies = { status: "ok", median_first_reply_hours: -1, replied_share: "x", sampled: "y" }
+  const defended = analyticsFromResponse(bad).issueReplies
+  assert.equal("medianFirstReplyHours" in defended, false)
+  assert.equal(defended.sampled, 0)
+})
+
+test("the issue replies card shows the median wait, counts and the Issues-category note", () => {
+  const html = render(payload())
+  assert.match(html, /Ответы на задачи/)
+  assert.match(html, /медианное время до первого ответа на задачи среди последних 25/)
+  assert.match(html, /отвечено\s*19, без ответа 6/)
+  assert.match(html, /не больше 30 дн\./)
+  assert.match(html, /входит в категорию Issues/)
+  assert.match(html, /на оценку не влияют, кроме времени ответа на задачи/)
+})
+
+test("the issue replies card explains every no-data reason", () => {
+  const reasons = {
+    few_authors: /слишком мало разных людей/,
+    few_issues: /слишком мало, чтобы судить/,
+    imported: /импорт трекера/,
+    unavailable: /получить не удалось/,
+  }
+
+  for (const [reason, pattern] of Object.entries(reasons)) {
+    const res = payload()
+    res.analytics.issue_replies = { status: "no_data", reason, sampled: 2, replied: 0, unanswered: 0, cap_days: 30 }
+    const html = render(res)
+    assert.match(html, pattern, reason)
+    assert.doesNotMatch(html, /медианное время до первого ответа/, `${reason}: no number when the metric does not apply`)
+  }
+})
+
+test("hours are shown with a decimal under ten, rounded to whole hours under two days, then in days", () => {
+  const median = (hours) => {
+    const res = payload()
+    res.analytics.issue_replies.median_first_reply_hours = hours
+    return render(res)
+  }
+
+  assert.match(median(0.4), /менее часа/)
+  assert.match(median(1.5), /1,5 ч/)
+  assert.match(median(30), />30 ч</)
+  assert.match(median(100), />4 дн\.</)
 })

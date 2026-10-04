@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"repo-therapist/grade-service/internal/config"
+	"repo-therapist/grade-service/internal/issuereplies"
 )
 
 // Event is the uniform shape every source (commits, pulls, releases, ...) converts into, so
@@ -247,6 +248,38 @@ func medianClosureDays(cfg config.AggregationConfig, events []Event, now time.Ti
 		return aggResult{NoData: true}
 	}
 	return aggResult{Value: median(durations)}
+}
+
+// medianFirstReplyHours: median wait for the first reply by someone other than the author or a bot,
+// over the sampled newest issues (docs/grading/issues.md). An issue nobody answered counts as the time
+// it waited (until it was closed, or until now), capped at cfg.CapDays, so a neglected tracker scores
+// badly instead of dropping out. Not applicable (NoData, never a bad score): no sample, fewer than
+// MinIssueAuthors different people opening issues (a team tracking its own work), an imported tracker,
+// or fewer than MinSampleSize readable issues.
+func medianFirstReplyHours(cfg config.AggregationConfig, export issuereplies.Export, now time.Time) aggResult {
+	if !export.Available {
+		return aggResult{NoData: true}
+	}
+
+	if issuereplies.DistinctAuthors(export.Issues) < cfg.MinIssueAuthors {
+		return aggResult{NoData: true}
+	}
+
+	if issuereplies.Imported(export.Issues, cfg.ImportShare, cfg.MinSampleSize) {
+		return aggResult{NoData: true}
+	}
+
+	samples := issuereplies.Samples(export.Issues, now, cfg.CapDays)
+	if len(samples) < cfg.MinSampleSize {
+		return aggResult{NoData: true}
+	}
+
+	hours := make([]float64, 0, len(samples))
+	for _, s := range samples {
+		hours = append(hours, s.Hours)
+	}
+
+	return aggResult{Value: median(hours)}
 }
 
 // closedInWindow: resolved issues whose updated_at (a proxy for close time) falls within

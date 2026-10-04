@@ -297,9 +297,9 @@ func needsGrading(repo domain.Repo, grade domain.RepoGrade) bool {
 }
 
 // MinAnalyticsVersion is the oldest analytics schema version that counts as current: version 2
-// added the pull request review block and version 3 the finer owner map and the review
-// bottlenecks, so an older stored object is regraded.
-const MinAnalyticsVersion = 3
+// added the pull request review block, version 3 the finer owner map and the review
+// bottlenecks and version 4 the issue first-reply block, so an older stored object is regraded.
+const MinAnalyticsVersion = 4
 
 // needsRegrade is needsGrading plus the data check: a grade whose analytics row is missing, or
 // stored with an older schema version, is outdated too. Only a definite answer counts; a failed

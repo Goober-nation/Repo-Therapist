@@ -5,6 +5,7 @@ import (
 
 	"repo-therapist/grade-service/internal/config"
 	"repo-therapist/grade-service/internal/gitlog"
+	"repo-therapist/grade-service/internal/issuereplies"
 )
 
 // Issue is the subset of sourcecraft-wrapper-service's Issue data Activity's issue-rate metric
@@ -41,6 +42,9 @@ type ActivityInputs struct {
 	IssuesAvailable     bool
 	Milestones          []Milestone
 	MilestonesAvailable bool
+	// IssueReplies is the _meta/issue-replies.json sample (who commented on the newest issues and
+	// when); Available false when the file was missing, unreadable or switched off.
+	IssueReplies issuereplies.Export
 }
 
 // ComputeCategory runs every calculated metric in a category config against the given inputs and
@@ -53,6 +57,7 @@ func ComputeCategory(categoryID string, cfg config.CategoryConfig, inputs Activi
 	}
 	inputs.Commits = FilterCommits(inputs.Commits, cfg.CommitFilters, now)
 	inputs.Issues = FilterIssues(inputs.Issues, cfg.IssueFilters)
+	inputs.IssueReplies = inputs.IssueReplies.FilterInstantClose(cfg.IssueFilters.InstantCloseSeconds)
 	inputs.Milestones = FilterMilestones(inputs.Milestones, inputs.Issues, inputs.IssuesAvailable, cfg.IssueFilters)
 
 	results := make([]MetricResult, 0, len(cfg.Metrics))
@@ -71,13 +76,19 @@ func computeMetric(m config.MetricConfig, inputs ActivityInputs, now time.Time) 
 		return base
 	}
 
-	events, available := eventsForSource(m.Source, inputs)
-	if !available {
-		base.NoData = true
-		return base
-	}
+	var agg aggResult
+	if m.Aggregation.Type == "median_first_reply_hours" {
+		// Reads the issue-replies sample directly: its unit is the issue, not a dated event.
+		agg = medianFirstReplyHours(m.Aggregation, inputs.IssueReplies, now)
+	} else {
+		events, available := eventsForSource(m.Source, inputs)
+		if !available {
+			base.NoData = true
+			return base
+		}
 
-	agg := aggregate(m.Aggregation, events, now)
+		agg = aggregate(m.Aggregation, events, now)
+	}
 	if agg.NoData {
 		base.NoData = true
 		return base
