@@ -887,9 +887,9 @@ test("new and renamed categories reach both the overview and downloaded report",
 
   const report = buildReport(repository)
 
-  assert.match(report, /Мяу: 72\/100/)
+  assert.match(report, /Мяу \| 72\/100/)
 
-  assert.match(report, /Architecture v2: 93\/100/)
+  assert.match(report, /Architecture v2 \| 93\/100/)
 
   assert.doesNotMatch(report, /undefined|Безопасность:/)
 })
@@ -1113,7 +1113,7 @@ test("zero is a valid score; null, invalid types and out-of-range numbers are un
   assert.match(
     buildReport({ ...baseline, categoryScores: categories }),
 
-    /absent: Нет данных/,
+    /absent \| Нет данных/,
   )
 })
 

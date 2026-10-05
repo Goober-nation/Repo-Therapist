@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { downloadReport } from "../reports/downloadReport"
+import { downloadReport, type ReportExtras } from "../reports/downloadReport"
 import type { AiReport, Recommendation, RepositorySummary } from "../types"
 import { Button } from "./Shell"
 
@@ -7,12 +7,15 @@ interface ReportDownloadMenuProps {
   repository: RepositorySummary
   recommendations: Recommendation[]
   ai?: AiReport
+  /** Analytics, place and history to include when they are loaded. */
+  extras?: ReportExtras
 }
 
 export default function ReportDownloadMenu({
   repository,
   recommendations,
   ai,
+  extras,
 }: ReportDownloadMenuProps) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -46,7 +49,7 @@ export default function ReportDownloadMenu({
     setBusy(true)
     try {
       const { downloadPdfReport } = await import("../reports/pdfReport")
-      await downloadPdfReport(repository, recommendations, ai)
+      await downloadPdfReport(repository, recommendations, ai, extras)
     } catch (cause) {
       console.error("PDF report download failed", cause)
       setError("Не удалось скачать PDF. Попробуйте ещё раз.")
@@ -74,7 +77,7 @@ export default function ReportDownloadMenu({
             onClick={() => {
               setOpen(false)
               setError("")
-              downloadReport(repository, recommendations, ai)
+              downloadReport(repository, recommendations, ai, extras)
             }}
           >
             Скачать MD

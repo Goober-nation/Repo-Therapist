@@ -121,6 +121,7 @@ const METRICS: Record<string, { label: string; percent?: boolean }> = {
   median_closure_days: { label: "Медиана закрытия issue, дней" },
   growth_ratio: { label: "Открыто issues на одно закрытое" },
   share_resolved: { label: "Доля решённых issues", percent: true },
+  median_first_reply_hours: { label: "Медиана до первого ответа на issue, часов" },
   has_ci: { label: "CI настроен (1 — да)" },
   ci_success_rate: { label: "Успешных прогонов CI", percent: true },
   ci_stability_trend: { label: "Тренд стабильности CI" },
@@ -131,6 +132,14 @@ const METRICS: Record<string, { label: string; percent?: boolean }> = {
   open_medium: { label: "Открытых medium-уязвимостей" },
   open_low: { label: "Открытых low-уязвимостей" },
   days_since_last_scan: { label: "Дней с последнего скана AppSec" },
+  required_files: { label: "Обязательные файлы" },
+  purpose: { label: "Назначение проекта" },
+  local_run: { label: "Локальный запуск" },
+  build: { label: "Сборка" },
+  usage: { label: "Использование и примеры" },
+  structure: { label: "Структура проекта" },
+  testing: { label: "Тесты" },
+  consistency: { label: "Согласованность документов" },
 }
 
 export function metricLabel(id: string): string {

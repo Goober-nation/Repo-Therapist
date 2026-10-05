@@ -135,7 +135,12 @@ export default function RepositoryOverviewPage({
             <Button variant="quiet" onClick={onBackToRanking}>
               К рейтингу
             </Button>
-            <ReportDownloadMenu repository={repository} recommendations={recommendations} ai={ai} />
+            <ReportDownloadMenu
+              repository={repository}
+              recommendations={recommendations}
+              ai={ai}
+              extras={{ analytics, position: rankingInfo?.position, history: rankingInfo?.history }}
+            />
             <Button
               variant="primary"
               onClick={analysis.run}

@@ -306,3 +306,16 @@ docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "sele
 `llm-service` — `Documentation mode: algorithmic`. После пересчёта репозитория оценка документации
 идёт с `method: "algorithmic"`, на карточке — «Упрощённая оценка: проверено только наличие разделов».
 Вернуть модель: `LLM_DOCS_MODE=auto` в `.env` и `docker compose up -d llm-service`.
+
+## Выгрузка отчёта (Markdown / PDF)
+
+Описание: [grading/frontend-results.md](grading/frontend-results.md). Тесты: `cd frontend && npm test`
+(`tests/reports.test.js`: структура Markdown, экранирование, пустые данные, сборка PDF с эмодзи,
+длинными текстами и 40 рекомендациями).
+
+Проверка глазами: откройте `/repo/<орг>/<репо>` (публичный) и приватный репозиторий через `/my`, нажмите
+«Скачать отчёт» → «Скачать MD» и «Скачать PDF». Для PDF-файла удобно `pdftoppm -r 80 -png файл.pdf страница`
+и просмотр картинок. Проверьте: пустой репозиторий без оценки; репозиторий без истории и аналитики;
+низкая достоверность; документация с пометкой «Упрощённая оценка»; очень длинные названия и рекомендации.
+Приватный анализ на аккаунте с многими репозиториями требует увеличенных `AGGREGATOR_GRPC_TIMEOUT`,
+`GRPC_TIMEOUT` и `HTTP_WRITE_TIMEOUT` (см. README, «Ограничения»).
