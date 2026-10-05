@@ -15,13 +15,15 @@ const vite = await createServer({
 
 after(() => vite.close())
 
-const { repositoryFromRanking, historyFromResponse, positionFromResponse } = await vite.ssrLoadModule("/src/api/mapper.ts")
+const { repositoryFromRanking, historyFromResponse, positionFromResponse, regradeFromResponse } = await vite.ssrLoadModule("/src/api/mapper.ts")
 const { parseRoute, routePath } = await vite.ssrLoadModule("/src/route.ts")
 const { default: HistoryChart } = await vite.ssrLoadModule("/src/components/HistoryChart.tsx")
 const { default: ScoreHistorySection } = await vite.ssrLoadModule("/src/components/ScoreHistorySection.tsx")
 const { default: PositionCard, pointsLabel } = await vite.ssrLoadModule("/src/components/PositionCard.tsx")
 const { default: ComparePage, parseRepoInput } = await vite.ssrLoadModule("/src/pages/ComparePage.tsx")
-const { default: RankingPage, DEFAULT_RANKING_QUERY, rankingFilters, hasActiveFilters } = await vite.ssrLoadModule("/src/pages/RankingPage.tsx")
+const { default: RankingPage, DEFAULT_RANKING_QUERY, rankingFilters, hasActiveFilters, activeFilterCount } = await vite.ssrLoadModule("/src/pages/RankingPage.tsx")
+const { default: RegradeNotice } = await vite.ssrLoadModule("/src/components/RegradeNotice.tsx")
+const { formatCountdown } = await vite.ssrLoadModule("/src/metrics.ts")
 const { HttpRepoHealthApi } = await vite.ssrLoadModule("/src/api/client.ts")
 
 const entry = (extra = {}) => ({
@@ -46,6 +48,14 @@ test("ranking entries carry whole-number score and place changes, anything else 
     const row = repositoryFromRanking(entry({ score_change: bad, place_change: bad }))
     assert.equal("scoreChange" in row, false, `score_change ${String(bad)} must be dropped`)
     assert.equal("placeChange" in row, false)
+  }
+})
+
+test("ranking entries carry the number of stored gradings, anything but a whole number means unknown", () => {
+  assert.equal(repositoryFromRanking(entry({ grade_count: 1 })).gradeCount, 1)
+  assert.equal(repositoryFromRanking(entry({ grade_count: 4 })).gradeCount, 4)
+  for (const bad of [null, undefined, "2", 1.5]) {
+    assert.equal("gradeCount" in repositoryFromRanking(entry({ grade_count: bad })), false, String(bad))
   }
 })
 
@@ -236,8 +246,9 @@ test("the ranking shows place and score changes, the new tag, and the compare ba
     repositories: [
       repo("up", { place: 1, placeChange: 3, scoreChange: 4 }),
       repo("down", { place: 2, placeChange: -2, scoreChange: -5 }),
-      repo("fresh", { place: 3 }),
-      repo("flat", { place: 4, placeChange: 0, scoreChange: 0 }),
+      repo("fresh", { place: 3, gradeCount: 1 }),
+      repo("flat", { place: 4, placeChange: 0, scoreChange: 0, gradeCount: 5 }),
+      repo("settling", { place: 5, gradeCount: 3 }),
     ],
     onSelectRepository: noop,
     dynamicsDays: 7,
@@ -248,20 +259,112 @@ test("the ranking shows place and score changes, the new tag, and the compare ba
   assert.match(html, /▼2/)
   assert.match(html, /\+4/)
   assert.match(html, /−5/)
-  assert.match(html, /новый/)
+  assert.equal(html.match(/>новый</g)?.length, 1, "only the repository with a single grading is new")
   assert.match(html, /за 7 дн\./)
-  assert.doesNotMatch(html, /compare-bar/, "no bar until a repository is ticked")
+  assert.doesNotMatch(html, /Сравнить →/, "no compare button until two repositories are ticked")
+  assert.doesNotMatch(html, /ranking-note--compare/, "no selection note until a repository is ticked")
 
   const one = renderToStaticMarkup(createElement(RankingPage, { ...props, compareSelection: [props.repositories[0]] }))
-  assert.match(one, /выберите ещё один репозиторий/)
-  assert.match(one, /<button[^>]*disabled[^>]*>Сравнить<\/button>/, "compare needs exactly two")
+  assert.match(one, /отметьте второй репозиторий/)
+  assert.doesNotMatch(one, /Сравнить →/, "compare needs exactly two")
 
   const two = renderToStaticMarkup(createElement(RankingPage, { ...props, compareSelection: [props.repositories[0], props.repositories[1]] }))
-  assert.doesNotMatch(two, /<button[^>]*disabled[^>]*>Сравнить<\/button>/)
+  assert.equal(two.match(/Сравнить →/g)?.length, 1, "one compare button")
+  const rows = two.split('role="row"').slice(1)
+  const withButton = rows.filter((row) => row.includes("Сравнить →"))
+  assert.equal(withButton.length, 1)
+  assert.match(withButton[0], /aria-label="Открыть анализ o\/down"/, "the button sits in the row of the second ticked repository")
   assert.match(two, /type="checkbox"[^>]*disabled/, "a third repository cannot be ticked")
 
   const without = renderToStaticMarkup(createElement(RankingPage, { ...props, dynamicsDays: undefined }))
-  assert.doesNotMatch(without, /новый/, "no 'new' tag when the backend sent no window")
+  assert.doesNotMatch(without, />новый</, "no 'new' tag when the backend sent no window")
+
+  const unknown = renderToStaticMarkup(createElement(RankingPage, { ...props, repositories: [repo("old", { place: 1 })] }))
+  assert.doesNotMatch(unknown, />новый</, "an unknown number of gradings is not shown as new")
+})
+
+test("the filters hide behind a button that counts them, and the change legend behind an info button", () => {
+  const noop = () => {}
+  const closed = renderToStaticMarkup(createElement(RankingPage, { repositories: [], onSelectRepository: noop, dynamicsDays: 7 }))
+  assert.match(closed, /aria-expanded="false"[^>]*aria-controls="ranking-filters"/)
+  assert.match(closed, /id="ranking-filters" hidden=""/, "the panel starts closed")
+  assert.match(closed, /id="ranking-dynamics-info" hidden=""/, "the legend starts closed")
+  assert.match(closed, /aria-label="Что значат стрелки/)
+  assert.doesNotMatch(closed, /filters-toggle__count/, "no counter without filters")
+
+  const noLegend = renderToStaticMarkup(createElement(RankingPage, { repositories: [], onSelectRepository: noop }))
+  assert.doesNotMatch(noLegend, /info-button/, "no info button while the backend sent no window")
+
+  const on = renderToStaticMarkup(createElement(RankingPage, { repositories: [], onSelectRepository: noop, query: { ...DEFAULT_RANKING_QUERY, language: "Go", ci: "yes", topic: " " } }))
+  assert.match(on, /filters-toggle__count">2</, "language and CI count, a blank topic does not")
+
+  assert.equal(activeFilterCount(DEFAULT_RANKING_QUERY), 0)
+  assert.equal(activeFilterCount(DEFAULT_RANKING_QUERY, 60), 1, "the page Score minimum counts")
+  assert.equal(activeFilterCount({ ...DEFAULT_RANKING_QUERY, hideLowConfidence: true, size: "large", security: "no", topic: "x" }), 4)
+})
+
+test("the countdown to the regrade is in hours and minutes and ends at zero", () => {
+  const minute = 60_000
+  assert.equal(formatCountdown(0), null)
+  assert.equal(formatCountdown(-5), null)
+  assert.equal(formatCountdown(20_000), "1 мин", "a started minute counts")
+  assert.equal(formatCountdown(59 * minute), "59 мин")
+  assert.equal(formatCountdown(60 * minute), "1 ч")
+  assert.equal(formatCountdown(47 * 60 * minute + 12 * minute), "47 ч 12 мин")
+  assert.equal(formatCountdown(72 * 60 * minute), "72 ч")
+})
+
+test("the regrade status maps to the page model and rejects bad data", () => {
+  const next = "2026-10-08T12:00:00Z"
+  assert.deepEqual(regradeFromResponse({ enabled: true, interval_seconds: 259200, next_run_at: next, running: false, started_at: null, last_finished_at: null, total: 0, done: 0 }), {
+    enabled: true, nextRunAt: next, running: false, total: 0, done: 0,
+  })
+  const off = regradeFromResponse({ enabled: false, interval_seconds: 0, next_run_at: next, running: false, started_at: null, last_finished_at: null, total: 0, done: 0 })
+  assert.equal("nextRunAt" in off, false, "an off schedule has no next run")
+  const running = regradeFromResponse({ enabled: true, interval_seconds: 1, next_run_at: "nope", running: true, started_at: null, last_finished_at: null, total: 20, done: 4 })
+  assert.deepEqual(running, { enabled: true, running: true, total: 20, done: 4 })
+  assert.equal(regradeFromResponse(undefined), undefined)
+  assert.equal(regradeFromResponse({ enabled: "yes" }), undefined)
+})
+
+test("the regrade notice shows the countdown, progress, or that the schedule is off", () => {
+  const now = Date.parse("2026-10-05T10:00:00Z")
+  const render = (status) => renderToStaticMarkup(createElement(RegradeNotice, { status, now }))
+
+  assert.equal(render(undefined), "", "nothing while the status is unknown")
+
+  const waiting = render({ enabled: true, nextRunAt: "2026-10-07T09:12:00Z", running: false, total: 0, done: 0 })
+  assert.match(waiting, /До плановой переоценки публичных репозиториев: 47 ч 12 мин/)
+
+  assert.match(render({ enabled: true, nextRunAt: "2026-10-05T09:59:00Z", running: false, total: 0, done: 0 }), /вот-вот начнётся/)
+
+  const going = render({ enabled: true, nextRunAt: "2026-10-08T10:00:00Z", running: true, total: 20, done: 4 })
+  assert.match(going, /Идёт плановая переоценка[^<]*: 4 из 20/)
+  assert.doesNotMatch(going, /До плановой/, "progress replaces the countdown")
+  assert.match(render({ enabled: true, running: true, total: 0, done: 0 }), /Идёт плановая переоценка публичных репозиториев…/)
+
+  assert.match(render({ enabled: false, running: false, total: 0, done: 0 }), /Плановая переоценка выключена/)
+})
+
+test("the ranking page carries the regrade notice", () => {
+  const html = renderToStaticMarkup(createElement(RankingPage, {
+    repositories: [],
+    onSelectRepository: () => {},
+    regradeStatus: { enabled: false, running: false, total: 0, done: 0 },
+  }))
+  assert.match(html, /Плановая переоценка выключена/)
+})
+
+test("the regrade status is requested from /regrade-status", async () => {
+  const urls = []
+  const api = new HttpRepoHealthApi({
+    fetcher: async (url) => {
+      urls.push(url)
+      return Response.json({ enabled: false })
+    },
+  })
+  await api.getRegradeStatus()
+  assert.deepEqual(urls, ["/api/regrade-status"])
 })
 
 test("the ranking request carries only the fact filters that are set", async () => {

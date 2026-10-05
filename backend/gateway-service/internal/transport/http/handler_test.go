@@ -35,6 +35,7 @@ type fakeService struct {
 	analyticsOut domain.RepoAnalytics
 	analyticsFor string
 
+	regradeOut     domain.RegradeStatus
 	historyOut     []domain.HistoryPoint
 	explanationOut domain.PositionExplanation
 	rankFor        string
@@ -47,6 +48,11 @@ type fakeService struct {
 func (f *fakeService) GetScoreHistory(ctx context.Context, clientIP, orgSlug, repoSlug string) ([]domain.HistoryPoint, error) {
 	f.called, f.scoreIP, f.rankFor = true, clientIP, orgSlug+"/"+repoSlug
 	return f.historyOut, f.err
+}
+
+func (f *fakeService) GetRegradeStatus(ctx context.Context, clientIP string) (domain.RegradeStatus, error) {
+	f.called, f.scoreIP = true, clientIP
+	return f.regradeOut, f.err
 }
 
 func (f *fakeService) GetPositionExplanation(ctx context.Context, clientIP, orgSlug, repoSlug string) (domain.PositionExplanation, error) {

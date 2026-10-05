@@ -83,6 +83,11 @@ type GatewayService interface {
 		repoSlug string,
 	) ([]domain.HistoryPoint, error)
 
+	GetRegradeStatus(
+		ctx context.Context,
+		clientIP string,
+	) (domain.RegradeStatus, error)
+
 	GetPositionExplanation(
 		ctx context.Context,
 		clientIP string,
@@ -143,6 +148,7 @@ func (h *Handler) Register(mux *stdhttp.ServeMux) {
 	mux.HandleFunc("GET /score/{org}/{repo}", h.GetScore)
 	mux.HandleFunc("GET /history/{org}/{repo}", h.GetHistory)
 	mux.HandleFunc("GET /position/{org}/{repo}", h.GetPosition)
+	mux.HandleFunc("GET /regrade-status", h.GetRegradeStatus)
 }
 
 func (h *Handler) LoginWithYandex(
@@ -612,6 +618,8 @@ type rankingEntryResponse struct {
 	// PlaceChange is also null unless the list is sorted by score. Positive PlaceChange = moved up.
 	ScoreChange *int32 `json:"score_change"`
 	PlaceChange *int32 `json:"place_change"`
+	// GradeCount is the number of stored public gradings; a repo is "new" while it is at most one.
+	GradeCount int32 `json:"grade_count"`
 }
 
 type confidenceReasonResponse struct {
@@ -772,6 +780,7 @@ func mapRankingEntryResponse(
 
 	result.LowConfidence, result.ConfidenceReasons = mapConfidenceResponse(entry.Confidence)
 	result.ScoreChange, result.PlaceChange = entry.ScoreChange, entry.PlaceChange
+	result.GradeCount = entry.GradeCount
 
 	return result
 }

@@ -22,10 +22,11 @@ type allowAll struct{}
 func (allowAll) Allow(ctx context.Context, key string) (bool, error) { return true, nil }
 
 type fakeAggregator struct {
-	err    error
-	grade  *agg.RepoGrade
-	calls  int
-	authMD []string
+	regrade *agg.GetRegradeStatusResponse
+	err     error
+	grade   *agg.RepoGrade
+	calls   int
+	authMD  []string
 
 	myOrgs     *agg.GetMyOrgsResponse
 	orgRepos   *agg.GetOrgReposResponse
@@ -71,6 +72,14 @@ func (f *fakeAggregator) GetGrading(ctx context.Context, in *agg.GetGradingReque
 func (f *fakeAggregator) GetAnalytics(ctx context.Context, in *agg.GetAnalyticsRequest, opts ...grpc.CallOption) (*agg.GetAnalyticsResponse, error) {
 	f.record(ctx)
 	return &agg.GetAnalyticsResponse{}, f.err
+}
+
+func (f *fakeAggregator) GetRegradeStatus(ctx context.Context, in *agg.GetRegradeStatusRequest, opts ...grpc.CallOption) (*agg.GetRegradeStatusResponse, error) {
+	f.record(ctx)
+	if f.regrade == nil {
+		return &agg.GetRegradeStatusResponse{}, f.err
+	}
+	return f.regrade, f.err
 }
 
 func (f *fakeAggregator) RequestLLMRecommendations(ctx context.Context, in *agg.RequestLLMRecommendationsRequest, opts ...grpc.CallOption) (*agg.RequestLLMRecommendationsResponse, error) {

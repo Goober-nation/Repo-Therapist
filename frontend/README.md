@@ -37,7 +37,7 @@ corepack pnpm run build
 
 | Путь | Страница |
 |---|---|
-| `/` | публичный рейтинг (фильтр по языку, сортировка, переключатель «Скрыть оценки с низкой достоверностью», изменение места и Score за неделю, фильтры по размеру, CI, SECURITY.md и тематике, выбор двух репозиториев для сравнения) |
+| `/` | публичный рейтинг (сортировка, кнопка «Фильтры» с языком, размером, CI, SECURITY.md, тематикой и переключателем «Скрыть оценки с низкой достоверностью», изменение места и Score за неделю со значком «i», таймер плановой переоценки, галочки в последнем столбце и кнопка «Сравнить →» у второго выбранного) |
 | `/repo/:org/:repo` | публичный анализ: оценка, категории, рекомендации, «Почему это место», история оценки, углублённая аналитика, бейджи и виджет |
 | `/my` | репозитории владельца токена |
 | `/my/:org/:repo` | приватный анализ с токеном владельца |
@@ -47,7 +47,7 @@ corepack pnpm run build
 ## Структура
 
 - `src/api/contracts.ts` — DTO ответов Gateway;
-- `src/api/client.ts` — HTTP-клиент маршрутов Gateway (`/grading`, `/recommendations`, `/analytics`, `/ranking`, `/history`, `/position`, `/score`, `/repos`, `/auth/yandex`);
+- `src/api/client.ts` — HTTP-клиент маршрутов Gateway (`/grading`, `/recommendations`, `/analytics`, `/ranking`, `/history`, `/position`, `/score`, `/regrade-status`, `/repos`, `/auth/yandex`);
 - `src/api/mapper.ts` — преобразование DTO в модель UI;
 - `src/api/yandexAuth.ts`, `src/components/YandexSignIn.tsx` — вход через Яндекс ID;
 - `src/useRepositoryAnalysis.ts` — запуск и опрос анализа;

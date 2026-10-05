@@ -18,6 +18,7 @@ import Sidebar from "./components/Sidebar"
 import TopBar from "./components/TopBar"
 import CompareRoute from "./pages/CompareRoute"
 import MyRepositoriesPage from "./pages/MyRepositoriesPage"
+import { useRegradeStatus } from "./useRegradeStatus"
 import RankingPage, { DEFAULT_RANKING_QUERY, rankingFilters, type RankingQuery } from "./pages/RankingPage"
 import RepositoryOverviewPage from "./pages/RepositoryOverviewPage"
 import RulesPage from "./pages/RulesPage"
@@ -84,6 +85,7 @@ export default function App() {
   const [positionByRepo, setPositionByRepo] = useState<Record<string, PositionExplanation | null>>({})
   // Repositories ticked in the ranking for comparison (at most two).
   const [compareSelection, setCompareSelection] = useState<RepositorySummary[]>([])
+  const regradeStatus = useRegradeStatus(api, route.page === "ranking")
   const [rankingAttempt, setRankingAttempt] = useState(0)
   const [ranking, setRanking] = useState<RepositoryList & { total: number; loadedKey?: string; dynamicsDays?: number }>({
     items: [],
@@ -426,6 +428,7 @@ export default function App() {
                 isLoading={ranking.isLoading}
                 error={ranking.error}
                 dynamicsDays={ranking.dynamicsDays}
+                regradeStatus={regradeStatus}
                 compareSelection={compareSelection}
                 onToggleCompare={toggleCompare}
                 onCompare={openCompare}

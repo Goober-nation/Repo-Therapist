@@ -631,6 +631,7 @@ rpc GetReccomendations(GetReccomendationsRequest) returns (GetReccomendationsRes
 | `GET /widget/{org}/{repo}.svg` | — | SVG-карточка для README: оценка, уровень здоровья и четыре публичные категории (`image/svg+xml`, `Cache-Control: max-age=300`); без данных — серая карточка «Нет данных» |
 | `GET /score/{org}/{repo}` | — | публичный JSON API: `{org, repo, name, web_url, status, score, level, categories: [{id, score, no_data}], missing_data, graded_at}`; только чтение |
 | `GET /history/{org}/{repo}` | — | история публичных оценок: `{org, repo, status, points: [{graded_at, score, categories: [{id, score, no_data}], low_confidence}]}`, от старых к новым, последние 200 точек; `NO_DATA` без истории, `404` для неизвестного или непубличного репозитория |
+| `GET /regrade-status` | — | плановая переоценка публичных репозиториев: `{enabled, interval_seconds, next_run_at, running, started_at, last_finished_at, total, done}`; `next_run_at` — `null`, если расписание выключено (`GRADING_REGRADE_INTERVAL` не положителен или нет `SERVICE_TOKEN`); `total`/`done` — прогресс текущего пересчёта; не кэшируется |
 | `GET /position/{org}/{repo}` | — | почему такое место: `{org, repo, status, place, total, score, above, below, categories: [{id, score, top10_median, gap}], weakest_category}`; `above`/`below` — `{place, org, name, score, points}` или `null` на краях; `NO_DATA`, если репозиторий не оценён |
 
 `GET /ranking` принимает фильтры `size=small|medium|large` (по числу строк кода), `ci=true|false`
@@ -645,13 +646,14 @@ rpc GetReccomendations(GetReccomendationsRequest) returns (GetReccomendationsRes
 
 Каждая запись `/ranking` содержит `score_change` (Score сейчас минус Score `dynamics_days` дней назад)
 и `place_change` (на сколько мест поднялся, отрицательное — опустился); `dynamics_days` — поле ответа
-(`RANKING_DYNAMICS_DAYS`, по умолчанию 7). Оба `null`, если репозиторий не был оценён тогда
-(«новый»); `place_change` также `null`, если сортировка не по Score. Методика и ограничения —
+(`RANKING_DYNAMICS_DAYS`, по умолчанию 7). Оба `null`, если у репозитория нет оценки недельной
+давности; `place_change` также `null`, если сортировка не по Score. `grade_count` — сколько публичных
+оценок репозитория хранится в истории: метку «новый» фронтенд ставит, только когда оно не больше 1. Методика и ограничения —
 [ranking.md](ranking.md).
 
-Публичные маршруты `/ranking`, `/score`, `/history`, `/position`, `/badge` и `/widget` отдают `Access-Control-Allow-Origin: *`,
+Публичные маршруты `/ranking`, `/score`, `/history`, `/position`, `/regrade-status`, `/badge` и `/widget` отдают `Access-Control-Allow-Origin: *`,
 остальные — нет. Картинки и shields-JSON не ограничиваются по IP: `429` сломал бы изображение в
-README. `GET /score/...`, `GET /history/...` и `GET /position/...` ограничены отдельно, `PUBLIC_API_RATE_LIMIT` запросов на IP за
+README. `GET /score/...`, `GET /history/...`, `GET /position/...` и `GET /regrade-status` ограничены отдельно, `PUBLIC_API_RATE_LIMIT` запросов на IP за
 `PUBLIC_API_RATE_LIMIT_WINDOW` (по умолчанию 300 в минуту, свой ключ в Redis; в docker-compose те же
 переменные); при превышении — `429 {"error":"rate limit exceeded"}`.
 

@@ -272,7 +272,8 @@ go run ./backend/grade-service/cmd/grade-service --repo-id=01a0dd5d-d258-7af2-9b
 ```bash
 curl -s "localhost:8081/api/history/<org>/<repo>"     # points от старых к новым; NO_DATA без истории
 curl -s "localhost:8081/api/position/<org>/<repo>"    # place, total, above/below, categories, weakest_category
-curl -s "localhost:8081/api/ranking?page_size=5"      # score_change, place_change, dynamics_days
+curl -s "localhost:8081/api/ranking?page_size=5"      # score_change, place_change, grade_count, dynamics_days
+curl -s localhost:8081/api/regrade-status              # enabled, next_run_at, running, total/done
 docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select count(*) from repo_grade_history"
 (cd backend/rating-service && POSTGRES_DSN="$POSTGRES_DSN" go test ./... -v)    # включая SQL динамики на реальном Postgres
 (cd backend/aggregator-service && POSTGRES_DSN="$POSTGRES_DSN" go test ./internal/database/... -v)
@@ -293,6 +294,15 @@ docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "sele
 Динамика появляется, когда у репозитория есть оценка старше `RANKING_DYNAMICS_DAYS` дней. Для
 локальной проверки интерфейса можно вручную добавить в `repo_grade_history` строки со старыми
 `graded_at` (только в локальной базе) и удалить их после проверки. В браузере: `/` (стрелки и ±Score
-у строк, галочки «Сравнить» у двух репозиториев и кнопка «Сравнить»), `/compare/<орг>/<репо>/<орг>/<репо>`
+у строк; метка «новый» только у репозиториев с одной оценкой; кнопка «Фильтры» со счётчиком и значок «i»;
+строка с таймером переоценки под заголовком; галочки в последнем столбце — у второго отмеченного
+репозитория появляется кнопка «Сравнить →»), `/compare/<орг>/<репо>/<орг>/<репо>`
 и `/repo/<орг>/<репо>` (карточки «Почему это место» и «История оценки»), в том числе в ширине 375 px.
 
+
+## Документация без модели
+
+`docker compose exec llm-service printenv LLM_DOCS_MODE` должен вернуть `algorithmic`; в логе
+`llm-service` — `Documentation mode: algorithmic`. После пересчёта репозитория оценка документации
+идёт с `method: "algorithmic"`, на карточке — «Упрощённая оценка: проверено только наличие разделов».
+Вернуть модель: `LLM_DOCS_MODE=auto` в `.env` и `docker compose up -d llm-service`.

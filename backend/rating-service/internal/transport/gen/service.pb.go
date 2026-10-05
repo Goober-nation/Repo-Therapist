@@ -218,7 +218,9 @@ type RankingEntry struct {
 	ScoreChange *int32 `protobuf:"varint,11,opt,name=score_change,json=scoreChange,proto3,oneof" json:"score_change,omitempty"`
 	// Places gained (positive) or lost (negative) in this list since dynamics_days ago, among the
 	// same filtered list. Only set when sorting by score and when the repo was graded back then.
-	PlaceChange   *int32 `protobuf:"varint,12,opt,name=place_change,json=placeChange,proto3,oneof" json:"place_change,omitempty"`
+	PlaceChange *int32 `protobuf:"varint,12,opt,name=place_change,json=placeChange,proto3,oneof" json:"place_change,omitempty"`
+	// How many public gradings of the repo are stored in its history.
+	GradeCount    int32 `protobuf:"varint,13,opt,name=grade_count,json=gradeCount,proto3" json:"grade_count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -333,6 +335,13 @@ func (x *RankingEntry) GetScoreChange() int32 {
 func (x *RankingEntry) GetPlaceChange() int32 {
 	if x != nil && x.PlaceChange != nil {
 		return *x.PlaceChange
+	}
+	return 0
+}
+
+func (x *RankingEntry) GetGradeCount() int32 {
+	if x != nil {
+		return x.GradeCount
 	}
 	return 0
 }
@@ -1315,7 +1324,7 @@ const file_service_proto_rawDesc = "" +
 	"\x13has_security_policy\x18\b \x01(\bH\x01R\x11hasSecurityPolicy\x88\x01\x01\x12\x14\n" +
 	"\x05topic\x18\t \x01(\tR\x05topicB\t\n" +
 	"\a_has_ciB\x16\n" +
-	"\x14_has_security_policy\"\xc8\x04\n" +
+	"\x14_has_security_policy\"\xe9\x04\n" +
 	"\fRankingEntry\x12\x14\n" +
 	"\x05place\x18\x01 \x01(\x05R\x05place\x12)\n" +
 	"\x10sourcecraft_uuid\x18\x02 \x01(\tR\x0fsourcecraftUuid\x12\x12\n" +
@@ -1329,7 +1338,9 @@ const file_service_proto_rawDesc = "" +
 	"\x12confidence_reasons\x18\n" +
 	" \x03(\v2\x18.rating.ConfidenceReasonR\x11confidenceReasons\x12&\n" +
 	"\fscore_change\x18\v \x01(\x05H\x03R\vscoreChange\x88\x01\x01\x12&\n" +
-	"\fplace_change\x18\f \x01(\x05H\x04R\vplaceChange\x88\x01\x01B\x0f\n" +
+	"\fplace_change\x18\f \x01(\x05H\x04R\vplaceChange\x88\x01\x01\x12\x1f\n" +
+	"\vgrade_count\x18\r \x01(\x05R\n" +
+	"gradeCountB\x0f\n" +
 	"\r_public_scoreB\b\n" +
 	"\x06_likesB\x11\n" +
 	"\x0f_low_confidenceB\x0f\n" +

@@ -193,3 +193,13 @@ export function signed(value: number): string {
   if (value < 0) return `\u2212${Math.abs(value)}`
   return "0"
 }
+
+/** Time left until the scheduled regrade: "47 ч 12 мин", "9 мин", or null once the time has come. */
+export function formatCountdown(milliseconds: number): string | null {
+  if (milliseconds <= 0) return null
+  const minutes = Math.ceil(milliseconds / 60000)
+  if (minutes < 60) return `${minutes} мин`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest === 0 ? `${hours} ч` : `${hours} ч ${rest} мин`
+}

@@ -85,8 +85,9 @@ func TestListRankingDynamicsAndHistoryAgainstPostgres(t *testing.T) {
 		name      string
 		pastScore *int16
 		pastPlace *int
+		grades    int
 	}
-	exp := []want{{"zz-a", i16(60), ip(3)}, {"zz-d", nil, nil}, {"zz-b", i16(85), ip(1)}, {"zz-c", i16(70), ip(2)}}
+	exp := []want{{"zz-a", i16(60), ip(3), 2}, {"zz-d", nil, nil, 0}, {"zz-b", i16(85), ip(1), 1}, {"zz-c", i16(70), ip(2), 2}}
 	if len(rows) != len(exp) {
 		t.Fatalf("rows = %d, want %d", len(rows), len(exp))
 	}
@@ -98,6 +99,9 @@ func TestListRankingDynamicsAndHistoryAgainstPostgres(t *testing.T) {
 		}
 		if (row.PastScore == nil) != (e.pastScore == nil) || (e.pastScore != nil && *row.PastScore != *e.pastScore) {
 			t.Errorf("%s past score = %v, want %v", e.name, row.PastScore, e.pastScore)
+		}
+		if row.GradeCount != e.grades {
+			t.Errorf("%s grade count = %d, want %d stored history points", e.name, row.GradeCount, e.grades)
 		}
 		if (row.PastPlace == nil) != (e.pastPlace == nil) || (e.pastPlace != nil && *row.PastPlace != *e.pastPlace) {
 			t.Errorf("%s past place = %v, want %v", e.name, row.PastPlace, e.pastPlace)

@@ -66,6 +66,21 @@ type AggregatorService struct {
 	failureMu       sync.Mutex
 	gradingFailures map[string]time.Time
 	now             func() time.Time
+
+	regradeMu    sync.Mutex
+	regradeState regradeState
+}
+
+// regradeState is what the public regrade reports about itself; guarded by regradeMu.
+type regradeState struct {
+	enabled        bool
+	interval       time.Duration
+	nextRunAt      time.Time
+	running        bool
+	startedAt      time.Time
+	lastFinishedAt time.Time
+	total          int
+	done           int
 }
 
 // llmRequest tracks one in-flight LLM request per repo view, keyed by llmKey.
@@ -562,10 +577,22 @@ func (as *AggregatorService) GetMyRepos(
 	}, nil
 }
 
-// StartPublicGrading regrades public repos once at startup and then every interval.
 // StartPublicGrading regrades public repos every interval; onStart also runs one regrade
-// immediately instead of waiting for the first tick.
+// immediately instead of waiting for the first tick. A non-positive interval, or a missing
+// service token, leaves the scheduled regrade off (GetRegradeStatus then reports it disabled).
 func (as *AggregatorService) StartPublicGrading(ctx context.Context, interval time.Duration, onStart bool) {
+	if interval <= 0 || as.Token == "" {
+		log.Println("scheduled public regrade is off (no interval or no SERVICE_TOKEN)")
+
+		return
+	}
+
+	as.regradeMu.Lock()
+	as.regradeState.enabled = true
+	as.regradeState.interval = interval
+	as.regradeState.nextRunAt = as.currentTime().Add(interval)
+	as.regradeMu.Unlock()
+
 	as.ticker = time.NewTicker(interval)
 
 	go func() {
@@ -580,17 +607,72 @@ func (as *AggregatorService) StartPublicGrading(ctx context.Context, interval ti
 			case <-ctx.Done():
 				return
 
-			case <-as.ticker.C:
+			case tick := <-as.ticker.C:
+				as.regradeMu.Lock()
+				as.regradeState.nextRunAt = tick.Add(interval)
+				as.regradeMu.Unlock()
+
 				as.runPublicRegrade(ctx)
 			}
 		}
 	}()
 }
 
+func (as *AggregatorService) currentTime() time.Time {
+	if as.now != nil {
+		return as.now()
+	}
+
+	return time.Now()
+}
+
 func (as *AggregatorService) runPublicRegrade(ctx context.Context) {
+	as.regradeMu.Lock()
+	as.regradeState.running = true
+	as.regradeState.startedAt = as.currentTime()
+	as.regradeState.total, as.regradeState.done = 0, 0
+	as.regradeMu.Unlock()
+
+	defer func() {
+		as.regradeMu.Lock()
+		as.regradeState.running = false
+		as.regradeState.lastFinishedAt = as.currentTime()
+		as.regradeMu.Unlock()
+	}()
+
 	if err := as.regradePublicRepos(ctx); err != nil {
 		log.Println("error during regrading: ", err.Error())
 	}
+}
+
+// GetRegradeStatus reports the scheduled public regrade: whether it is on, when it runs next
+// and, while it runs, how many repos it has gone through. It only reads in-memory state.
+func (as *AggregatorService) GetRegradeStatus(_ context.Context) domain.RegradeStatus {
+	as.regradeMu.Lock()
+	defer as.regradeMu.Unlock()
+
+	state := as.regradeState
+	status := domain.RegradeStatus{
+		Enabled:  state.enabled,
+		Interval: state.interval,
+		Running:  state.running,
+		Total:    state.total,
+		Done:     state.done,
+	}
+
+	if state.enabled {
+		status.NextRunAt = &state.nextRunAt
+	}
+
+	if !state.startedAt.IsZero() {
+		status.StartedAt = &state.startedAt
+	}
+
+	if !state.lastFinishedAt.IsZero() {
+		status.LastFinishedAt = &state.lastFinishedAt
+	}
+
+	return status
 }
 
 // SaveGradingResult stores a grading.results message and always releases the repo lock, so a
@@ -797,6 +879,10 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 	repos := topPublicRepos(response.GetRepos(), as.RegradeLimit)
 	failed := 0
 
+	as.regradeMu.Lock()
+	as.regradeState.total = len(repos)
+	as.regradeMu.Unlock()
+
 	for _, pbRepo := range repos {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -806,6 +892,10 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 			failed++
 			log.Printf("regrade %s/%s: %v", pbRepo.GetOrganization().GetSlug(), pbRepo.GetSlug(), err)
 		}
+
+		as.regradeMu.Lock()
+		as.regradeState.done++
+		as.regradeMu.Unlock()
 	}
 
 	if failed > 0 {

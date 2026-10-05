@@ -251,6 +251,8 @@ func entryToProto(entry domain.RankingEntry) *pb.RankingEntry {
 		result.ConfidenceReasons = reasonsToProto(entry.Confidence.Reasons)
 	}
 
+	result.GradeCount = int32(entry.GradeCount)
+
 	if entry.ScoreChange != nil {
 		change := int32(*entry.ScoreChange)
 		result.ScoreChange = &change

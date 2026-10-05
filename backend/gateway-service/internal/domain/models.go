@@ -74,6 +74,9 @@ type RankingEntry struct {
 	// PlaceChange is also nil unless the list is sorted by score.
 	ScoreChange *int32
 	PlaceChange *int32
+	// GradeCount is how many public gradings of the repo are stored; a repo is "new" while it is
+	// at most one.
+	GradeCount int32
 }
 
 // RepoAnalytics is a repo's stored informational analytics (bus factor, ownership map) and the time
@@ -99,6 +102,18 @@ type PublicSummary struct {
 	MissingData []string
 	GradedAt    *time.Time
 	Confidence  *Confidence
+}
+
+// RegradeStatus is the aggregator's scheduled public regrade. NextRunAt is nil while it is off.
+type RegradeStatus struct {
+	Enabled         bool
+	IntervalSeconds int64
+	NextRunAt       *time.Time
+	Running         bool
+	StartedAt       *time.Time
+	LastFinishedAt  *time.Time
+	Total           int32
+	Done            int32
 }
 
 // HistoryPoint is one stored public grading of a repo; a nil category Score means no data and a

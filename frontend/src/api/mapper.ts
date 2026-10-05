@@ -13,6 +13,7 @@ import type {
   PositionNeighbour,
   Priority,
   Recommendation,
+  RegradeStatus,
   RepositorySummary,
   ScorePoint,
 } from "../types"
@@ -28,6 +29,7 @@ import type {
   MyRepository,
   PositionResponse,
   RecommendationsResponse,
+  RegradeStatusResponse,
 } from "./contracts"
 
 const DAY_MS = 86_400_000
@@ -324,6 +326,7 @@ export function repositoryFromRanking(entry: GatewayRankingEntry): RepositorySum
         : {}),
       ...(wholeNumber(entry.score_change) !== undefined ? { scoreChange: wholeNumber(entry.score_change) } : {}),
       ...(wholeNumber(entry.place_change) !== undefined ? { placeChange: wholeNumber(entry.place_change) } : {}),
+      ...(wholeNumber(entry.grade_count) !== undefined ? { gradeCount: wholeNumber(entry.grade_count) } : {}),
       lastActivityDaysAgo: daysSince(entry.last_activity_at),
       categoryScores: {},
       gradeStatus: "FINISHED",
@@ -331,6 +334,20 @@ export function repositoryFromRanking(entry: GatewayRankingEntry): RepositorySum
     }
   } catch {
     return null
+  }
+}
+
+/** The scheduled regrade; a missing response or a malformed time counts as "no schedule shown". */
+export function regradeFromResponse(response: RegradeStatusResponse | undefined): RegradeStatus | undefined {
+  if (!response || typeof response.enabled !== "boolean") return undefined
+  const next = typeof response.next_run_at === "string" && !Number.isNaN(Date.parse(response.next_run_at)) ? response.next_run_at : undefined
+  const count = (value: unknown) => (typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0)
+  return {
+    enabled: response.enabled,
+    ...(response.enabled && next ? { nextRunAt: next } : {}),
+    running: response.running === true,
+    total: count(response.total),
+    done: count(response.done),
   }
 }
 

@@ -22,6 +22,144 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type GetRegradeStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRegradeStatusRequest) Reset() {
+	*x = GetRegradeStatusRequest{}
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRegradeStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRegradeStatusRequest) ProtoMessage() {}
+
+func (x *GetRegradeStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRegradeStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetRegradeStatusRequest) Descriptor() ([]byte, []int) {
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{0}
+}
+
+type GetRegradeStatusResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Enabled         bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	IntervalSeconds int64                  `protobuf:"varint,2,opt,name=interval_seconds,json=intervalSeconds,proto3" json:"interval_seconds,omitempty"`
+	// Unset while the scheduled regrade is off.
+	NextRunAt      *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=next_run_at,json=nextRunAt,proto3" json:"next_run_at,omitempty"`
+	Running        bool                   `protobuf:"varint,4,opt,name=running,proto3" json:"running,omitempty"`
+	StartedAt      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	LastFinishedAt *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_finished_at,json=lastFinishedAt,proto3" json:"last_finished_at,omitempty"`
+	// Repos of the current (or last) run; total is 0 until the list is loaded.
+	Total         int32 `protobuf:"varint,7,opt,name=total,proto3" json:"total,omitempty"`
+	Done          int32 `protobuf:"varint,8,opt,name=done,proto3" json:"done,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRegradeStatusResponse) Reset() {
+	*x = GetRegradeStatusResponse{}
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRegradeStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRegradeStatusResponse) ProtoMessage() {}
+
+func (x *GetRegradeStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRegradeStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetRegradeStatusResponse) Descriptor() ([]byte, []int) {
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *GetRegradeStatusResponse) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *GetRegradeStatusResponse) GetIntervalSeconds() int64 {
+	if x != nil {
+		return x.IntervalSeconds
+	}
+	return 0
+}
+
+func (x *GetRegradeStatusResponse) GetNextRunAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.NextRunAt
+	}
+	return nil
+}
+
+func (x *GetRegradeStatusResponse) GetRunning() bool {
+	if x != nil {
+		return x.Running
+	}
+	return false
+}
+
+func (x *GetRegradeStatusResponse) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
+func (x *GetRegradeStatusResponse) GetLastFinishedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastFinishedAt
+	}
+	return nil
+}
+
+func (x *GetRegradeStatusResponse) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+func (x *GetRegradeStatusResponse) GetDone() int32 {
+	if x != nil {
+		return x.Done
+	}
+	return 0
+}
+
 type GetMyReposRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -30,7 +168,7 @@ type GetMyReposRequest struct {
 
 func (x *GetMyReposRequest) Reset() {
 	*x = GetMyReposRequest{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[0]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -42,7 +180,7 @@ func (x *GetMyReposRequest) String() string {
 func (*GetMyReposRequest) ProtoMessage() {}
 
 func (x *GetMyReposRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[0]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -55,7 +193,7 @@ func (x *GetMyReposRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMyReposRequest.ProtoReflect.Descriptor instead.
 func (*GetMyReposRequest) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{0}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{2}
 }
 
 type GetMyReposResponse struct {
@@ -68,7 +206,7 @@ type GetMyReposResponse struct {
 
 func (x *GetMyReposResponse) Reset() {
 	*x = GetMyReposResponse{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[1]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -80,7 +218,7 @@ func (x *GetMyReposResponse) String() string {
 func (*GetMyReposResponse) ProtoMessage() {}
 
 func (x *GetMyReposResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[1]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -93,7 +231,7 @@ func (x *GetMyReposResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMyReposResponse.ProtoReflect.Descriptor instead.
 func (*GetMyReposResponse) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{1}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetMyReposResponse) GetRepositories() []*Repository {
@@ -118,7 +256,7 @@ type GetMyOrgsRequest struct {
 
 func (x *GetMyOrgsRequest) Reset() {
 	*x = GetMyOrgsRequest{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[2]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -130,7 +268,7 @@ func (x *GetMyOrgsRequest) String() string {
 func (*GetMyOrgsRequest) ProtoMessage() {}
 
 func (x *GetMyOrgsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[2]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -143,7 +281,7 @@ func (x *GetMyOrgsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMyOrgsRequest.ProtoReflect.Descriptor instead.
 func (*GetMyOrgsRequest) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{2}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{4}
 }
 
 type GetMyOrgsResponse struct {
@@ -156,7 +294,7 @@ type GetMyOrgsResponse struct {
 
 func (x *GetMyOrgsResponse) Reset() {
 	*x = GetMyOrgsResponse{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[3]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -168,7 +306,7 @@ func (x *GetMyOrgsResponse) String() string {
 func (*GetMyOrgsResponse) ProtoMessage() {}
 
 func (x *GetMyOrgsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[3]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -181,7 +319,7 @@ func (x *GetMyOrgsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMyOrgsResponse.ProtoReflect.Descriptor instead.
 func (*GetMyOrgsResponse) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{3}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetMyOrgsResponse) GetOrganizations() []*UserOrganization {
@@ -209,7 +347,7 @@ type UserOrganization struct {
 
 func (x *UserOrganization) Reset() {
 	*x = UserOrganization{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[4]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -221,7 +359,7 @@ func (x *UserOrganization) String() string {
 func (*UserOrganization) ProtoMessage() {}
 
 func (x *UserOrganization) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[4]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -234,7 +372,7 @@ func (x *UserOrganization) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserOrganization.ProtoReflect.Descriptor instead.
 func (*UserOrganization) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{4}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UserOrganization) GetSlug() string {
@@ -268,7 +406,7 @@ type GetOrgReposRequest struct {
 
 func (x *GetOrgReposRequest) Reset() {
 	*x = GetOrgReposRequest{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[5]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -280,7 +418,7 @@ func (x *GetOrgReposRequest) String() string {
 func (*GetOrgReposRequest) ProtoMessage() {}
 
 func (x *GetOrgReposRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[5]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -293,7 +431,7 @@ func (x *GetOrgReposRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOrgReposRequest.ProtoReflect.Descriptor instead.
 func (*GetOrgReposRequest) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{5}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetOrgReposRequest) GetOrgSlug() string {
@@ -320,7 +458,7 @@ type GetOrgReposResponse struct {
 
 func (x *GetOrgReposResponse) Reset() {
 	*x = GetOrgReposResponse{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[6]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -332,7 +470,7 @@ func (x *GetOrgReposResponse) String() string {
 func (*GetOrgReposResponse) ProtoMessage() {}
 
 func (x *GetOrgReposResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[6]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -345,7 +483,7 @@ func (x *GetOrgReposResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOrgReposResponse.ProtoReflect.Descriptor instead.
 func (*GetOrgReposResponse) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{6}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetOrgReposResponse) GetRepositories() []*Repository {
@@ -372,7 +510,7 @@ type GetGradingRequest struct {
 
 func (x *GetGradingRequest) Reset() {
 	*x = GetGradingRequest{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[7]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -384,7 +522,7 @@ func (x *GetGradingRequest) String() string {
 func (*GetGradingRequest) ProtoMessage() {}
 
 func (x *GetGradingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[7]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -397,7 +535,7 @@ func (x *GetGradingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGradingRequest.ProtoReflect.Descriptor instead.
 func (*GetGradingRequest) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{7}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetGradingRequest) GetOrgSlug() string {
@@ -423,7 +561,7 @@ type GetGradingResponse struct {
 
 func (x *GetGradingResponse) Reset() {
 	*x = GetGradingResponse{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[8]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -435,7 +573,7 @@ func (x *GetGradingResponse) String() string {
 func (*GetGradingResponse) ProtoMessage() {}
 
 func (x *GetGradingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[8]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -448,7 +586,7 @@ func (x *GetGradingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGradingResponse.ProtoReflect.Descriptor instead.
 func (*GetGradingResponse) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{8}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetGradingResponse) GetGrade() *RepoGrade {
@@ -468,7 +606,7 @@ type RequestLLMRecommendationsRequest struct {
 
 func (x *RequestLLMRecommendationsRequest) Reset() {
 	*x = RequestLLMRecommendationsRequest{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[9]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -480,7 +618,7 @@ func (x *RequestLLMRecommendationsRequest) String() string {
 func (*RequestLLMRecommendationsRequest) ProtoMessage() {}
 
 func (x *RequestLLMRecommendationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[9]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -493,7 +631,7 @@ func (x *RequestLLMRecommendationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestLLMRecommendationsRequest.ProtoReflect.Descriptor instead.
 func (*RequestLLMRecommendationsRequest) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{9}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RequestLLMRecommendationsRequest) GetOrgSlug() string {
@@ -521,7 +659,7 @@ type RequestLLMRecommendationsResponse struct {
 
 func (x *RequestLLMRecommendationsResponse) Reset() {
 	*x = RequestLLMRecommendationsResponse{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[10]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -533,7 +671,7 @@ func (x *RequestLLMRecommendationsResponse) String() string {
 func (*RequestLLMRecommendationsResponse) ProtoMessage() {}
 
 func (x *RequestLLMRecommendationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[10]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -546,7 +684,7 @@ func (x *RequestLLMRecommendationsResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use RequestLLMRecommendationsResponse.ProtoReflect.Descriptor instead.
 func (*RequestLLMRecommendationsResponse) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{10}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *RequestLLMRecommendationsResponse) GetRawResponse() []byte {
@@ -589,7 +727,7 @@ type Repository struct {
 
 func (x *Repository) Reset() {
 	*x = Repository{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[11]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -601,7 +739,7 @@ func (x *Repository) String() string {
 func (*Repository) ProtoMessage() {}
 
 func (x *Repository) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[11]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -614,7 +752,7 @@ func (x *Repository) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Repository.ProtoReflect.Descriptor instead.
 func (*Repository) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{11}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *Repository) GetId() string {
@@ -704,7 +842,7 @@ type Language struct {
 
 func (x *Language) Reset() {
 	*x = Language{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[12]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -716,7 +854,7 @@ func (x *Language) String() string {
 func (*Language) ProtoMessage() {}
 
 func (x *Language) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[12]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -729,7 +867,7 @@ func (x *Language) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Language.ProtoReflect.Descriptor instead.
 func (*Language) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{12}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *Language) GetName() string {
@@ -755,7 +893,7 @@ type Logo struct {
 
 func (x *Logo) Reset() {
 	*x = Logo{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[13]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -767,7 +905,7 @@ func (x *Logo) String() string {
 func (*Logo) ProtoMessage() {}
 
 func (x *Logo) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[13]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -780,7 +918,7 @@ func (x *Logo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Logo.ProtoReflect.Descriptor instead.
 func (*Logo) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{13}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Logo) GetUrl() string {
@@ -799,7 +937,7 @@ type Organization struct {
 
 func (x *Organization) Reset() {
 	*x = Organization{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[14]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -811,7 +949,7 @@ func (x *Organization) String() string {
 func (*Organization) ProtoMessage() {}
 
 func (x *Organization) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[14]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -824,7 +962,7 @@ func (x *Organization) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Organization.ProtoReflect.Descriptor instead.
 func (*Organization) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{14}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *Organization) GetSlug() string {
@@ -844,7 +982,7 @@ type ReactionCount struct {
 
 func (x *ReactionCount) Reset() {
 	*x = ReactionCount{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[15]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -856,7 +994,7 @@ func (x *ReactionCount) String() string {
 func (*ReactionCount) ProtoMessage() {}
 
 func (x *ReactionCount) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[15]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -869,7 +1007,7 @@ func (x *ReactionCount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReactionCount.ProtoReflect.Descriptor instead.
 func (*ReactionCount) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{15}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ReactionCount) GetType() string {
@@ -900,7 +1038,7 @@ type RepoGrade struct {
 
 func (x *RepoGrade) Reset() {
 	*x = RepoGrade{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[16]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -912,7 +1050,7 @@ func (x *RepoGrade) String() string {
 func (*RepoGrade) ProtoMessage() {}
 
 func (x *RepoGrade) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[16]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -925,7 +1063,7 @@ func (x *RepoGrade) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RepoGrade.ProtoReflect.Descriptor instead.
 func (*RepoGrade) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{16}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *RepoGrade) GetSourcecraftUuid() string {
@@ -980,7 +1118,7 @@ type GetAnalyticsRequest struct {
 
 func (x *GetAnalyticsRequest) Reset() {
 	*x = GetAnalyticsRequest{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[17]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -992,7 +1130,7 @@ func (x *GetAnalyticsRequest) String() string {
 func (*GetAnalyticsRequest) ProtoMessage() {}
 
 func (x *GetAnalyticsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[17]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1005,7 +1143,7 @@ func (x *GetAnalyticsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAnalyticsRequest.ProtoReflect.Descriptor instead.
 func (*GetAnalyticsRequest) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{17}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *GetAnalyticsRequest) GetOrgSlug() string {
@@ -1034,7 +1172,7 @@ type GetAnalyticsResponse struct {
 
 func (x *GetAnalyticsResponse) Reset() {
 	*x = GetAnalyticsResponse{}
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[18]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1046,7 +1184,7 @@ func (x *GetAnalyticsResponse) String() string {
 func (*GetAnalyticsResponse) ProtoMessage() {}
 
 func (x *GetAnalyticsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_transport_rpc_server_proto_msgTypes[18]
+	mi := &file_internal_transport_rpc_server_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1059,7 +1197,7 @@ func (x *GetAnalyticsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAnalyticsResponse.ProtoReflect.Descriptor instead.
 func (*GetAnalyticsResponse) Descriptor() ([]byte, []int) {
-	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{18}
+	return file_internal_transport_rpc_server_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *GetAnalyticsResponse) GetAnalytics() []byte {
@@ -1081,7 +1219,18 @@ var File_internal_transport_rpc_server_proto protoreflect.FileDescriptor
 const file_internal_transport_rpc_server_proto_rawDesc = "" +
 	"\n" +
 	"#internal/transport/rpc/server.proto\x12\n" +
-	"aggregator\x1a\x1fgoogle/protobuf/timestamp.proto\"\x13\n" +
+	"aggregator\x1a\x1fgoogle/protobuf/timestamp.proto\"\x19\n" +
+	"\x17GetRegradeStatusRequest\"\xe0\x02\n" +
+	"\x18GetRegradeStatusResponse\x12\x18\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled\x12)\n" +
+	"\x10interval_seconds\x18\x02 \x01(\x03R\x0fintervalSeconds\x12:\n" +
+	"\vnext_run_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tnextRunAt\x12\x18\n" +
+	"\arunning\x18\x04 \x01(\bR\arunning\x129\n" +
+	"\n" +
+	"started_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12D\n" +
+	"\x10last_finished_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x0elastFinishedAt\x12\x14\n" +
+	"\x05total\x18\a \x01(\x05R\x05total\x12\x12\n" +
+	"\x04done\x18\b \x01(\x05R\x04done\"\x13\n" +
 	"\x11GetMyReposRequest\"x\n" +
 	"\x12GetMyReposResponse\x12:\n" +
 	"\frepositories\x18\x01 \x03(\v2\x16.aggregator.RepositoryR\frepositories\x12&\n" +
@@ -1153,7 +1302,7 @@ const file_internal_transport_rpc_server_proto_rawDesc = "" +
 	"\trepo_slug\x18\x02 \x01(\tR\brepoSlug\"m\n" +
 	"\x14GetAnalyticsResponse\x12\x1c\n" +
 	"\tanalytics\x18\x01 \x01(\fR\tanalytics\x127\n" +
-	"\tgraded_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\bgradedAt2\x8d\x04\n" +
+	"\tgraded_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\bgradedAt2\xec\x04\n" +
 	"\n" +
 	"Aggregator\x12K\n" +
 	"\n" +
@@ -1163,7 +1312,8 @@ const file_internal_transport_rpc_server_proto_rawDesc = "" +
 	"\n" +
 	"GetGrading\x12\x1d.aggregator.GetGradingRequest\x1a\x1e.aggregator.GetGradingResponse\x12x\n" +
 	"\x19RequestLLMRecommendations\x12,.aggregator.RequestLLMRecommendationsRequest\x1a-.aggregator.RequestLLMRecommendationsResponse\x12Q\n" +
-	"\fGetAnalytics\x12\x1f.aggregator.GetAnalyticsRequest\x1a .aggregator.GetAnalyticsResponseB2Z0aggregator-service/internal/transport/rpc/gen;pbb\x06proto3"
+	"\fGetAnalytics\x12\x1f.aggregator.GetAnalyticsRequest\x1a .aggregator.GetAnalyticsResponse\x12]\n" +
+	"\x10GetRegradeStatus\x12#.aggregator.GetRegradeStatusRequest\x1a$.aggregator.GetRegradeStatusResponseB2Z0aggregator-service/internal/transport/rpc/gen;pbb\x06proto3"
 
 var (
 	file_internal_transport_rpc_server_proto_rawDescOnce sync.Once
@@ -1177,57 +1327,64 @@ func file_internal_transport_rpc_server_proto_rawDescGZIP() []byte {
 	return file_internal_transport_rpc_server_proto_rawDescData
 }
 
-var file_internal_transport_rpc_server_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_internal_transport_rpc_server_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_internal_transport_rpc_server_proto_goTypes = []any{
-	(*GetMyReposRequest)(nil),                 // 0: aggregator.GetMyReposRequest
-	(*GetMyReposResponse)(nil),                // 1: aggregator.GetMyReposResponse
-	(*GetMyOrgsRequest)(nil),                  // 2: aggregator.GetMyOrgsRequest
-	(*GetMyOrgsResponse)(nil),                 // 3: aggregator.GetMyOrgsResponse
-	(*UserOrganization)(nil),                  // 4: aggregator.UserOrganization
-	(*GetOrgReposRequest)(nil),                // 5: aggregator.GetOrgReposRequest
-	(*GetOrgReposResponse)(nil),               // 6: aggregator.GetOrgReposResponse
-	(*GetGradingRequest)(nil),                 // 7: aggregator.GetGradingRequest
-	(*GetGradingResponse)(nil),                // 8: aggregator.GetGradingResponse
-	(*RequestLLMRecommendationsRequest)(nil),  // 9: aggregator.RequestLLMRecommendationsRequest
-	(*RequestLLMRecommendationsResponse)(nil), // 10: aggregator.RequestLLMRecommendationsResponse
-	(*Repository)(nil),                        // 11: aggregator.Repository
-	(*Language)(nil),                          // 12: aggregator.Language
-	(*Logo)(nil),                              // 13: aggregator.Logo
-	(*Organization)(nil),                      // 14: aggregator.Organization
-	(*ReactionCount)(nil),                     // 15: aggregator.ReactionCount
-	(*RepoGrade)(nil),                         // 16: aggregator.RepoGrade
-	(*GetAnalyticsRequest)(nil),               // 17: aggregator.GetAnalyticsRequest
-	(*GetAnalyticsResponse)(nil),              // 18: aggregator.GetAnalyticsResponse
-	(*timestamppb.Timestamp)(nil),             // 19: google.protobuf.Timestamp
+	(*GetRegradeStatusRequest)(nil),           // 0: aggregator.GetRegradeStatusRequest
+	(*GetRegradeStatusResponse)(nil),          // 1: aggregator.GetRegradeStatusResponse
+	(*GetMyReposRequest)(nil),                 // 2: aggregator.GetMyReposRequest
+	(*GetMyReposResponse)(nil),                // 3: aggregator.GetMyReposResponse
+	(*GetMyOrgsRequest)(nil),                  // 4: aggregator.GetMyOrgsRequest
+	(*GetMyOrgsResponse)(nil),                 // 5: aggregator.GetMyOrgsResponse
+	(*UserOrganization)(nil),                  // 6: aggregator.UserOrganization
+	(*GetOrgReposRequest)(nil),                // 7: aggregator.GetOrgReposRequest
+	(*GetOrgReposResponse)(nil),               // 8: aggregator.GetOrgReposResponse
+	(*GetGradingRequest)(nil),                 // 9: aggregator.GetGradingRequest
+	(*GetGradingResponse)(nil),                // 10: aggregator.GetGradingResponse
+	(*RequestLLMRecommendationsRequest)(nil),  // 11: aggregator.RequestLLMRecommendationsRequest
+	(*RequestLLMRecommendationsResponse)(nil), // 12: aggregator.RequestLLMRecommendationsResponse
+	(*Repository)(nil),                        // 13: aggregator.Repository
+	(*Language)(nil),                          // 14: aggregator.Language
+	(*Logo)(nil),                              // 15: aggregator.Logo
+	(*Organization)(nil),                      // 16: aggregator.Organization
+	(*ReactionCount)(nil),                     // 17: aggregator.ReactionCount
+	(*RepoGrade)(nil),                         // 18: aggregator.RepoGrade
+	(*GetAnalyticsRequest)(nil),               // 19: aggregator.GetAnalyticsRequest
+	(*GetAnalyticsResponse)(nil),              // 20: aggregator.GetAnalyticsResponse
+	(*timestamppb.Timestamp)(nil),             // 21: google.protobuf.Timestamp
 }
 var file_internal_transport_rpc_server_proto_depIdxs = []int32{
-	11, // 0: aggregator.GetMyReposResponse.repositories:type_name -> aggregator.Repository
-	4,  // 1: aggregator.GetMyOrgsResponse.organizations:type_name -> aggregator.UserOrganization
-	11, // 2: aggregator.GetOrgReposResponse.repositories:type_name -> aggregator.Repository
-	16, // 3: aggregator.GetGradingResponse.grade:type_name -> aggregator.RepoGrade
-	19, // 4: aggregator.RequestLLMRecommendationsResponse.evaluated_at:type_name -> google.protobuf.Timestamp
-	14, // 5: aggregator.Repository.organization:type_name -> aggregator.Organization
-	13, // 6: aggregator.Repository.logo:type_name -> aggregator.Logo
-	12, // 7: aggregator.Repository.language:type_name -> aggregator.Language
-	19, // 8: aggregator.RepoGrade.graded_at:type_name -> google.protobuf.Timestamp
-	19, // 9: aggregator.GetAnalyticsResponse.graded_at:type_name -> google.protobuf.Timestamp
-	0,  // 10: aggregator.Aggregator.GetMyRepos:input_type -> aggregator.GetMyReposRequest
-	2,  // 11: aggregator.Aggregator.GetMyOrgs:input_type -> aggregator.GetMyOrgsRequest
-	5,  // 12: aggregator.Aggregator.GetOrgRepos:input_type -> aggregator.GetOrgReposRequest
-	7,  // 13: aggregator.Aggregator.GetGrading:input_type -> aggregator.GetGradingRequest
-	9,  // 14: aggregator.Aggregator.RequestLLMRecommendations:input_type -> aggregator.RequestLLMRecommendationsRequest
-	17, // 15: aggregator.Aggregator.GetAnalytics:input_type -> aggregator.GetAnalyticsRequest
-	1,  // 16: aggregator.Aggregator.GetMyRepos:output_type -> aggregator.GetMyReposResponse
-	3,  // 17: aggregator.Aggregator.GetMyOrgs:output_type -> aggregator.GetMyOrgsResponse
-	6,  // 18: aggregator.Aggregator.GetOrgRepos:output_type -> aggregator.GetOrgReposResponse
-	8,  // 19: aggregator.Aggregator.GetGrading:output_type -> aggregator.GetGradingResponse
-	10, // 20: aggregator.Aggregator.RequestLLMRecommendations:output_type -> aggregator.RequestLLMRecommendationsResponse
-	18, // 21: aggregator.Aggregator.GetAnalytics:output_type -> aggregator.GetAnalyticsResponse
-	16, // [16:22] is the sub-list for method output_type
-	10, // [10:16] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	21, // 0: aggregator.GetRegradeStatusResponse.next_run_at:type_name -> google.protobuf.Timestamp
+	21, // 1: aggregator.GetRegradeStatusResponse.started_at:type_name -> google.protobuf.Timestamp
+	21, // 2: aggregator.GetRegradeStatusResponse.last_finished_at:type_name -> google.protobuf.Timestamp
+	13, // 3: aggregator.GetMyReposResponse.repositories:type_name -> aggregator.Repository
+	6,  // 4: aggregator.GetMyOrgsResponse.organizations:type_name -> aggregator.UserOrganization
+	13, // 5: aggregator.GetOrgReposResponse.repositories:type_name -> aggregator.Repository
+	18, // 6: aggregator.GetGradingResponse.grade:type_name -> aggregator.RepoGrade
+	21, // 7: aggregator.RequestLLMRecommendationsResponse.evaluated_at:type_name -> google.protobuf.Timestamp
+	16, // 8: aggregator.Repository.organization:type_name -> aggregator.Organization
+	15, // 9: aggregator.Repository.logo:type_name -> aggregator.Logo
+	14, // 10: aggregator.Repository.language:type_name -> aggregator.Language
+	21, // 11: aggregator.RepoGrade.graded_at:type_name -> google.protobuf.Timestamp
+	21, // 12: aggregator.GetAnalyticsResponse.graded_at:type_name -> google.protobuf.Timestamp
+	2,  // 13: aggregator.Aggregator.GetMyRepos:input_type -> aggregator.GetMyReposRequest
+	4,  // 14: aggregator.Aggregator.GetMyOrgs:input_type -> aggregator.GetMyOrgsRequest
+	7,  // 15: aggregator.Aggregator.GetOrgRepos:input_type -> aggregator.GetOrgReposRequest
+	9,  // 16: aggregator.Aggregator.GetGrading:input_type -> aggregator.GetGradingRequest
+	11, // 17: aggregator.Aggregator.RequestLLMRecommendations:input_type -> aggregator.RequestLLMRecommendationsRequest
+	19, // 18: aggregator.Aggregator.GetAnalytics:input_type -> aggregator.GetAnalyticsRequest
+	0,  // 19: aggregator.Aggregator.GetRegradeStatus:input_type -> aggregator.GetRegradeStatusRequest
+	3,  // 20: aggregator.Aggregator.GetMyRepos:output_type -> aggregator.GetMyReposResponse
+	5,  // 21: aggregator.Aggregator.GetMyOrgs:output_type -> aggregator.GetMyOrgsResponse
+	8,  // 22: aggregator.Aggregator.GetOrgRepos:output_type -> aggregator.GetOrgReposResponse
+	10, // 23: aggregator.Aggregator.GetGrading:output_type -> aggregator.GetGradingResponse
+	12, // 24: aggregator.Aggregator.RequestLLMRecommendations:output_type -> aggregator.RequestLLMRecommendationsResponse
+	20, // 25: aggregator.Aggregator.GetAnalytics:output_type -> aggregator.GetAnalyticsResponse
+	1,  // 26: aggregator.Aggregator.GetRegradeStatus:output_type -> aggregator.GetRegradeStatusResponse
+	20, // [20:27] is the sub-list for method output_type
+	13, // [13:20] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_internal_transport_rpc_server_proto_init() }
@@ -1235,14 +1392,14 @@ func file_internal_transport_rpc_server_proto_init() {
 	if File_internal_transport_rpc_server_proto != nil {
 		return
 	}
-	file_internal_transport_rpc_server_proto_msgTypes[16].OneofWrappers = []any{}
+	file_internal_transport_rpc_server_proto_msgTypes[18].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_transport_rpc_server_proto_rawDesc), len(file_internal_transport_rpc_server_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   19,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

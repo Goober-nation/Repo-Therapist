@@ -62,6 +62,19 @@ type RepoAnalytics struct {
 	GradedAt        *time.Time
 }
 
+// RegradeStatus describes the scheduled public regrade. NextRunAt is nil while it is off;
+// Total and Done count the repos of the current run (Total is 0 until the list is loaded).
+type RegradeStatus struct {
+	Enabled        bool
+	Interval       time.Duration
+	NextRunAt      *time.Time
+	Running        bool
+	StartedAt      *time.Time
+	LastFinishedAt *time.Time
+	Total          int
+	Done           int
+}
+
 // GradeConfidence is the low-confidence flag of a public grade (grading.results "confidence").
 // Reasons is the raw [{code, text}] JSON; the flag never changes the score.
 type GradeConfidence struct {

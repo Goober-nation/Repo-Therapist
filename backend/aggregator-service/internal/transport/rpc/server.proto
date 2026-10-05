@@ -26,6 +26,23 @@ service Aggregator {
   // GetAnalytics returns the stored informational analytics (bus factor, ownership map) of the
   // view the caller may see. Read-only: it never starts a grading. Empty analytics means none yet.
   rpc GetAnalytics(GetAnalyticsRequest) returns (GetAnalyticsResponse);
+  // GetRegradeStatus reports the scheduled public regrade (on/off, next run, progress). Read-only.
+  rpc GetRegradeStatus(GetRegradeStatusRequest) returns (GetRegradeStatusResponse);
+}
+
+message GetRegradeStatusRequest {}
+
+message GetRegradeStatusResponse {
+  bool enabled = 1;
+  int64 interval_seconds = 2;
+  // Unset while the scheduled regrade is off.
+  google.protobuf.Timestamp next_run_at = 3;
+  bool running = 4;
+  google.protobuf.Timestamp started_at = 5;
+  google.protobuf.Timestamp last_finished_at = 6;
+  // Repos of the current (or last) run; total is 0 until the list is loaded.
+  int32 total = 7;
+  int32 done = 8;
 }
 
 message GetMyReposRequest {}

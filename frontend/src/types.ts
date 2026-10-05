@@ -77,6 +77,19 @@ export interface RepositorySummary {
   scoreChange?: number
   /** Places gained (positive) or lost (negative) in the ranking over the same window; only when sorted by score. */
   placeChange?: number
+  /** Stored public gradings of the repository; the ranking marks it "new" while there is at most one. */
+  gradeCount?: number
+}
+
+/** The scheduled public regrade as the ranking page shows it. */
+export interface RegradeStatus {
+  enabled: boolean
+  /** ISO time of the next scheduled run; undefined while the schedule is off. */
+  nextRunAt?: string
+  running: boolean
+  /** Repositories of the current run; total is 0 until the list is loaded. */
+  total: number
+  done: number
 }
 
 /** One author's share of the commits in the analytics window. */

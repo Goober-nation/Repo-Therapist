@@ -65,6 +65,9 @@ type RankingRow struct {
 	// service turns them into ScoreChange and PlaceChange.
 	PastScore *int16
 	PastPlace *int
+	// GradeCount is how many public gradings of the repo the history holds; the UI marks a repo
+	// "new" only while this is at most one.
+	GradeCount int
 	// ScoreChange is the score now minus the past score; PlaceChange is places gained (positive)
 	// or lost (negative) since then, set only when sorting by score.
 	ScoreChange *int

@@ -77,6 +77,7 @@ func (r *RankingRepository) ListRanking(ctx context.Context, q domain.RankingQue
 			&reasons,
 			&row.PastScore,
 			&row.PastPlace,
+			&row.GradeCount,
 		); err != nil {
 			return nil, fmt.Errorf("scan ranking row: %w", err)
 		}
@@ -284,7 +285,8 @@ func buildListQuery(q domain.RankingQuery) (string, []any, error) {
 			c.low_confidence,
 			c.reasons,
 			pr.past_score,
-			pr.past_place::int
+			pr.past_place::int,
+			(SELECT count(*) FROM repo_grade_history h WHERE h.sourcecraft_uuid = r.sourcecraft_uuid)::int
 		FROM repos r
 		JOIN repo_grades_public g ON g.sourcecraft_uuid = r.sourcecraft_uuid
 		LEFT JOIN repo_confidence_public c ON c.sourcecraft_uuid = r.sourcecraft_uuid

@@ -8,6 +8,7 @@ import type {
   PositionResponse,
   PublicScoreResponse,
   RecommendationsResponse,
+  RegradeStatusResponse,
 } from "./contracts"
 
 export class ApiRequestError extends Error {
@@ -121,6 +122,11 @@ export class HttpRepoHealthApi {
   /** The stored public grade with its low-confidence flag; read-only, never starts a grading. */
   getPublicScore(orgSlug: string, repoSlug: string): Promise<PublicScoreResponse> {
     return this.request(`/score/${repoPath(orgSlug, repoSlug)}`)
+  }
+
+  /** The scheduled public regrade: on or off, when it runs next, progress while it runs. */
+  getRegradeStatus(): Promise<RegradeStatusResponse> {
+    return this.request("/regrade-status")
   }
 
   /** Stored public score history, oldest first; read-only, never starts a grading. */

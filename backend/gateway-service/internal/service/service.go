@@ -568,6 +568,47 @@ func (s *GatewayService) GetScoreHistory(
 	return points, nil
 }
 
+// GetRegradeStatus reports the scheduled public regrade (on or off, next run, progress), behind
+// the public API's per-IP limit. It only reads.
+func (s *GatewayService) GetRegradeStatus(ctx context.Context, clientIP string) (domain.RegradeStatus, error) {
+	if err := s.allowPublicAPI(ctx, clientIP); err != nil {
+		return domain.RegradeStatus{}, err
+	}
+
+	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorTimeout)
+	defer cancel()
+
+	resp, err := s.aggregatorClient.GetRegradeStatus(rpcCtx, &agg.GetRegradeStatusRequest{})
+	if err != nil {
+		return domain.RegradeStatus{}, rpcError("get regrade status", err)
+	}
+
+	status := domain.RegradeStatus{
+		Enabled:         resp.GetEnabled(),
+		IntervalSeconds: resp.GetIntervalSeconds(),
+		Running:         resp.GetRunning(),
+		Total:           resp.GetTotal(),
+		Done:            resp.GetDone(),
+	}
+
+	if resp.GetNextRunAt() != nil {
+		next := resp.GetNextRunAt().AsTime()
+		status.NextRunAt = &next
+	}
+
+	if resp.GetStartedAt() != nil {
+		started := resp.GetStartedAt().AsTime()
+		status.StartedAt = &started
+	}
+
+	if resp.GetLastFinishedAt() != nil {
+		finished := resp.GetLastFinishedAt().AsTime()
+		status.LastFinishedAt = &finished
+	}
+
+	return status, nil
+}
+
 // GetPositionExplanation explains a public repo's place in the default ranking, behind the public
 // API's per-IP limit. It only reads.
 func (s *GatewayService) GetPositionExplanation(
@@ -748,6 +789,7 @@ func mapRankingEntry(
 	result.Confidence = mapConfidence(entry.LowConfidence, entry.GetConfidenceReasons())
 	result.ScoreChange = entry.ScoreChange
 	result.PlaceChange = entry.PlaceChange
+	result.GradeCount = entry.GetGradeCount()
 
 	if entry.Likes != nil {
 		likes := entry.GetLikes()

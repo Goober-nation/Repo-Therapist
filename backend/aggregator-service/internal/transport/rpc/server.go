@@ -43,6 +43,8 @@ type AggregatorService interface {
 		orgSlug string,
 		repoSlug string,
 	) (domain.RepoAnalytics, error)
+
+	GetRegradeStatus(ctx context.Context) domain.RegradeStatus
 }
 
 type Server struct {
@@ -178,6 +180,35 @@ func (s *Server) GetAnalytics(
 	response := &server.GetAnalyticsResponse{Analytics: analytics.Analytics}
 	if analytics.GradedAt != nil {
 		response.GradedAt = timestamppb.New(*analytics.GradedAt)
+	}
+
+	return response, nil
+}
+
+func (s *Server) GetRegradeStatus(
+	ctx context.Context,
+	_ *server.GetRegradeStatusRequest,
+) (*server.GetRegradeStatusResponse, error) {
+	status := s.service.GetRegradeStatus(ctx)
+
+	response := &server.GetRegradeStatusResponse{
+		Enabled:         status.Enabled,
+		IntervalSeconds: int64(status.Interval.Seconds()),
+		Running:         status.Running,
+		Total:           int32(status.Total),
+		Done:            int32(status.Done),
+	}
+
+	if status.NextRunAt != nil {
+		response.NextRunAt = timestamppb.New(*status.NextRunAt)
+	}
+
+	if status.StartedAt != nil {
+		response.StartedAt = timestamppb.New(*status.StartedAt)
+	}
+
+	if status.LastFinishedAt != nil {
+		response.LastFinishedAt = timestamppb.New(*status.LastFinishedAt)
 	}
 
 	return response, nil

@@ -328,7 +328,7 @@ func TestMapGetRankingResponseCarriesDynamics(t *testing.T) {
 	resp, err := mapGetRankingResponse(&rank.GetRankingResponse{
 		DynamicsDays: 7,
 		Entries: []*rank.RankingEntry{
-			{Place: 1, SourcecraftUuid: "0192b0a8-0000-7000-8000-000000000001", ScoreChange: int32Ptr(4), PlaceChange: int32Ptr(-2)},
+			{Place: 1, SourcecraftUuid: "0192b0a8-0000-7000-8000-000000000001", ScoreChange: int32Ptr(4), PlaceChange: int32Ptr(-2), GradeCount: 3},
 			{Place: 2, SourcecraftUuid: "0192b0a8-0000-7000-8000-000000000002"},
 		},
 	})
@@ -341,6 +341,9 @@ func TestMapGetRankingResponseCarriesDynamics(t *testing.T) {
 	}
 	if e := resp.Entries[0]; e.ScoreChange == nil || *e.ScoreChange != 4 || e.PlaceChange == nil || *e.PlaceChange != -2 {
 		t.Errorf("first = %+v", e)
+	}
+	if resp.Entries[0].GradeCount != 3 || resp.Entries[1].GradeCount != 0 {
+		t.Errorf("grade counts = %d, %d, want 3 and 0", resp.Entries[0].GradeCount, resp.Entries[1].GradeCount)
 	}
 	if e := resp.Entries[1]; e.ScoreChange != nil || e.PlaceChange != nil {
 		t.Errorf("second = %+v, want nil changes", e)
@@ -379,4 +382,36 @@ type captureRanking struct {
 func (c *captureRanking) GetRanking(ctx context.Context, in *rank.GetRankingRequest, opts ...grpc.CallOption) (*rank.GetRankingResponse, error) {
 	c.req = in
 	return &rank.GetRankingResponse{}, nil
+}
+
+func TestGetRegradeStatusMapsScheduleAndAppliesTheLimiter(t *testing.T) {
+	next := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
+	aggregator := &fakeAggregator{regrade: &agg.GetRegradeStatusResponse{
+		Enabled: true, IntervalSeconds: 259200, NextRunAt: timestamppb.New(next), Running: true, Total: 20, Done: 4,
+	}}
+	limiter := &countingLimiter{allow: true}
+	svc := newService(aggregator)
+	svc.publicAPILimiter = limiter
+
+	status, err := svc.GetRegradeStatus(context.Background(), "203.0.113.9")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !status.Enabled || status.IntervalSeconds != 259200 || status.NextRunAt == nil || !status.NextRunAt.Equal(next) ||
+		!status.Running || status.Total != 20 || status.Done != 4 || status.StartedAt != nil || status.LastFinishedAt != nil {
+		t.Errorf("status = %+v", status)
+	}
+	if len(limiter.keys) != 1 {
+		t.Errorf("limiter keys = %v, want one public API check", limiter.keys)
+	}
+
+	limiter.allow = false
+	calls := aggregator.calls
+	if _, err := svc.GetRegradeStatus(context.Background(), "ip"); !errors.Is(err, domain.ErrLimitExceeded) {
+		t.Errorf("err = %v, want ErrLimitExceeded", err)
+	}
+	if aggregator.calls != calls {
+		t.Error("a rate-limited request must not reach the aggregator")
+	}
 }

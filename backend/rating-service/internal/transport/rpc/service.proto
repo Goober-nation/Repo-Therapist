@@ -83,6 +83,8 @@ message RankingEntry {
   // Places gained (positive) or lost (negative) in this list since dynamics_days ago, among the
   // same filtered list. Only set when sorting by score and when the repo was graded back then.
   optional int32 place_change = 12;
+  // How many public gradings of the repo are stored in its history.
+  int32 grade_count = 13;
 }
 
 message Language {

@@ -124,6 +124,9 @@ services:
     environment:
       KAFKA_BROKERS: kafka:29092
       S3_ENDPOINT: minio:9000
+      # Documentation is graded without the model for now (presence of sections only);
+      # set LLM_DOCS_MODE=auto in .env to bring the model back.
+      LLM_DOCS_MODE: ${LLM_DOCS_MODE:-algorithmic}
     restart: unless-stopped
     depends_on:
       kafka:

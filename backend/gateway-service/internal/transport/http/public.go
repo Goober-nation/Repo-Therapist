@@ -310,6 +310,33 @@ func (h *Handler) GetHistory(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	writeJSON(w, stdhttp.StatusOK, response)
 }
 
+type regradeStatusResponse struct {
+	Enabled         bool       `json:"enabled"`
+	IntervalSeconds int64      `json:"interval_seconds"`
+	NextRunAt       *time.Time `json:"next_run_at"`
+	Running         bool       `json:"running"`
+	StartedAt       *time.Time `json:"started_at"`
+	LastFinishedAt  *time.Time `json:"last_finished_at"`
+	Total           int32      `json:"total"`
+	Done            int32      `json:"done"`
+}
+
+// GetRegradeStatus serves GET /regrade-status: whether the scheduled public regrade is on, when it
+// runs next and its progress while it runs. Read-only, public and CORS-open; not cached, because
+// the progress changes while a run is going.
+func (h *Handler) GetRegradeStatus(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+	setPublicCORS(w)
+
+	status, err := h.service.GetRegradeStatus(r.Context(), clientIP(r))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, stdhttp.StatusOK, regradeStatusResponse(status))
+}
+
 type neighbourResponse struct {
 	Place  int32  `json:"place"`
 	Org    string `json:"org"`

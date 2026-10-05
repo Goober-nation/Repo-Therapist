@@ -208,6 +208,8 @@ export interface GatewayRankingEntry {
   score_change?: number | null
   /** Null unless the list is sorted by score and the repo was graded a window ago. */
   place_change?: number | null
+  /** How many public gradings of the repo are stored; a repo is "new" while this is at most one. */
+  grade_count?: number
 }
 
 export interface GatewayRankingResponse {
@@ -217,6 +219,19 @@ export interface GatewayRankingResponse {
   page_size: number
   /** Window of score_change / place_change in days (RANKING_DYNAMICS_DAYS). */
   dynamics_days?: number
+}
+
+/** GET /regrade-status: the scheduled public regrade. Times are null while unknown or off. */
+export interface RegradeStatusResponse {
+  enabled: boolean
+  interval_seconds: number
+  next_run_at: string | null
+  running: boolean
+  started_at: string | null
+  last_finished_at: string | null
+  /** Repositories of the current or last run; total is 0 until the list is loaded. */
+  total: number
+  done: number
 }
 
 /** GET /history/{org}/{repo}: stored public gradings, oldest first. */

@@ -1228,3 +1228,46 @@ func TestGetAnalyticsPrivateRepoWithoutAccessIsRefused(t *testing.T) {
 		}
 	}
 }
+
+func TestRegradeStatusOffUntilStarted(t *testing.T) {
+	f := newFixture("public")
+
+	if status := f.svc.GetRegradeStatus(context.Background()); status.Enabled || status.NextRunAt != nil || status.Running {
+		t.Errorf("status = %+v, want off before the schedule starts", status)
+	}
+
+	f.svc.StartPublicGrading(context.Background(), 0, false)
+	if f.svc.GetRegradeStatus(context.Background()).Enabled {
+		t.Errorf("a zero interval must leave the schedule off")
+	}
+
+	f.svc.Token = ""
+	f.svc.StartPublicGrading(context.Background(), time.Hour, false)
+	if f.svc.GetRegradeStatus(context.Background()).Enabled {
+		t.Errorf("no service token must leave the schedule off")
+	}
+}
+
+func TestRegradeStatusReportsScheduleAndProgress(t *testing.T) {
+	f := newFixture("public")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	f.svc.StartPublicGrading(ctx, time.Hour, false)
+
+	status := f.svc.GetRegradeStatus(ctx)
+	if !status.Enabled || status.Interval != time.Hour || status.NextRunAt == nil || status.Running {
+		t.Fatalf("status = %+v, want an idle schedule every hour", status)
+	}
+
+	if until := status.NextRunAt.Sub(f.svc.currentTime()); until != time.Hour {
+		t.Errorf("next run in %v, want one interval from the clock", until)
+	}
+
+	f.svc.runPublicRegrade(ctx)
+
+	status = f.svc.GetRegradeStatus(ctx)
+	if status.Running || status.StartedAt == nil || status.LastFinishedAt == nil || status.Total != status.Done {
+		t.Errorf("status = %+v, want a finished run with every repo counted", status)
+	}
+}

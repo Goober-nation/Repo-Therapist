@@ -25,6 +25,7 @@ const (
 	Aggregator_GetGrading_FullMethodName                = "/aggregator.Aggregator/GetGrading"
 	Aggregator_RequestLLMRecommendations_FullMethodName = "/aggregator.Aggregator/RequestLLMRecommendations"
 	Aggregator_GetAnalytics_FullMethodName              = "/aggregator.Aggregator/GetAnalytics"
+	Aggregator_GetRegradeStatus_FullMethodName          = "/aggregator.Aggregator/GetRegradeStatus"
 )
 
 // AggregatorClient is the client API for Aggregator service.
@@ -39,6 +40,8 @@ type AggregatorClient interface {
 	GetGrading(ctx context.Context, in *GetGradingRequest, opts ...grpc.CallOption) (*GetGradingResponse, error)
 	RequestLLMRecommendations(ctx context.Context, in *RequestLLMRecommendationsRequest, opts ...grpc.CallOption) (*RequestLLMRecommendationsResponse, error)
 	GetAnalytics(ctx context.Context, in *GetAnalyticsRequest, opts ...grpc.CallOption) (*GetAnalyticsResponse, error)
+	// GetRegradeStatus reports the scheduled public regrade (on/off, next run, progress). Read-only.
+	GetRegradeStatus(ctx context.Context, in *GetRegradeStatusRequest, opts ...grpc.CallOption) (*GetRegradeStatusResponse, error)
 }
 
 type aggregatorClient struct {
@@ -109,6 +112,16 @@ func (c *aggregatorClient) GetAnalytics(ctx context.Context, in *GetAnalyticsReq
 	return out, nil
 }
 
+func (c *aggregatorClient) GetRegradeStatus(ctx context.Context, in *GetRegradeStatusRequest, opts ...grpc.CallOption) (*GetRegradeStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetRegradeStatusResponse)
+	err := c.cc.Invoke(ctx, Aggregator_GetRegradeStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AggregatorServer is the server API for Aggregator service.
 // All implementations must embed UnimplementedAggregatorServer
 // for forward compatibility.
@@ -121,6 +134,8 @@ type AggregatorServer interface {
 	GetGrading(context.Context, *GetGradingRequest) (*GetGradingResponse, error)
 	RequestLLMRecommendations(context.Context, *RequestLLMRecommendationsRequest) (*RequestLLMRecommendationsResponse, error)
 	GetAnalytics(context.Context, *GetAnalyticsRequest) (*GetAnalyticsResponse, error)
+	// GetRegradeStatus reports the scheduled public regrade (on/off, next run, progress). Read-only.
+	GetRegradeStatus(context.Context, *GetRegradeStatusRequest) (*GetRegradeStatusResponse, error)
 	mustEmbedUnimplementedAggregatorServer()
 }
 
@@ -148,6 +163,9 @@ func (UnimplementedAggregatorServer) RequestLLMRecommendations(context.Context, 
 }
 func (UnimplementedAggregatorServer) GetAnalytics(context.Context, *GetAnalyticsRequest) (*GetAnalyticsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAnalytics not implemented")
+}
+func (UnimplementedAggregatorServer) GetRegradeStatus(context.Context, *GetRegradeStatusRequest) (*GetRegradeStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRegradeStatus not implemented")
 }
 func (UnimplementedAggregatorServer) mustEmbedUnimplementedAggregatorServer() {}
 func (UnimplementedAggregatorServer) testEmbeddedByValue()                    {}
@@ -278,6 +296,24 @@ func _Aggregator_GetAnalytics_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Aggregator_GetRegradeStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRegradeStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregatorServer).GetRegradeStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Aggregator_GetRegradeStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregatorServer).GetRegradeStatus(ctx, req.(*GetRegradeStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Aggregator_ServiceDesc is the grpc.ServiceDesc for Aggregator service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -308,6 +344,10 @@ var Aggregator_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAnalytics",
 			Handler:    _Aggregator_GetAnalytics_Handler,
+		},
+		{
+			MethodName: "GetRegradeStatus",
+			Handler:    _Aggregator_GetRegradeStatus_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

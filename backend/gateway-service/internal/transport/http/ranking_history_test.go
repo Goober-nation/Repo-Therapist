@@ -123,7 +123,7 @@ func TestRankingResponseCarriesDynamics(t *testing.T) {
 	svc := &fakeService{rankingOut: domain.GetRankingResponse{
 		DynamicsDays: 7,
 		Entries: []domain.RankingEntry{
-			{Place: 1, Name: "up", ScoreChange: i32(4), PlaceChange: i32(2)},
+			{Place: 1, Name: "up", ScoreChange: i32(4), PlaceChange: i32(2), GradeCount: 3},
 			{Place: 2, Name: "new"},
 		},
 	}}
@@ -136,6 +136,9 @@ func TestRankingResponseCarriesDynamics(t *testing.T) {
 	}
 	if up := entries[0].(map[string]any); up["score_change"] != float64(4) || up["place_change"] != float64(2) {
 		t.Errorf("first = %v", up)
+	}
+	if entries[0].(map[string]any)["grade_count"] != float64(3) {
+		t.Errorf("grade_count = %v, want 3", entries[0].(map[string]any)["grade_count"])
 	}
 	if fresh := entries[1].(map[string]any); fresh["score_change"] != nil || fresh["place_change"] != nil {
 		t.Errorf("second = %v, want null changes for a repo without a past grade", fresh)
@@ -196,5 +199,32 @@ func TestRankingFactFilterParametersAreValidated(t *testing.T) {
 	svc := &fakeService{}
 	if rec := serve(t, svc, "GET", "/ranking?topic="+exact, nil); rec.Code != stdhttp.StatusOK {
 		t.Errorf("a topic of exactly 64 characters (not bytes) must be accepted, got %d", rec.Code)
+	}
+}
+
+func TestRegradeStatusIsPublicUncachedAndNullWhenOff(t *testing.T) {
+	rec := serve(t, &fakeService{}, "GET", "/regrade-status", map[string]string{"X-Real-IP": "203.0.113.9"})
+
+	if rec.Code != stdhttp.StatusOK || rec.Header().Get("Access-Control-Allow-Origin") != "*" || rec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("status = %d, headers = %v", rec.Code, rec.Header())
+	}
+
+	body := decode(t, rec)
+	if body["enabled"] != false || body["next_run_at"] != nil || body["running"] != false || body["total"] != float64(0) {
+		t.Errorf("body = %v, want an off schedule with null times", body)
+	}
+}
+
+func TestRegradeStatusReportsScheduleAndProgress(t *testing.T) {
+	next := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
+	svc := &fakeService{regradeOut: domain.RegradeStatus{
+		Enabled: true, IntervalSeconds: 259200, NextRunAt: &next, Running: true, StartedAt: &next, Total: 20, Done: 4,
+	}}
+
+	body := decode(t, serve(t, svc, "GET", "/regrade-status", map[string]string{"X-Real-IP": "203.0.113.9"}))
+
+	if !svc.called || body["enabled"] != true || body["interval_seconds"] != float64(259200) ||
+		body["next_run_at"] != "2026-10-08T12:00:00Z" || body["running"] != true || body["total"] != float64(20) || body["done"] != float64(4) {
+		t.Errorf("body = %v", body)
 	}
 }
