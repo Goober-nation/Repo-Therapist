@@ -100,16 +100,16 @@
 
 * { box-sizing: border-box; }
 
-html { zoom: 0.7; }
+html { --ui-zoom: 0.75; zoom: var(--ui-zoom); background: var(--canvas); }
 html, body, #root { min-width: 320px; min-height: 100%; margin: 0; }
 
-body { min-height: 100vh; font-size: var(--fs-md); line-height: 1.5; background: var(--canvas); color: var(--text); }
+body { min-height: calc(100vh / var(--ui-zoom)); font-size: var(--fs-md); line-height: 1.5; background: var(--canvas); color: var(--text); }
 
 button, input, select { font: inherit; }
 button { color: inherit; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
-.app-shell { display: flex; min-height: 100vh; flex-direction: column; }
+.app-shell { display: flex; min-height: calc(100vh / var(--ui-zoom)); flex-direction: column; }
 .app-body { display: flex; flex: 1; min-height: 0; }
 .app-workspace { display: flex; flex: 1; min-width: 0; flex-direction: column; }
 .sidebar { display: flex; width: 242px; flex: 0 0 242px; flex-direction: column; padding: 18px 14px 14px; background: var(--surface); border-right: 1px solid var(--border); }
