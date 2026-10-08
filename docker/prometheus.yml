@@ -14,3 +14,10 @@ scrape_configs:
   - job_name: rating
     static_configs:
       - targets: ["go-services:9103"]
+  # The LLM service runs in two containers: documentation grading and the recommendation summaries.
+  - job_name: llm
+    static_configs:
+      - targets: ["llm-service:9104"]
+  - job_name: llm_summary
+    static_configs:
+      - targets: ["llm-summary-service:9105"]

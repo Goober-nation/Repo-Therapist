@@ -12,17 +12,17 @@ export interface AuditState {
 }
 
 /**
- * One page of the audit log, newest first, AUDIT_PAGE_SIZE entries at a time. Changing `outcome` or
- * `attempt` (retry, or a reload after a new entry) goes back to the first page; `next` and `previous`
- * move between pages.
+ * One page of the audit log, newest first, AUDIT_PAGE_SIZE entries at a time. `scope` is the admin
+ * journal ("admin") or the user actions ("users"). Changing `outcome`, `action` or `attempt` (retry, or
+ * a reload after a new entry) goes back to the first page; `next` and `previous` move between pages.
  */
-export function useAudit(api: HttpRepoHealthApi, outcome: string, attempt: number) {
-  const scope = `${outcome}|${attempt}`
-  const [nav, setNav] = useState<{ scope: string; cursors: AuditCursors }>({ scope, cursors: FIRST_AUDIT_PAGE })
+export function useAudit(api: HttpRepoHealthApi, outcome: string, attempt: number, scope = "", action = "") {
+  const key = `${scope}|${action}|${outcome}|${attempt}`
+  const [nav, setNav] = useState<{ scope: string; cursors: AuditCursors }>({ scope: key, cursors: FIRST_AUDIT_PAGE })
   const [state, setState] = useState<AuditState>({ entries: [], nextBeforeId: 0, isLoading: true })
 
   // A new scope starts again from the first page, without an extra render of the old one.
-  const cursors = nav.scope === scope ? nav.cursors : FIRST_AUDIT_PAGE
+  const cursors = nav.scope === key ? nav.cursors : FIRST_AUDIT_PAGE
   const beforeId = cursors[cursors.length - 1]
 
   useEffect(() => {
@@ -30,7 +30,7 @@ export function useAudit(api: HttpRepoHealthApi, outcome: string, attempt: numbe
     setState((current) => ({ ...current, isLoading: true, error: undefined }))
 
     api
-      .getAudit({ outcome, beforeId, limit: AUDIT_PAGE_SIZE })
+      .getAudit({ outcome, beforeId, limit: AUDIT_PAGE_SIZE, scope, action })
       .then((page) => {
         if (!cancelled) setState({ entries: page.entries, nextBeforeId: page.next_before_id, isLoading: false })
       })
@@ -48,15 +48,15 @@ export function useAudit(api: HttpRepoHealthApi, outcome: string, attempt: numbe
     return () => {
       cancelled = true
     }
-  }, [api, outcome, beforeId, scope])
+  }, [api, outcome, beforeId, scope, action, key])
 
   const next = useCallback(() => {
-    if (state.nextBeforeId > 0 && !state.isLoading) setNav({ scope, cursors: nextAuditPage(cursors, state.nextBeforeId) })
-  }, [scope, cursors, state.nextBeforeId, state.isLoading])
+    if (state.nextBeforeId > 0 && !state.isLoading) setNav({ scope: key, cursors: nextAuditPage(cursors, state.nextBeforeId) })
+  }, [key, cursors, state.nextBeforeId, state.isLoading])
 
   const previous = useCallback(() => {
-    if (!state.isLoading) setNav({ scope, cursors: previousAuditPage(cursors) })
-  }, [scope, cursors, state.isLoading])
+    if (!state.isLoading) setNav({ scope: key, cursors: previousAuditPage(cursors) })
+  }, [key, cursors, state.isLoading])
 
   return { ...state, page: cursors.length, hasPrevious: cursors.length > 1, hasNext: state.nextBeforeId > 0, next, previous }
 }

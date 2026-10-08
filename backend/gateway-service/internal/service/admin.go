@@ -248,6 +248,7 @@ func (s *GatewayService) ListAudit(ctx context.Context, filter domain.AuditFilte
 		BeforeId: filter.BeforeID,
 		Action:   filter.Action,
 		Outcome:  filter.Outcome,
+		Scope:    filter.Scope,
 	})
 	if err != nil {
 		return domain.AuditPage{}, rpcError("list audit", err)

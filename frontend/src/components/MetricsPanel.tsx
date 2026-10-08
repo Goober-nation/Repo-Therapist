@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { HttpRepoHealthApi } from "../api/client"
-import { ADMIN_RANGES, ADMIN_SERIES, DEFAULT_ADMIN_RANGE } from "../seriesView"
+import { ADMIN_RANGES, ADMIN_SERIES, DEFAULT_ADMIN_RANGE, LLM_SERIES } from "../seriesView"
 import SeriesCard from "./SeriesCard"
 import { Button, Card, Label } from "./Shell"
 
@@ -45,6 +45,28 @@ export default function MetricsPanel({ api }: { api: HttpRepoHealthApi }) {
             loadKey={`${info.name}|${range}|${refresh}`}
             load={() => api.getAdminSeries(info.name, range)}
             emptyText="За этот период данных пока нет."
+          />
+        ))}
+      </div>
+
+      <Card>
+        <Label>Языковая модель</Label>
+        <h2 className="regrade-title">Расход LLM</h2>
+        <p className="muted">
+          Токены берутся из ответа модели, как их считает провайдер. Деньги не считаются: цены в настройках нет. Данные по
+          репозиториям и пользователям не собираются. Сводка рекомендаций идёт через модель всегда, оценка документации
+          только при <code>LLM_DOCS_MODE=auto</code>.
+        </p>
+      </Card>
+
+      <div className="metric-grid">
+        {LLM_SERIES.map((info) => (
+          <SeriesCard
+            key={info.name}
+            info={info}
+            loadKey={`${info.name}|${info.fixedRange ? "fixed" : range}|${refresh}`}
+            load={() => api.getAdminSeries(info.name, range)}
+            emptyText="Модель пока не вызывалась."
           />
         ))}
       </div>

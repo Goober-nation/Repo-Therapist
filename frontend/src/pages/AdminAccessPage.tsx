@@ -188,7 +188,9 @@ function AdminTools({
 
       <MetricsPanel api={api} />
 
-      <AuditLog api={api} reloadKey={auditReload} />
+      <AuditLog api={api} scope="admin" reloadKey={auditReload} />
+
+      <AuditLog api={api} scope="users" />
     </>
   )
 }

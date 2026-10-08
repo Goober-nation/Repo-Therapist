@@ -591,6 +591,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 /* Admin page */
 .audit-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 .audit-head h2 { margin: 6px 0 0; font-size: var(--fs-lg); font-weight: 650; letter-spacing: -.02em; }
+.audit-filters { display: flex; flex-wrap: wrap; gap: 12px; }
 .audit-table { min-width: 640px; }
 .audit-table td { vertical-align: top; }
 .audit-hash { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

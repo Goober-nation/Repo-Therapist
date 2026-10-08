@@ -190,7 +190,8 @@ func TestCatalogNamesAreUniqueAndQueriesAreOurOwnMetrics(t *testing.T) {
 
 		seen[def.Name] = true
 
-		if !strings.Contains(def.Query, "gateway_") && !strings.Contains(def.Query, "aggregator_") && !strings.Contains(def.Query, "rating_") {
+		if !strings.Contains(def.Query, "gateway_") && !strings.Contains(def.Query, "aggregator_") &&
+			!strings.Contains(def.Query, "rating_") && !strings.Contains(def.Query, "llm_model_") {
 			t.Errorf("%s reads no metric of ours: %s", def.Name, def.Query)
 		}
 
@@ -232,8 +233,56 @@ func TestEveryGraphEndsNowSoTodayIsVisible(t *testing.T) {
 
 func TestCountQueriesAreRoundedBecauseIncreaseExtrapolates(t *testing.T) {
 	for _, def := range Catalog {
-		if def.Unit == "count" && !strings.HasPrefix(def.Query, "round(") {
+		if (def.Unit == "count" || def.Unit == "tokens") && !strings.HasPrefix(def.Query, "round(") {
 			t.Errorf("%s counts events but its query is not rounded: %s", def.Name, def.Query)
 		}
+	}
+}
+
+func TestLLMSeriesAreAdminOnlyAndNeverCarryPricesOrRepositories(t *testing.T) {
+	llm := 0
+
+	for _, def := range Catalog {
+		if !strings.HasPrefix(def.Name, "llm_") || !strings.Contains(def.Query, "llm_model_") {
+			continue
+		}
+
+		llm++
+
+		if def.Public {
+			t.Errorf("%s: model usage is for admins only", def.Name)
+		}
+
+		// A repository, user or price would have to be a label or a factor in the query.
+		for _, banned := range []string{"repo", "user", "slug", "price", " * ", "cost"} {
+			if strings.Contains(def.Query, banned) {
+				t.Errorf("%s: query mentions %q: %s", def.Name, banned, def.Query)
+			}
+		}
+	}
+
+	if llm != 5 {
+		t.Fatalf("expected 5 LLM series, found %d", llm)
+	}
+
+	if _, ok := Lookup("llm_tokens_per_day", true); ok {
+		t.Fatal("a public caller must not reach an LLM series")
+	}
+
+	// The daily token graph has its own fixed 14-day window, whatever range the caller asks for.
+	var seen []string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.URL.Query().Get("step"))
+		_, _ = w.Write([]byte(`{"status":"success","data":{"resultType":"matrix","result":[]}}`))
+	}))
+	defer server.Close()
+
+	if _, err := NewClient(server.URL, 0, nil).Query(context.Background(), "llm_tokens_per_day", false, "1h"); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(seen) != 1 || seen[0] != "86400" {
+		t.Fatalf("step = %v, want one daily step", seen)
 	}
 }

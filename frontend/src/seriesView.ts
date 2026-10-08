@@ -36,6 +36,23 @@ export const ADMIN_SERIES: SeriesInfo[] = [
   { name: "admin_denied", title: "Отказы администратору", description: "Попытки зайти в админские маршруты без прав, за час." },
 ]
 
+/**
+ * Use of the language model, from the tokens the provider reports for each call. Tokens, not money: no
+ * prices are configured or guessed. `fixedRange` graphs have their own window and ignore the period choice.
+ */
+export const LLM_SERIES: (SeriesInfo & { fixedRange?: boolean })[] = [
+  {
+    name: "llm_tokens_per_day",
+    title: "Токены за сутки",
+    description: "Сколько токенов израсходовано за 24 часа до каждой точки, последние две недели.",
+    fixedRange: true,
+  },
+  { name: "llm_tokens", title: "Токены за час", description: "Входные и выходные токены за час; «из кэша» — часть входных." },
+  { name: "llm_tokens_by_purpose", title: "На что уходят токены", description: "Рекомендации по репозиторию и оценка документации." },
+  { name: "llm_calls", title: "Вызовы модели", description: "Вызовы за час по итогу; повтор после неверного формата — отдельный вызов." },
+  { name: "llm_call_p95_seconds", title: "Время вызова модели", description: "95% вызовов быстрее этого времени." },
+]
+
 export const ADMIN_RANGES = [
   { value: "1h", label: "Час" },
   { value: "6h", label: "6 часов" },
@@ -62,6 +79,16 @@ const LABELS: Record<string, Record<string, string>> = {
     not_admin: "не администратор",
   },
   grpc_errors: { aggregator: "Aggregator", rating: "Rating" },
+  llm_tokens: { input: "входные", output: "выходные", cached_input: "из них из кэша" },
+  llm_tokens_per_day: { input: "входные", output: "выходные", cached_input: "из них из кэша" },
+  llm_tokens_by_purpose: { summary: "рекомендации", documentation: "документация" },
+  llm_calls: {
+    ok: "успешно",
+    rate_limited: "лимит провайдера",
+    content_filtered: "отклонено фильтром",
+    timeout: "не уложился во время",
+    error: "ошибка",
+  },
 }
 
 /** The legend text of a curve; an ungrouped query is named by its graph. */
@@ -90,6 +117,9 @@ export function formatValue(unit: SeriesUnit, value: number): string {
       if (value === 0) return "0 /с"
       if (value >= 10) return `${Math.round(value)} /с`
       return `${decimal(value, value >= 1 ? 1 : value >= 0.1 ? 2 : 3)} /с`
+    case "tokens":
+      // Whole tokens, grouped by thousands with non-breaking spaces: 1 234 567.
+      return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0")
     default:
       return Number.isInteger(value) || value >= 100 ? String(Math.round(value)) : decimal(value, 1)
   }
@@ -105,11 +135,11 @@ export function niceStep(value: number): number {
   return ([1, 2, 2.5, 5, 10].find((step) => unit <= step) ?? 10) * power
 }
 
-/** Step between ticks so that four steps cover `max`; a count of events moves in whole numbers. */
+/** Step between ticks so that four steps cover `max`; counts of events and tokens move in whole numbers. */
 export function tickStep(unit: SeriesUnit, max: number): number {
   const step = niceStep(max / 4)
 
-  return unit === "count" ? Math.max(1, step) : step
+  return unit === "count" || unit === "tokens" ? Math.max(1, step) : step
 }
 
 export interface ChartGeometry {
@@ -193,9 +223,15 @@ export function seriesErrorMessage(status: number, code: string, scope: "public"
   return undefined
 }
 
-/** The curves of a response with their Russian legend text, dropping empty ones. */
+/**
+ * The curves of a response with their Russian legend text. Curves without points are dropped, and so are
+ * curves that are zero throughout when another curve has data: a legend of five outcomes of which four
+ * never happened says nothing. If everything is zero the curves stay, so "nothing happened" still shows.
+ */
 export function chartLines(name: string, fallback: string, lines: SeriesLineResponse[]) {
-  return lines
-    .filter((line) => line.points.length > 0)
-    .map((line) => ({ label: lineLabel(name, line.label, fallback), points: line.points }))
+  const withPoints = lines.filter((line) => line.points.length > 0)
+  const active = withPoints.filter((line) => line.points.some(([, value]) => value !== 0))
+  const shown = active.length > 0 ? active : withPoints
+
+  return shown.map((line) => ({ label: lineLabel(name, line.label, fallback), points: line.points }))
 }

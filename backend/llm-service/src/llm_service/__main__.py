@@ -2,10 +2,12 @@
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
+from . import metrics
 from .context import build_model_context, select_context_paths
 from .discovery import readme_links
 from .grading import required_file_paths
@@ -68,10 +70,12 @@ def main(argv=None) -> int:
     try:
         if args.listen:
             from .kafka_worker import main as run_kafka_worker
+            metrics.start_server(metrics.port_from_env(os.environ))
             run_kafka_worker()
             return 0
         if args.listen_summary:
             from .kafka_worker import summary_main
+            metrics.start_server(metrics.port_from_env(os.environ))
             summary_main()
             return 0
         if args.summary_file:

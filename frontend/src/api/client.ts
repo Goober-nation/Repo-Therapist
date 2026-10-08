@@ -209,12 +209,19 @@ export class HttpRepoHealthApi {
     return this.request("/admin/lock", { method: "POST", headers: REQUEST_GUARD_HEADER }, unlockError)
   }
 
-  /** One page of the audit log, newest first; admins only. `beforeId` is the previous page's cursor. */
-  async getAudit(filter: { outcome?: string; beforeId?: number; limit?: number } = {}): Promise<AuditResponse> {
+  /**
+   * One page of the audit log, newest first; admins only. `beforeId` is the previous page's cursor; `scope`
+   * ("admin" or "users") picks the admin journal or the user actions, `action` an exact action.
+   */
+  async getAudit(
+    filter: { outcome?: string; beforeId?: number; limit?: number; action?: string; scope?: string } = {},
+  ): Promise<AuditResponse> {
     const query = new URLSearchParams()
     if (filter.limit) query.set("limit", String(filter.limit))
     if (filter.beforeId) query.set("before_id", String(filter.beforeId))
     if (filter.outcome) query.set("outcome", filter.outcome)
+    if (filter.action) query.set("action", filter.action)
+    if (filter.scope) query.set("scope", filter.scope)
     const search = query.toString()
     try {
       return await this.request(search ? `/admin/audit?${search}` : "/admin/audit")

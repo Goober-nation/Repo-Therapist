@@ -371,6 +371,26 @@ REDIS_TEST_ADDRESS=localhost:8052 REDIS_TEST_PASSWORD=$REDIS_PASSWORD \
 `429` с `Retry-After`, верный пароль во время блокировки — `429`, после блокировки — `200`, `/admin/audit` — `200`,
 `/admin/lock` — права сняты; после смены `ADMIN_PASSWORD` и перезапуска права снова нет.
 
+### Журнал действий пользователей
+
+Автотесты: `backend/gateway-service/internal/service/user_audit_test.go` (кто записан, хеш вместо названия при токене и
+при отказе, исходы, один раз за окно, непохожие названия, выключенный журнал), `internal/transport/http/admin_test.go`
+(обработчики передают действие, куку, наличие токена и ошибку), `backend/aggregator-service` (проверка `scope`) и
+`frontend/tests/admin.test.js` (подписи, фильтры, запрос с `scope` и `action`, блок на странице).
+
+С настоящим Postgres (миграция 000008 применена; строки помечены своим хешем и удаляются тестом):
+
+```bash
+cd backend/aggregator-service
+POSTGRES_DSN='postgres://user:pass@localhost:8051/repotherapist?sslmode=disable' \
+  go test ./internal/database/postgres-repositories -run Audit -v
+```
+
+Живая проверка: отдельные Postgres и темы Kafka, Aggregator и Gateway, у Aggregator — заглушка обёртки SourceCraft
+(иначе репозиторий не определить). Запросы `/grading/...` с кукой и без неё, с заголовком `PAT` и без, шесть опросов подряд
+(одна запись), неизвестный и закрытый репозиторий; затем `GET /admin/audit?scope=users` и `scope=admin` от администратора.
+В таблице не должно быть названия закрытого репозитория, IP и Яндекс-идентификатора.
+
 ### Пакетная переоценка
 
 Автотесты: `backend/aggregator-service` (условия и их проверка, пробный расчёт, не больше трёх репозиториев
@@ -399,7 +419,14 @@ POSTGRES_DSN="postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:8051/$POSTG
 Prometheus, кэш, публичные запросы только по публичным оценкам, округление счётчиков, график заканчивается «сейчас»;
 маршруты `/stats/series` и `/admin/metrics`), `backend/aggregator-service` (счётчики запуска, результата и времени
 оценки, источник запуска `user`/`schedule`/`batch`, отказ по лимиту, LLM, пакеты) и `backend/rating-service` (кэш
-аналитики), `frontend/tests/series.test.js`.
+аналитики), `frontend/tests/series.test.js`. Сервис LLM (Python): `tests/test_metrics.py` проверяет, что вызов
+модели считается с итогом и временем, токены берутся из `usage`, отклонённый ответ всё равно считает токены, неверное
+`usage` не считается, метка `model` не содержит адреса с папкой облака. Тесты запускаются в контейнере с той же версией
+Python, что и сервис:
+
+```bash
+docker run --rm -v "$PWD/backend/llm-service:/app:ro" -w /tmp python:3.11-slim sh -c "cp -r /app /tmp/svc && cd /tmp/svc && pip install -q . pytest && python -m pytest -q -p no:cacheprovider"
+```
 
 Живая проверка: поднимите Prometheus и сервисы, откройте `http://localhost:8056/targets` (три цели `UP`), потом
 сделайте запросы к Gateway и посмотрите `curl localhost:9101/metrics` изнутри контейнера: должны быть

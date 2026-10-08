@@ -102,6 +102,16 @@ type AuditEntry struct {
 	AuditEvent
 }
 
+// Audit scopes of the list filter. User actions are the entries whose action starts with one of
+// UserActionPrefixes; the rest is the admin journal.
+const (
+	AuditScopeAdmin = "admin"
+	AuditScopeUsers = "users"
+)
+
+// UserActionPrefixes are the action prefixes of what ordinary users do (docs/admin.md).
+var UserActionPrefixes = []string{"grading.", "recommendations."}
+
 // AuditFilter selects a page of the log, newest first. BeforeID is the keyset cursor: only entries
 // with a smaller ID are returned. Action matches an exact action or, ending in ".", a prefix.
 type AuditFilter struct {
@@ -109,6 +119,9 @@ type AuditFilter struct {
 	BeforeID int64
 	Action   string
 	Outcome  string
+	// Scope splits the log in two: AuditScopeUsers keeps the user-action entries, AuditScopeAdmin
+	// everything else; empty keeps all.
+	Scope string
 }
 
 // AuditPage is one page and the cursor for the next one (0 when this was the last).

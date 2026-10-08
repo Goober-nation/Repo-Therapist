@@ -1,38 +1,69 @@
 import { useState } from "react"
 import type { HttpRepoHealthApi } from "../api/client"
-import { auditRow, OUTCOME_FILTERS } from "../auditView"
+import { auditRow, OUTCOME_FILTERS, USER_ACTION_FILTERS } from "../auditView"
 import { formatDateTime } from "../metrics"
 import { useAudit } from "../useAudit"
 import AuditPager from "./AuditPager"
 import { Badge, Button, Card, Label } from "./Shell"
 
 /**
- * The audit log of admin and user actions, newest first, with an outcome filter and previous/next paging. A new
- * `reloadKey` reloads it from the newest entry (the page raises it when an admin action has just been logged).
+ * The audit log, newest first, with an outcome filter and previous/next paging. `scope` "admin" is the
+ * journal of admin events, "users" the block of what ordinary users did (with an action filter too). A
+ * new `reloadKey` reloads it from the newest entry (the page raises it when an admin action was logged).
  */
-export default function AuditLog({ api, reloadKey = 0 }: { api: HttpRepoHealthApi; reloadKey?: number }) {
+export default function AuditLog({
+  api,
+  scope = "admin",
+  reloadKey = 0,
+}: {
+  api: HttpRepoHealthApi
+  scope?: "admin" | "users"
+  reloadKey?: number
+}) {
+  const isUsers = scope === "users"
   const [outcome, setOutcome] = useState("")
+  const [action, setAction] = useState("")
   const [attempt, setAttempt] = useState(0)
-  const audit = useAudit(api, outcome, attempt + reloadKey)
+  const audit = useAudit(api, outcome, attempt + reloadKey, scope, isUsers ? action : "")
 
   return (
     <Card>
       <div className="audit-head">
         <div>
-          <Label>Журнал действий</Label>
-          <h2>Входы и действия администраторов</h2>
+          <Label>{isUsers ? "Действия пользователей" : "Журнал действий"}</Label>
+          <h2>{isUsers ? "Оценки и рекомендации по запросу пользователей" : "Входы и действия администраторов"}</h2>
         </div>
-        <label className="filter-field">
-          <span>Результат</span>
-          <select value={outcome} onChange={(event) => setOutcome(event.target.value)}>
-            {OUTCOME_FILTERS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="audit-filters">
+          {isUsers && (
+            <label className="filter-field">
+              <span>Действие</span>
+              <select value={action} onChange={(event) => setAction(event.target.value)}>
+                {USER_ACTION_FILTERS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label className="filter-field">
+            <span>Результат</span>
+            <select value={outcome} onChange={(event) => setOutcome(event.target.value)}>
+              {OUTCOME_FILTERS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
+
+      {isUsers && (
+        <p className="muted">
+          Кто запросил: хеш аккаунта, без имени. Репозиторий, запрошенный с токеном или закрытый для запросившего, виден только хешем.
+        </p>
+      )}
 
       {audit.error && (
         <div className="empty-state" role="alert">
@@ -43,7 +74,7 @@ export default function AuditLog({ api, reloadKey = 0 }: { api: HttpRepoHealthAp
       )}
 
       {!audit.error && audit.entries.length === 0 && !audit.isLoading && (
-        <p className="muted">Записей пока нет. Журнал хранит последние 30 дней.</p>
+        <p className="muted">{isUsers ? "Действий пользователей пока нет." : "Записей пока нет."} Журнал хранит последние 30 дней.</p>
       )}
 
       {audit.entries.length > 0 && (

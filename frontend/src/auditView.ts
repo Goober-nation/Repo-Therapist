@@ -17,6 +17,8 @@ const ACTION_LABELS: Record<string, string> = {
   "regrade.batch.resume": "Продолжение пакетной переоценки",
   "regrade.batch.cancel": "Отмена пакетной переоценки",
   "regrade.batch.complete": "Пакетная переоценка завершена",
+  "grading.request": "Запрос оценки репозитория",
+  "recommendations.request": "Запрос рекомендаций от модели",
 }
 
 const OUTCOME_LABELS: Record<string, { label: string; tone: Tone }> = {
@@ -37,6 +39,16 @@ const REASON_LABELS: Record<string, string> = {
   not_admin: "не администратор",
   wrong_password: "неверный пароль",
   locked: "вход заблокирован после неверных паролей",
+  grading_limit: "достигнут общий лимит оценок",
+  no_access: "нет доступа к репозиторию",
+  not_found: "репозиторий не найден",
+  interrupted: "оценка прервана",
+  failed: "сбой при выполнении",
+}
+
+const STATE_LABELS: Record<string, string> = {
+  ready: "оценка готова",
+  pending: "оценка ещё считается",
 }
 
 const VIA_LABELS: Record<string, string> = {
@@ -63,6 +75,13 @@ export const OUTCOME_FILTERS = [
   { value: "error", label: "Ошибка" },
 ]
 
+/** The action filter of the user-action block. */
+export const USER_ACTION_FILTERS = [
+  { value: "", label: "Все действия" },
+  { value: "grading.request", label: "Запросы оценки" },
+  { value: "recommendations.request", label: "Запросы рекомендаций" },
+]
+
 export function actionLabel(action: string): string {
   return Object.hasOwn(ACTION_LABELS, action) ? ACTION_LABELS[action] : action
 }
@@ -75,7 +94,15 @@ export function reasonLabel(details: Record<string, unknown> | null | undefined)
   const via = details?.via
   if (typeof via === "string") return Object.hasOwn(VIA_LABELS, via) ? VIA_LABELS[via] : via
 
+  const state = details?.state
+  if (typeof state === "string") return Object.hasOwn(STATE_LABELS, state) ? STATE_LABELS[state] : state
+
   return ""
+}
+
+/** A request with an access token may be about a private repository, so the log keeps only a hash of it. */
+export function accessNote(details: Record<string, unknown> | null | undefined): string {
+  return details?.access === "token" ? "по токену, репозиторий скрыт хешем" : ""
 }
 
 export function auditRow(entry: AuditEntryResponse): AuditRow {
@@ -88,7 +115,7 @@ export function auditRow(entry: AuditEntryResponse): AuditRow {
     action: actionLabel(entry.action),
     target,
     outcome: OUTCOME_LABELS[entry.outcome] ?? { label: entry.outcome, tone: "neutral" },
-    note: reasonLabel(entry.details),
+    note: [reasonLabel(entry.details), accessNote(entry.details)].filter(Boolean).join(" · "),
   }
 }
 

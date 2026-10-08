@@ -51,6 +51,9 @@ type AdminConfig struct {
 	// DeniedLog caps how many denied admin attempts per client IP reach the audit log, so a flood of
 	// probes cannot fill it.
 	DeniedLog RateLimitConfig
+	// UserAuditWindow is how long an identical user action of one actor is recorded only once
+	// (USER_AUDIT_WINDOW); zero or less turns the audit of user actions off.
+	UserAuditWindow time.Duration
 	// Password unlocks admin rights for a signed-in account (ADMIN_PASSWORD, plain text in the
 	// environment); empty turns the unlock off. UnlockMaxAttempts wrong passwords lock the client IP and
 	// the account for UnlockLock.
@@ -246,6 +249,7 @@ func LoadConfig() *Config {
 				Limit:  getEnvIntDefault("ADMIN_DENIED_LOG_LIMIT", 5),
 				Window: getEnvDuration("ADMIN_DENIED_LOG_WINDOW", 10*time.Minute),
 			},
+			UserAuditWindow:   getEnvDuration("USER_AUDIT_WINDOW", 5*time.Minute),
 			Password:          os.Getenv("ADMIN_PASSWORD"),
 			UnlockMaxAttempts: getEnvIntDefault("ADMIN_UNLOCK_MAX_ATTEMPTS", 5),
 			UnlockLock:        getEnvDuration("ADMIN_UNLOCK_LOCK", 15*time.Minute),

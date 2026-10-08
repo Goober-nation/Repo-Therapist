@@ -124,6 +124,7 @@ func TestListAuditDefaultsCapsAndValidates(t *testing.T) {
 		"negative limit":  {Limit: -1},
 		"negative cursor": {BeforeID: -5},
 		"unknown outcome": {Outcome: "maybe"},
+		"unknown scope":   {Scope: "everyone"},
 		"huge action":     {Action: string(make([]byte, 200))},
 	} {
 		if _, err := s.ListAudit(context.Background(), filter); !errors.Is(err, domain.ErrInvalidAudit) {
@@ -156,5 +157,16 @@ func TestStartAuditRetentionDisabledDoesNothing(t *testing.T) {
 
 	if !repo.cutoff.IsZero() {
 		t.Error("a non-positive retention must keep the log and never purge")
+	}
+}
+
+func TestListAuditPassesTheScopeOn(t *testing.T) {
+	repo := &fakeAuditRepo{}
+	s := auditService(repo)
+
+	for _, scope := range []string{"", domain.AuditScopeAdmin, domain.AuditScopeUsers} {
+		if _, err := s.ListAudit(context.Background(), domain.AuditFilter{Scope: scope}); err != nil || repo.filter.Scope != scope {
+			t.Errorf("scope %q: got %q, err %v", scope, repo.filter.Scope, err)
+		}
 	}
 }

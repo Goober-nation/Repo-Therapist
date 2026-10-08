@@ -95,6 +95,7 @@ type GatewayService interface {
 	LockAdmin(ctx context.Context, sessionID string) error
 	AuthenticateAdmin(ctx context.Context, clientIP, sessionID, route string) (domain.AdminIdentity, error)
 	ListAudit(ctx context.Context, filter domain.AuditFilter) (domain.AuditPage, error)
+	RecordUserAction(ctx context.Context, action domain.UserAction)
 	PublicSeries(ctx context.Context, clientIP, name string) (series.Result, error)
 	AdminSeries(ctx context.Context, name, rangeName string) (series.Result, error)
 	PreviewRegradeBatch(ctx context.Context, filter domain.BatchFilter) (domain.BatchPreview, error)
@@ -337,15 +338,17 @@ func (h *Handler) GetGrading(
 	w stdhttp.ResponseWriter,
 	r *stdhttp.Request,
 ) {
+	orgSlug, repoSlug := strings.TrimSpace(r.PathValue("org")), strings.TrimSpace(r.PathValue("repo"))
+
 	result, err := h.service.GetGrading(
 		r.Context(),
 		clientIP(r),
 		patFromRequest(r),
-		domain.GetGradingDTO{
-			OrgSlug:  strings.TrimSpace(r.PathValue("org")),
-			RepoSlug: strings.TrimSpace(r.PathValue("repo")),
-		},
+		domain.GetGradingDTO{OrgSlug: orgSlug, RepoSlug: repoSlug},
 	)
+
+	h.recordUserAction(r, domain.AuditActionGrading, orgSlug, repoSlug, err)
+
 	if err != nil {
 		writeError(w, err)
 		return
@@ -402,15 +405,17 @@ func (h *Handler) RequestLLMRecommendations(
 	w stdhttp.ResponseWriter,
 	r *stdhttp.Request,
 ) {
+	orgSlug, repoSlug := strings.TrimSpace(r.PathValue("org")), strings.TrimSpace(r.PathValue("repo"))
+
 	result, err := h.service.RequestLLMRecommendations(
 		r.Context(),
 		clientIP(r),
 		patFromRequest(r),
-		domain.RequestLLMRecommendationsDTO{
-			OrgSlug:  strings.TrimSpace(r.PathValue("org")),
-			RepoSlug: strings.TrimSpace(r.PathValue("repo")),
-		},
+		domain.RequestLLMRecommendationsDTO{OrgSlug: orgSlug, RepoSlug: repoSlug},
 	)
+
+	h.recordUserAction(r, domain.AuditActionRecommendations, orgSlug, repoSlug, err)
+
 	if err != nil {
 		writeError(w, err)
 		return

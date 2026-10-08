@@ -19,6 +19,8 @@ import (
 type fakeService struct {
 	err error
 
+	userActions []domain.UserAction
+
 	pat      string
 	grading  domain.GetGradingDTO
 	ranking  domain.GetRankingDTO
@@ -96,6 +98,10 @@ func (f *fakeService) ListRegradeBatches(context.Context, int32) ([]domain.Regra
 
 func (f *fakeService) ListAudit(ctx context.Context, filter domain.AuditFilter) (domain.AuditPage, error) {
 	return domain.AuditPage{}, f.err
+}
+
+func (f *fakeService) RecordUserAction(ctx context.Context, action domain.UserAction) {
+	f.userActions = append(f.userActions, action)
 }
 
 func (f *fakeService) GetPlatformStats(ctx context.Context, clientIP string) (domain.PlatformStats, error) {

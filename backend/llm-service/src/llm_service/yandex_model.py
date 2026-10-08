@@ -18,11 +18,13 @@ from .model_response import InvalidModelResponse
 from .formatted_response import parse_formatted_response
 from .documentation_result import documentation_payload
 from .snapshot import Snapshot
+from . import metrics
 
 API_URL = "https://ai.api.cloud.yandex.net/v1/responses"
 # Approximate UTF-8 guardrails, below the model context windows with room for output.
 # These are safety caps, not token counts; the provider tokenizer is authoritative.
 MODEL_INPUT_BYTE_LIMITS = {"aliceai-llm": 220_000, "aliceai-llm-flash": 96_000}
+metrics.init_series(MODEL_INPUT_BYTE_LIMITS)
 
 # The Python validator remains authoritative. This schema gives the model a precise
 # response envelope; strict=False means local validation is still required.
@@ -215,7 +217,11 @@ class YandexModel:
                  json_output: bool = False, json_schema: dict | None = None,
                  schema_name: str = "documentation_grading",
                  schema_description: str = "Documentation grading checks only",
-                 timeout_seconds: float | None = None) -> bytes:
+                 timeout_seconds: float | None = None,
+                 purpose: str = "documentation") -> bytes:
+        """Send one prompt and return the reply text. ``purpose`` (summary or documentation) only labels
+        the metrics: every call is counted with its outcome and duration, and the tokens the provider
+        reports in ``usage`` are counted even when the reply is then rejected."""
         if not isinstance(prompt, str) or not prompt:
             raise ValueError("model prompt must be nonempty text")
         prompt_bytes = len(prompt.encode("utf-8"))
@@ -253,6 +259,26 @@ class YandexModel:
             self.config.timeout_seconds, timeout_seconds)
         if timeout <= 0:
             raise ModelDeadlineExceeded("Documentation model time budget expired")
+        started = monotonic()
+        outcome = "error"
+        try:
+            text = self._send(request, timeout, purpose)
+            outcome = "ok"
+            return text
+        except ModelRateLimited:
+            outcome = "rate_limited"
+            raise
+        except ModelContentFiltered:
+            outcome = "content_filtered"
+            raise
+        except ModelDeadlineExceeded:
+            outcome = "timeout"
+            raise
+        finally:
+            metrics.record_call(self.config.model, purpose, outcome, monotonic() - started)
+
+    def _send(self, request: Request, timeout: float, purpose: str) -> bytes:
+        """The network call and the reply parsing, split out so ``complete`` can time and count it."""
         try:
             with urlopen(request, timeout=timeout) as response:
                 raw = response.read(1_000_001)
@@ -280,6 +306,9 @@ class YandexModel:
             payload = json.loads(raw)
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise ModelProviderError("Yandex AI Studio returned invalid JSON") from exc
+        # Tokens are billed whatever happens to the reply next (filtered, incomplete, rejected format).
+        metrics.record_usage(self.config.model, purpose,
+                             payload.get("usage") if isinstance(payload, dict) else None)
         if isinstance(payload, dict) and payload.get("status") == "incomplete":
             details = payload.get("incomplete_details")
             reason = (details.get("reason") if isinstance(details, dict) else None) or payload.get("reason")

@@ -110,6 +110,27 @@ var Catalog = []Definition{
 		Name: "batch_items", Unit: "count",
 		Query: `round(sum by (status) (increase(aggregator_regrade_batch_items_total[1h])))`,
 	},
+	// The LLM service's own counters: tokens as the provider reports them, never money, never per repository.
+	{
+		Name: "llm_tokens_per_day", Unit: "tokens", Range: "14d",
+		Query: `round(sum by (kind) (increase(llm_model_tokens_total[1d])))`,
+	},
+	{
+		Name: "llm_tokens", Unit: "tokens",
+		Query: `round(sum by (kind) (increase(llm_model_tokens_total[1h])))`,
+	},
+	{
+		Name: "llm_tokens_by_purpose", Unit: "tokens",
+		Query: `round(sum by (purpose) (increase(llm_model_tokens_total{kind=~"input|output"}[1h])))`,
+	},
+	{
+		Name: "llm_calls", Unit: "count",
+		Query: `round(sum by (outcome) (increase(llm_model_calls_total[1h])))`,
+	},
+	{
+		Name: "llm_call_p95_seconds", Unit: "seconds",
+		Query: `histogram_quantile(0.95, sum by (le) (rate(llm_model_call_duration_seconds_bucket[30m])))`,
+	},
 	{
 		Name: "admin_denied", Unit: "count",
 		Query: `round(sum by (reason) (increase(gateway_admin_denied_total[1h])))`,

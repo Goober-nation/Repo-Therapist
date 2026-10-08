@@ -42,6 +42,8 @@ type GatewayService struct {
 	adminIDs       map[string]struct{}
 	auditSecret    []byte
 	adminDeniedLog Limiter
+	// userAuditDedup lets one identical user action through to the audit log once per window.
+	userAuditDedup Limiter
 
 	// Password unlock (see SetAdminUnlock).
 	series        SeriesSource

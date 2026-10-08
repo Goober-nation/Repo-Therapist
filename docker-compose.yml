@@ -131,6 +131,7 @@ services:
       ADMIN_UNLOCK_LOCK: ${ADMIN_UNLOCK_LOCK:-15m}
       ADMIN_DENIED_LOG_LIMIT: ${ADMIN_DENIED_LOG_LIMIT:-5}
       ADMIN_DENIED_LOG_WINDOW: ${ADMIN_DENIED_LOG_WINDOW:-10m}
+      USER_AUDIT_WINDOW: ${USER_AUDIT_WINDOW:-5m}
       AUDIT_RETENTION_DAYS: ${AUDIT_RETENTION_DAYS:-30}
       BATCH_REGRADE_CONCURRENCY: ${BATCH_REGRADE_CONCURRENCY:-3}
       BATCH_REGRADE_MAX_REPOS: ${BATCH_REGRADE_MAX_REPOS:-500}
@@ -160,6 +161,8 @@ services:
       # Documentation is graded without the model for now (presence of sections only);
       # set LLM_DOCS_MODE=auto in .env to bring the model back.
       LLM_DOCS_MODE: ${LLM_DOCS_MODE:-algorithmic}
+      # Model calls and tokens for Prometheus (docs/metrics.md); the port is internal, never published.
+      LLM_METRICS_PORT: "9104"
     restart: unless-stopped
     depends_on:
       kafka:
@@ -172,6 +175,7 @@ services:
     env_file: .env
     environment:
       KAFKA_BROKERS: kafka:29092
+      LLM_METRICS_PORT: "9105"
     command: ["python", "-m", "llm_service", "--listen-summary"]
     restart: unless-stopped
     depends_on:

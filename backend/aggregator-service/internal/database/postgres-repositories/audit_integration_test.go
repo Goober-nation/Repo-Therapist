@@ -133,3 +133,64 @@ func TestAuditRepositoryInsertListAndPurge(t *testing.T) {
 		t.Errorf("rows left after purge = %d, want 2", count)
 	}
 }
+
+// The scope filter splits the log by action prefix. Rows carry the actor hash "beadbeadbeadbead".
+func TestAuditRepositoryScopeSplitsUserActionsFromTheAdminJournal(t *testing.T) {
+	dsn := os.Getenv("POSTGRES_DSN")
+	if dsn == "" {
+		t.Skip("POSTGRES_DSN not set")
+	}
+
+	ctx := context.Background()
+
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+
+	const marker = "beadbeadbeadbead"
+
+	cleanup := func() { _, _ = pool.Exec(ctx, `DELETE FROM audit_log WHERE actor_hash = $1`, marker) }
+	cleanup()
+	defer cleanup()
+
+	repo := NewAuditRepository(pool)
+
+	for _, action := range []string{"grading.request", "recommendations.request", "admin.denied", "regrade.batch.start", "gradingx.other"} {
+		if err := repo.InsertAudit(ctx, domain.AuditEvent{ActorKind: "user", ActorHash: marker, Action: action, Outcome: "ok"}); err != nil {
+			t.Fatalf("insert %s: %v", action, err)
+		}
+	}
+
+	actionsOf := func(scope string) map[string]bool {
+		entries, err := repo.ListAudit(ctx, domain.AuditFilter{Limit: 200, Scope: scope})
+		if err != nil {
+			t.Fatalf("scope %q: %v", scope, err)
+		}
+
+		got := map[string]bool{}
+
+		for _, entry := range entries {
+			if entry.ActorHash == marker {
+				got[entry.Action] = true
+			}
+		}
+
+		return got
+	}
+
+	users, admin, all := actionsOf(domain.AuditScopeUsers), actionsOf(domain.AuditScopeAdmin), actionsOf("")
+
+	if len(users) != 2 || !users["grading.request"] || !users["recommendations.request"] {
+		t.Errorf("users scope = %v, want exactly the two user actions", users)
+	}
+
+	if len(admin) != 3 || users["admin.denied"] || !admin["admin.denied"] || !admin["regrade.batch.start"] || !admin["gradingx.other"] {
+		t.Errorf("admin scope = %v, want the other three", admin)
+	}
+
+	if len(all) != 5 {
+		t.Errorf("no scope = %v, want all five", all)
+	}
+}

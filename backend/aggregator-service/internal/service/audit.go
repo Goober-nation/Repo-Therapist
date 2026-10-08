@@ -53,6 +53,10 @@ func (as *AggregatorService) ListAudit(ctx context.Context, filter domain.AuditF
 		return domain.AuditPage{}, fmt.Errorf("%w: unknown outcome %q", domain.ErrInvalidAudit, filter.Outcome)
 	}
 
+	if filter.Scope != "" && filter.Scope != domain.AuditScopeAdmin && filter.Scope != domain.AuditScopeUsers {
+		return domain.AuditPage{}, fmt.Errorf("%w: unknown scope %q", domain.ErrInvalidAudit, filter.Scope)
+	}
+
 	if len(filter.Action) > domain.MaxAuditActionLength+1 {
 		return domain.AuditPage{}, fmt.Errorf("%w: action filter is too long", domain.ErrInvalidAudit)
 	}

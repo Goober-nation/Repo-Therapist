@@ -1304,7 +1304,9 @@ type ListAuditRequest struct {
 	// An exact action, or one ending in "." for a prefix (e.g. "admin.").
 	Action string `protobuf:"bytes,3,opt,name=action,proto3" json:"action,omitempty"`
 	// ok | denied | error; empty means any.
-	Outcome       string `protobuf:"bytes,4,opt,name=outcome,proto3" json:"outcome,omitempty"`
+	Outcome string `protobuf:"bytes,4,opt,name=outcome,proto3" json:"outcome,omitempty"`
+	// admin | users: the admin journal or the user-action entries; empty means both.
+	Scope         string `protobuf:"bytes,5,opt,name=scope,proto3" json:"scope,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1363,6 +1365,13 @@ func (x *ListAuditRequest) GetAction() string {
 func (x *ListAuditRequest) GetOutcome() string {
 	if x != nil {
 		return x.Outcome
+	}
+	return ""
+}
+
+func (x *ListAuditRequest) GetScope() string {
+	if x != nil {
+		return x.Scope
 	}
 	return ""
 }
@@ -2447,12 +2456,13 @@ const file_agg_client_proto_rawDesc = "" +
 	"\x06target\x18\x05 \x01(\tR\x06target\x12\x18\n" +
 	"\aoutcome\x18\x06 \x01(\tR\aoutcome\x12\x18\n" +
 	"\adetails\x18\a \x01(\fR\adetails\"\x15\n" +
-	"\x13RecordAuditResponse\"w\n" +
+	"\x13RecordAuditResponse\"\x8d\x01\n" +
 	"\x10ListAuditRequest\x12\x14\n" +
 	"\x05limit\x18\x01 \x01(\x05R\x05limit\x12\x1b\n" +
 	"\tbefore_id\x18\x02 \x01(\x03R\bbeforeId\x12\x16\n" +
 	"\x06action\x18\x03 \x01(\tR\x06action\x12\x18\n" +
-	"\aoutcome\x18\x04 \x01(\tR\aoutcome\"\x9c\x02\n" +
+	"\aoutcome\x18\x04 \x01(\tR\aoutcome\x12\x14\n" +
+	"\x05scope\x18\x05 \x01(\tR\x05scope\"\x9c\x02\n" +
 	"\n" +
 	"AuditEntry\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12;\n" +

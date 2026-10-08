@@ -194,3 +194,15 @@ fields follow the [Responses API reference](https://aistudio.yandex.ru/en/docs/a
 Excluded checks (NOT_APPLICABLE or algorithmically not_reviewed) are normalized
 to null scores and empty deductions before validating their unused values.
 Evaluated checks retain score type/range validation.
+
+## Metrics
+
+`llm_service.metrics` counts every model call (`llm_model_calls_total{model,purpose,outcome}`), its duration, and the
+tokens the provider reports in the reply's `usage` object (`llm_model_tokens_total{model,purpose,kind}`, kinds `input`,
+`output` and `cached_input`). `purpose` is `summary` or `documentation`; a format retry is a second call; tokens are
+counted even when the reply is then rejected. Labels are fixed words only: no repository, no prompt text, and the
+`model` label is the configured model name, not the provider URI (which contains the folder ID). Prices are not part of
+this: the admin dashboard shows tokens.
+
+The endpoint is served by `--listen` and `--listen-summary` on `LLM_METRICS_PORT` (empty = off; compose sets 9104 and
+9105). See [docs/metrics.md](../../docs/metrics.md).

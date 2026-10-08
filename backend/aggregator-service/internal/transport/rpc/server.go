@@ -225,6 +225,7 @@ func (s *Server) ListAudit(
 		BeforeID: req.GetBeforeId(),
 		Action:   req.GetAction(),
 		Outcome:  req.GetOutcome(),
+		Scope:    req.GetScope(),
 	})
 	if err != nil {
 		return nil, mapError(err)

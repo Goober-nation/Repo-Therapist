@@ -204,6 +204,8 @@ message ListAuditRequest {
   string action = 3;
   // ok | denied | error; empty means any.
   string outcome = 4;
+  // admin | users: the admin journal or the user-action entries; empty means both.
+  string scope = 5;
 }
 
 message AuditEntry {

@@ -90,3 +90,23 @@ func TestHashSecretIsOptional(t *testing.T) {
 		t.Error("the list is part of the derivation")
 	}
 }
+
+func TestUserAuditWindow(t *testing.T) {
+	t.Setenv("USER_AUDIT_WINDOW", "")
+
+	if got := LoadConfig().Admin.UserAuditWindow; got != 5*time.Minute {
+		t.Errorf("default window = %s, want 5m", got)
+	}
+
+	t.Setenv("USER_AUDIT_WINDOW", "90s")
+
+	if got := LoadConfig().Admin.UserAuditWindow; got != 90*time.Second {
+		t.Errorf("window = %s, want 90s", got)
+	}
+
+	t.Setenv("USER_AUDIT_WINDOW", "0")
+
+	if got := LoadConfig().Admin.UserAuditWindow; got != 0 {
+		t.Errorf("window = %s, want 0 (the audit of user actions off)", got)
+	}
+}

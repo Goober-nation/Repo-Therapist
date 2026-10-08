@@ -138,3 +138,58 @@ test("the pager shows the page number, and only the directions that exist", asyn
   assert.match(html({ isLoading: true }), /disabled=""[^>]*>Назад/)
   assert.equal(html({ hasPrevious: false, hasNext: false }), "")
 })
+
+test("a user action reads as a request with its state, and a token request says the repo is hidden", () => {
+  const row = view.auditRow(
+    entry({
+      actor_kind: "user",
+      action: "grading.request",
+      target_kind: "repo",
+      target: "3f9a1c0b7d2e4a65",
+      details: { state: "pending", access: "token" },
+      outcome: "ok",
+    }),
+  )
+  assert.equal(row.action, "Запрос оценки репозитория")
+  assert.equal(row.target, "Репозиторий: 3f9a1c0b7d2e4a65")
+  assert.equal(row.note, "оценка ещё считается · по токену, репозиторий скрыт хешем")
+
+  const recommendation = view.auditRow(
+    entry({ action: "recommendations.request", details: { reason: "grading_limit", access: "public" }, outcome: "denied" }),
+  )
+  assert.equal(recommendation.action, "Запрос рекомендаций от модели")
+  assert.equal(recommendation.note, "достигнут общий лимит оценок")
+})
+
+test("the user-action filter names both actions and the all option sends nothing", () => {
+  assert.deepEqual(
+    view.USER_ACTION_FILTERS.map((option) => option.value),
+    ["", "grading.request", "recommendations.request"],
+  )
+})
+
+test("getAudit sends the scope and the action", async () => {
+  const urls = []
+  const api = new HttpRepoHealthApi({
+    fetcher: async (url) => {
+      urls.push(url)
+      return new Response(JSON.stringify({ entries: [], next_before_id: 0 }), { status: 200 })
+    },
+  })
+  await api.getAudit({ scope: "users", action: "grading.request", limit: 10 })
+  await api.getAudit({ scope: "admin" })
+  assert.deepEqual(urls, ["/api/admin/audit?limit=10&action=grading.request&scope=users", "/api/admin/audit?scope=admin"])
+})
+
+test("the access page shows the admin journal and the user-action block", async () => {
+  const { default: AuditLog } = await vite.ssrLoadModule("/src/components/AuditLog.tsx")
+  const { renderToStaticMarkup } = await import("react-dom/server")
+  const { createElement } = await import("react")
+  const api = new HttpRepoHealthApi({ fetcher: async () => new Response("{}", { status: 200 }) })
+  const users = renderToStaticMarkup(createElement(AuditLog, { api, scope: "users" }))
+  const admin = renderToStaticMarkup(createElement(AuditLog, { api }))
+  assert.match(users, /Действия пользователей/)
+  assert.match(users, /Запросы рекомендаций/)
+  assert.doesNotMatch(admin, /Запросы рекомендаций/)
+  assert.match(admin, /Входы и действия администраторов/)
+})

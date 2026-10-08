@@ -482,3 +482,40 @@ func TestLogoutErrorsKeepTheCookie(t *testing.T) {
 		}
 	}
 }
+
+func TestGradingAndRecommendationsReportTheUserAction(t *testing.T) {
+	for route, action := range map[string]string{
+		"/grading/my-org/my-repo":         domain.AuditActionGrading,
+		"/recommendations/my-org/my-repo": domain.AuditActionRecommendations,
+	} {
+		svc := &fakeService{}
+
+		serve(t, svc, "GET", route+"?x=1", map[string]string{"Cookie": "session_id=abc", "PAT": "Bearer tok", "X-Forwarded-For": "198.51.100.7"})
+
+		if len(svc.userActions) != 1 {
+			t.Fatalf("%s: %d actions reported, want 1", route, len(svc.userActions))
+		}
+
+		got := svc.userActions[0]
+		if got.Action != action || got.SessionID != "abc" || !got.HasToken || got.OrgSlug != "my-org" || got.RepoSlug != "my-repo" || got.Err != nil {
+			t.Errorf("%s: reported %+v", route, got)
+		}
+	}
+}
+
+func TestAFailedRequestIsReportedWithItsErrorAndNoToken(t *testing.T) {
+	svc := &fakeService{err: domain.ErrNotFound}
+
+	serve(t, svc, "GET", "/grading/o/r", nil)
+
+	if len(svc.userActions) != 1 || !errors.Is(svc.userActions[0].Err, domain.ErrNotFound) || svc.userActions[0].HasToken || svc.userActions[0].SessionID != "" {
+		t.Errorf("reported %+v", svc.userActions)
+	}
+}
+
+func TestAuditRouteForwardsAValidScope(t *testing.T) {
+	filter, err := mapAuditRequest(httptest.NewRequest("GET", "/admin/audit?scope=users&limit=10", nil))
+	if err != nil || filter.Scope != "users" || filter.Limit != 10 {
+		t.Errorf("filter = %+v, err %v", filter, err)
+	}
+}

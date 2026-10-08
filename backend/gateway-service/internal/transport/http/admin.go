@@ -45,6 +45,19 @@ func isSafeMethod(method string) bool {
 	return method == stdhttp.MethodGet || method == stdhttp.MethodHead || method == stdhttp.MethodOptions
 }
 
+// recordUserAction reports a finished grading or recommendation request to the audit log.
+func (h *Handler) recordUserAction(r *stdhttp.Request, action, orgSlug, repoSlug string, err error) {
+	h.service.RecordUserAction(r.Context(), domain.UserAction{
+		Action:    action,
+		SessionID: sessionCookie(r),
+		ClientIP:  clientIP(r),
+		HasToken:  patFromRequest(r) != "",
+		OrgSlug:   orgSlug,
+		RepoSlug:  repoSlug,
+		Err:       err,
+	})
+}
+
 func sessionCookie(r *stdhttp.Request) string {
 	cookie, err := r.Cookie(sessionCookieName)
 	if err != nil {
@@ -213,7 +226,7 @@ func (h *Handler) GetAudit(w stdhttp.ResponseWriter, r *stdhttp.Request, _ domai
 
 func mapAuditRequest(r *stdhttp.Request) (domain.AuditFilter, error) {
 	query := r.URL.Query()
-	filter := domain.AuditFilter{Action: query.Get("action"), Outcome: query.Get("outcome")}
+	filter := domain.AuditFilter{Action: query.Get("action"), Outcome: query.Get("outcome"), Scope: query.Get("scope")}
 
 	if value := query.Get("limit"); value != "" {
 		limit, err := strconv.ParseInt(value, 10, 32)

@@ -25,6 +25,7 @@ const (
 	AuditOutcomeError  = "error"
 
 	AuditTargetRoute = "route"
+	AuditTargetRepo  = "repo"
 )
 
 // AuditEvent is one event the Gateway reports to the Aggregator, which owns the audit log.
@@ -45,12 +46,32 @@ type AuditEntry struct {
 	AuditEvent
 }
 
-// AuditFilter selects a page of the log; zero values mean the Aggregator's defaults.
+// AuditFilter selects a page of the log; zero values mean the Aggregator's defaults. Scope is
+// "admin" (the admin journal), "users" (the user-action entries) or empty (both).
 type AuditFilter struct {
 	Limit    int32
 	BeforeID int64
 	Action   string
 	Outcome  string
+	Scope    string
+}
+
+// Audit actions of what a user does (docs/admin.md).
+const (
+	AuditActionGrading         = "grading.request"
+	AuditActionRecommendations = "recommendations.request"
+)
+
+// UserAction is one user request to report to the audit log once it is answered. Err is what the
+// request returned; HasToken tells whether it carried an access token (so the repo may be private).
+type UserAction struct {
+	Action    string
+	SessionID string
+	ClientIP  string
+	HasToken  bool
+	OrgSlug   string
+	RepoSlug  string
+	Err       error
 }
 
 // AuditPage is one page, newest first, and the cursor of the next (0 on the last page).

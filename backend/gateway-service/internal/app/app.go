@@ -178,6 +178,10 @@ func StartApp() {
 		service.NewRedisLimiter(redisClient, cfg.Admin.DeniedLog.Limit, cfg.Admin.DeniedLog.Window),
 	)
 
+	if cfg.Admin.UserAuditWindow > 0 {
+		gatewayService.SetUserAudit(service.NewRedisLimiter(redisClient, 1, cfg.Admin.UserAuditWindow))
+	}
+
 	gatewayService.SetAdminUnlock(
 		cfg.Admin.Password,
 		redis_repository.NewAdminGrantStore(redisClient),

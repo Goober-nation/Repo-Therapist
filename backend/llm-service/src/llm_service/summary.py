@@ -205,7 +205,7 @@ def generate_summary(model, request, *, timeout_seconds=60):
         raw = model.complete(prompt, max_output_tokens=2048, json_schema=_schema(scores),
                              schema_name="repository_summary",
                              schema_description="Repository health summary and recommendations",
-                             timeout_seconds=remaining)
+                             timeout_seconds=remaining, purpose="summary")
         if monotonic() >= deadline:
             raise ModelDeadlineExceeded("Summary model time budget expired")
         try:

@@ -66,6 +66,22 @@ func (r *AuditRepository) ListAudit(ctx context.Context, filter domain.AuditFilt
 		add("outcome = $%d", filter.Outcome)
 	}
 
+	if filter.Scope != "" {
+		// The prefixes are fixed constants, so the clause is assembled from fixed text and parameters.
+		patterns := make([]string, 0, len(domain.UserActionPrefixes))
+		for _, prefix := range domain.UserActionPrefixes {
+			patterns = append(patterns, escapeLike(prefix)+"%")
+		}
+
+		args = append(args, patterns)
+
+		if filter.Scope == domain.AuditScopeUsers {
+			where = append(where, fmt.Sprintf("action LIKE ANY($%d)", len(args)))
+		} else {
+			where = append(where, fmt.Sprintf("NOT (action LIKE ANY($%d))", len(args)))
+		}
+	}
+
 	query := "SELECT id, occurred_at, actor_kind, actor_hash, action, target_kind, target, outcome, details FROM audit_log"
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")

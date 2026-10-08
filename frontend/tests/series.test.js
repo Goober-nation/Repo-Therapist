@@ -44,7 +44,12 @@ test("the graphs the tabs ask for are exactly the series the Gateway serves", ()
       "admin_denied",
     ],
   )
-  for (const info of [...view.PUBLIC_SERIES, ...view.ADMIN_SERIES]) {
+  assert.deepEqual(
+    view.LLM_SERIES.map((s) => s.name),
+    ["llm_tokens_per_day", "llm_tokens", "llm_tokens_by_purpose", "llm_calls", "llm_call_p95_seconds"],
+  )
+  assert.deepEqual(view.LLM_SERIES.filter((s) => s.fixedRange).map((s) => s.name), ["llm_tokens_per_day"])
+  for (const info of [...view.PUBLIC_SERIES, ...view.ADMIN_SERIES, ...view.LLM_SERIES]) {
     assert.ok(info.title && info.description, info.name)
     assert.doesNotMatch(`${info.title} ${info.description}`, /админк/i)
   }
@@ -65,6 +70,8 @@ test("axis ticks move in round steps, and counts in whole numbers", () => {
   assert.equal(view.tickStep("count", 4), 1) // ticks 0 1 2 3 4
   assert.equal(view.tickStep("count", 5), 2) // 0 2 4 6 8
   assert.equal(view.tickStep("count", 0.3), 1)
+  assert.equal(view.tickStep("tokens", 0.3), 1)
+  assert.equal(view.tickStep("tokens", 4000), 1000)
   assert.equal(view.tickStep("seconds", 0.3), 0.1)
   assert.equal(view.tickStep("seconds", 41), 20) // 41 / 4 = 10.25 is just over 10, so the next round step
 })
@@ -85,6 +92,10 @@ test("values read in Russian style with their unit", () => {
   // Tiny rates keep distinct axis ticks instead of repeating one rounded value.
   assert.deepEqual([0, 0.002, 0.004, 0.006, 0.01].map((v) => view.formatValue("per_second", v)), ["0 /с", "0,002 /с", "0,004 /с", "0,006 /с", "0,010 /с"])
   assert.equal(view.formatValue("count", Infinity), "—")
+  assert.equal(view.formatValue("tokens", 0), "0")
+  assert.equal(view.formatValue("tokens", 950), "950")
+  assert.equal(view.formatValue("tokens", 1234567), "1\u00a0234\u00a0567")
+  assert.equal(view.formatValue("tokens", 12000.4), "12\u00a0000")
 })
 
 test("legend text is Russian for known groupings and honest for unknown ones", () => {
@@ -96,6 +107,9 @@ test("legend text is Russian for known groupings and honest for unknown ones", (
   assert.equal(view.lineLabel("limiter_rejections", "", "Отказы по лимиту"), "Отказы по лимиту")
   // A label named like an Object property must not read the prototype.
   assert.equal(view.lineLabel("batch_items", "constructor", "x"), "constructor")
+  assert.equal(view.lineLabel("llm_tokens", "cached_input", "x"), "из них из кэша")
+  assert.equal(view.lineLabel("llm_tokens_by_purpose", "summary", "x"), "рекомендации")
+  assert.equal(view.lineLabel("llm_calls", "rate_limited", "x"), "лимит провайдера")
 })
 
 test("curves are placed by real time and scaled to a round maximum", () => {
@@ -152,6 +166,18 @@ test("empty curves are dropped and an ungrouped curve is named by its graph", ()
   ])
   assert.deepEqual(lines, [{ label: "успешно", points: [[1, 2]] }])
   assert.equal(view.chartLines("limiter_rejections", "Отказы", [{ label: "", points: [[1, 0]] }])[0].label, "Отказы")
+})
+
+test("curves that stayed at zero are hidden while another one has data, and kept when all are zero", () => {
+  const zero = (label) => ({ label, points: [[1, 0], [2, 0]] })
+  const some = { label: "ok", points: [[1, 0], [2, 4]] }
+
+  const mixed = view.chartLines("llm_calls", "Вызовы", [some, zero("error"), zero("timeout")])
+  assert.deepEqual(mixed.map((l) => l.label), ["успешно"])
+
+  // Nothing happened at all: the curves stay, so the graph can say so instead of looking broken.
+  const quiet = view.chartLines("llm_calls", "Вызовы", [zero("ok"), zero("error")])
+  assert.deepEqual(quiet.map((l) => l.label), ["успешно", "ошибка"])
 })
 
 test("graph calls use the public and admin routes and never send PromQL", async () => {
@@ -242,7 +268,9 @@ test("a graph card starts loading and has a title and description", () => {
 test("the admin panel lists every graph with a period choice and says what is not on them", () => {
   const api = new HttpRepoHealthApi({ fetcher: async () => new Response("{}", { status: 200 }) })
   const html = renderToStaticMarkup(createElement(MetricsPanel, { api }))
-  for (const info of view.ADMIN_SERIES) assert.ok(html.includes(info.title), info.title)
+  for (const info of [...view.ADMIN_SERIES, ...view.LLM_SERIES]) assert.ok(html.includes(info.title), info.title)
+  assert.match(html, /Расход LLM/)
+  assert.match(html, /Деньги не считаются/)
   assert.match(html, /Период/)
   assert.match(html, /<option value="24h" selected="">Сутки/)
   assert.match(html, /ни репозиториев, ни пользователей/)
