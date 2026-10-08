@@ -211,7 +211,7 @@ export interface AiReport {
   recommendations: Recommendation[]
 }
 
-export type PageId = "ranking" | "my" | "rules" | "overview"
+export type PageId = "ranking" | "analytics" | "access" | "my" | "rules" | "overview"
 
 /** One stored public grading; a null category score means that category had no data. */
 export interface ScorePoint {

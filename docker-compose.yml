@@ -78,6 +78,21 @@ services:
       postgres:
         condition: service_healthy
 
+  # Metrics store (docs/metrics.md). Scrapes the services' own metrics ports on the internal network; its UI
+  # is bound to localhost only.
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+    ports:
+      - "127.0.0.1:8056:9090"
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    restart: unless-stopped
+
   go-services:
     build:
       context: .
@@ -105,6 +120,24 @@ services:
       # Public JSON score API (GET /score/...): its own per-IP budget; badges and the widget are not limited.
       PUBLIC_API_RATE_LIMIT: ${PUBLIC_API_RATE_LIMIT:-300}
       PUBLIC_API_RATE_LIMIT_WINDOW: ${PUBLIC_API_RATE_LIMIT_WINDOW:-1m}
+      EXPORT_RATE_LIMIT: ${EXPORT_RATE_LIMIT:-5}
+      EXPORT_RATE_LIMIT_WINDOW: ${EXPORT_RATE_LIMIT_WINDOW:-1m}
+      ANALYTICS_CACHE_SECONDS: ${ANALYTICS_CACHE_SECONDS:-300}
+      # "Доступ админа" (docs/admin.md): off until ADMIN_PASSWORD or ADMIN_YANDEX_IDS is set; AUDIT_HASH_SECRET is optional.
+      ADMIN_YANDEX_IDS: ${ADMIN_YANDEX_IDS:-}
+      AUDIT_HASH_SECRET: ${AUDIT_HASH_SECRET:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_UNLOCK_MAX_ATTEMPTS: ${ADMIN_UNLOCK_MAX_ATTEMPTS:-5}
+      ADMIN_UNLOCK_LOCK: ${ADMIN_UNLOCK_LOCK:-15m}
+      ADMIN_DENIED_LOG_LIMIT: ${ADMIN_DENIED_LOG_LIMIT:-5}
+      ADMIN_DENIED_LOG_WINDOW: ${ADMIN_DENIED_LOG_WINDOW:-10m}
+      AUDIT_RETENTION_DAYS: ${AUDIT_RETENTION_DAYS:-30}
+      BATCH_REGRADE_CONCURRENCY: ${BATCH_REGRADE_CONCURRENCY:-3}
+      BATCH_REGRADE_MAX_REPOS: ${BATCH_REGRADE_MAX_REPOS:-500}
+      BATCH_REGRADE_ITEM_TIMEOUT: ${BATCH_REGRADE_ITEM_TIMEOUT:-15m}
+      # Monitoring (docs/metrics.md): the graphs of the admin and Analytics tabs read Prometheus; empty turns them off.
+      PROMETHEUS_URL: ${PROMETHEUS_URL:-http://prometheus:9090}
+      SERIES_CACHE_SECONDS: ${SERIES_CACHE_SECONDS:-60}
     # Clones go to /dev/shm first; repository-service retries on disk if a repo outgrows it.
     shm_size: 400m
     restart: unless-stopped
@@ -156,6 +189,7 @@ services:
       - go-services
 
 volumes:
+  promdata:
   pgdata:
   s3data:
   kafkadata:

@@ -4,6 +4,7 @@ import (
 	"aggregator-service/internal/config"
 	postgres_repositories "aggregator-service/internal/database/postgres-repositories"
 	redis_repositories "aggregator-service/internal/database/redis"
+	"aggregator-service/internal/metrics"
 	"aggregator-service/internal/service"
 	"aggregator-service/internal/transport/kafka"
 	grpctransport "aggregator-service/internal/transport/rpc"
@@ -54,6 +55,8 @@ func StartApp() {
 	reposRepo.LockTimeout = cfg.Grading.LockTimeout
 	gradesRepo := postgres_repositories.NewGradesRepository(db)
 	llmRepo := postgres_repositories.NewLLMRepository(db)
+	auditRepo := postgres_repositories.NewAuditRepository(db)
+	batchRepo := postgres_repositories.NewBatchRepository(db)
 
 	redisClient := goredis.NewClient(&goredis.Options{
 		Addr:     cfg.Redis.Address,
@@ -101,6 +104,20 @@ func StartApp() {
 		cfg.GRPC.Timeout,
 		cfg.Token.Token,
 	)
+	appMetrics := metrics.New()
+	appMetrics.Serve(ctx, cfg.MetricsAddress)
+	appMetrics.RegisterScheduledRegrade(func() (bool, int, int) {
+		status := aggregatorService.GetRegradeStatus(ctx)
+
+		return status.Running, status.Total, status.Done
+	})
+
+	aggregatorService.Metrics = appMetrics
+	aggregatorService.AuditRepo = auditRepo
+	aggregatorService.BatchRepo = batchRepo
+	aggregatorService.BatchConcurrency = cfg.Batch.Concurrency
+	aggregatorService.BatchMaxRepos = cfg.Batch.MaxRepos
+	aggregatorService.BatchItemTimeout = cfg.Batch.ItemTimeout
 	aggregatorService.TokenStore = redis_repositories.NewTokenStore(redisClient)
 	aggregatorService.TokenTTL = cfg.Grading.LockTimeout
 	aggregatorService.RegradeLimit = cfg.Grading.RegradeLimit
@@ -130,7 +147,7 @@ func StartApp() {
 
 	log.Println("kafka consumers started")
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(appMetrics.UnaryServerInterceptor()))
 
 	rpcServer := grpctransport.NewServer(
 		aggregatorService,
@@ -150,6 +167,9 @@ func StartApp() {
 	}
 
 	log.Printf("grpc server listening on %s", cfg.GRPC.Address)
+
+	aggregatorService.StartAuditRetention(ctx, cfg.Audit.RetentionDays)
+	aggregatorService.ResumeBatch(ctx)
 
 	aggregatorService.StartPublicGrading(
 		ctx,

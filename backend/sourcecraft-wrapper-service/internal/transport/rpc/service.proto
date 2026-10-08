@@ -32,6 +32,11 @@ service CodeHealth {
   rpc GetMyRepos(GetMyReposRequest)
       returns (GetMyReposResponse);
 
+  // ListTopRatedRepos returns one page (100) of all repositories sorted by SourceCraft rating,
+  // highest first (GET /repos?sort_by=-rating), starting at page_token.
+  rpc ListTopRatedRepos(ListTopRatedReposRequest)
+      returns (ListTopRatedReposResponse);
+
   // GetMyOrgs lists the caller's organizations (GET /me/orgs) and picks a default:
   // the personal org (slug equal to the GET /user username), else the first one.
   rpc GetMyOrgs(GetMyOrgsRequest)
@@ -98,6 +103,15 @@ message UserOrganization {
   string slug = 2;
   string display_name = 3;
   bool personal = 4;
+}
+
+message ListTopRatedReposRequest {
+  string page_token = 1;
+}
+
+message ListTopRatedReposResponse {
+  repeated Repository repositories = 1;
+  string next_page_token = 2;
 }
 
 message GetOrgReposRequest {

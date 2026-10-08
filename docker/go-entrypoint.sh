@@ -6,11 +6,11 @@ GO_SERVICES="${GO_SERVICES:-aggregator-service sourcecraft-wrapper-service secur
 
 start() {
 	case "$1" in
-	gateway-service) gateway-service & ;;
-	rating-service) GRPC_ADDRESS=:8086 rating-service & ;;
+	gateway-service) METRICS_ADDRESS=:9101 gateway-service & ;;
+	rating-service) GRPC_ADDRESS=:8086 METRICS_ADDRESS=:9103 rating-service & ;;
 	sourcecraft-wrapper-service) APP_PORT=8082 sourcecraft-wrapper-service & ;;
 	security-wrapper-service) APP_PORT=8085 security-wrapper-service & ;;
-	aggregator-service) GRPC_ADDRESS=:8083 aggregator-service & ;;
+	aggregator-service) GRPC_ADDRESS=:8083 METRICS_ADDRESS=:9102 aggregator-service & ;;
 	repository-service) repository-service --listen & ;;
 	grade-service) grade-service --listen & ;;
 	*) echo "unknown service: $1" >&2; exit 2 ;;

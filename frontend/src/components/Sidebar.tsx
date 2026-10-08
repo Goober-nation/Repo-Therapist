@@ -13,6 +13,16 @@ const pageLinks: { id: Exclude<PageId, "overview">; label: string; icon: ReactNo
     ),
   },
   {
+    id: "analytics",
+    label: "Аналитика",
+    icon: (
+      <>
+        <path d="M3 15V9M7 15V4M11 15V7M15 15V11" />
+        <circle cx="15" cy="4" r="1.5" />
+      </>
+    ),
+  },
+  {
     id: "my",
     label: "Мои репозитории",
     icon: (
@@ -21,6 +31,16 @@ const pageLinks: { id: Exclude<PageId, "overview">; label: string; icon: ReactNo
         <rect x="10" y="3" width="3" height="3" rx="1" />
         <rect x="3" y="10" width="3" height="3" rx="1" />
         <rect x="8" y="8" width="5" height="5" rx="1" />
+      </>
+    ),
+  },
+  {
+    id: "access",
+    label: "Доступ админа",
+    icon: (
+      <>
+        <rect x="3.5" y="8" width="11" height="7" rx="1.5" />
+        <path d="M6 8V6a3 3 0 0 1 6 0v2" />
       </>
     ),
   },

@@ -117,6 +117,7 @@ const METRICS: Record<string, { label: string; percent?: boolean }> = {
   density_per_kloc: { label: "TODO/FIXME на 1000 строк" },
   share_stale_markers: { label: "Доля устаревших TODO/FIXME", percent: true },
   worst_file_concentration: { label: "Доля TODO/FIXME в одном файле", percent: true },
+  unused_private_share: { label: "Доля неиспользуемых приватных функций", percent: true },
   abandoned_share: { label: "Доля заброшенных issues", percent: true },
   median_closure_days: { label: "Медиана закрытия issue, дней" },
   growth_ratio: { label: "Открыто issues на одно закрытое" },

@@ -1,0 +1,810 @@
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log"
+	"math"
+	"strings"
+	"sync"
+	"time"
+
+	"aggregator-service/internal/domain"
+	"aggregator-service/internal/transport/rpc/gen/client"
+
+	"github.com/google/uuid"
+)
+
+// Defaults of the admin batch regrade (config BATCH_REGRADE_*).
+const (
+	DefaultBatchConcurrency = 3
+	DefaultBatchMaxRepos    = 500
+	DefaultBatchItemTimeout = 15 * time.Minute
+	DefaultBatchPoll        = 2 * time.Second
+	// DefaultBatchEstimateSeconds is the guess for one grading until batches have measured real ones.
+	DefaultBatchEstimateSeconds = 90
+
+	// gradeClockSkew tolerates the grader's clock being slightly behind ours when deciding whether a
+	// grade is newer than the start of the item.
+	gradeClockSkew = 5 * time.Second
+)
+
+// batchRunner is the process-wide state of the batch worker: at most one batch runs at a time, and
+// the batch itself lives in the database, so a restart picks it up again (ResumeBatch).
+type batchRunner struct {
+	mu      sync.Mutex
+	running bool
+}
+
+func (as *AggregatorService) batchConcurrency() int {
+	if as.BatchConcurrency > 0 {
+		return as.BatchConcurrency
+	}
+
+	return DefaultBatchConcurrency
+}
+
+func (as *AggregatorService) batchMaxRepos() int {
+	if as.BatchMaxRepos > 0 {
+		return as.BatchMaxRepos
+	}
+
+	return DefaultBatchMaxRepos
+}
+
+func (as *AggregatorService) batchItemTimeout() time.Duration {
+	if as.BatchItemTimeout > 0 {
+		return as.BatchItemTimeout
+	}
+
+	return DefaultBatchItemTimeout
+}
+
+func (as *AggregatorService) batchPoll() time.Duration {
+	if as.BatchPoll > 0 {
+		return as.BatchPoll
+	}
+
+	return DefaultBatchPoll
+}
+
+func (as *AggregatorService) requireBatches() error {
+	if as.BatchRepo == nil {
+		return fmt.Errorf("%w: batch regrade is not configured", domain.ErrInvalidBatch)
+	}
+
+	return nil
+}
+
+// batchSelection is what a filter selected. Fetched holds the SourceCraft metadata of a top-rated
+// selection, saved to repos when the batch starts (the repos may be new to the service).
+type batchSelection struct {
+	Repos   []domain.BatchCandidate
+	Fetched []domain.Repo
+	Capped  bool
+}
+
+// selectForBatch validates the filter and returns the repos it selects, public ones only.
+func (as *AggregatorService) selectForBatch(ctx context.Context, filter domain.BatchFilter) (domain.BatchFilter, batchSelection, error) {
+	if err := as.requireBatches(); err != nil {
+		return filter, batchSelection{}, err
+	}
+
+	filter = filter.Normalize()
+	if err := filter.Validate(); err != nil {
+		return filter, batchSelection{}, err
+	}
+
+	if filter.TopRated != nil {
+		sel, err := as.selectTopRated(ctx, filter, as.batchMaxRepos())
+
+		return filter, sel, err
+	}
+
+	repos, capped, err := as.BatchRepo.SelectBatchRepos(ctx, filter, as.batchMaxRepos())
+	if err != nil {
+		return filter, batchSelection{}, err
+	}
+
+	return filter, batchSelection{Repos: repos, Capped: capped}, nil
+}
+
+// TopRatedScanPages bounds how deep into SourceCraft's rating order a top-N selection looks, at 100
+// repos a page: with narrow criteria fewer than N repos may match within it.
+const TopRatedScanPages = 50
+
+// selectTopRated walks SourceCraft's repos from the highest rating down and keeps the first
+// filter.TopRated public ones that match the other criteria. Language and hand-picked slugs are
+// checked on the listing; score and age on the stored grade, with the same rules as SelectBatchRepos.
+func (as *AggregatorService) selectTopRated(ctx context.Context, filter domain.BatchFilter, limit int) (batchSelection, error) {
+	want := *filter.TopRated
+
+	languages := make(map[string]bool, len(filter.Languages))
+	for _, language := range filter.Languages {
+		languages[language] = true
+	}
+
+	picks := make(map[string]bool, len(filter.Repos))
+	for _, slug := range filter.Repos {
+		picks[lowerASCII(slug)] = true
+	}
+
+	var (
+		sel       batchSelection
+		pageToken string
+	)
+
+	for page := 0; page < TopRatedScanPages && len(sel.Repos) < want; page++ {
+		cont, cancel := context.WithTimeout(as.wrapperContext(ctx), as.RPCTimeout)
+		response, err := as.clientRPC.ListTopRatedRepos(cont, &client.ListTopRatedReposRequest{PageToken: pageToken})
+		cancel()
+
+		if err != nil {
+			return batchSelection{}, wrapperError("list top-rated repositories", err)
+		}
+
+		var (
+			matched []domain.Repo
+			ids     []uuid.UUID
+		)
+
+		for _, pbRepo := range response.GetRepositories() {
+			repo, err := repoFromWrapper(pbRepo)
+			if err != nil || repo.Visibility != domain.VisibilityPublic {
+				continue
+			}
+
+			if len(languages) > 0 && !languages[strings.ToLower(repo.Language.Name)] {
+				continue
+			}
+
+			if len(picks) > 0 && !picks[lowerASCII(repo.OrgSlug+"/"+repo.RepoSlug)] {
+				continue
+			}
+
+			matched = append(matched, repo)
+			ids = append(ids, repo.SourcecraftUUID)
+		}
+
+		grades, err := as.BatchRepo.BatchGradeInfo(ctx, ids)
+		if err != nil {
+			return batchSelection{}, err
+		}
+
+		for _, repo := range matched {
+			grade, graded := grades[repo.SourcecraftUUID]
+			if !matchesGradeCriteria(filter, grade, graded, as.now()) {
+				continue
+			}
+
+			sel.Repos = append(sel.Repos, domain.BatchCandidate{
+				RepoID: repo.SourcecraftUUID, OrgSlug: repo.OrgSlug, RepoSlug: repo.RepoSlug,
+				LastActivityAt: repo.LastActivityAt, GradedAt: grade.GradedAt,
+			})
+			sel.Fetched = append(sel.Fetched, repo)
+
+			if len(sel.Repos) == want {
+				break
+			}
+		}
+
+		pageToken = response.GetNextPageToken()
+		if pageToken == "" {
+			break
+		}
+	}
+
+	if len(sel.Repos) > limit {
+		sel.Repos, sel.Fetched, sel.Capped = sel.Repos[:limit], sel.Fetched[:limit], true
+	}
+
+	return sel, nil
+}
+
+// matchesGradeCriteria applies the score and age criteria to a stored grade: a score bound never
+// matches a repo without a grade, the age one always does.
+func matchesGradeCriteria(filter domain.BatchFilter, grade domain.BatchGrade, graded bool, now time.Time) bool {
+	scored := graded && grade.Score != nil
+
+	if filter.MinScore != nil && (!scored || *grade.Score < *filter.MinScore) {
+		return false
+	}
+
+	if filter.MaxScore != nil && (!scored || *grade.Score > *filter.MaxScore) {
+		return false
+	}
+
+	if filter.OlderThanDays != nil && graded && grade.GradedAt != nil &&
+		!grade.GradedAt.Before(now.AddDate(0, 0, -*filter.OlderThanDays)) {
+		return false
+	}
+
+	return true
+}
+
+// PreviewBatch is the dry run: how many public repos the filter selects, a sample of them, the
+// hand-picked ones that matched nothing and a rough duration. It starts nothing and writes nothing.
+func (as *AggregatorService) PreviewBatch(ctx context.Context, filter domain.BatchFilter) (domain.BatchPreview, error) {
+	filter, sel, err := as.selectForBatch(ctx, filter)
+	if err != nil {
+		return domain.BatchPreview{}, err
+	}
+
+	repos, capped := sel.Repos, sel.Capped
+	preview := domain.BatchPreview{Count: len(repos), Capped: capped}
+
+	if !filter.Force {
+		for _, repo := range repos {
+			if !domain.HasNewActivity(repo.LastActivityAt, repo.GradedAt) {
+				preview.Inactive++
+			}
+		}
+	}
+
+	for i, repo := range repos {
+		if i >= domain.PreviewSampleSize {
+			break
+		}
+
+		preview.Sample = append(preview.Sample, repo.Slug())
+	}
+
+	if !capped {
+		preview.Unmatched = unmatchedPicks(filter.Repos, repos)
+	}
+
+	per := float64(DefaultBatchEstimateSeconds)
+	if avg, err := as.BatchRepo.AvgGradeSeconds(ctx); err == nil && avg > 0 {
+		per = avg
+	}
+
+	preview.EstimateSeconds = int(math.Ceil(float64(len(repos))/float64(as.batchConcurrency())) * per)
+
+	return preview, nil
+}
+
+func unmatchedPicks(picked []string, matched []domain.BatchCandidate) []string {
+	found := make(map[string]struct{}, len(matched))
+	for _, repo := range matched {
+		found[lowerASCII(repo.Slug())] = struct{}{}
+	}
+
+	var missing []string
+
+	for _, slug := range picked {
+		if _, ok := found[lowerASCII(slug)]; !ok {
+			missing = append(missing, slug)
+		}
+	}
+
+	return missing
+}
+
+func lowerASCII(s string) string {
+	out := []byte(s)
+	for i, c := range out {
+		if c >= 'A' && c <= 'Z' {
+			out[i] = c + 'a' - 'A'
+		}
+	}
+
+	return string(out)
+}
+
+// StartBatch creates a batch for the filter and starts working on it. Only one batch can be
+// unfinished at a time (ErrBatchActive). A filter that selects nothing, or more than the batch cap, is
+// refused: narrowing it is the admin's decision, not a silent cut.
+func (as *AggregatorService) StartBatch(ctx context.Context, actorHash string, filter domain.BatchFilter) (domain.Batch, error) {
+	filter, sel, err := as.selectForBatch(ctx, filter)
+	if err != nil {
+		return domain.Batch{}, err
+	}
+
+	repos, capped := sel.Repos, sel.Capped
+
+	switch {
+	case len(repos) == 0:
+		return domain.Batch{}, domain.ErrBatchNothing
+	case capped:
+		return domain.Batch{}, domain.ErrBatchTooMany
+	}
+
+	// A cancelled batch's worker is alive until its in-flight repos finish; starting another before then
+	// would put more than the configured number of gradings in flight.
+	if as.batchWorkerBusy() {
+		return domain.Batch{}, domain.ErrBatchActive
+	}
+
+	// A top-rated selection may hold repos the service has never seen; the items need their rows.
+	for _, repo := range sel.Fetched {
+		if err := as.upsertRepo(ctx, repo); err != nil {
+			return domain.Batch{}, fmt.Errorf("save repository %s/%s: %w", repo.OrgSlug, repo.RepoSlug, err)
+		}
+	}
+
+	id, err := as.BatchRepo.CreateBatch(ctx, actorHash, filter, repos)
+	if err != nil {
+		return domain.Batch{}, err
+	}
+
+	as.auditBatch(ctx, actorHash, domain.AuditActorAdmin, "regrade.batch.start", id, map[string]any{
+		"total": len(repos), "filter": filterSummary(filter),
+	})
+
+	as.startBatchRunner(id)
+
+	return as.BatchRepo.GetBatch(ctx, id)
+}
+
+// ControlBatch pauses, resumes or cancels a batch. Pausing lets the repos already in flight finish and
+// takes no new ones; cancelling does the same and drops the rest.
+func (as *AggregatorService) ControlBatch(ctx context.Context, actorHash string, id int64, action string) (domain.Batch, error) {
+	if err := as.requireBatches(); err != nil {
+		return domain.Batch{}, err
+	}
+
+	switch action {
+	case domain.BatchActionPause:
+		ok, err := as.BatchRepo.SetBatchStatus(ctx, id, []string{domain.BatchRunning}, domain.BatchPaused)
+		if err != nil {
+			return domain.Batch{}, err
+		}
+
+		if !ok {
+			return domain.Batch{}, as.stateError(ctx, id, "only a running batch can be paused")
+		}
+
+	case domain.BatchActionResume:
+		ok, err := as.BatchRepo.SetBatchStatus(ctx, id, []string{domain.BatchPaused}, domain.BatchRunning)
+		if err != nil {
+			return domain.Batch{}, err
+		}
+
+		if !ok {
+			return domain.Batch{}, as.stateError(ctx, id, "only a paused batch can be resumed")
+		}
+
+		as.startBatchRunner(id)
+
+	case domain.BatchActionCancel:
+		batch, err := as.BatchRepo.GetBatch(ctx, id)
+		if err != nil {
+			return domain.Batch{}, err
+		}
+
+		if !batch.Active() {
+			return domain.Batch{}, fmt.Errorf("%w: the batch has already finished", domain.ErrBatchState)
+		}
+
+		if err := as.BatchRepo.FinishBatch(ctx, id, domain.BatchCancelled); err != nil {
+			return domain.Batch{}, err
+		}
+
+		if _, err := as.BatchRepo.SkipPendingItems(ctx, id); err != nil {
+			return domain.Batch{}, err
+		}
+
+	default:
+		return domain.Batch{}, fmt.Errorf("%w: unknown action %q", domain.ErrInvalidBatch, action)
+	}
+
+	as.auditBatch(ctx, actorHash, domain.AuditActorAdmin, "regrade.batch."+action, id, nil)
+
+	return as.BatchRepo.GetBatch(ctx, id)
+}
+
+// stateError explains a refused control action: the batch is missing, or in the wrong state.
+func (as *AggregatorService) stateError(ctx context.Context, id int64, reason string) error {
+	if _, err := as.BatchRepo.GetBatch(ctx, id); err != nil {
+		return err
+	}
+
+	return fmt.Errorf("%w: %s", domain.ErrBatchState, reason)
+}
+
+// BatchStatus is a batch with the repos that failed in it. id 0 means the active batch, or the
+// latest one when none is active.
+func (as *AggregatorService) BatchStatus(ctx context.Context, id int64) (domain.Batch, []domain.BatchItem, error) {
+	if err := as.requireBatches(); err != nil {
+		return domain.Batch{}, nil, err
+	}
+
+	var (
+		batch domain.Batch
+		err   error
+	)
+
+	if id == 0 {
+		batch, err = as.BatchRepo.GetActiveBatch(ctx)
+		if errors.Is(err, domain.ErrBatchNotFound) {
+			var latest []domain.Batch
+
+			if latest, err = as.BatchRepo.ListBatches(ctx, 1); err == nil {
+				if len(latest) == 0 {
+					return domain.Batch{}, nil, domain.ErrBatchNotFound
+				}
+
+				batch = latest[0]
+			}
+		}
+	} else {
+		batch, err = as.BatchRepo.GetBatch(ctx, id)
+	}
+
+	if err != nil {
+		return domain.Batch{}, nil, err
+	}
+
+	failed, err := as.BatchRepo.ListBatchItems(ctx, batch.ID, domain.BatchItemFailed, domain.MaxBatchFailuresShown)
+	if err != nil {
+		return domain.Batch{}, nil, err
+	}
+
+	return batch, failed, nil
+}
+
+// ListBatches returns the most recent batches, newest first.
+func (as *AggregatorService) ListBatches(ctx context.Context, limit int) ([]domain.Batch, error) {
+	if err := as.requireBatches(); err != nil {
+		return nil, err
+	}
+
+	if limit <= 0 || limit > 50 {
+		limit = 10
+	}
+
+	return as.BatchRepo.ListBatches(ctx, limit)
+}
+
+// ResumeBatch continues the unfinished batch after a restart: items that were mid-flight go back to
+// pending, and a running batch gets its worker again. A paused batch stays paused.
+func (as *AggregatorService) ResumeBatch(ctx context.Context) {
+	if as.BatchRepo == nil {
+		return
+	}
+
+	as.batchCtx = ctx
+
+	if err := as.BatchRepo.SkipOrphanedItems(ctx); err != nil {
+		log.Printf("resume regrade batch: %v", err)
+	}
+
+	batch, err := as.BatchRepo.GetActiveBatch(ctx)
+	if errors.Is(err, domain.ErrBatchNotFound) {
+		return
+	}
+
+	if err != nil {
+		log.Printf("resume regrade batch: %v", err)
+
+		return
+	}
+
+	if err := as.BatchRepo.RequeueRunningItems(ctx, batch.ID); err != nil {
+		log.Printf("resume regrade batch %d: %v", batch.ID, err)
+
+		return
+	}
+
+	log.Printf("regrade batch %d is %s, %d repositories left", batch.ID, batch.Status, batch.Pending+batch.Running)
+
+	if batch.Status == domain.BatchRunning {
+		as.startBatchRunner(batch.ID)
+	}
+}
+
+func (as *AggregatorService) batchWorkerBusy() bool {
+	as.batches.mu.Lock()
+	defer as.batches.mu.Unlock()
+
+	return as.batches.running
+}
+
+// startBatchRunner starts the worker unless one is already running in this process.
+func (as *AggregatorService) startBatchRunner(id int64) {
+	ctx := as.batchCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	as.batches.mu.Lock()
+	defer as.batches.mu.Unlock()
+
+	if as.batches.running {
+		return
+	}
+
+	as.batches.running = true
+
+	go func() {
+		defer func() {
+			as.batches.mu.Lock()
+			as.batches.running = false
+			as.batches.mu.Unlock()
+		}()
+
+		as.runBatch(ctx, id)
+	}()
+}
+
+// runBatch works through the batch with up to batchConcurrency repos in flight, until nothing is
+// left, it is cancelled or the process stops. Pause and cancel take effect in the database: a claim
+// only succeeds while the batch is running.
+func (as *AggregatorService) runBatch(ctx context.Context, id int64) {
+	slots := make(chan struct{}, as.batchConcurrency())
+
+	// Without the batch's filter the force flag is unknown; the activity check then runs, the
+	// cautious default (a skipped repo can be regraded by hand, a needless grading cannot be undone).
+	force := false
+	if batch, err := as.BatchRepo.GetBatch(ctx, id); err == nil {
+		force = batch.Filter.Force
+	}
+
+	var wg sync.WaitGroup
+
+loop:
+	for {
+		select {
+		case slots <- struct{}{}:
+		case <-ctx.Done():
+			break loop
+		}
+
+		item, ok, err := as.BatchRepo.ClaimNextBatchItem(ctx, id)
+		if err != nil || !ok {
+			<-slots
+
+			if err != nil && ctx.Err() == nil {
+				log.Printf("regrade batch %d: claim: %v", id, err)
+			}
+
+			if !as.batchShouldWait(ctx, id) {
+				break loop
+			}
+
+			select {
+			case <-time.After(as.batchPoll()):
+			case <-ctx.Done():
+				break loop
+			}
+
+			continue
+		}
+
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+			defer func() { <-slots }()
+
+			as.processBatchItem(ctx, id, item, force)
+		}()
+	}
+
+	wg.Wait()
+
+	if ctx.Err() != nil {
+		return
+	}
+
+	as.completeBatch(ctx, id)
+}
+
+// batchShouldWait is asked when no item could be claimed: true while the batch is paused or an
+// error hides its state, false when the batch is over or has nothing left to start.
+func (as *AggregatorService) batchShouldWait(ctx context.Context, id int64) bool {
+	batch, err := as.BatchRepo.GetBatch(ctx, id)
+	if err != nil {
+		return ctx.Err() == nil
+
+	}
+
+	switch {
+	case !batch.Active():
+		return false
+	case batch.Status == domain.BatchPaused:
+		return true
+	default:
+		return batch.Pending > 0
+	}
+}
+
+func (as *AggregatorService) completeBatch(ctx context.Context, id int64) {
+	batch, err := as.BatchRepo.GetBatch(ctx, id)
+	if err != nil || !batch.Active() || batch.Pending > 0 {
+		return
+	}
+
+	if err := as.BatchRepo.FinishBatch(ctx, id, domain.BatchCompleted); err != nil {
+		log.Printf("finish regrade batch %d: %v", id, err)
+
+		return
+	}
+
+	as.auditBatch(ctx, "", domain.AuditActorSystem, "regrade.batch.complete", id, map[string]any{
+		"total": batch.Total, "ok": batch.OK, "failed": batch.Failed,
+	})
+}
+
+// processBatchItem regrades one repo and records the outcome. A stop of the process leaves the item
+// running; ResumeBatch puts it back in the queue.
+func (as *AggregatorService) processBatchItem(ctx context.Context, batchID int64, item domain.BatchItem, force bool) {
+	status, code := as.gradeBatchItem(ctx, item.RepoID, force)
+
+	if ctx.Err() != nil {
+		return
+	}
+
+	if err := as.BatchRepo.FinishBatchItem(ctx, batchID, item.RepoID, status, code); err != nil {
+		log.Printf("regrade batch %d: record %s/%s: %v", batchID, item.OrgSlug, item.RepoSlug, err)
+	}
+
+	if as.Metrics != nil {
+		as.Metrics.BatchItem(status)
+	}
+}
+
+func (as *AggregatorService) gradeBatchItem(ctx context.Context, repoID uuid.UUID, force bool) (string, string) {
+	repo, err := as.BatchRepo.GetBatchRepo(ctx, repoID)
+	if err != nil {
+		if ctx.Err() == nil {
+			log.Printf("regrade batch: load repository %s: %v", repoID, err)
+		}
+
+		return domain.BatchItemFailed, domain.BatchErrorRequest
+	}
+
+	// A batch only ever grades public repos; this guards against a repo that changed visibility since.
+	if repo.Visibility != domain.VisibilityPublic {
+		return domain.BatchItemSkipped, ""
+	}
+
+	if !force {
+		active, err := as.batchRepoActive(ctx, repo)
+		if err != nil {
+			// An unanswered check never skips: the repo is graded as if forced.
+			log.Printf("regrade batch: activity check %s/%s: %v (grading anyway)", repo.OrgSlug, repo.RepoSlug, err)
+		} else if !active {
+			return domain.BatchItemSkipped, domain.BatchSkipNoActivity
+		}
+	}
+
+	key := llmKey(repo.SourcecraftUUID, domain.VisibilityPublic)
+	as.takeGradingFailure(key) // a failure from before this attempt must not count against it
+
+	startedAt := as.now()
+
+	if err := as.requestGrading(withTrigger(ctx, "batch"), repo, false, false); !errors.Is(err, domain.GradingPending) {
+		log.Printf("regrade batch: request %s/%s: %v", repo.OrgSlug, repo.RepoSlug, err)
+
+		return domain.BatchItemFailed, domain.BatchErrorRequest
+	}
+
+	deadline := time.NewTimer(as.batchItemTimeout())
+	defer deadline.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return domain.BatchItemFailed, domain.BatchErrorTimeout
+		case <-deadline.C:
+			return domain.BatchItemFailed, domain.BatchErrorTimeout
+		case <-time.After(as.batchPoll()):
+		}
+
+		lock, err := as.ReposRepo.GetRepositoryLock(ctx, repo.SourcecraftUUID)
+		if err != nil && !errors.Is(err, domain.ErrRepositoryNotFound) {
+			continue
+		}
+
+		if err == nil && lock.Status != "free" {
+			continue
+		}
+
+		break
+	}
+
+	if as.takeGradingFailure(key) {
+		return domain.BatchItemFailed, domain.BatchErrorGrading
+	}
+
+	grade, err := as.GradesRepo.GetPublicGradeByRepoID(ctx, repo.SourcecraftUUID)
+	if err != nil || grade.GradedAt == nil || grade.GradedAt.Before(startedAt.Add(-gradeClockSkew)) {
+		return domain.BatchItemFailed, domain.BatchErrorNoGrade
+	}
+
+	return domain.BatchItemOK, ""
+}
+
+// batchRepoActive asks SourceCraft for the repo's current last_updated (refreshing the stored
+// metadata) and reports whether it is newer than the last public grade.
+func (as *AggregatorService) batchRepoActive(ctx context.Context, repo domain.Repo) (bool, error) {
+	grade, err := as.GradesRepo.GetPublicGradeByRepoID(ctx, repo.SourcecraftUUID)
+	if errors.Is(err, domain.ErrGradeNotFound) {
+		return true, nil
+	}
+
+	if err != nil {
+		return true, fmt.Errorf("load grade: %w", err)
+	}
+
+	fresh, err := as.resolveRepo(ctx, repo.OrgSlug, repo.RepoSlug)
+	if err != nil {
+		return true, err
+	}
+
+	return domain.HasNewActivity(fresh.LastActivityAt, grade.GradedAt), nil
+}
+
+// auditBatch records a batch action. It is best effort: the batch is already changed, and a failed
+// audit write is logged rather than undoing it.
+func (as *AggregatorService) auditBatch(ctx context.Context, actorHash, actorKind, action string, id int64, details map[string]any) {
+	if as.Metrics != nil {
+		as.Metrics.BatchEvent(strings.TrimPrefix(action, "regrade.batch."))
+	}
+
+	if as.AuditRepo == nil {
+		return
+	}
+
+	var raw json.RawMessage
+
+	if details != nil {
+		raw, _ = json.Marshal(details)
+	}
+
+	err := as.RecordAudit(ctx, domain.AuditEvent{
+		ActorKind:  actorKind,
+		ActorHash:  actorHash,
+		Action:     action,
+		TargetKind: domain.AuditTargetBatch,
+		Target:     fmt.Sprintf("%d", id),
+		Outcome:    domain.AuditOutcomeOK,
+		Details:    raw,
+	})
+	if err != nil {
+		log.Printf("audit %s for batch %d: %v", action, id, err)
+	}
+}
+
+// filterSummary is the filter without the hand-picked slugs (only their count), so one audit entry
+// stays small.
+func filterSummary(filter domain.BatchFilter) map[string]any {
+	summary := map[string]any{}
+
+	if filter.All {
+		summary["all"] = true
+	}
+
+	if len(filter.Languages) > 0 {
+		summary["languages"] = filter.Languages
+	}
+
+	if filter.MinScore != nil {
+		summary["min_score"] = *filter.MinScore
+	}
+
+	if filter.MaxScore != nil {
+		summary["max_score"] = *filter.MaxScore
+	}
+
+	if filter.OlderThanDays != nil {
+		summary["older_than_days"] = *filter.OlderThanDays
+	}
+
+	if len(filter.Repos) > 0 {
+		summary["picked"] = len(filter.Repos)
+	}
+
+	if filter.TopRated != nil {
+		summary["top_rated"] = *filter.TopRated
+	}
+
+	if filter.Force {
+		summary["force"] = true
+	}
+
+	return summary
+}

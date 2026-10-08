@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"gateway-service/internal/domain"
+	"gateway-service/internal/series"
 
 	"github.com/google/uuid"
 )
@@ -43,6 +44,66 @@ type fakeService struct {
 	orgsOut     domain.GetMyOrgsDTO
 	orgReposOut domain.GetMyReposDTO
 	orgReposFor string
+}
+
+func (f *fakeService) Logout(ctx context.Context, clientIP, sessionID string) error {
+	return f.err
+}
+
+func (f *fakeService) AdminStatus(ctx context.Context, sessionID string) (domain.AdminStatus, error) {
+	return domain.AdminStatus{}, f.err
+}
+
+func (f *fakeService) UnlockAdmin(ctx context.Context, clientIP, sessionID, password string) error {
+	return f.err
+}
+
+func (f *fakeService) LockAdmin(ctx context.Context, sessionID string) error {
+	return f.err
+}
+
+func (f *fakeService) AuthenticateAdmin(ctx context.Context, clientIP, sessionID, route string) (domain.AdminIdentity, error) {
+	return domain.AdminIdentity{}, f.err
+}
+
+func (f *fakeService) PublicSeries(context.Context, string, string) (series.Result, error) {
+	return series.Result{}, nil
+}
+
+func (f *fakeService) AdminSeries(context.Context, string, string) (series.Result, error) {
+	return series.Result{}, nil
+}
+
+func (f *fakeService) PreviewRegradeBatch(context.Context, domain.BatchFilter) (domain.BatchPreview, error) {
+	return domain.BatchPreview{}, nil
+}
+
+func (f *fakeService) StartRegradeBatch(context.Context, string, domain.BatchFilter) (domain.RegradeBatch, error) {
+	return domain.RegradeBatch{}, nil
+}
+
+func (f *fakeService) ControlRegradeBatch(context.Context, string, int64, string) (domain.RegradeBatch, error) {
+	return domain.RegradeBatch{}, nil
+}
+
+func (f *fakeService) GetRegradeBatch(context.Context, int64) (domain.RegradeBatchDetail, error) {
+	return domain.RegradeBatchDetail{}, nil
+}
+
+func (f *fakeService) ListRegradeBatches(context.Context, int32) ([]domain.RegradeBatch, error) {
+	return nil, nil
+}
+
+func (f *fakeService) ListAudit(ctx context.Context, filter domain.AuditFilter) (domain.AuditPage, error) {
+	return domain.AuditPage{}, f.err
+}
+
+func (f *fakeService) GetPlatformStats(ctx context.Context, clientIP string) (domain.PlatformStats, error) {
+	return domain.PlatformStats{}, f.err
+}
+
+func (f *fakeService) ExportPublicGrades(ctx context.Context, clientIP string, emit func(domain.ExportPage) error) error {
+	return f.err
 }
 
 func (f *fakeService) GetScoreHistory(ctx context.Context, clientIP, orgSlug, repoSlug string) ([]domain.HistoryPoint, error) {

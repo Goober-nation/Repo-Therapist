@@ -3,6 +3,9 @@ import { useCallback, useEffect, useState } from "react"
 /**
  * URL routing on the History API. Paths:
  *   /                      public ranking
+ *   /analytics             statistics over all public grades and the grades export
+ *   /admin-access          "Доступ админа": enter the admin password; the admin tools show here for admins
+ *   /admin                 an old link, opens the same tab
  *   /my                    the signed-in user's repositories
  *   /repo/:org/:repo       public analysis
  *   /my/:org/:repo         private analysis with the owner's token
@@ -18,6 +21,8 @@ export interface RepoRef {
 export type Route =
   | { page: "ranking" }
   | { page: "my" }
+  | { page: "analytics" }
+  | { page: "access" }
   | { page: "rules"; section?: string }
   | { page: "compare"; a: RepoRef; b: RepoRef }
   | { page: "repository"; org: string; repo: string; private: boolean }
@@ -39,12 +44,16 @@ export function parseRoute(pathname: string): Route {
     return { page: "repository", org, repo, private: first === "my" }
   }
   if (first === "my") return { page: "my" }
+  if (first === "analytics") return { page: "analytics" }
+  if (first === "admin" || first === "admin-access") return { page: "access" }
   if (first === "rules") return { page: "rules", section: org }
   return { page: "ranking" }
 }
 
 export function routePath(route: Route): string {
   if (route.page === "my") return "/my"
+  if (route.page === "analytics") return "/analytics"
+  if (route.page === "access") return "/admin-access"
   if (route.page === "ranking") return "/"
   if (route.page === "compare") {
     const part = (ref: RepoRef) => `${encodeURIComponent(ref.org)}/${encodeURIComponent(ref.repo)}`

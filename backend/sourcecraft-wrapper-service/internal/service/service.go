@@ -25,6 +25,7 @@ type SCService interface {
 	GetMilestones(ctx context.Context, repoID string) (domain.Milestones, error)
 	ListAllPublicRepos(ctx context.Context) ([]domain.Repository, error)
 	GetMyRepos(ctx context.Context) (domain.MyRepositoriesResponse, error)
+	ListTopRatedRepos(ctx context.Context, pageToken string) (domain.MyRepositoriesResponse, error)
 	GetMyOrgs(ctx context.Context) (domain.MyOrganizations, error)
 	GetOrgRepos(ctx context.Context, orgSlug, pageToken string) (domain.MyRepositoriesResponse, error)
 	GetPullRequests(ctx context.Context, repoID string, limit int) (domain.PullRequests, error)
@@ -247,6 +248,27 @@ func (scw *SCWrapper) GetMilestones(ctx context.Context, repoID string) (domain.
 		pageToken = next
 	}
 	return all, nil
+}
+
+// ListTopRatedRepos returns one page (100) of GET /repos sorted by SourceCraft rating, highest
+// first, starting at pageToken.
+func (scw *SCWrapper) ListTopRatedRepos(ctx context.Context, pageToken string) (domain.MyRepositoriesResponse, error) {
+	token, err := tokenFromContext(ctx)
+	if err != nil {
+		return domain.MyRepositoriesResponse{}, fmt.Errorf("%w: %w", domain.ErrUnauthenticated, err)
+	}
+
+	params := url2.Values{"page_size": {"100"}, "sort_by": {"-rating"}}
+	if pageToken != "" {
+		params.Set("page_token", pageToken)
+	}
+
+	var page domain.MyRepositoriesResponse
+	if err := scw.fetchJSON(ctx, token, "/repos?"+params.Encode(), &page); err != nil {
+		return domain.MyRepositoriesResponse{}, err
+	}
+
+	return page, nil
 }
 
 // getPage fetches one page of a paginated GET endpoint into out, returning the next page's token

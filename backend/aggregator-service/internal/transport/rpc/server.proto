@@ -28,6 +28,31 @@ service Aggregator {
   rpc GetAnalytics(GetAnalyticsRequest) returns (GetAnalyticsResponse);
   // GetRegradeStatus reports the scheduled public regrade (on/off, next run, progress). Read-only.
   rpc GetRegradeStatus(GetRegradeStatusRequest) returns (GetRegradeStatusResponse);
+
+  // RecordAudit stores one audit event (docs/admin.md). The caller computes actor_hash from the
+  // Yandex ID, so a raw ID never reaches the Aggregator. INVALID_ARGUMENT for an event that breaks
+  // the audit rules.
+  rpc RecordAudit(RecordAuditRequest) returns (RecordAuditResponse);
+  // ListAudit returns one page of the audit log, newest first, with a cursor for the next page.
+  rpc ListAudit(ListAuditRequest) returns (ListAuditResponse);
+
+  // PreviewRegradeBatch is the dry run of an admin batch regrade: how many public repos a filter
+  // selects, a sample, the hand-picked ones that matched nothing and a rough duration. Writes nothing.
+  // INVALID_ARGUMENT for a filter that breaks the rules.
+  rpc PreviewRegradeBatch(PreviewRegradeBatchRequest) returns (PreviewRegradeBatchResponse);
+  // StartRegradeBatch creates a batch and starts it. ALREADY_EXISTS (batch_active) while another batch
+  // is running or paused; INVALID_ARGUMENT (invalid_filter | nothing_selected | too_many) for a bad
+  // filter or one that selects nothing or too many repos. The start is recorded in the audit log
+  // under actor_hash.
+  rpc StartRegradeBatch(StartRegradeBatchRequest) returns (StartRegradeBatchResponse);
+  // ControlRegradeBatch pauses, resumes or cancels a batch. ABORTED (bad_state) when the action does
+  // not fit the batch's state, NOT_FOUND (batch_not_found) for an unknown batch.
+  rpc ControlRegradeBatch(ControlRegradeBatchRequest) returns (ControlRegradeBatchResponse);
+  // GetRegradeBatch returns a batch and the repos that failed in it. batch_id 0 means the active
+  // batch, or the latest one when none is active; NOT_FOUND when there has never been one.
+  rpc GetRegradeBatch(GetRegradeBatchRequest) returns (GetRegradeBatchResponse);
+  // ListRegradeBatches returns the most recent batches, newest first.
+  rpc ListRegradeBatches(ListRegradeBatchesRequest) returns (ListRegradeBatchesResponse);
 }
 
 message GetRegradeStatusRequest {}
@@ -149,4 +174,151 @@ message GetAnalyticsResponse {
   bytes analytics = 1;
   // The grade the analytics describe; unset when there are none.
   google.protobuf.Timestamp graded_at = 2;
+}
+
+message RecordAuditRequest {
+  // admin | user | anonymous | system.
+  string actor_kind = 1;
+  // Lowercase hex HMAC of the Yandex ID, up to 64 characters; empty for anonymous and system.
+  string actor_hash = 2;
+  // Dotted lowercase name, e.g. admin.denied.
+  string action = 3;
+  // "" | repo | batch | route.
+  string target_kind = 4;
+  // A public repo slug, an ID, a route, or a hash; never the slug of a private repo.
+  string target = 5;
+  // ok | denied | error.
+  string outcome = 6;
+  // A small JSON object of non-sensitive context; empty means {}.
+  bytes details = 7;
+}
+
+message RecordAuditResponse {}
+
+message ListAuditRequest {
+  // Entries per page; 0 means 50, at most 200.
+  int32 limit = 1;
+  // Only entries with a smaller id; 0 means from the newest.
+  int64 before_id = 2;
+  // An exact action, or one ending in "." for a prefix (e.g. "admin.").
+  string action = 3;
+  // ok | denied | error; empty means any.
+  string outcome = 4;
+}
+
+message AuditEntry {
+  int64 id = 1;
+  google.protobuf.Timestamp occurred_at = 2;
+  string actor_kind = 3;
+  string actor_hash = 4;
+  string action = 5;
+  string target_kind = 6;
+  string target = 7;
+  string outcome = 8;
+  bytes details = 9;
+}
+
+message ListAuditResponse {
+  repeated AuditEntry entries = 1;
+  // The cursor for the next page (pass as before_id); 0 when this was the last page.
+  int64 next_before_id = 2;
+}
+
+message BatchFilter {
+  // Main language, matched case-insensitively.
+  repeated string languages = 1;
+  // Bounds of the stored public score; a repo without a grade never matches them.
+  optional int32 min_score = 2;
+  optional int32 max_score = 3;
+  // Last grade older than this many days (or never graded).
+  optional int32 older_than_days = 4;
+  // Hand-picked "org/repo" slugs.
+  repeated string repos = 5;
+  // Every public repository; cannot be combined with the criteria above.
+  bool all = 6;
+  // The first N matching public repos in SourceCraft rating order (highest first).
+  optional int32 top_rated = 7;
+  // Regrade every selected repo, skipping the "new activity since the last grade" check.
+  bool force = 8;
+}
+
+message PreviewRegradeBatchRequest {
+  BatchFilter filter = 1;
+}
+
+message PreviewRegradeBatchResponse {
+  // Repos selected, at most the batch cap.
+  int32 count = 1;
+  // More repos matched than the cap: the batch could not start.
+  bool capped = 2;
+  repeated string sample = 3;
+  // Hand-picked slugs that are not public repositories known to the service.
+  repeated string unmatched = 4;
+  int32 estimate_seconds = 5;
+  // Estimated repos the activity check will skip (0 with force).
+  int32 inactive = 6;
+}
+
+message StartRegradeBatchRequest {
+  BatchFilter filter = 1;
+  // The starting admin's actor hash, for the audit log and the batch record.
+  string actor_hash = 2;
+}
+
+message StartRegradeBatchResponse {
+  RegradeBatch batch = 1;
+}
+
+message ControlRegradeBatchRequest {
+  int64 batch_id = 1;
+  // pause | resume | cancel.
+  string action = 2;
+  string actor_hash = 3;
+}
+
+message ControlRegradeBatchResponse {
+  RegradeBatch batch = 1;
+}
+
+message GetRegradeBatchRequest {
+  int64 batch_id = 1;
+}
+
+message GetRegradeBatchResponse {
+  RegradeBatch batch = 1;
+  // Repos that failed, with a fixed error code; at most 100.
+  repeated RegradeBatchFailure failures = 2;
+}
+
+message ListRegradeBatchesRequest {
+  // 0 means 10, at most 50.
+  int32 limit = 1;
+}
+
+message ListRegradeBatchesResponse {
+  repeated RegradeBatch batches = 1;
+}
+
+message RegradeBatch {
+  int64 id = 1;
+  google.protobuf.Timestamp created_at = 2;
+  // Unset while the batch is unfinished.
+  google.protobuf.Timestamp finished_at = 3;
+  // running | paused | completed | cancelled.
+  string status = 4;
+  string actor_hash = 5;
+  BatchFilter filter = 6;
+  int32 total = 7;
+  int32 pending = 8;
+  int32 running = 9;
+  int32 ok = 10;
+  int32 failed = 11;
+  int32 skipped = 12;
+}
+
+message RegradeBatchFailure {
+  string org_slug = 1;
+  string repo_slug = 2;
+  // request_failed | grading_failed | timeout | no_new_grade.
+  string error = 3;
 }

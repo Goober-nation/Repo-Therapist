@@ -1160,6 +1160,1196 @@ func (x *GetAnalyticsResponse) GetGradedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type RecordAuditRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// admin | user | anonymous | system.
+	ActorKind string `protobuf:"bytes,1,opt,name=actor_kind,json=actorKind,proto3" json:"actor_kind,omitempty"`
+	// Lowercase hex HMAC of the Yandex ID, up to 64 characters; empty for anonymous and system.
+	ActorHash string `protobuf:"bytes,2,opt,name=actor_hash,json=actorHash,proto3" json:"actor_hash,omitempty"`
+	// Dotted lowercase name, e.g. admin.denied.
+	Action string `protobuf:"bytes,3,opt,name=action,proto3" json:"action,omitempty"`
+	// "" | repo | batch | route.
+	TargetKind string `protobuf:"bytes,4,opt,name=target_kind,json=targetKind,proto3" json:"target_kind,omitempty"`
+	// A public repo slug, an ID, a route, or a hash; never the slug of a private repo.
+	Target string `protobuf:"bytes,5,opt,name=target,proto3" json:"target,omitempty"`
+	// ok | denied | error.
+	Outcome string `protobuf:"bytes,6,opt,name=outcome,proto3" json:"outcome,omitempty"`
+	// A small JSON object of non-sensitive context; empty means {}.
+	Details       []byte `protobuf:"bytes,7,opt,name=details,proto3" json:"details,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecordAuditRequest) Reset() {
+	*x = RecordAuditRequest{}
+	mi := &file_agg_client_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecordAuditRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecordAuditRequest) ProtoMessage() {}
+
+func (x *RecordAuditRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecordAuditRequest.ProtoReflect.Descriptor instead.
+func (*RecordAuditRequest) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *RecordAuditRequest) GetActorKind() string {
+	if x != nil {
+		return x.ActorKind
+	}
+	return ""
+}
+
+func (x *RecordAuditRequest) GetActorHash() string {
+	if x != nil {
+		return x.ActorHash
+	}
+	return ""
+}
+
+func (x *RecordAuditRequest) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *RecordAuditRequest) GetTargetKind() string {
+	if x != nil {
+		return x.TargetKind
+	}
+	return ""
+}
+
+func (x *RecordAuditRequest) GetTarget() string {
+	if x != nil {
+		return x.Target
+	}
+	return ""
+}
+
+func (x *RecordAuditRequest) GetOutcome() string {
+	if x != nil {
+		return x.Outcome
+	}
+	return ""
+}
+
+func (x *RecordAuditRequest) GetDetails() []byte {
+	if x != nil {
+		return x.Details
+	}
+	return nil
+}
+
+type RecordAuditResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecordAuditResponse) Reset() {
+	*x = RecordAuditResponse{}
+	mi := &file_agg_client_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecordAuditResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecordAuditResponse) ProtoMessage() {}
+
+func (x *RecordAuditResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecordAuditResponse.ProtoReflect.Descriptor instead.
+func (*RecordAuditResponse) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{21}
+}
+
+type ListAuditRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Entries per page; 0 means 50, at most 200.
+	Limit int32 `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
+	// Only entries with a smaller id; 0 means from the newest.
+	BeforeId int64 `protobuf:"varint,2,opt,name=before_id,json=beforeId,proto3" json:"before_id,omitempty"`
+	// An exact action, or one ending in "." for a prefix (e.g. "admin.").
+	Action string `protobuf:"bytes,3,opt,name=action,proto3" json:"action,omitempty"`
+	// ok | denied | error; empty means any.
+	Outcome       string `protobuf:"bytes,4,opt,name=outcome,proto3" json:"outcome,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAuditRequest) Reset() {
+	*x = ListAuditRequest{}
+	mi := &file_agg_client_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAuditRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAuditRequest) ProtoMessage() {}
+
+func (x *ListAuditRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAuditRequest.ProtoReflect.Descriptor instead.
+func (*ListAuditRequest) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *ListAuditRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *ListAuditRequest) GetBeforeId() int64 {
+	if x != nil {
+		return x.BeforeId
+	}
+	return 0
+}
+
+func (x *ListAuditRequest) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *ListAuditRequest) GetOutcome() string {
+	if x != nil {
+		return x.Outcome
+	}
+	return ""
+}
+
+type AuditEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	OccurredAt    *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	ActorKind     string                 `protobuf:"bytes,3,opt,name=actor_kind,json=actorKind,proto3" json:"actor_kind,omitempty"`
+	ActorHash     string                 `protobuf:"bytes,4,opt,name=actor_hash,json=actorHash,proto3" json:"actor_hash,omitempty"`
+	Action        string                 `protobuf:"bytes,5,opt,name=action,proto3" json:"action,omitempty"`
+	TargetKind    string                 `protobuf:"bytes,6,opt,name=target_kind,json=targetKind,proto3" json:"target_kind,omitempty"`
+	Target        string                 `protobuf:"bytes,7,opt,name=target,proto3" json:"target,omitempty"`
+	Outcome       string                 `protobuf:"bytes,8,opt,name=outcome,proto3" json:"outcome,omitempty"`
+	Details       []byte                 `protobuf:"bytes,9,opt,name=details,proto3" json:"details,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuditEntry) Reset() {
+	*x = AuditEntry{}
+	mi := &file_agg_client_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuditEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuditEntry) ProtoMessage() {}
+
+func (x *AuditEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuditEntry.ProtoReflect.Descriptor instead.
+func (*AuditEntry) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *AuditEntry) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *AuditEntry) GetOccurredAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.OccurredAt
+	}
+	return nil
+}
+
+func (x *AuditEntry) GetActorKind() string {
+	if x != nil {
+		return x.ActorKind
+	}
+	return ""
+}
+
+func (x *AuditEntry) GetActorHash() string {
+	if x != nil {
+		return x.ActorHash
+	}
+	return ""
+}
+
+func (x *AuditEntry) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *AuditEntry) GetTargetKind() string {
+	if x != nil {
+		return x.TargetKind
+	}
+	return ""
+}
+
+func (x *AuditEntry) GetTarget() string {
+	if x != nil {
+		return x.Target
+	}
+	return ""
+}
+
+func (x *AuditEntry) GetOutcome() string {
+	if x != nil {
+		return x.Outcome
+	}
+	return ""
+}
+
+func (x *AuditEntry) GetDetails() []byte {
+	if x != nil {
+		return x.Details
+	}
+	return nil
+}
+
+type ListAuditResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Entries []*AuditEntry          `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
+	// The cursor for the next page (pass as before_id); 0 when this was the last page.
+	NextBeforeId  int64 `protobuf:"varint,2,opt,name=next_before_id,json=nextBeforeId,proto3" json:"next_before_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAuditResponse) Reset() {
+	*x = ListAuditResponse{}
+	mi := &file_agg_client_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAuditResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAuditResponse) ProtoMessage() {}
+
+func (x *ListAuditResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAuditResponse.ProtoReflect.Descriptor instead.
+func (*ListAuditResponse) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ListAuditResponse) GetEntries() []*AuditEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+func (x *ListAuditResponse) GetNextBeforeId() int64 {
+	if x != nil {
+		return x.NextBeforeId
+	}
+	return 0
+}
+
+type BatchFilter struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Main language, matched case-insensitively.
+	Languages []string `protobuf:"bytes,1,rep,name=languages,proto3" json:"languages,omitempty"`
+	// Bounds of the stored public score; a repo without a grade never matches them.
+	MinScore *int32 `protobuf:"varint,2,opt,name=min_score,json=minScore,proto3,oneof" json:"min_score,omitempty"`
+	MaxScore *int32 `protobuf:"varint,3,opt,name=max_score,json=maxScore,proto3,oneof" json:"max_score,omitempty"`
+	// Last grade older than this many days (or never graded).
+	OlderThanDays *int32 `protobuf:"varint,4,opt,name=older_than_days,json=olderThanDays,proto3,oneof" json:"older_than_days,omitempty"`
+	// Hand-picked "org/repo" slugs.
+	Repos []string `protobuf:"bytes,5,rep,name=repos,proto3" json:"repos,omitempty"`
+	// Every public repository; cannot be combined with the criteria above.
+	All bool `protobuf:"varint,6,opt,name=all,proto3" json:"all,omitempty"`
+	// The first N matching public repos in SourceCraft rating order (highest first).
+	TopRated *int32 `protobuf:"varint,7,opt,name=top_rated,json=topRated,proto3,oneof" json:"top_rated,omitempty"`
+	// Regrade every selected repo, skipping the "new activity since the last grade" check.
+	Force         bool `protobuf:"varint,8,opt,name=force,proto3" json:"force,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BatchFilter) Reset() {
+	*x = BatchFilter{}
+	mi := &file_agg_client_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BatchFilter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BatchFilter) ProtoMessage() {}
+
+func (x *BatchFilter) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BatchFilter.ProtoReflect.Descriptor instead.
+func (*BatchFilter) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *BatchFilter) GetLanguages() []string {
+	if x != nil {
+		return x.Languages
+	}
+	return nil
+}
+
+func (x *BatchFilter) GetMinScore() int32 {
+	if x != nil && x.MinScore != nil {
+		return *x.MinScore
+	}
+	return 0
+}
+
+func (x *BatchFilter) GetMaxScore() int32 {
+	if x != nil && x.MaxScore != nil {
+		return *x.MaxScore
+	}
+	return 0
+}
+
+func (x *BatchFilter) GetOlderThanDays() int32 {
+	if x != nil && x.OlderThanDays != nil {
+		return *x.OlderThanDays
+	}
+	return 0
+}
+
+func (x *BatchFilter) GetRepos() []string {
+	if x != nil {
+		return x.Repos
+	}
+	return nil
+}
+
+func (x *BatchFilter) GetAll() bool {
+	if x != nil {
+		return x.All
+	}
+	return false
+}
+
+func (x *BatchFilter) GetTopRated() int32 {
+	if x != nil && x.TopRated != nil {
+		return *x.TopRated
+	}
+	return 0
+}
+
+func (x *BatchFilter) GetForce() bool {
+	if x != nil {
+		return x.Force
+	}
+	return false
+}
+
+type PreviewRegradeBatchRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Filter        *BatchFilter           `protobuf:"bytes,1,opt,name=filter,proto3" json:"filter,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PreviewRegradeBatchRequest) Reset() {
+	*x = PreviewRegradeBatchRequest{}
+	mi := &file_agg_client_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PreviewRegradeBatchRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PreviewRegradeBatchRequest) ProtoMessage() {}
+
+func (x *PreviewRegradeBatchRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PreviewRegradeBatchRequest.ProtoReflect.Descriptor instead.
+func (*PreviewRegradeBatchRequest) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *PreviewRegradeBatchRequest) GetFilter() *BatchFilter {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+type PreviewRegradeBatchResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Repos selected, at most the batch cap.
+	Count int32 `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
+	// More repos matched than the cap: the batch could not start.
+	Capped bool     `protobuf:"varint,2,opt,name=capped,proto3" json:"capped,omitempty"`
+	Sample []string `protobuf:"bytes,3,rep,name=sample,proto3" json:"sample,omitempty"`
+	// Hand-picked slugs that are not public repositories known to the service.
+	Unmatched       []string `protobuf:"bytes,4,rep,name=unmatched,proto3" json:"unmatched,omitempty"`
+	EstimateSeconds int32    `protobuf:"varint,5,opt,name=estimate_seconds,json=estimateSeconds,proto3" json:"estimate_seconds,omitempty"`
+	// Estimated repos the activity check will skip (0 with force).
+	Inactive      int32 `protobuf:"varint,6,opt,name=inactive,proto3" json:"inactive,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PreviewRegradeBatchResponse) Reset() {
+	*x = PreviewRegradeBatchResponse{}
+	mi := &file_agg_client_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PreviewRegradeBatchResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PreviewRegradeBatchResponse) ProtoMessage() {}
+
+func (x *PreviewRegradeBatchResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PreviewRegradeBatchResponse.ProtoReflect.Descriptor instead.
+func (*PreviewRegradeBatchResponse) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *PreviewRegradeBatchResponse) GetCount() int32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+func (x *PreviewRegradeBatchResponse) GetCapped() bool {
+	if x != nil {
+		return x.Capped
+	}
+	return false
+}
+
+func (x *PreviewRegradeBatchResponse) GetSample() []string {
+	if x != nil {
+		return x.Sample
+	}
+	return nil
+}
+
+func (x *PreviewRegradeBatchResponse) GetUnmatched() []string {
+	if x != nil {
+		return x.Unmatched
+	}
+	return nil
+}
+
+func (x *PreviewRegradeBatchResponse) GetEstimateSeconds() int32 {
+	if x != nil {
+		return x.EstimateSeconds
+	}
+	return 0
+}
+
+func (x *PreviewRegradeBatchResponse) GetInactive() int32 {
+	if x != nil {
+		return x.Inactive
+	}
+	return 0
+}
+
+type StartRegradeBatchRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Filter *BatchFilter           `protobuf:"bytes,1,opt,name=filter,proto3" json:"filter,omitempty"`
+	// The starting admin's actor hash, for the audit log and the batch record.
+	ActorHash     string `protobuf:"bytes,2,opt,name=actor_hash,json=actorHash,proto3" json:"actor_hash,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartRegradeBatchRequest) Reset() {
+	*x = StartRegradeBatchRequest{}
+	mi := &file_agg_client_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartRegradeBatchRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartRegradeBatchRequest) ProtoMessage() {}
+
+func (x *StartRegradeBatchRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartRegradeBatchRequest.ProtoReflect.Descriptor instead.
+func (*StartRegradeBatchRequest) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *StartRegradeBatchRequest) GetFilter() *BatchFilter {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+func (x *StartRegradeBatchRequest) GetActorHash() string {
+	if x != nil {
+		return x.ActorHash
+	}
+	return ""
+}
+
+type StartRegradeBatchResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Batch         *RegradeBatch          `protobuf:"bytes,1,opt,name=batch,proto3" json:"batch,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartRegradeBatchResponse) Reset() {
+	*x = StartRegradeBatchResponse{}
+	mi := &file_agg_client_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartRegradeBatchResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartRegradeBatchResponse) ProtoMessage() {}
+
+func (x *StartRegradeBatchResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartRegradeBatchResponse.ProtoReflect.Descriptor instead.
+func (*StartRegradeBatchResponse) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *StartRegradeBatchResponse) GetBatch() *RegradeBatch {
+	if x != nil {
+		return x.Batch
+	}
+	return nil
+}
+
+type ControlRegradeBatchRequest struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	BatchId int64                  `protobuf:"varint,1,opt,name=batch_id,json=batchId,proto3" json:"batch_id,omitempty"`
+	// pause | resume | cancel.
+	Action        string `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`
+	ActorHash     string `protobuf:"bytes,3,opt,name=actor_hash,json=actorHash,proto3" json:"actor_hash,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ControlRegradeBatchRequest) Reset() {
+	*x = ControlRegradeBatchRequest{}
+	mi := &file_agg_client_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ControlRegradeBatchRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ControlRegradeBatchRequest) ProtoMessage() {}
+
+func (x *ControlRegradeBatchRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ControlRegradeBatchRequest.ProtoReflect.Descriptor instead.
+func (*ControlRegradeBatchRequest) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *ControlRegradeBatchRequest) GetBatchId() int64 {
+	if x != nil {
+		return x.BatchId
+	}
+	return 0
+}
+
+func (x *ControlRegradeBatchRequest) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *ControlRegradeBatchRequest) GetActorHash() string {
+	if x != nil {
+		return x.ActorHash
+	}
+	return ""
+}
+
+type ControlRegradeBatchResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Batch         *RegradeBatch          `protobuf:"bytes,1,opt,name=batch,proto3" json:"batch,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ControlRegradeBatchResponse) Reset() {
+	*x = ControlRegradeBatchResponse{}
+	mi := &file_agg_client_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ControlRegradeBatchResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ControlRegradeBatchResponse) ProtoMessage() {}
+
+func (x *ControlRegradeBatchResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ControlRegradeBatchResponse.ProtoReflect.Descriptor instead.
+func (*ControlRegradeBatchResponse) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *ControlRegradeBatchResponse) GetBatch() *RegradeBatch {
+	if x != nil {
+		return x.Batch
+	}
+	return nil
+}
+
+type GetRegradeBatchRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BatchId       int64                  `protobuf:"varint,1,opt,name=batch_id,json=batchId,proto3" json:"batch_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRegradeBatchRequest) Reset() {
+	*x = GetRegradeBatchRequest{}
+	mi := &file_agg_client_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRegradeBatchRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRegradeBatchRequest) ProtoMessage() {}
+
+func (x *GetRegradeBatchRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRegradeBatchRequest.ProtoReflect.Descriptor instead.
+func (*GetRegradeBatchRequest) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *GetRegradeBatchRequest) GetBatchId() int64 {
+	if x != nil {
+		return x.BatchId
+	}
+	return 0
+}
+
+type GetRegradeBatchResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Batch *RegradeBatch          `protobuf:"bytes,1,opt,name=batch,proto3" json:"batch,omitempty"`
+	// Repos that failed, with a fixed error code; at most 100.
+	Failures      []*RegradeBatchFailure `protobuf:"bytes,2,rep,name=failures,proto3" json:"failures,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRegradeBatchResponse) Reset() {
+	*x = GetRegradeBatchResponse{}
+	mi := &file_agg_client_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRegradeBatchResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRegradeBatchResponse) ProtoMessage() {}
+
+func (x *GetRegradeBatchResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRegradeBatchResponse.ProtoReflect.Descriptor instead.
+func (*GetRegradeBatchResponse) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *GetRegradeBatchResponse) GetBatch() *RegradeBatch {
+	if x != nil {
+		return x.Batch
+	}
+	return nil
+}
+
+func (x *GetRegradeBatchResponse) GetFailures() []*RegradeBatchFailure {
+	if x != nil {
+		return x.Failures
+	}
+	return nil
+}
+
+type ListRegradeBatchesRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 0 means 10, at most 50.
+	Limit         int32 `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListRegradeBatchesRequest) Reset() {
+	*x = ListRegradeBatchesRequest{}
+	mi := &file_agg_client_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListRegradeBatchesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListRegradeBatchesRequest) ProtoMessage() {}
+
+func (x *ListRegradeBatchesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListRegradeBatchesRequest.ProtoReflect.Descriptor instead.
+func (*ListRegradeBatchesRequest) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *ListRegradeBatchesRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type ListRegradeBatchesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Batches       []*RegradeBatch        `protobuf:"bytes,1,rep,name=batches,proto3" json:"batches,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListRegradeBatchesResponse) Reset() {
+	*x = ListRegradeBatchesResponse{}
+	mi := &file_agg_client_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListRegradeBatchesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListRegradeBatchesResponse) ProtoMessage() {}
+
+func (x *ListRegradeBatchesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListRegradeBatchesResponse.ProtoReflect.Descriptor instead.
+func (*ListRegradeBatchesResponse) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *ListRegradeBatchesResponse) GetBatches() []*RegradeBatch {
+	if x != nil {
+		return x.Batches
+	}
+	return nil
+}
+
+type RegradeBatch struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	// Unset while the batch is unfinished.
+	FinishedAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	// running | paused | completed | cancelled.
+	Status        string       `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
+	ActorHash     string       `protobuf:"bytes,5,opt,name=actor_hash,json=actorHash,proto3" json:"actor_hash,omitempty"`
+	Filter        *BatchFilter `protobuf:"bytes,6,opt,name=filter,proto3" json:"filter,omitempty"`
+	Total         int32        `protobuf:"varint,7,opt,name=total,proto3" json:"total,omitempty"`
+	Pending       int32        `protobuf:"varint,8,opt,name=pending,proto3" json:"pending,omitempty"`
+	Running       int32        `protobuf:"varint,9,opt,name=running,proto3" json:"running,omitempty"`
+	Ok            int32        `protobuf:"varint,10,opt,name=ok,proto3" json:"ok,omitempty"`
+	Failed        int32        `protobuf:"varint,11,opt,name=failed,proto3" json:"failed,omitempty"`
+	Skipped       int32        `protobuf:"varint,12,opt,name=skipped,proto3" json:"skipped,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegradeBatch) Reset() {
+	*x = RegradeBatch{}
+	mi := &file_agg_client_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegradeBatch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegradeBatch) ProtoMessage() {}
+
+func (x *RegradeBatch) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegradeBatch.ProtoReflect.Descriptor instead.
+func (*RegradeBatch) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *RegradeBatch) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *RegradeBatch) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *RegradeBatch) GetFinishedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FinishedAt
+	}
+	return nil
+}
+
+func (x *RegradeBatch) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *RegradeBatch) GetActorHash() string {
+	if x != nil {
+		return x.ActorHash
+	}
+	return ""
+}
+
+func (x *RegradeBatch) GetFilter() *BatchFilter {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+func (x *RegradeBatch) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+func (x *RegradeBatch) GetPending() int32 {
+	if x != nil {
+		return x.Pending
+	}
+	return 0
+}
+
+func (x *RegradeBatch) GetRunning() int32 {
+	if x != nil {
+		return x.Running
+	}
+	return 0
+}
+
+func (x *RegradeBatch) GetOk() int32 {
+	if x != nil {
+		return x.Ok
+	}
+	return 0
+}
+
+func (x *RegradeBatch) GetFailed() int32 {
+	if x != nil {
+		return x.Failed
+	}
+	return 0
+}
+
+func (x *RegradeBatch) GetSkipped() int32 {
+	if x != nil {
+		return x.Skipped
+	}
+	return 0
+}
+
+type RegradeBatchFailure struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	OrgSlug  string                 `protobuf:"bytes,1,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
+	RepoSlug string                 `protobuf:"bytes,2,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
+	// request_failed | grading_failed | timeout | no_new_grade.
+	Error         string `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegradeBatchFailure) Reset() {
+	*x = RegradeBatchFailure{}
+	mi := &file_agg_client_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegradeBatchFailure) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegradeBatchFailure) ProtoMessage() {}
+
+func (x *RegradeBatchFailure) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegradeBatchFailure.ProtoReflect.Descriptor instead.
+func (*RegradeBatchFailure) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *RegradeBatchFailure) GetOrgSlug() string {
+	if x != nil {
+		return x.OrgSlug
+	}
+	return ""
+}
+
+func (x *RegradeBatchFailure) GetRepoSlug() string {
+	if x != nil {
+		return x.RepoSlug
+	}
+	return ""
+}
+
+func (x *RegradeBatchFailure) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 var File_agg_client_proto protoreflect.FileDescriptor
 
 const file_agg_client_proto_rawDesc = "" +
@@ -1245,7 +2435,110 @@ const file_agg_client_proto_rawDesc = "" +
 	"\trepo_slug\x18\x02 \x01(\tR\brepoSlug\"m\n" +
 	"\x14GetAnalyticsResponse\x12\x1c\n" +
 	"\tanalytics\x18\x01 \x01(\fR\tanalytics\x127\n" +
-	"\tgraded_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\bgradedAt2\xec\x04\n" +
+	"\tgraded_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\bgradedAt\"\xd7\x01\n" +
+	"\x12RecordAuditRequest\x12\x1d\n" +
+	"\n" +
+	"actor_kind\x18\x01 \x01(\tR\tactorKind\x12\x1d\n" +
+	"\n" +
+	"actor_hash\x18\x02 \x01(\tR\tactorHash\x12\x16\n" +
+	"\x06action\x18\x03 \x01(\tR\x06action\x12\x1f\n" +
+	"\vtarget_kind\x18\x04 \x01(\tR\n" +
+	"targetKind\x12\x16\n" +
+	"\x06target\x18\x05 \x01(\tR\x06target\x12\x18\n" +
+	"\aoutcome\x18\x06 \x01(\tR\aoutcome\x12\x18\n" +
+	"\adetails\x18\a \x01(\fR\adetails\"\x15\n" +
+	"\x13RecordAuditResponse\"w\n" +
+	"\x10ListAuditRequest\x12\x14\n" +
+	"\x05limit\x18\x01 \x01(\x05R\x05limit\x12\x1b\n" +
+	"\tbefore_id\x18\x02 \x01(\x03R\bbeforeId\x12\x16\n" +
+	"\x06action\x18\x03 \x01(\tR\x06action\x12\x18\n" +
+	"\aoutcome\x18\x04 \x01(\tR\aoutcome\"\x9c\x02\n" +
+	"\n" +
+	"AuditEntry\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12;\n" +
+	"\voccurred_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"occurredAt\x12\x1d\n" +
+	"\n" +
+	"actor_kind\x18\x03 \x01(\tR\tactorKind\x12\x1d\n" +
+	"\n" +
+	"actor_hash\x18\x04 \x01(\tR\tactorHash\x12\x16\n" +
+	"\x06action\x18\x05 \x01(\tR\x06action\x12\x1f\n" +
+	"\vtarget_kind\x18\x06 \x01(\tR\n" +
+	"targetKind\x12\x16\n" +
+	"\x06target\x18\a \x01(\tR\x06target\x12\x18\n" +
+	"\aoutcome\x18\b \x01(\tR\aoutcome\x12\x18\n" +
+	"\adetails\x18\t \x01(\fR\adetails\"k\n" +
+	"\x11ListAuditResponse\x120\n" +
+	"\aentries\x18\x01 \x03(\v2\x16.aggregator.AuditEntryR\aentries\x12$\n" +
+	"\x0enext_before_id\x18\x02 \x01(\x03R\fnextBeforeId\"\xba\x02\n" +
+	"\vBatchFilter\x12\x1c\n" +
+	"\tlanguages\x18\x01 \x03(\tR\tlanguages\x12 \n" +
+	"\tmin_score\x18\x02 \x01(\x05H\x00R\bminScore\x88\x01\x01\x12 \n" +
+	"\tmax_score\x18\x03 \x01(\x05H\x01R\bmaxScore\x88\x01\x01\x12+\n" +
+	"\x0folder_than_days\x18\x04 \x01(\x05H\x02R\rolderThanDays\x88\x01\x01\x12\x14\n" +
+	"\x05repos\x18\x05 \x03(\tR\x05repos\x12\x10\n" +
+	"\x03all\x18\x06 \x01(\bR\x03all\x12 \n" +
+	"\ttop_rated\x18\a \x01(\x05H\x03R\btopRated\x88\x01\x01\x12\x14\n" +
+	"\x05force\x18\b \x01(\bR\x05forceB\f\n" +
+	"\n" +
+	"_min_scoreB\f\n" +
+	"\n" +
+	"_max_scoreB\x12\n" +
+	"\x10_older_than_daysB\f\n" +
+	"\n" +
+	"_top_rated\"M\n" +
+	"\x1aPreviewRegradeBatchRequest\x12/\n" +
+	"\x06filter\x18\x01 \x01(\v2\x17.aggregator.BatchFilterR\x06filter\"\xc8\x01\n" +
+	"\x1bPreviewRegradeBatchResponse\x12\x14\n" +
+	"\x05count\x18\x01 \x01(\x05R\x05count\x12\x16\n" +
+	"\x06capped\x18\x02 \x01(\bR\x06capped\x12\x16\n" +
+	"\x06sample\x18\x03 \x03(\tR\x06sample\x12\x1c\n" +
+	"\tunmatched\x18\x04 \x03(\tR\tunmatched\x12)\n" +
+	"\x10estimate_seconds\x18\x05 \x01(\x05R\x0festimateSeconds\x12\x1a\n" +
+	"\binactive\x18\x06 \x01(\x05R\binactive\"j\n" +
+	"\x18StartRegradeBatchRequest\x12/\n" +
+	"\x06filter\x18\x01 \x01(\v2\x17.aggregator.BatchFilterR\x06filter\x12\x1d\n" +
+	"\n" +
+	"actor_hash\x18\x02 \x01(\tR\tactorHash\"K\n" +
+	"\x19StartRegradeBatchResponse\x12.\n" +
+	"\x05batch\x18\x01 \x01(\v2\x18.aggregator.RegradeBatchR\x05batch\"n\n" +
+	"\x1aControlRegradeBatchRequest\x12\x19\n" +
+	"\bbatch_id\x18\x01 \x01(\x03R\abatchId\x12\x16\n" +
+	"\x06action\x18\x02 \x01(\tR\x06action\x12\x1d\n" +
+	"\n" +
+	"actor_hash\x18\x03 \x01(\tR\tactorHash\"M\n" +
+	"\x1bControlRegradeBatchResponse\x12.\n" +
+	"\x05batch\x18\x01 \x01(\v2\x18.aggregator.RegradeBatchR\x05batch\"3\n" +
+	"\x16GetRegradeBatchRequest\x12\x19\n" +
+	"\bbatch_id\x18\x01 \x01(\x03R\abatchId\"\x86\x01\n" +
+	"\x17GetRegradeBatchResponse\x12.\n" +
+	"\x05batch\x18\x01 \x01(\v2\x18.aggregator.RegradeBatchR\x05batch\x12;\n" +
+	"\bfailures\x18\x02 \x03(\v2\x1f.aggregator.RegradeBatchFailureR\bfailures\"1\n" +
+	"\x19ListRegradeBatchesRequest\x12\x14\n" +
+	"\x05limit\x18\x01 \x01(\x05R\x05limit\"P\n" +
+	"\x1aListRegradeBatchesResponse\x122\n" +
+	"\abatches\x18\x01 \x03(\v2\x18.aggregator.RegradeBatchR\abatches\"\x8a\x03\n" +
+	"\fRegradeBatch\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x129\n" +
+	"\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12;\n" +
+	"\vfinished_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"finishedAt\x12\x16\n" +
+	"\x06status\x18\x04 \x01(\tR\x06status\x12\x1d\n" +
+	"\n" +
+	"actor_hash\x18\x05 \x01(\tR\tactorHash\x12/\n" +
+	"\x06filter\x18\x06 \x01(\v2\x17.aggregator.BatchFilterR\x06filter\x12\x14\n" +
+	"\x05total\x18\a \x01(\x05R\x05total\x12\x18\n" +
+	"\apending\x18\b \x01(\x05R\apending\x12\x18\n" +
+	"\arunning\x18\t \x01(\x05R\arunning\x12\x0e\n" +
+	"\x02ok\x18\n" +
+	" \x01(\x05R\x02ok\x12\x16\n" +
+	"\x06failed\x18\v \x01(\x05R\x06failed\x12\x18\n" +
+	"\askipped\x18\f \x01(\x05R\askipped\"c\n" +
+	"\x13RegradeBatchFailure\x12\x19\n" +
+	"\borg_slug\x18\x01 \x01(\tR\aorgSlug\x12\x1b\n" +
+	"\trepo_slug\x18\x02 \x01(\tR\brepoSlug\x12\x14\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error2\xf9\t\n" +
 	"\n" +
 	"Aggregator\x12K\n" +
 	"\n" +
@@ -1256,7 +2549,14 @@ const file_agg_client_proto_rawDesc = "" +
 	"GetGrading\x12\x1d.aggregator.GetGradingRequest\x1a\x1e.aggregator.GetGradingResponse\x12x\n" +
 	"\x19RequestLLMRecommendations\x12,.aggregator.RequestLLMRecommendationsRequest\x1a-.aggregator.RequestLLMRecommendationsResponse\x12Q\n" +
 	"\fGetAnalytics\x12\x1f.aggregator.GetAnalyticsRequest\x1a .aggregator.GetAnalyticsResponse\x12]\n" +
-	"\x10GetRegradeStatus\x12#.aggregator.GetRegradeStatusRequest\x1a$.aggregator.GetRegradeStatusResponseB4Z2gateway-service/internal/transport/rpc/gen/agg;aggb\x06proto3"
+	"\x10GetRegradeStatus\x12#.aggregator.GetRegradeStatusRequest\x1a$.aggregator.GetRegradeStatusResponse\x12N\n" +
+	"\vRecordAudit\x12\x1e.aggregator.RecordAuditRequest\x1a\x1f.aggregator.RecordAuditResponse\x12H\n" +
+	"\tListAudit\x12\x1c.aggregator.ListAuditRequest\x1a\x1d.aggregator.ListAuditResponse\x12f\n" +
+	"\x13PreviewRegradeBatch\x12&.aggregator.PreviewRegradeBatchRequest\x1a'.aggregator.PreviewRegradeBatchResponse\x12`\n" +
+	"\x11StartRegradeBatch\x12$.aggregator.StartRegradeBatchRequest\x1a%.aggregator.StartRegradeBatchResponse\x12f\n" +
+	"\x13ControlRegradeBatch\x12&.aggregator.ControlRegradeBatchRequest\x1a'.aggregator.ControlRegradeBatchResponse\x12Z\n" +
+	"\x0fGetRegradeBatch\x12\".aggregator.GetRegradeBatchRequest\x1a#.aggregator.GetRegradeBatchResponse\x12c\n" +
+	"\x12ListRegradeBatches\x12%.aggregator.ListRegradeBatchesRequest\x1a&.aggregator.ListRegradeBatchesResponseB4Z2gateway-service/internal/transport/rpc/gen/agg;aggb\x06proto3"
 
 var (
 	file_agg_client_proto_rawDescOnce sync.Once
@@ -1270,7 +2570,7 @@ func file_agg_client_proto_rawDescGZIP() []byte {
 	return file_agg_client_proto_rawDescData
 }
 
-var file_agg_client_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_agg_client_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
 var file_agg_client_proto_goTypes = []any{
 	(*GetRegradeStatusRequest)(nil),           // 0: aggregator.GetRegradeStatusRequest
 	(*GetRegradeStatusResponse)(nil),          // 1: aggregator.GetRegradeStatusResponse
@@ -1292,41 +2592,85 @@ var file_agg_client_proto_goTypes = []any{
 	(*RepoGrade)(nil),                         // 17: aggregator.RepoGrade
 	(*GetAnalyticsRequest)(nil),               // 18: aggregator.GetAnalyticsRequest
 	(*GetAnalyticsResponse)(nil),              // 19: aggregator.GetAnalyticsResponse
-	(*timestamppb.Timestamp)(nil),             // 20: google.protobuf.Timestamp
+	(*RecordAuditRequest)(nil),                // 20: aggregator.RecordAuditRequest
+	(*RecordAuditResponse)(nil),               // 21: aggregator.RecordAuditResponse
+	(*ListAuditRequest)(nil),                  // 22: aggregator.ListAuditRequest
+	(*AuditEntry)(nil),                        // 23: aggregator.AuditEntry
+	(*ListAuditResponse)(nil),                 // 24: aggregator.ListAuditResponse
+	(*BatchFilter)(nil),                       // 25: aggregator.BatchFilter
+	(*PreviewRegradeBatchRequest)(nil),        // 26: aggregator.PreviewRegradeBatchRequest
+	(*PreviewRegradeBatchResponse)(nil),       // 27: aggregator.PreviewRegradeBatchResponse
+	(*StartRegradeBatchRequest)(nil),          // 28: aggregator.StartRegradeBatchRequest
+	(*StartRegradeBatchResponse)(nil),         // 29: aggregator.StartRegradeBatchResponse
+	(*ControlRegradeBatchRequest)(nil),        // 30: aggregator.ControlRegradeBatchRequest
+	(*ControlRegradeBatchResponse)(nil),       // 31: aggregator.ControlRegradeBatchResponse
+	(*GetRegradeBatchRequest)(nil),            // 32: aggregator.GetRegradeBatchRequest
+	(*GetRegradeBatchResponse)(nil),           // 33: aggregator.GetRegradeBatchResponse
+	(*ListRegradeBatchesRequest)(nil),         // 34: aggregator.ListRegradeBatchesRequest
+	(*ListRegradeBatchesResponse)(nil),        // 35: aggregator.ListRegradeBatchesResponse
+	(*RegradeBatch)(nil),                      // 36: aggregator.RegradeBatch
+	(*RegradeBatchFailure)(nil),               // 37: aggregator.RegradeBatchFailure
+	(*timestamppb.Timestamp)(nil),             // 38: google.protobuf.Timestamp
 }
 var file_agg_client_proto_depIdxs = []int32{
-	20, // 0: aggregator.GetRegradeStatusResponse.next_run_at:type_name -> google.protobuf.Timestamp
-	20, // 1: aggregator.GetRegradeStatusResponse.started_at:type_name -> google.protobuf.Timestamp
-	20, // 2: aggregator.GetRegradeStatusResponse.last_finished_at:type_name -> google.protobuf.Timestamp
+	38, // 0: aggregator.GetRegradeStatusResponse.next_run_at:type_name -> google.protobuf.Timestamp
+	38, // 1: aggregator.GetRegradeStatusResponse.started_at:type_name -> google.protobuf.Timestamp
+	38, // 2: aggregator.GetRegradeStatusResponse.last_finished_at:type_name -> google.protobuf.Timestamp
 	13, // 3: aggregator.GetMyReposResponse.repositories:type_name -> aggregator.Repository
 	6,  // 4: aggregator.GetMyOrgsResponse.organizations:type_name -> aggregator.UserOrganization
 	13, // 5: aggregator.GetOrgReposResponse.repositories:type_name -> aggregator.Repository
 	17, // 6: aggregator.GetGradingResponse.grade:type_name -> aggregator.RepoGrade
-	20, // 7: aggregator.RequestLLMRecommendationsResponse.evaluated_at:type_name -> google.protobuf.Timestamp
+	38, // 7: aggregator.RequestLLMRecommendationsResponse.evaluated_at:type_name -> google.protobuf.Timestamp
 	16, // 8: aggregator.Repository.organization:type_name -> aggregator.Organization
 	15, // 9: aggregator.Repository.logo:type_name -> aggregator.Logo
 	14, // 10: aggregator.Repository.language:type_name -> aggregator.Language
-	20, // 11: aggregator.RepoGrade.graded_at:type_name -> google.protobuf.Timestamp
-	20, // 12: aggregator.GetAnalyticsResponse.graded_at:type_name -> google.protobuf.Timestamp
-	2,  // 13: aggregator.Aggregator.GetMyRepos:input_type -> aggregator.GetMyReposRequest
-	4,  // 14: aggregator.Aggregator.GetMyOrgs:input_type -> aggregator.GetMyOrgsRequest
-	7,  // 15: aggregator.Aggregator.GetOrgRepos:input_type -> aggregator.GetOrgReposRequest
-	9,  // 16: aggregator.Aggregator.GetGrading:input_type -> aggregator.GetGradingRequest
-	11, // 17: aggregator.Aggregator.RequestLLMRecommendations:input_type -> aggregator.RequestLLMRecommendationsRequest
-	18, // 18: aggregator.Aggregator.GetAnalytics:input_type -> aggregator.GetAnalyticsRequest
-	0,  // 19: aggregator.Aggregator.GetRegradeStatus:input_type -> aggregator.GetRegradeStatusRequest
-	3,  // 20: aggregator.Aggregator.GetMyRepos:output_type -> aggregator.GetMyReposResponse
-	5,  // 21: aggregator.Aggregator.GetMyOrgs:output_type -> aggregator.GetMyOrgsResponse
-	8,  // 22: aggregator.Aggregator.GetOrgRepos:output_type -> aggregator.GetOrgReposResponse
-	10, // 23: aggregator.Aggregator.GetGrading:output_type -> aggregator.GetGradingResponse
-	12, // 24: aggregator.Aggregator.RequestLLMRecommendations:output_type -> aggregator.RequestLLMRecommendationsResponse
-	19, // 25: aggregator.Aggregator.GetAnalytics:output_type -> aggregator.GetAnalyticsResponse
-	1,  // 26: aggregator.Aggregator.GetRegradeStatus:output_type -> aggregator.GetRegradeStatusResponse
-	20, // [20:27] is the sub-list for method output_type
-	13, // [13:20] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	38, // 11: aggregator.RepoGrade.graded_at:type_name -> google.protobuf.Timestamp
+	38, // 12: aggregator.GetAnalyticsResponse.graded_at:type_name -> google.protobuf.Timestamp
+	38, // 13: aggregator.AuditEntry.occurred_at:type_name -> google.protobuf.Timestamp
+	23, // 14: aggregator.ListAuditResponse.entries:type_name -> aggregator.AuditEntry
+	25, // 15: aggregator.PreviewRegradeBatchRequest.filter:type_name -> aggregator.BatchFilter
+	25, // 16: aggregator.StartRegradeBatchRequest.filter:type_name -> aggregator.BatchFilter
+	36, // 17: aggregator.StartRegradeBatchResponse.batch:type_name -> aggregator.RegradeBatch
+	36, // 18: aggregator.ControlRegradeBatchResponse.batch:type_name -> aggregator.RegradeBatch
+	36, // 19: aggregator.GetRegradeBatchResponse.batch:type_name -> aggregator.RegradeBatch
+	37, // 20: aggregator.GetRegradeBatchResponse.failures:type_name -> aggregator.RegradeBatchFailure
+	36, // 21: aggregator.ListRegradeBatchesResponse.batches:type_name -> aggregator.RegradeBatch
+	38, // 22: aggregator.RegradeBatch.created_at:type_name -> google.protobuf.Timestamp
+	38, // 23: aggregator.RegradeBatch.finished_at:type_name -> google.protobuf.Timestamp
+	25, // 24: aggregator.RegradeBatch.filter:type_name -> aggregator.BatchFilter
+	2,  // 25: aggregator.Aggregator.GetMyRepos:input_type -> aggregator.GetMyReposRequest
+	4,  // 26: aggregator.Aggregator.GetMyOrgs:input_type -> aggregator.GetMyOrgsRequest
+	7,  // 27: aggregator.Aggregator.GetOrgRepos:input_type -> aggregator.GetOrgReposRequest
+	9,  // 28: aggregator.Aggregator.GetGrading:input_type -> aggregator.GetGradingRequest
+	11, // 29: aggregator.Aggregator.RequestLLMRecommendations:input_type -> aggregator.RequestLLMRecommendationsRequest
+	18, // 30: aggregator.Aggregator.GetAnalytics:input_type -> aggregator.GetAnalyticsRequest
+	0,  // 31: aggregator.Aggregator.GetRegradeStatus:input_type -> aggregator.GetRegradeStatusRequest
+	20, // 32: aggregator.Aggregator.RecordAudit:input_type -> aggregator.RecordAuditRequest
+	22, // 33: aggregator.Aggregator.ListAudit:input_type -> aggregator.ListAuditRequest
+	26, // 34: aggregator.Aggregator.PreviewRegradeBatch:input_type -> aggregator.PreviewRegradeBatchRequest
+	28, // 35: aggregator.Aggregator.StartRegradeBatch:input_type -> aggregator.StartRegradeBatchRequest
+	30, // 36: aggregator.Aggregator.ControlRegradeBatch:input_type -> aggregator.ControlRegradeBatchRequest
+	32, // 37: aggregator.Aggregator.GetRegradeBatch:input_type -> aggregator.GetRegradeBatchRequest
+	34, // 38: aggregator.Aggregator.ListRegradeBatches:input_type -> aggregator.ListRegradeBatchesRequest
+	3,  // 39: aggregator.Aggregator.GetMyRepos:output_type -> aggregator.GetMyReposResponse
+	5,  // 40: aggregator.Aggregator.GetMyOrgs:output_type -> aggregator.GetMyOrgsResponse
+	8,  // 41: aggregator.Aggregator.GetOrgRepos:output_type -> aggregator.GetOrgReposResponse
+	10, // 42: aggregator.Aggregator.GetGrading:output_type -> aggregator.GetGradingResponse
+	12, // 43: aggregator.Aggregator.RequestLLMRecommendations:output_type -> aggregator.RequestLLMRecommendationsResponse
+	19, // 44: aggregator.Aggregator.GetAnalytics:output_type -> aggregator.GetAnalyticsResponse
+	1,  // 45: aggregator.Aggregator.GetRegradeStatus:output_type -> aggregator.GetRegradeStatusResponse
+	21, // 46: aggregator.Aggregator.RecordAudit:output_type -> aggregator.RecordAuditResponse
+	24, // 47: aggregator.Aggregator.ListAudit:output_type -> aggregator.ListAuditResponse
+	27, // 48: aggregator.Aggregator.PreviewRegradeBatch:output_type -> aggregator.PreviewRegradeBatchResponse
+	29, // 49: aggregator.Aggregator.StartRegradeBatch:output_type -> aggregator.StartRegradeBatchResponse
+	31, // 50: aggregator.Aggregator.ControlRegradeBatch:output_type -> aggregator.ControlRegradeBatchResponse
+	33, // 51: aggregator.Aggregator.GetRegradeBatch:output_type -> aggregator.GetRegradeBatchResponse
+	35, // 52: aggregator.Aggregator.ListRegradeBatches:output_type -> aggregator.ListRegradeBatchesResponse
+	39, // [39:53] is the sub-list for method output_type
+	25, // [25:39] is the sub-list for method input_type
+	25, // [25:25] is the sub-list for extension type_name
+	25, // [25:25] is the sub-list for extension extendee
+	0,  // [0:25] is the sub-list for field type_name
 }
 
 func init() { file_agg_client_proto_init() }
@@ -1335,13 +2679,14 @@ func file_agg_client_proto_init() {
 		return
 	}
 	file_agg_client_proto_msgTypes[17].OneofWrappers = []any{}
+	file_agg_client_proto_msgTypes[25].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agg_client_proto_rawDesc), len(file_agg_client_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   20,
+			NumMessages:   38,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

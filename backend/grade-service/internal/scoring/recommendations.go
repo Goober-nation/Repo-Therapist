@@ -41,7 +41,11 @@ func BuildRecommendations(categories map[string]CategoryResult, categoryIDs []st
 			if !ok {
 				continue
 			}
-			recs = append(recs, Recommendation{CategoryID: catID, MetricID: m.ID, Priority: entry.Priority, Text: entry.Text})
+			text := entry.Text
+			if m.Detail != "" {
+				text = m.Detail
+			}
+			recs = append(recs, Recommendation{CategoryID: catID, MetricID: m.ID, Priority: entry.Priority, Text: text})
 		}
 	}
 	return recs

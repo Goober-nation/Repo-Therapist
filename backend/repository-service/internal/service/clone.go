@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"repo-therapist/repository-service/internal/cidata"
+	"repo-therapist/repository-service/internal/deadcode"
 	"repo-therapist/repository-service/internal/gitlog"
 	"repo-therapist/repository-service/internal/issuedata"
 	"repo-therapist/repository-service/internal/prdata"
@@ -149,6 +150,17 @@ func CloneAndUpload(ctx context.Context, org, repo, jobID, token string) (res *R
 	}
 	if err := s3Client.PutObject(ctx, keyPrefix+"/_meta/todo-markers.json", todoJSON, "application/json"); err != nil {
 		return nil, fmt.Errorf("uploading todo markers: %w", err)
+	}
+
+	// Dead-code export is best-effort: without it only Code health's unused-functions metric is
+	// no-data, so a scan or upload failure must not fail the clone.
+	log.Printf("scanning for unused private functions in %s", tmpDir)
+	if deadExport, err := deadcode.Scan(tmpDir); err != nil {
+		log.Printf("dead-code scan failed for %s/%s: %v (metric will be no-data)", org, repo, err)
+	} else if deadJSON, err := json.Marshal(deadExport); err != nil {
+		log.Printf("marshaling dead-code export failed: %v", err)
+	} else if err := s3Client.PutObject(ctx, keyPrefix+"/_meta/dead-functions.json", deadJSON, "application/json"); err != nil {
+		log.Printf("uploading dead-code export failed: %v", err)
 	}
 
 	// CI/CD export: a runs fetch failure (typically 403 — /cicd/runs needs owner access) is not

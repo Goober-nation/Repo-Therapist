@@ -25,6 +25,19 @@ type fakeService struct {
 
 	history     []domain.HistoryPoint
 	explanation domain.PositionExplanation
+
+	analytics domain.PlatformAnalytics
+	grades    domain.PublicGradesPage
+	gradesReq [2]int
+}
+
+func (f *fakeService) GetPlatformAnalytics(ctx context.Context) (domain.PlatformAnalytics, error) {
+	return f.analytics, f.err
+}
+
+func (f *fakeService) ListPublicGrades(ctx context.Context, page, pageSize int) (domain.PublicGradesPage, error) {
+	f.gradesReq = [2]int{page, pageSize}
+	return f.grades, f.err
 }
 
 func (f *fakeService) GetScoreHistory(ctx context.Context, orgSlug, repoSlug string) ([]domain.HistoryPoint, error) {
@@ -377,5 +390,110 @@ func TestRankingRequestCarriesTheFactFilters(t *testing.T) {
 	}
 	if e := svc.req.Extra; e.Size != "" || e.HasCI != nil || e.HasSecurityPolicy != nil || e.Topic != "" {
 		t.Errorf("an empty request must leave every filter off (unset is 'any', not false): %+v", e)
+	}
+}
+
+func TestGetPlatformAnalyticsMapping(t *testing.T) {
+	week := time.Date(2026, 10, 5, 0, 0, 0, 0, time.UTC)
+	svc := &fakeService{analytics: domain.PlatformAnalytics{
+		GradedRepos:  40,
+		AvgScore:     71.5,
+		MedianScore:  73,
+		Distribution: []domain.ScoreBucket{{MinScore: 90, MaxScore: 100, Repos: 4}},
+		Levels:       []domain.LevelCount{{Level: domain.LevelHealthy, Repos: 12}},
+		Languages:    []domain.LanguageStat{{Name: "Go", Color: "#00ADD8", Repos: 9, AvgScore: 80.2}},
+		Categories:   []domain.CategoryAverage{{ID: "activity", AvgScore: 66.6, Repos: 38}},
+		TopAdvice:    []domain.AdviceStat{{CategoryID: "documentation", MetricID: "readme", Priority: "high", Repos: 21}},
+		Trend:        []domain.TrendPoint{{WeekStart: week, AvgScore: 70.1, Repos: 15}},
+		MostImproved: []domain.ImprovedRepo{{OrgSlug: "acme", Name: "tool", Score: 80, PastScore: 60, Change: 20}},
+		ImprovedDays: 30,
+		MinLanguage:  3,
+		GeneratedAt:  week,
+	}}
+
+	got, err := NewServer(svc).GetPlatformAnalytics(context.Background(), &pb.GetPlatformAnalyticsRequest{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got.GetGradedRepos() != 40 || got.GetAvgScore() != 71.5 || got.GetMedianScore() != 73 {
+		t.Errorf("totals = %d/%v/%v", got.GetGradedRepos(), got.GetAvgScore(), got.GetMedianScore())
+	}
+
+	if d := got.GetDistribution(); len(d) != 1 || d[0].GetMinScore() != 90 || d[0].GetMaxScore() != 100 || d[0].GetRepos() != 4 {
+		t.Errorf("distribution = %v", d)
+	}
+
+	if l := got.GetLanguages(); len(l) != 1 || l[0].GetName() != "Go" || l[0].GetAvgScore() != 80.2 {
+		t.Errorf("languages = %v", l)
+	}
+
+	if a := got.GetTopAdvice(); len(a) != 1 || a[0].GetMetricId() != "readme" || a[0].GetRepos() != 21 {
+		t.Errorf("advice = %v", a)
+	}
+
+	if tr := got.GetTrend(); len(tr) != 1 || !tr[0].GetWeekStart().AsTime().Equal(week) {
+		t.Errorf("trend = %v", tr)
+	}
+
+	if m := got.GetMostImproved(); len(m) != 1 || m[0].GetChange() != 20 || m[0].GetPastScore() != 60 {
+		t.Errorf("improved = %v", m)
+	}
+
+	if got.GetImprovedDays() != 30 || got.GetMinLanguageRepos() != 3 {
+		t.Errorf("windows = %d/%d", got.GetImprovedDays(), got.GetMinLanguageRepos())
+	}
+}
+
+func TestGetPlatformAnalyticsMapsError(t *testing.T) {
+	_, err := NewServer(&fakeService{err: domain.ErrInvalidArgument}).
+		GetPlatformAnalytics(context.Background(), &pb.GetPlatformAnalyticsRequest{})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("code = %v, want InvalidArgument", status.Code(err))
+	}
+}
+
+func TestListPublicGradesMapping(t *testing.T) {
+	graded := time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
+	score, low := 82, true
+	likes := 4.5
+	svc := &fakeService{grades: domain.PublicGradesPage{
+		TotalCount: 2500,
+		Page:       2,
+		PageSize:   1000,
+		Entries: []domain.PublicGrade{
+			{
+				OrgSlug: "acme", Name: "tool", WebURL: "https://sourcecraft.dev/acme/tool", Score: 82,
+				Language: "Go", Likes: &likes, GradedAt: &graded, LowConfidence: &low,
+				Categories: []domain.CategoryScore{{ID: "activity", Score: &score}, {ID: "issues"}},
+			},
+			{OrgSlug: "acme", Name: "bare", Score: 10},
+		},
+	}}
+
+	got, err := NewServer(svc).ListPublicGrades(context.Background(), &pb.ListPublicGradesRequest{Page: 2, PageSize: 1000})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if svc.gradesReq != [2]int{2, 1000} {
+		t.Errorf("request = %v", svc.gradesReq)
+	}
+
+	if got.GetTotalCount() != 2500 || got.GetPage() != 2 || len(got.GetEntries()) != 2 {
+		t.Fatalf("page = %v", got)
+	}
+
+	first, second := got.GetEntries()[0], got.GetEntries()[1]
+	if first.GetScore() != 82 || first.GetLikes() != 4.5 || !first.GetLowConfidence() || !first.GetGradedAt().AsTime().Equal(graded) {
+		t.Errorf("first = %v", first)
+	}
+
+	if c := first.GetCategories(); len(c) != 2 || c[0].Score == nil || *c[0].Score != 82 || c[1].Score != nil {
+		t.Errorf("categories = %v (a no-data category must keep an unset score)", c)
+	}
+
+	if second.LastActivityAt != nil || second.GradedAt != nil || second.LowConfidence != nil || second.Likes != nil {
+		t.Errorf("unknown fields must stay unset, got %v", second)
 	}
 }

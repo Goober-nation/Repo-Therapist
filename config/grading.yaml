@@ -172,7 +172,7 @@ categories:
       # Design history), not a from-scratch guess.
       - id: median_marker_age
         status: calculated
-        weight: 0.25
+        weight: 0.15  # was 0.25; 2026-10-08 unused_private_share added at 0.40
         source: todo-markers.json
         aggregation:
           type: median_marker_age
@@ -186,7 +186,7 @@ categories:
 
       - id: density_per_kloc
         status: calculated
-        weight: 0.30
+        weight: 0.18  # was 0.30; 2026-10-08 unused_private_share added at 0.40
         source: todo-markers.json
         aggregation:
           type: density_per_kloc
@@ -206,7 +206,7 @@ categories:
 
       - id: share_stale_markers
         status: calculated
-        weight: 0.25
+        weight: 0.15  # was 0.25; 2026-10-08 unused_private_share added at 0.40
         source: todo-markers.json
         aggregation:
           type: share_stale_markers
@@ -226,7 +226,7 @@ categories:
 
       - id: worst_file_concentration
         status: calculated
-        weight: 0.20
+        weight: 0.12  # was 0.20; 2026-10-08 unused_private_share added at 0.40
         source: todo-markers.json
         aggregation:
           type: worst_file_concentration
@@ -236,6 +236,25 @@ categories:
           direction: "-"
           critical: 0.6
           healthy: 0.15
+          provisional: true
+
+      # Unused private functions ÷ all private functions (repository-service's internal/deadcode:
+      # per-extension regex definitions + identifier reference counts, Go/Java/Kotlin/C#/Rust).
+      # Weighted highest in the category by user decision (2026-10-08): dead code is worse than
+      # TODOs. Thresholds from 14 real SourceCraft repos (2026-10-08): 11 had 0, the rest
+      # 0.4%-1.5% (worst: 12 of 823) — healthy/critical set so that 1.5% already costs points.
+      - id: unused_private_share
+        status: calculated
+        weight: 0.40
+        source: dead-functions.json
+        aggregation:
+          type: unused_private_share
+          min_sample_size: 10
+        formula:
+          type: linear_clamp
+          direction: "-"
+          critical: 0.08
+          healthy: 0.005
           provisional: true
 
   issues:

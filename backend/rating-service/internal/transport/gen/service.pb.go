@@ -1308,6 +1308,882 @@ func (x *GetPositionExplanationResponse) GetWeakestCategory() string {
 	return ""
 }
 
+type GetPlatformAnalyticsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPlatformAnalyticsRequest) Reset() {
+	*x = GetPlatformAnalyticsRequest{}
+	mi := &file_service_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPlatformAnalyticsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPlatformAnalyticsRequest) ProtoMessage() {}
+
+func (x *GetPlatformAnalyticsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPlatformAnalyticsRequest.ProtoReflect.Descriptor instead.
+func (*GetPlatformAnalyticsRequest) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{17}
+}
+
+type ScoreBucket struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Inclusive bounds; the last bucket is 90-100.
+	MinScore      int32 `protobuf:"varint,1,opt,name=min_score,json=minScore,proto3" json:"min_score,omitempty"`
+	MaxScore      int32 `protobuf:"varint,2,opt,name=max_score,json=maxScore,proto3" json:"max_score,omitempty"`
+	Repos         int32 `protobuf:"varint,3,opt,name=repos,proto3" json:"repos,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScoreBucket) Reset() {
+	*x = ScoreBucket{}
+	mi := &file_service_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScoreBucket) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScoreBucket) ProtoMessage() {}
+
+func (x *ScoreBucket) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScoreBucket.ProtoReflect.Descriptor instead.
+func (*ScoreBucket) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ScoreBucket) GetMinScore() int32 {
+	if x != nil {
+		return x.MinScore
+	}
+	return 0
+}
+
+func (x *ScoreBucket) GetMaxScore() int32 {
+	if x != nil {
+		return x.MaxScore
+	}
+	return 0
+}
+
+func (x *ScoreBucket) GetRepos() int32 {
+	if x != nil {
+		return x.Repos
+	}
+	return 0
+}
+
+type LevelCount struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// excellent (from 90), healthy (from 75), attention (from 60), at_risk (below 60).
+	Level         string `protobuf:"bytes,1,opt,name=level,proto3" json:"level,omitempty"`
+	Repos         int32  `protobuf:"varint,2,opt,name=repos,proto3" json:"repos,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LevelCount) Reset() {
+	*x = LevelCount{}
+	mi := &file_service_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LevelCount) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LevelCount) ProtoMessage() {}
+
+func (x *LevelCount) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LevelCount.ProtoReflect.Descriptor instead.
+func (*LevelCount) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *LevelCount) GetLevel() string {
+	if x != nil {
+		return x.Level
+	}
+	return ""
+}
+
+func (x *LevelCount) GetRepos() int32 {
+	if x != nil {
+		return x.Repos
+	}
+	return 0
+}
+
+type LanguageStat struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Color         string                 `protobuf:"bytes,2,opt,name=color,proto3" json:"color,omitempty"`
+	Repos         int32                  `protobuf:"varint,3,opt,name=repos,proto3" json:"repos,omitempty"`
+	AvgScore      float64                `protobuf:"fixed64,4,opt,name=avg_score,json=avgScore,proto3" json:"avg_score,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LanguageStat) Reset() {
+	*x = LanguageStat{}
+	mi := &file_service_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LanguageStat) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LanguageStat) ProtoMessage() {}
+
+func (x *LanguageStat) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LanguageStat.ProtoReflect.Descriptor instead.
+func (*LanguageStat) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *LanguageStat) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *LanguageStat) GetColor() string {
+	if x != nil {
+		return x.Color
+	}
+	return ""
+}
+
+func (x *LanguageStat) GetRepos() int32 {
+	if x != nil {
+		return x.Repos
+	}
+	return 0
+}
+
+func (x *LanguageStat) GetAvgScore() float64 {
+	if x != nil {
+		return x.AvgScore
+	}
+	return 0
+}
+
+type CategoryAverage struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Average over the repos that have data in this category (no-data is not counted as zero).
+	AvgScore      float64 `protobuf:"fixed64,2,opt,name=avg_score,json=avgScore,proto3" json:"avg_score,omitempty"`
+	Repos         int32   `protobuf:"varint,3,opt,name=repos,proto3" json:"repos,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CategoryAverage) Reset() {
+	*x = CategoryAverage{}
+	mi := &file_service_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CategoryAverage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CategoryAverage) ProtoMessage() {}
+
+func (x *CategoryAverage) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CategoryAverage.ProtoReflect.Descriptor instead.
+func (*CategoryAverage) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *CategoryAverage) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *CategoryAverage) GetAvgScore() float64 {
+	if x != nil {
+		return x.AvgScore
+	}
+	return 0
+}
+
+func (x *CategoryAverage) GetRepos() int32 {
+	if x != nil {
+		return x.Repos
+	}
+	return 0
+}
+
+type AdviceStat struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	CategoryId string                 `protobuf:"bytes,1,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
+	MetricId   string                 `protobuf:"bytes,2,opt,name=metric_id,json=metricId,proto3" json:"metric_id,omitempty"`
+	// The most common priority of this item across repos.
+	Priority string `protobuf:"bytes,3,opt,name=priority,proto3" json:"priority,omitempty"`
+	// How many repos have this item in their advice.
+	Repos         int32 `protobuf:"varint,4,opt,name=repos,proto3" json:"repos,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdviceStat) Reset() {
+	*x = AdviceStat{}
+	mi := &file_service_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdviceStat) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdviceStat) ProtoMessage() {}
+
+func (x *AdviceStat) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdviceStat.ProtoReflect.Descriptor instead.
+func (*AdviceStat) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *AdviceStat) GetCategoryId() string {
+	if x != nil {
+		return x.CategoryId
+	}
+	return ""
+}
+
+func (x *AdviceStat) GetMetricId() string {
+	if x != nil {
+		return x.MetricId
+	}
+	return ""
+}
+
+func (x *AdviceStat) GetPriority() string {
+	if x != nil {
+		return x.Priority
+	}
+	return ""
+}
+
+func (x *AdviceStat) GetRepos() int32 {
+	if x != nil {
+		return x.Repos
+	}
+	return 0
+}
+
+type TrendPoint struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	WeekStart *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=week_start,json=weekStart,proto3" json:"week_start,omitempty"`
+	// Average of the latest score of each repo graded that week.
+	AvgScore      float64 `protobuf:"fixed64,2,opt,name=avg_score,json=avgScore,proto3" json:"avg_score,omitempty"`
+	Repos         int32   `protobuf:"varint,3,opt,name=repos,proto3" json:"repos,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TrendPoint) Reset() {
+	*x = TrendPoint{}
+	mi := &file_service_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TrendPoint) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TrendPoint) ProtoMessage() {}
+
+func (x *TrendPoint) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TrendPoint.ProtoReflect.Descriptor instead.
+func (*TrendPoint) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *TrendPoint) GetWeekStart() *timestamppb.Timestamp {
+	if x != nil {
+		return x.WeekStart
+	}
+	return nil
+}
+
+func (x *TrendPoint) GetAvgScore() float64 {
+	if x != nil {
+		return x.AvgScore
+	}
+	return 0
+}
+
+func (x *TrendPoint) GetRepos() int32 {
+	if x != nil {
+		return x.Repos
+	}
+	return 0
+}
+
+type ImprovedRepo struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	OrgSlug string                 `protobuf:"bytes,1,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
+	// Currently repo_slug.
+	Name          string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Score         int32  `protobuf:"varint,3,opt,name=score,proto3" json:"score,omitempty"`
+	PastScore     int32  `protobuf:"varint,4,opt,name=past_score,json=pastScore,proto3" json:"past_score,omitempty"`
+	Change        int32  `protobuf:"varint,5,opt,name=change,proto3" json:"change,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImprovedRepo) Reset() {
+	*x = ImprovedRepo{}
+	mi := &file_service_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImprovedRepo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImprovedRepo) ProtoMessage() {}
+
+func (x *ImprovedRepo) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImprovedRepo.ProtoReflect.Descriptor instead.
+func (*ImprovedRepo) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ImprovedRepo) GetOrgSlug() string {
+	if x != nil {
+		return x.OrgSlug
+	}
+	return ""
+}
+
+func (x *ImprovedRepo) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ImprovedRepo) GetScore() int32 {
+	if x != nil {
+		return x.Score
+	}
+	return 0
+}
+
+func (x *ImprovedRepo) GetPastScore() int32 {
+	if x != nil {
+		return x.PastScore
+	}
+	return 0
+}
+
+func (x *ImprovedRepo) GetChange() int32 {
+	if x != nil {
+		return x.Change
+	}
+	return 0
+}
+
+type GetPlatformAnalyticsResponse struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	GradedRepos int32                  `protobuf:"varint,1,opt,name=graded_repos,json=gradedRepos,proto3" json:"graded_repos,omitempty"`
+	AvgScore    float64                `protobuf:"fixed64,2,opt,name=avg_score,json=avgScore,proto3" json:"avg_score,omitempty"`
+	MedianScore float64                `protobuf:"fixed64,3,opt,name=median_score,json=medianScore,proto3" json:"median_score,omitempty"`
+	// Ten buckets of ten points, lowest first.
+	Distribution []*ScoreBucket `protobuf:"bytes,4,rep,name=distribution,proto3" json:"distribution,omitempty"`
+	Levels       []*LevelCount  `protobuf:"bytes,5,rep,name=levels,proto3" json:"levels,omitempty"`
+	// Languages with at least min_language_repos graded repos, most repos first.
+	Languages  []*LanguageStat    `protobuf:"bytes,6,rep,name=languages,proto3" json:"languages,omitempty"`
+	Categories []*CategoryAverage `protobuf:"bytes,7,rep,name=categories,proto3" json:"categories,omitempty"`
+	// Most common advice items first.
+	TopAdvice []*AdviceStat `protobuf:"bytes,8,rep,name=top_advice,json=topAdvice,proto3" json:"top_advice,omitempty"`
+	// Oldest week first.
+	Trend []*TrendPoint `protobuf:"bytes,9,rep,name=trend,proto3" json:"trend,omitempty"`
+	// Biggest score gain first; compared with the latest grade improved_days ago (RANKING_DYNAMICS_DAYS).
+	MostImproved     []*ImprovedRepo        `protobuf:"bytes,10,rep,name=most_improved,json=mostImproved,proto3" json:"most_improved,omitempty"`
+	ImprovedDays     int32                  `protobuf:"varint,11,opt,name=improved_days,json=improvedDays,proto3" json:"improved_days,omitempty"`
+	MinLanguageRepos int32                  `protobuf:"varint,12,opt,name=min_language_repos,json=minLanguageRepos,proto3" json:"min_language_repos,omitempty"`
+	GeneratedAt      *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=generated_at,json=generatedAt,proto3" json:"generated_at,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *GetPlatformAnalyticsResponse) Reset() {
+	*x = GetPlatformAnalyticsResponse{}
+	mi := &file_service_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPlatformAnalyticsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPlatformAnalyticsResponse) ProtoMessage() {}
+
+func (x *GetPlatformAnalyticsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPlatformAnalyticsResponse.ProtoReflect.Descriptor instead.
+func (*GetPlatformAnalyticsResponse) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *GetPlatformAnalyticsResponse) GetGradedRepos() int32 {
+	if x != nil {
+		return x.GradedRepos
+	}
+	return 0
+}
+
+func (x *GetPlatformAnalyticsResponse) GetAvgScore() float64 {
+	if x != nil {
+		return x.AvgScore
+	}
+	return 0
+}
+
+func (x *GetPlatformAnalyticsResponse) GetMedianScore() float64 {
+	if x != nil {
+		return x.MedianScore
+	}
+	return 0
+}
+
+func (x *GetPlatformAnalyticsResponse) GetDistribution() []*ScoreBucket {
+	if x != nil {
+		return x.Distribution
+	}
+	return nil
+}
+
+func (x *GetPlatformAnalyticsResponse) GetLevels() []*LevelCount {
+	if x != nil {
+		return x.Levels
+	}
+	return nil
+}
+
+func (x *GetPlatformAnalyticsResponse) GetLanguages() []*LanguageStat {
+	if x != nil {
+		return x.Languages
+	}
+	return nil
+}
+
+func (x *GetPlatformAnalyticsResponse) GetCategories() []*CategoryAverage {
+	if x != nil {
+		return x.Categories
+	}
+	return nil
+}
+
+func (x *GetPlatformAnalyticsResponse) GetTopAdvice() []*AdviceStat {
+	if x != nil {
+		return x.TopAdvice
+	}
+	return nil
+}
+
+func (x *GetPlatformAnalyticsResponse) GetTrend() []*TrendPoint {
+	if x != nil {
+		return x.Trend
+	}
+	return nil
+}
+
+func (x *GetPlatformAnalyticsResponse) GetMostImproved() []*ImprovedRepo {
+	if x != nil {
+		return x.MostImproved
+	}
+	return nil
+}
+
+func (x *GetPlatformAnalyticsResponse) GetImprovedDays() int32 {
+	if x != nil {
+		return x.ImprovedDays
+	}
+	return 0
+}
+
+func (x *GetPlatformAnalyticsResponse) GetMinLanguageRepos() int32 {
+	if x != nil {
+		return x.MinLanguageRepos
+	}
+	return 0
+}
+
+func (x *GetPlatformAnalyticsResponse) GetGeneratedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.GeneratedAt
+	}
+	return nil
+}
+
+type ListPublicGradesRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 1-based page number; 0 means the first page.
+	Page int32 `protobuf:"varint,1,opt,name=page,proto3" json:"page,omitempty"`
+	// Entries per page; 0 means the default (1000), max 1000.
+	PageSize      int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPublicGradesRequest) Reset() {
+	*x = ListPublicGradesRequest{}
+	mi := &file_service_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPublicGradesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPublicGradesRequest) ProtoMessage() {}
+
+func (x *ListPublicGradesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPublicGradesRequest.ProtoReflect.Descriptor instead.
+func (*ListPublicGradesRequest) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *ListPublicGradesRequest) GetPage() int32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *ListPublicGradesRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+type PublicGradeEntry struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	OrgSlug string                 `protobuf:"bytes,1,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
+	// Currently repo_slug.
+	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// Empty when unknown.
+	WebUrl string `protobuf:"bytes,3,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
+	Score  int32  `protobuf:"varint,4,opt,name=score,proto3" json:"score,omitempty"`
+	// Empty when unknown.
+	Language       string                 `protobuf:"bytes,5,opt,name=language,proto3" json:"language,omitempty"`
+	Likes          *float64               `protobuf:"fixed64,6,opt,name=likes,proto3,oneof" json:"likes,omitempty"`
+	LastActivityAt *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
+	GradedAt       *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=graded_at,json=gradedAt,proto3" json:"graded_at,omitempty"`
+	// Unset when unknown (grade stored before the flag).
+	LowConfidence *bool `protobuf:"varint,9,opt,name=low_confidence,json=lowConfidence,proto3,oneof" json:"low_confidence,omitempty"`
+	// Sorted by id; a category without data has no score.
+	Categories    []*CategoryScore `protobuf:"bytes,10,rep,name=categories,proto3" json:"categories,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublicGradeEntry) Reset() {
+	*x = PublicGradeEntry{}
+	mi := &file_service_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublicGradeEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublicGradeEntry) ProtoMessage() {}
+
+func (x *PublicGradeEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublicGradeEntry.ProtoReflect.Descriptor instead.
+func (*PublicGradeEntry) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *PublicGradeEntry) GetOrgSlug() string {
+	if x != nil {
+		return x.OrgSlug
+	}
+	return ""
+}
+
+func (x *PublicGradeEntry) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PublicGradeEntry) GetWebUrl() string {
+	if x != nil {
+		return x.WebUrl
+	}
+	return ""
+}
+
+func (x *PublicGradeEntry) GetScore() int32 {
+	if x != nil {
+		return x.Score
+	}
+	return 0
+}
+
+func (x *PublicGradeEntry) GetLanguage() string {
+	if x != nil {
+		return x.Language
+	}
+	return ""
+}
+
+func (x *PublicGradeEntry) GetLikes() float64 {
+	if x != nil && x.Likes != nil {
+		return *x.Likes
+	}
+	return 0
+}
+
+func (x *PublicGradeEntry) GetLastActivityAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastActivityAt
+	}
+	return nil
+}
+
+func (x *PublicGradeEntry) GetGradedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.GradedAt
+	}
+	return nil
+}
+
+func (x *PublicGradeEntry) GetLowConfidence() bool {
+	if x != nil && x.LowConfidence != nil {
+		return *x.LowConfidence
+	}
+	return false
+}
+
+func (x *PublicGradeEntry) GetCategories() []*CategoryScore {
+	if x != nil {
+		return x.Categories
+	}
+	return nil
+}
+
+type ListPublicGradesResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Entries []*PublicGradeEntry    `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
+	// Number of graded public repos across all pages.
+	TotalCount    int32 `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
+	Page          int32 `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize      int32 `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPublicGradesResponse) Reset() {
+	*x = ListPublicGradesResponse{}
+	mi := &file_service_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPublicGradesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPublicGradesResponse) ProtoMessage() {}
+
+func (x *ListPublicGradesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPublicGradesResponse.ProtoReflect.Descriptor instead.
+func (*ListPublicGradesResponse) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *ListPublicGradesResponse) GetEntries() []*PublicGradeEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+func (x *ListPublicGradesResponse) GetTotalCount() int32 {
+	if x != nil {
+		return x.TotalCount
+	}
+	return 0
+}
+
+func (x *ListPublicGradesResponse) GetPage() int32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *ListPublicGradesResponse) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
 var File_service_proto protoreflect.FileDescriptor
 
 const file_service_proto_rawDesc = "" +
@@ -1426,18 +2302,101 @@ const file_service_proto_rawDesc = "" +
 	"categories\x12)\n" +
 	"\x10weakest_category\x18\b \x01(\tR\x0fweakestCategoryB\b\n" +
 	"\x06_aboveB\b\n" +
-	"\x06_below*I\n" +
+	"\x06_below\"\x1d\n" +
+	"\x1bGetPlatformAnalyticsRequest\"]\n" +
+	"\vScoreBucket\x12\x1b\n" +
+	"\tmin_score\x18\x01 \x01(\x05R\bminScore\x12\x1b\n" +
+	"\tmax_score\x18\x02 \x01(\x05R\bmaxScore\x12\x14\n" +
+	"\x05repos\x18\x03 \x01(\x05R\x05repos\"8\n" +
+	"\n" +
+	"LevelCount\x12\x14\n" +
+	"\x05level\x18\x01 \x01(\tR\x05level\x12\x14\n" +
+	"\x05repos\x18\x02 \x01(\x05R\x05repos\"k\n" +
+	"\fLanguageStat\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05color\x18\x02 \x01(\tR\x05color\x12\x14\n" +
+	"\x05repos\x18\x03 \x01(\x05R\x05repos\x12\x1b\n" +
+	"\tavg_score\x18\x04 \x01(\x01R\bavgScore\"T\n" +
+	"\x0fCategoryAverage\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\tavg_score\x18\x02 \x01(\x01R\bavgScore\x12\x14\n" +
+	"\x05repos\x18\x03 \x01(\x05R\x05repos\"|\n" +
+	"\n" +
+	"AdviceStat\x12\x1f\n" +
+	"\vcategory_id\x18\x01 \x01(\tR\n" +
+	"categoryId\x12\x1b\n" +
+	"\tmetric_id\x18\x02 \x01(\tR\bmetricId\x12\x1a\n" +
+	"\bpriority\x18\x03 \x01(\tR\bpriority\x12\x14\n" +
+	"\x05repos\x18\x04 \x01(\x05R\x05repos\"z\n" +
+	"\n" +
+	"TrendPoint\x129\n" +
+	"\n" +
+	"week_start\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\tweekStart\x12\x1b\n" +
+	"\tavg_score\x18\x02 \x01(\x01R\bavgScore\x12\x14\n" +
+	"\x05repos\x18\x03 \x01(\x05R\x05repos\"\x8a\x01\n" +
+	"\fImprovedRepo\x12\x19\n" +
+	"\borg_slug\x18\x01 \x01(\tR\aorgSlug\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
+	"\x05score\x18\x03 \x01(\x05R\x05score\x12\x1d\n" +
+	"\n" +
+	"past_score\x18\x04 \x01(\x05R\tpastScore\x12\x16\n" +
+	"\x06change\x18\x05 \x01(\x05R\x06change\"\xfd\x04\n" +
+	"\x1cGetPlatformAnalyticsResponse\x12!\n" +
+	"\fgraded_repos\x18\x01 \x01(\x05R\vgradedRepos\x12\x1b\n" +
+	"\tavg_score\x18\x02 \x01(\x01R\bavgScore\x12!\n" +
+	"\fmedian_score\x18\x03 \x01(\x01R\vmedianScore\x127\n" +
+	"\fdistribution\x18\x04 \x03(\v2\x13.rating.ScoreBucketR\fdistribution\x12*\n" +
+	"\x06levels\x18\x05 \x03(\v2\x12.rating.LevelCountR\x06levels\x122\n" +
+	"\tlanguages\x18\x06 \x03(\v2\x14.rating.LanguageStatR\tlanguages\x127\n" +
+	"\n" +
+	"categories\x18\a \x03(\v2\x17.rating.CategoryAverageR\n" +
+	"categories\x121\n" +
+	"\n" +
+	"top_advice\x18\b \x03(\v2\x12.rating.AdviceStatR\ttopAdvice\x12(\n" +
+	"\x05trend\x18\t \x03(\v2\x12.rating.TrendPointR\x05trend\x129\n" +
+	"\rmost_improved\x18\n" +
+	" \x03(\v2\x14.rating.ImprovedRepoR\fmostImproved\x12#\n" +
+	"\rimproved_days\x18\v \x01(\x05R\fimprovedDays\x12,\n" +
+	"\x12min_language_repos\x18\f \x01(\x05R\x10minLanguageRepos\x12=\n" +
+	"\fgenerated_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\vgeneratedAt\"J\n" +
+	"\x17ListPublicGradesRequest\x12\x12\n" +
+	"\x04page\x18\x01 \x01(\x05R\x04page\x12\x1b\n" +
+	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\"\xa6\x03\n" +
+	"\x10PublicGradeEntry\x12\x19\n" +
+	"\borg_slug\x18\x01 \x01(\tR\aorgSlug\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x17\n" +
+	"\aweb_url\x18\x03 \x01(\tR\x06webUrl\x12\x14\n" +
+	"\x05score\x18\x04 \x01(\x05R\x05score\x12\x1a\n" +
+	"\blanguage\x18\x05 \x01(\tR\blanguage\x12\x19\n" +
+	"\x05likes\x18\x06 \x01(\x01H\x00R\x05likes\x88\x01\x01\x12D\n" +
+	"\x10last_activity_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\x0elastActivityAt\x127\n" +
+	"\tgraded_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\bgradedAt\x12*\n" +
+	"\x0elow_confidence\x18\t \x01(\bH\x01R\rlowConfidence\x88\x01\x01\x125\n" +
+	"\n" +
+	"categories\x18\n" +
+	" \x03(\v2\x15.rating.CategoryScoreR\n" +
+	"categoriesB\b\n" +
+	"\x06_likesB\x11\n" +
+	"\x0f_low_confidence\"\xa0\x01\n" +
+	"\x18ListPublicGradesResponse\x122\n" +
+	"\aentries\x18\x01 \x03(\v2\x18.rating.PublicGradeEntryR\aentries\x12\x1f\n" +
+	"\vtotal_count\x18\x02 \x01(\x05R\n" +
+	"totalCount\x12\x12\n" +
+	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize*I\n" +
 	"\x06SortBy\x12\x11\n" +
 	"\rSORT_BY_SCORE\x10\x00\x12\x19\n" +
 	"\x15SORT_BY_LAST_ACTIVITY\x10\x01\x12\x11\n" +
-	"\rSORT_BY_LIKES\x10\x022\xb2\x03\n" +
+	"\rSORT_BY_LIKES\x10\x022\xec\x04\n" +
 	"\x06Rating\x12C\n" +
 	"\n" +
 	"GetRanking\x12\x19.rating.GetRankingRequest\x1a\x1a.rating.GetRankingResponse\x12O\n" +
 	"\x0eGetPublicScore\x12\x1d.rating.GetPublicScoreRequest\x1a\x1e.rating.GetPublicScoreResponse\x12U\n" +
 	"\x10GetPublicSummary\x12\x1f.rating.GetPublicSummaryRequest\x1a .rating.GetPublicSummaryResponse\x12R\n" +
 	"\x0fGetScoreHistory\x12\x1e.rating.GetScoreHistoryRequest\x1a\x1f.rating.GetScoreHistoryResponse\x12g\n" +
-	"\x16GetPositionExplanation\x12%.rating.GetPositionExplanationRequest\x1a&.rating.GetPositionExplanationResponseB*Z(rating-service/internal/transport/gen;pbb\x06proto3"
+	"\x16GetPositionExplanation\x12%.rating.GetPositionExplanationRequest\x1a&.rating.GetPositionExplanationResponse\x12a\n" +
+	"\x14GetPlatformAnalytics\x12#.rating.GetPlatformAnalyticsRequest\x1a$.rating.GetPlatformAnalyticsResponse\x12U\n" +
+	"\x10ListPublicGrades\x12\x1f.rating.ListPublicGradesRequest\x1a .rating.ListPublicGradesResponseB*Z(rating-service/internal/transport/gen;pbb\x06proto3"
 
 var (
 	file_service_proto_rawDescOnce sync.Once
@@ -1452,7 +2411,7 @@ func file_service_proto_rawDescGZIP() []byte {
 }
 
 var file_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_service_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_service_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
 var file_service_proto_goTypes = []any{
 	(SortBy)(0),                            // 0: rating.SortBy
 	(*GetRankingRequest)(nil),              // 1: rating.GetRankingRequest
@@ -1472,38 +2431,67 @@ var file_service_proto_goTypes = []any{
 	(*Neighbour)(nil),                      // 15: rating.Neighbour
 	(*CategoryComparison)(nil),             // 16: rating.CategoryComparison
 	(*GetPositionExplanationResponse)(nil), // 17: rating.GetPositionExplanationResponse
-	(*timestamppb.Timestamp)(nil),          // 18: google.protobuf.Timestamp
+	(*GetPlatformAnalyticsRequest)(nil),    // 18: rating.GetPlatformAnalyticsRequest
+	(*ScoreBucket)(nil),                    // 19: rating.ScoreBucket
+	(*LevelCount)(nil),                     // 20: rating.LevelCount
+	(*LanguageStat)(nil),                   // 21: rating.LanguageStat
+	(*CategoryAverage)(nil),                // 22: rating.CategoryAverage
+	(*AdviceStat)(nil),                     // 23: rating.AdviceStat
+	(*TrendPoint)(nil),                     // 24: rating.TrendPoint
+	(*ImprovedRepo)(nil),                   // 25: rating.ImprovedRepo
+	(*GetPlatformAnalyticsResponse)(nil),   // 26: rating.GetPlatformAnalyticsResponse
+	(*ListPublicGradesRequest)(nil),        // 27: rating.ListPublicGradesRequest
+	(*PublicGradeEntry)(nil),               // 28: rating.PublicGradeEntry
+	(*ListPublicGradesResponse)(nil),       // 29: rating.ListPublicGradesResponse
+	(*timestamppb.Timestamp)(nil),          // 30: google.protobuf.Timestamp
 }
 var file_service_proto_depIdxs = []int32{
 	0,  // 0: rating.GetRankingRequest.sort_by:type_name -> rating.SortBy
 	3,  // 1: rating.RankingEntry.language:type_name -> rating.Language
-	18, // 2: rating.RankingEntry.last_activity_at:type_name -> google.protobuf.Timestamp
+	30, // 2: rating.RankingEntry.last_activity_at:type_name -> google.protobuf.Timestamp
 	10, // 3: rating.RankingEntry.confidence_reasons:type_name -> rating.ConfidenceReason
 	2,  // 4: rating.GetRankingResponse.entries:type_name -> rating.RankingEntry
 	8,  // 5: rating.GetPublicSummaryResponse.categories:type_name -> rating.CategoryScore
-	18, // 6: rating.GetPublicSummaryResponse.graded_at:type_name -> google.protobuf.Timestamp
+	30, // 6: rating.GetPublicSummaryResponse.graded_at:type_name -> google.protobuf.Timestamp
 	10, // 7: rating.GetPublicSummaryResponse.confidence_reasons:type_name -> rating.ConfidenceReason
-	18, // 8: rating.HistoryPoint.graded_at:type_name -> google.protobuf.Timestamp
+	30, // 8: rating.HistoryPoint.graded_at:type_name -> google.protobuf.Timestamp
 	8,  // 9: rating.HistoryPoint.categories:type_name -> rating.CategoryScore
 	12, // 10: rating.GetScoreHistoryResponse.points:type_name -> rating.HistoryPoint
 	15, // 11: rating.GetPositionExplanationResponse.above:type_name -> rating.Neighbour
 	15, // 12: rating.GetPositionExplanationResponse.below:type_name -> rating.Neighbour
 	16, // 13: rating.GetPositionExplanationResponse.categories:type_name -> rating.CategoryComparison
-	1,  // 14: rating.Rating.GetRanking:input_type -> rating.GetRankingRequest
-	5,  // 15: rating.Rating.GetPublicScore:input_type -> rating.GetPublicScoreRequest
-	7,  // 16: rating.Rating.GetPublicSummary:input_type -> rating.GetPublicSummaryRequest
-	11, // 17: rating.Rating.GetScoreHistory:input_type -> rating.GetScoreHistoryRequest
-	14, // 18: rating.Rating.GetPositionExplanation:input_type -> rating.GetPositionExplanationRequest
-	4,  // 19: rating.Rating.GetRanking:output_type -> rating.GetRankingResponse
-	6,  // 20: rating.Rating.GetPublicScore:output_type -> rating.GetPublicScoreResponse
-	9,  // 21: rating.Rating.GetPublicSummary:output_type -> rating.GetPublicSummaryResponse
-	13, // 22: rating.Rating.GetScoreHistory:output_type -> rating.GetScoreHistoryResponse
-	17, // 23: rating.Rating.GetPositionExplanation:output_type -> rating.GetPositionExplanationResponse
-	19, // [19:24] is the sub-list for method output_type
-	14, // [14:19] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	30, // 14: rating.TrendPoint.week_start:type_name -> google.protobuf.Timestamp
+	19, // 15: rating.GetPlatformAnalyticsResponse.distribution:type_name -> rating.ScoreBucket
+	20, // 16: rating.GetPlatformAnalyticsResponse.levels:type_name -> rating.LevelCount
+	21, // 17: rating.GetPlatformAnalyticsResponse.languages:type_name -> rating.LanguageStat
+	22, // 18: rating.GetPlatformAnalyticsResponse.categories:type_name -> rating.CategoryAverage
+	23, // 19: rating.GetPlatformAnalyticsResponse.top_advice:type_name -> rating.AdviceStat
+	24, // 20: rating.GetPlatformAnalyticsResponse.trend:type_name -> rating.TrendPoint
+	25, // 21: rating.GetPlatformAnalyticsResponse.most_improved:type_name -> rating.ImprovedRepo
+	30, // 22: rating.GetPlatformAnalyticsResponse.generated_at:type_name -> google.protobuf.Timestamp
+	30, // 23: rating.PublicGradeEntry.last_activity_at:type_name -> google.protobuf.Timestamp
+	30, // 24: rating.PublicGradeEntry.graded_at:type_name -> google.protobuf.Timestamp
+	8,  // 25: rating.PublicGradeEntry.categories:type_name -> rating.CategoryScore
+	28, // 26: rating.ListPublicGradesResponse.entries:type_name -> rating.PublicGradeEntry
+	1,  // 27: rating.Rating.GetRanking:input_type -> rating.GetRankingRequest
+	5,  // 28: rating.Rating.GetPublicScore:input_type -> rating.GetPublicScoreRequest
+	7,  // 29: rating.Rating.GetPublicSummary:input_type -> rating.GetPublicSummaryRequest
+	11, // 30: rating.Rating.GetScoreHistory:input_type -> rating.GetScoreHistoryRequest
+	14, // 31: rating.Rating.GetPositionExplanation:input_type -> rating.GetPositionExplanationRequest
+	18, // 32: rating.Rating.GetPlatformAnalytics:input_type -> rating.GetPlatformAnalyticsRequest
+	27, // 33: rating.Rating.ListPublicGrades:input_type -> rating.ListPublicGradesRequest
+	4,  // 34: rating.Rating.GetRanking:output_type -> rating.GetRankingResponse
+	6,  // 35: rating.Rating.GetPublicScore:output_type -> rating.GetPublicScoreResponse
+	9,  // 36: rating.Rating.GetPublicSummary:output_type -> rating.GetPublicSummaryResponse
+	13, // 37: rating.Rating.GetScoreHistory:output_type -> rating.GetScoreHistoryResponse
+	17, // 38: rating.Rating.GetPositionExplanation:output_type -> rating.GetPositionExplanationResponse
+	26, // 39: rating.Rating.GetPlatformAnalytics:output_type -> rating.GetPlatformAnalyticsResponse
+	29, // 40: rating.Rating.ListPublicGrades:output_type -> rating.ListPublicGradesResponse
+	34, // [34:41] is the sub-list for method output_type
+	27, // [27:34] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_service_proto_init() }
@@ -1519,13 +2507,14 @@ func file_service_proto_init() {
 	file_service_proto_msgTypes[11].OneofWrappers = []any{}
 	file_service_proto_msgTypes[15].OneofWrappers = []any{}
 	file_service_proto_msgTypes[16].OneofWrappers = []any{}
+	file_service_proto_msgTypes[27].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_proto_rawDesc), len(file_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   17,
+			NumMessages:   29,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -256,3 +256,136 @@ export interface PositionResponse {
   categories?: { id: string; score: number; top10_median?: number | null; gap?: number | null }[]
   weakest_category?: string
 }
+
+/** GET /stats: aggregate statistics over all graded public repositories (public grades only). */
+export interface StatsResponse {
+  graded_repos: number
+  avg_score: number
+  median_score: number
+  distribution: { min: number; max: number; repos: number }[]
+  levels: { level: string; repos: number }[]
+  languages: { name: string; color: string; repos: number; avg_score: number }[]
+  categories: { id: string; avg_score: number; repos: number }[]
+  top_advice: { category_id: string; metric_id: string; priority: string; repos: number }[]
+  trend: { week_start: string | null; avg_score: number; repos: number }[]
+  most_improved: { org: string; name: string; score: number; past_score: number; change: number }[]
+  improved_days: number
+  min_language_repos: number
+  generated_at: string | null
+}
+
+/** GET /admin/me: whether the caller is an administrator. Always answered, for visitors too. */
+export interface AdminMeResponse {
+  is_admin: boolean
+  /** The session cookie belongs to a signed-in account. */
+  signed_in: boolean
+  /** A password unlock is configured on this stand. */
+  unlock_available: boolean
+  /** The admin rights come from a password unlock of this session (and can be taken off). */
+  via_password: boolean
+}
+
+/** One entry of the audit log (GET /admin/audit). `actor` is a hash of the Yandex ID, never the ID. */
+export interface AuditEntryResponse {
+  id: number
+  at: string
+  actor_kind: string
+  actor: string
+  action: string
+  target_kind: string
+  target: string
+  outcome: string
+  details: Record<string, unknown>
+}
+
+/** GET /admin/audit: one page, newest first; `next_before_id` is the cursor of the next page (0 = last). */
+export interface AuditResponse {
+  entries: AuditEntryResponse[]
+  next_before_id: number
+}
+
+/** The filter of a batch regrade (POST /admin/regrade/preview and /admin/regrade/batches). */
+export interface BatchFilterBody {
+  languages?: string[]
+  min_score?: number
+  max_score?: number
+  older_than_days?: number
+  repos?: string[]
+  /** The first N matching public repositories in SourceCraft rating order. */
+  top_rated?: number
+  all?: boolean
+  /** Regrade even repositories with no SourceCraft activity since their last grade. */
+  force?: boolean
+}
+
+/** POST /admin/regrade/preview: the dry run. */
+export interface BatchPreviewResponse {
+  count: number
+  /** More repositories matched than one batch may hold; the batch cannot start. */
+  capped: boolean
+  sample: string[]
+  /** Hand-picked repositories that are not public repositories known to the service. */
+  unmatched: string[]
+  estimate_seconds: number
+  /** Estimated repositories the activity check will skip (0 with force). */
+  inactive: number
+}
+
+export type BatchStatus = "running" | "paused" | "completed" | "cancelled"
+
+/** One regrade batch with its counters. `actor` is a hash of the starting admin's Yandex ID. */
+export interface RegradeBatchResponse {
+  id: number
+  created_at: string
+  finished_at: string | null
+  status: BatchStatus
+  actor: string
+  filter: {
+    languages: string[] | null
+    min_score: number | null
+    max_score: number | null
+    older_than_days: number | null
+    repos: string[] | null
+    top_rated: number | null
+    all: boolean
+    force: boolean
+  }
+  total: number
+  pending: number
+  running: number
+  ok: number
+  failed: number
+  skipped: number
+}
+
+/** GET /admin/regrade/batches/{id|current}. */
+export interface RegradeBatchDetailResponse {
+  batch: RegradeBatchResponse
+  failures: { repo: string; error: string }[]
+}
+
+/** GET /admin/regrade/batches/current: `batch` is null while there has never been a batch. */
+export interface CurrentBatchResponse {
+  batch: RegradeBatchResponse | null
+  failures: { repo: string; error: string }[]
+}
+
+export interface RegradeBatchListResponse {
+  batches: RegradeBatchResponse[]
+}
+
+/** One curve of a graph: `points` are [unix seconds, value]. `label` is "" when the query has no grouping. */
+export interface SeriesLineResponse {
+  label: string
+  points: [number, number][]
+}
+
+/** GET /stats/series/{name} and GET /admin/metrics/{name}: one graph read from Prometheus. */
+export interface SeriesResponse {
+  name: string
+  /** count | seconds | per_second. */
+  unit: string
+  step_seconds: number
+  generated_at: string
+  series: SeriesLineResponse[]
+}

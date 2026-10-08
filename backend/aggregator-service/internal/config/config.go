@@ -15,6 +15,27 @@ type Config struct {
 	Grading            GradingConfig
 	Token              ServiceToken
 	Redis              RedisConfig
+	Audit              AuditConfig
+	Batch              BatchConfig
+	// MetricsAddress serves /metrics for Prometheus (METRICS_ADDRESS); empty leaves it off. It is its own
+	// port, never published (docs/metrics.md).
+	MetricsAddress string
+}
+
+// BatchConfig tunes the admin batch regrade (docs/admin.md).
+type BatchConfig struct {
+	// Concurrency is how many repos of a batch are graded at once.
+	Concurrency int
+	// MaxRepos caps one batch; a filter that matches more is refused.
+	MaxRepos int
+	// ItemTimeout is how long one repo may take before it counts as failed.
+	ItemTimeout time.Duration
+}
+
+// AuditConfig is the audit log's retention (docs/admin.md).
+type AuditConfig struct {
+	// RetentionDays deletes audit entries older than this many days; 0 keeps them forever.
+	RetentionDays int
 }
 
 // RedisConfig uses the same env names as gateway-service.
@@ -97,6 +118,18 @@ type GradingConfig struct {
 
 func LoadConfig() *Config {
 	return &Config{
+		Audit: AuditConfig{
+			RetentionDays: getEnvInt("AUDIT_RETENTION_DAYS", 30),
+		},
+
+		MetricsAddress: getEnvDefault("METRICS_ADDRESS", ""),
+
+		Batch: BatchConfig{
+			Concurrency: getEnvInt("BATCH_REGRADE_CONCURRENCY", 3),
+			MaxRepos:    getEnvInt("BATCH_REGRADE_MAX_REPOS", 500),
+			ItemTimeout: getEnvDuration("BATCH_REGRADE_ITEM_TIMEOUT", 15*time.Minute),
+		},
+
 		Redis: RedisConfig{
 			Address:  getEnvDefault("REDIS_ADDRESS", "localhost:6379"),
 			Password: getEnvDefault("REDIS_PASSWORD", ""),

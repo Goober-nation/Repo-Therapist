@@ -13,6 +13,9 @@ type MetricResult struct {
 	RawValue float64 `json:"raw_value"`
 	Score    float64 `json:"score"` // 0-1
 	Weight   float64 `json:"weight"`
+	// Detail is a metric-specific recommendation text that replaces the catalog's generic one
+	// (e.g. naming the files with unused functions); empty for most metrics.
+	Detail string `json:"detail,omitempty"`
 }
 
 type CategoryResult struct {

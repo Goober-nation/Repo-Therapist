@@ -20,6 +20,8 @@ type RatingService interface {
 	GetPublicSummary(ctx context.Context, orgSlug, repoSlug string) (domain.PublicSummary, error)
 	GetScoreHistory(ctx context.Context, orgSlug, repoSlug string) ([]domain.HistoryPoint, error)
 	GetPositionExplanation(ctx context.Context, orgSlug, repoSlug string) (domain.PositionExplanation, error)
+	GetPlatformAnalytics(ctx context.Context) (domain.PlatformAnalytics, error)
+	ListPublicGrades(ctx context.Context, page, pageSize int) (domain.PublicGradesPage, error)
 }
 
 type Server struct {
@@ -176,6 +178,104 @@ func (s *Server) GetPositionExplanation(ctx context.Context, req *pb.GetPosition
 		}
 
 		result.Categories = append(result.Categories, entry)
+	}
+
+	return result, nil
+}
+
+func (s *Server) GetPlatformAnalytics(ctx context.Context, _ *pb.GetPlatformAnalyticsRequest) (*pb.GetPlatformAnalyticsResponse, error) {
+	analytics, err := s.service.GetPlatformAnalytics(ctx)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	result := &pb.GetPlatformAnalyticsResponse{
+		GradedRepos:      int32(analytics.GradedRepos),
+		AvgScore:         analytics.AvgScore,
+		MedianScore:      analytics.MedianScore,
+		ImprovedDays:     int32(analytics.ImprovedDays),
+		MinLanguageRepos: int32(analytics.MinLanguage),
+		GeneratedAt:      timestamppb.New(analytics.GeneratedAt),
+	}
+
+	for _, bucket := range analytics.Distribution {
+		result.Distribution = append(result.Distribution, &pb.ScoreBucket{
+			MinScore: int32(bucket.MinScore), MaxScore: int32(bucket.MaxScore), Repos: int32(bucket.Repos),
+		})
+	}
+
+	for _, level := range analytics.Levels {
+		result.Levels = append(result.Levels, &pb.LevelCount{Level: level.Level, Repos: int32(level.Repos)})
+	}
+
+	for _, language := range analytics.Languages {
+		result.Languages = append(result.Languages, &pb.LanguageStat{
+			Name: language.Name, Color: language.Color, Repos: int32(language.Repos), AvgScore: language.AvgScore,
+		})
+	}
+
+	for _, category := range analytics.Categories {
+		result.Categories = append(result.Categories, &pb.CategoryAverage{
+			Id: category.ID, AvgScore: category.AvgScore, Repos: int32(category.Repos),
+		})
+	}
+
+	for _, advice := range analytics.TopAdvice {
+		result.TopAdvice = append(result.TopAdvice, &pb.AdviceStat{
+			CategoryId: advice.CategoryID, MetricId: advice.MetricID, Priority: advice.Priority, Repos: int32(advice.Repos),
+		})
+	}
+
+	for _, point := range analytics.Trend {
+		result.Trend = append(result.Trend, &pb.TrendPoint{
+			WeekStart: timestamppb.New(point.WeekStart), AvgScore: point.AvgScore, Repos: int32(point.Repos),
+		})
+	}
+
+	for _, repo := range analytics.MostImproved {
+		result.MostImproved = append(result.MostImproved, &pb.ImprovedRepo{
+			OrgSlug: repo.OrgSlug, Name: repo.Name, Score: int32(repo.Score),
+			PastScore: int32(repo.PastScore), Change: int32(repo.Change),
+		})
+	}
+
+	return result, nil
+}
+
+func (s *Server) ListPublicGrades(ctx context.Context, req *pb.ListPublicGradesRequest) (*pb.ListPublicGradesResponse, error) {
+	page, err := s.service.ListPublicGrades(ctx, int(req.GetPage()), int(req.GetPageSize()))
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	result := &pb.ListPublicGradesResponse{
+		Entries:    make([]*pb.PublicGradeEntry, 0, len(page.Entries)),
+		TotalCount: int32(page.TotalCount),
+		Page:       int32(page.Page),
+		PageSize:   int32(page.PageSize),
+	}
+
+	for _, grade := range page.Entries {
+		entry := &pb.PublicGradeEntry{
+			OrgSlug:       grade.OrgSlug,
+			Name:          grade.Name,
+			WebUrl:        grade.WebURL,
+			Score:         int32(grade.Score),
+			Language:      grade.Language,
+			Likes:         grade.Likes,
+			LowConfidence: grade.LowConfidence,
+			Categories:    categoriesToProto(grade.Categories),
+		}
+
+		if grade.LastActivityAt != nil {
+			entry.LastActivityAt = timestamppb.New(*grade.LastActivityAt)
+		}
+
+		if grade.GradedAt != nil {
+			entry.GradedAt = timestamppb.New(*grade.GradedAt)
+		}
+
+		result.Entries = append(result.Entries, entry)
 	}
 
 	return result, nil

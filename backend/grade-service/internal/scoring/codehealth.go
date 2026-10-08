@@ -1,6 +1,12 @@
 package scoring
 
-import "repo-therapist/grade-service/internal/config"
+import (
+	"fmt"
+	"sort"
+	"strings"
+
+	"repo-therapist/grade-service/internal/config"
+)
 
 // Marker is the subset of repository-service's todomarkers.Marker Code health needs — matches the
 // shape written to _meta/todo-markers.json.
@@ -22,6 +28,23 @@ type CodeHealthInputs struct {
 	// ScannedFiles is the number of scanned text files; only the low-confidence flag reads it.
 	ScannedFiles int
 	Available    bool
+	// DeadCode is _meta/dead-functions.json; nil when it couldn't be fetched, which makes only
+	// unused_private_share no-data, not the whole category.
+	DeadCode *DeadCodeExport
+}
+
+// DeadFunction / DeadCodeExport mirror repository-service's deadcode.Function / deadcode.Export.
+type DeadFunction struct {
+	File string `json:"file"`
+	Line int    `json:"line"`
+	Name string `json:"name"`
+	Lang string `json:"lang"`
+}
+
+type DeadCodeExport struct {
+	Unused       []DeadFunction `json:"unused"`
+	UnusedTotal  int            `json:"unused_total"`
+	PrivateTotal int            `json:"private_total"`
 }
 
 // ComputeCodeHealth doesn't go through ComputeCategory/eventsForSource like Activity/Issues: its
@@ -67,6 +90,9 @@ func computeCodeHealthMetric(m config.MetricConfig, inputs CodeHealthInputs) Met
 
 	base.RawValue = agg.Value
 	base.Score = applyFormula(m.Formula, agg.Value)
+	if m.Aggregation.Type == "unused_private_share" {
+		base.Detail = deadCodeAdvice(inputs.DeadCode)
+	}
 	return base
 }
 
@@ -80,6 +106,8 @@ func aggregateCodeHealth(m config.MetricConfig, inputs CodeHealthInputs) aggResu
 		return shareStaleMarkers(m.Aggregation, inputs.Markers)
 	case "worst_file_concentration":
 		return worstFileConcentration(m.Aggregation, inputs.Markers)
+	case "unused_private_share":
+		return unusedPrivateShare(m.Aggregation, inputs.DeadCode)
 	default:
 		return aggResult{NoData: true}
 	}
@@ -180,4 +208,70 @@ func worstFileConcentration(cfg config.AggregationConfig, markers []Marker) aggR
 		}
 	}
 	return aggResult{Value: float64(max) / float64(len(markers))}
+}
+
+// unusedPrivateShare: unused private functions ÷ all private functions in supported languages.
+// Private only, since a public function may be called from outside the repo. Below
+// cfg.MinSampleSize private functions → NoData: in a tiny codebase one helper swings the share
+// too far. Also NoData when the export is missing.
+func unusedPrivateShare(cfg config.AggregationConfig, dead *DeadCodeExport) aggResult {
+	if dead == nil || dead.PrivateTotal == 0 || dead.PrivateTotal < cfg.MinSampleSize {
+		return aggResult{NoData: true}
+	}
+	return aggResult{Value: float64(dead.UnusedTotal) / float64(dead.PrivateTotal)}
+}
+
+// deadCodeAdviceFiles is how many files the advice names before "и других".
+const deadCodeAdviceFiles = 3
+
+// deadCodeAdvice renders the Russian recommendation naming the files with the most unused
+// functions; "" when nothing was found.
+func deadCodeAdvice(dead *DeadCodeExport) string {
+	if dead == nil || dead.UnusedTotal == 0 {
+		return ""
+	}
+	counts := make(map[string]int)
+	for _, f := range dead.Unused {
+		counts[f.File]++
+	}
+	files := make([]string, 0, len(counts))
+	for f := range counts {
+		files = append(files, f)
+	}
+	sort.Slice(files, func(i, j int) bool {
+		if counts[files[i]] != counts[files[j]] {
+			return counts[files[i]] > counts[files[j]]
+		}
+		return files[i] < files[j]
+	})
+	more := len(files) > deadCodeAdviceFiles
+	if more {
+		files = files[:deadCodeAdviceFiles]
+	}
+	where := "в файле"
+	if len(files) > 1 {
+		where = "в файлах"
+	}
+	text := fmt.Sprintf("Найдено %d %s %s %s", dead.UnusedTotal,
+		ruPlural(dead.UnusedTotal, "неиспользуемая приватная функция", "неиспользуемые приватные функции", "неиспользуемых приватных функций"),
+		where, strings.Join(files, ", "))
+	if more {
+		text += " и других"
+	}
+	return text + ". Удалите мёртвый код или используйте его — он усложняет чтение и сопровождение."
+}
+
+// ruPlural picks the Russian noun form for n (1 функция, 2 функции, 5 функций).
+func ruPlural(n int, one, few, many string) string {
+	n %= 100
+	if n >= 11 && n <= 14 {
+		return many
+	}
+	switch n % 10 {
+	case 1:
+		return one
+	case 2, 3, 4:
+		return few
+	}
+	return many
 }

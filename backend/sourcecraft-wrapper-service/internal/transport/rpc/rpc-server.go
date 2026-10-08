@@ -181,6 +181,21 @@ func (s *ServerRPC) GetMyRepos(
 	}, nil
 }
 
+func (s *ServerRPC) ListTopRatedRepos(
+	ctx context.Context,
+	req *pb.ListTopRatedReposRequest,
+) (*pb.ListTopRatedReposResponse, error) {
+	page, err := s.service.ListTopRatedRepos(ctx, req.GetPageToken())
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return &pb.ListTopRatedReposResponse{
+		Repositories:  mapRepositories(page.Repositories),
+		NextPageToken: page.NextPageToken,
+	}, nil
+}
+
 func (s *ServerRPC) GetMyOrgs(
 	ctx context.Context,
 	req *pb.GetMyOrgsRequest,

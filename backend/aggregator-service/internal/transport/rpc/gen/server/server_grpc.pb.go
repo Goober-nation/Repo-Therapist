@@ -26,6 +26,13 @@ const (
 	Aggregator_RequestLLMRecommendations_FullMethodName = "/aggregator.Aggregator/RequestLLMRecommendations"
 	Aggregator_GetAnalytics_FullMethodName              = "/aggregator.Aggregator/GetAnalytics"
 	Aggregator_GetRegradeStatus_FullMethodName          = "/aggregator.Aggregator/GetRegradeStatus"
+	Aggregator_RecordAudit_FullMethodName               = "/aggregator.Aggregator/RecordAudit"
+	Aggregator_ListAudit_FullMethodName                 = "/aggregator.Aggregator/ListAudit"
+	Aggregator_PreviewRegradeBatch_FullMethodName       = "/aggregator.Aggregator/PreviewRegradeBatch"
+	Aggregator_StartRegradeBatch_FullMethodName         = "/aggregator.Aggregator/StartRegradeBatch"
+	Aggregator_ControlRegradeBatch_FullMethodName       = "/aggregator.Aggregator/ControlRegradeBatch"
+	Aggregator_GetRegradeBatch_FullMethodName           = "/aggregator.Aggregator/GetRegradeBatch"
+	Aggregator_ListRegradeBatches_FullMethodName        = "/aggregator.Aggregator/ListRegradeBatches"
 )
 
 // AggregatorClient is the client API for Aggregator service.
@@ -44,6 +51,29 @@ type AggregatorClient interface {
 	GetAnalytics(ctx context.Context, in *GetAnalyticsRequest, opts ...grpc.CallOption) (*GetAnalyticsResponse, error)
 	// GetRegradeStatus reports the scheduled public regrade (on/off, next run, progress). Read-only.
 	GetRegradeStatus(ctx context.Context, in *GetRegradeStatusRequest, opts ...grpc.CallOption) (*GetRegradeStatusResponse, error)
+	// RecordAudit stores one audit event (docs/admin.md). The caller computes actor_hash from the
+	// Yandex ID, so a raw ID never reaches the Aggregator. INVALID_ARGUMENT for an event that breaks
+	// the audit rules.
+	RecordAudit(ctx context.Context, in *RecordAuditRequest, opts ...grpc.CallOption) (*RecordAuditResponse, error)
+	// ListAudit returns one page of the audit log, newest first, with a cursor for the next page.
+	ListAudit(ctx context.Context, in *ListAuditRequest, opts ...grpc.CallOption) (*ListAuditResponse, error)
+	// PreviewRegradeBatch is the dry run of an admin batch regrade: how many public repos a filter
+	// selects, a sample, the hand-picked ones that matched nothing and a rough duration. Writes nothing.
+	// INVALID_ARGUMENT for a filter that breaks the rules.
+	PreviewRegradeBatch(ctx context.Context, in *PreviewRegradeBatchRequest, opts ...grpc.CallOption) (*PreviewRegradeBatchResponse, error)
+	// StartRegradeBatch creates a batch and starts it. ALREADY_EXISTS (batch_active) while another batch
+	// is running or paused; INVALID_ARGUMENT (invalid_filter | nothing_selected | too_many) for a bad
+	// filter or one that selects nothing or too many repos. The start is recorded in the audit log
+	// under actor_hash.
+	StartRegradeBatch(ctx context.Context, in *StartRegradeBatchRequest, opts ...grpc.CallOption) (*StartRegradeBatchResponse, error)
+	// ControlRegradeBatch pauses, resumes or cancels a batch. ABORTED (bad_state) when the action does
+	// not fit the batch's state, NOT_FOUND (batch_not_found) for an unknown batch.
+	ControlRegradeBatch(ctx context.Context, in *ControlRegradeBatchRequest, opts ...grpc.CallOption) (*ControlRegradeBatchResponse, error)
+	// GetRegradeBatch returns a batch and the repos that failed in it. batch_id 0 means the active
+	// batch, or the latest one when none is active; NOT_FOUND when there has never been one.
+	GetRegradeBatch(ctx context.Context, in *GetRegradeBatchRequest, opts ...grpc.CallOption) (*GetRegradeBatchResponse, error)
+	// ListRegradeBatches returns the most recent batches, newest first.
+	ListRegradeBatches(ctx context.Context, in *ListRegradeBatchesRequest, opts ...grpc.CallOption) (*ListRegradeBatchesResponse, error)
 }
 
 type aggregatorClient struct {
@@ -124,6 +154,76 @@ func (c *aggregatorClient) GetRegradeStatus(ctx context.Context, in *GetRegradeS
 	return out, nil
 }
 
+func (c *aggregatorClient) RecordAudit(ctx context.Context, in *RecordAuditRequest, opts ...grpc.CallOption) (*RecordAuditResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecordAuditResponse)
+	err := c.cc.Invoke(ctx, Aggregator_RecordAudit_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aggregatorClient) ListAudit(ctx context.Context, in *ListAuditRequest, opts ...grpc.CallOption) (*ListAuditResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAuditResponse)
+	err := c.cc.Invoke(ctx, Aggregator_ListAudit_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aggregatorClient) PreviewRegradeBatch(ctx context.Context, in *PreviewRegradeBatchRequest, opts ...grpc.CallOption) (*PreviewRegradeBatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PreviewRegradeBatchResponse)
+	err := c.cc.Invoke(ctx, Aggregator_PreviewRegradeBatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aggregatorClient) StartRegradeBatch(ctx context.Context, in *StartRegradeBatchRequest, opts ...grpc.CallOption) (*StartRegradeBatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StartRegradeBatchResponse)
+	err := c.cc.Invoke(ctx, Aggregator_StartRegradeBatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aggregatorClient) ControlRegradeBatch(ctx context.Context, in *ControlRegradeBatchRequest, opts ...grpc.CallOption) (*ControlRegradeBatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ControlRegradeBatchResponse)
+	err := c.cc.Invoke(ctx, Aggregator_ControlRegradeBatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aggregatorClient) GetRegradeBatch(ctx context.Context, in *GetRegradeBatchRequest, opts ...grpc.CallOption) (*GetRegradeBatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetRegradeBatchResponse)
+	err := c.cc.Invoke(ctx, Aggregator_GetRegradeBatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aggregatorClient) ListRegradeBatches(ctx context.Context, in *ListRegradeBatchesRequest, opts ...grpc.CallOption) (*ListRegradeBatchesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListRegradeBatchesResponse)
+	err := c.cc.Invoke(ctx, Aggregator_ListRegradeBatches_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AggregatorServer is the server API for Aggregator service.
 // All implementations must embed UnimplementedAggregatorServer
 // for forward compatibility.
@@ -140,6 +240,29 @@ type AggregatorServer interface {
 	GetAnalytics(context.Context, *GetAnalyticsRequest) (*GetAnalyticsResponse, error)
 	// GetRegradeStatus reports the scheduled public regrade (on/off, next run, progress). Read-only.
 	GetRegradeStatus(context.Context, *GetRegradeStatusRequest) (*GetRegradeStatusResponse, error)
+	// RecordAudit stores one audit event (docs/admin.md). The caller computes actor_hash from the
+	// Yandex ID, so a raw ID never reaches the Aggregator. INVALID_ARGUMENT for an event that breaks
+	// the audit rules.
+	RecordAudit(context.Context, *RecordAuditRequest) (*RecordAuditResponse, error)
+	// ListAudit returns one page of the audit log, newest first, with a cursor for the next page.
+	ListAudit(context.Context, *ListAuditRequest) (*ListAuditResponse, error)
+	// PreviewRegradeBatch is the dry run of an admin batch regrade: how many public repos a filter
+	// selects, a sample, the hand-picked ones that matched nothing and a rough duration. Writes nothing.
+	// INVALID_ARGUMENT for a filter that breaks the rules.
+	PreviewRegradeBatch(context.Context, *PreviewRegradeBatchRequest) (*PreviewRegradeBatchResponse, error)
+	// StartRegradeBatch creates a batch and starts it. ALREADY_EXISTS (batch_active) while another batch
+	// is running or paused; INVALID_ARGUMENT (invalid_filter | nothing_selected | too_many) for a bad
+	// filter or one that selects nothing or too many repos. The start is recorded in the audit log
+	// under actor_hash.
+	StartRegradeBatch(context.Context, *StartRegradeBatchRequest) (*StartRegradeBatchResponse, error)
+	// ControlRegradeBatch pauses, resumes or cancels a batch. ABORTED (bad_state) when the action does
+	// not fit the batch's state, NOT_FOUND (batch_not_found) for an unknown batch.
+	ControlRegradeBatch(context.Context, *ControlRegradeBatchRequest) (*ControlRegradeBatchResponse, error)
+	// GetRegradeBatch returns a batch and the repos that failed in it. batch_id 0 means the active
+	// batch, or the latest one when none is active; NOT_FOUND when there has never been one.
+	GetRegradeBatch(context.Context, *GetRegradeBatchRequest) (*GetRegradeBatchResponse, error)
+	// ListRegradeBatches returns the most recent batches, newest first.
+	ListRegradeBatches(context.Context, *ListRegradeBatchesRequest) (*ListRegradeBatchesResponse, error)
 	mustEmbedUnimplementedAggregatorServer()
 }
 
@@ -170,6 +293,27 @@ func (UnimplementedAggregatorServer) GetAnalytics(context.Context, *GetAnalytics
 }
 func (UnimplementedAggregatorServer) GetRegradeStatus(context.Context, *GetRegradeStatusRequest) (*GetRegradeStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetRegradeStatus not implemented")
+}
+func (UnimplementedAggregatorServer) RecordAudit(context.Context, *RecordAuditRequest) (*RecordAuditResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecordAudit not implemented")
+}
+func (UnimplementedAggregatorServer) ListAudit(context.Context, *ListAuditRequest) (*ListAuditResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAudit not implemented")
+}
+func (UnimplementedAggregatorServer) PreviewRegradeBatch(context.Context, *PreviewRegradeBatchRequest) (*PreviewRegradeBatchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PreviewRegradeBatch not implemented")
+}
+func (UnimplementedAggregatorServer) StartRegradeBatch(context.Context, *StartRegradeBatchRequest) (*StartRegradeBatchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartRegradeBatch not implemented")
+}
+func (UnimplementedAggregatorServer) ControlRegradeBatch(context.Context, *ControlRegradeBatchRequest) (*ControlRegradeBatchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ControlRegradeBatch not implemented")
+}
+func (UnimplementedAggregatorServer) GetRegradeBatch(context.Context, *GetRegradeBatchRequest) (*GetRegradeBatchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRegradeBatch not implemented")
+}
+func (UnimplementedAggregatorServer) ListRegradeBatches(context.Context, *ListRegradeBatchesRequest) (*ListRegradeBatchesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListRegradeBatches not implemented")
 }
 func (UnimplementedAggregatorServer) mustEmbedUnimplementedAggregatorServer() {}
 func (UnimplementedAggregatorServer) testEmbeddedByValue()                    {}
@@ -318,6 +462,132 @@ func _Aggregator_GetRegradeStatus_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Aggregator_RecordAudit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecordAuditRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregatorServer).RecordAudit(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Aggregator_RecordAudit_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregatorServer).RecordAudit(ctx, req.(*RecordAuditRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Aggregator_ListAudit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAuditRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregatorServer).ListAudit(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Aggregator_ListAudit_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregatorServer).ListAudit(ctx, req.(*ListAuditRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Aggregator_PreviewRegradeBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PreviewRegradeBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregatorServer).PreviewRegradeBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Aggregator_PreviewRegradeBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregatorServer).PreviewRegradeBatch(ctx, req.(*PreviewRegradeBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Aggregator_StartRegradeBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartRegradeBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregatorServer).StartRegradeBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Aggregator_StartRegradeBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregatorServer).StartRegradeBatch(ctx, req.(*StartRegradeBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Aggregator_ControlRegradeBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ControlRegradeBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregatorServer).ControlRegradeBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Aggregator_ControlRegradeBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregatorServer).ControlRegradeBatch(ctx, req.(*ControlRegradeBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Aggregator_GetRegradeBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRegradeBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregatorServer).GetRegradeBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Aggregator_GetRegradeBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregatorServer).GetRegradeBatch(ctx, req.(*GetRegradeBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Aggregator_ListRegradeBatches_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListRegradeBatchesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregatorServer).ListRegradeBatches(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Aggregator_ListRegradeBatches_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregatorServer).ListRegradeBatches(ctx, req.(*ListRegradeBatchesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Aggregator_ServiceDesc is the grpc.ServiceDesc for Aggregator service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -352,6 +622,34 @@ var Aggregator_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetRegradeStatus",
 			Handler:    _Aggregator_GetRegradeStatus_Handler,
+		},
+		{
+			MethodName: "RecordAudit",
+			Handler:    _Aggregator_RecordAudit_Handler,
+		},
+		{
+			MethodName: "ListAudit",
+			Handler:    _Aggregator_ListAudit_Handler,
+		},
+		{
+			MethodName: "PreviewRegradeBatch",
+			Handler:    _Aggregator_PreviewRegradeBatch_Handler,
+		},
+		{
+			MethodName: "StartRegradeBatch",
+			Handler:    _Aggregator_StartRegradeBatch_Handler,
+		},
+		{
+			MethodName: "ControlRegradeBatch",
+			Handler:    _Aggregator_ControlRegradeBatch_Handler,
+		},
+		{
+			MethodName: "GetRegradeBatch",
+			Handler:    _Aggregator_GetRegradeBatch_Handler,
+		},
+		{
+			MethodName: "ListRegradeBatches",
+			Handler:    _Aggregator_ListRegradeBatches_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

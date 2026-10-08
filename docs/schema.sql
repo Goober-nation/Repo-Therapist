@@ -135,3 +135,60 @@ CREATE TABLE users (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+
+-- Audit log of admin and user actions (docs/admin.md). Written only by the Aggregator; no tokens, no
+-- raw Yandex IDs, no slugs of private repositories. Rows older than AUDIT_RETENTION_DAYS are deleted.
+CREATE TABLE audit_log (
+  id           BIGSERIAL PRIMARY KEY,
+  occurred_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  actor_kind   TEXT NOT NULL CHECK (actor_kind IN ('admin', 'user', 'anonymous', 'system')),
+  -- HMAC of the Yandex ID, truncated; empty for anonymous and system actors.
+  actor_hash   TEXT NOT NULL DEFAULT '',
+
+  -- Dotted lowercase name, e.g. admin.denied, regrade.batch.start.
+  action       TEXT NOT NULL,
+  -- '' | repo | batch | route; a private repo is a hash, never its slug.
+  target_kind  TEXT NOT NULL DEFAULT '',
+  target       TEXT NOT NULL DEFAULT '',
+  outcome      TEXT NOT NULL CHECK (outcome IN ('ok', 'denied', 'error')),
+  details      JSONB NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX ON audit_log (occurred_at);
+CREATE INDEX ON audit_log (action, id DESC);
+
+
+-- Admin batch regrade (docs/admin.md). Written only by the Aggregator. A batch selects public
+-- repositories only; the actor is an HMAC of the Yandex ID. At most one batch is unfinished at a time.
+CREATE TABLE regrade_batches (
+  id           BIGSERIAL PRIMARY KEY,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  finished_at  TIMESTAMPTZ,
+
+  status       TEXT NOT NULL DEFAULT 'running'
+               CHECK (status IN ('running', 'paused', 'completed', 'cancelled')),
+  actor_hash   TEXT NOT NULL DEFAULT '',
+  -- The filter the admin chose (languages, score range, age, hand-picked list); no secrets.
+  filter       JSONB NOT NULL DEFAULT '{}'
+);
+
+CREATE UNIQUE INDEX regrade_batches_one_active ON regrade_batches ((true))
+  WHERE status IN ('running', 'paused');
+
+CREATE TABLE regrade_batch_items (
+  batch_id     BIGINT NOT NULL REFERENCES regrade_batches(id) ON DELETE CASCADE,
+  repo_id      UUID NOT NULL REFERENCES repos(sourcecraft_uuid),
+  org_slug     TEXT NOT NULL,
+  repo_slug    TEXT NOT NULL,
+  PRIMARY KEY (batch_id, repo_id),
+
+  status       TEXT NOT NULL DEFAULT 'pending'
+               CHECK (status IN ('pending', 'running', 'ok', 'failed', 'skipped')),
+  -- A short fixed code (grading_failed, timeout, ...), never free text from the graders.
+  error        TEXT NOT NULL DEFAULT '',
+  started_at   TIMESTAMPTZ,
+  finished_at  TIMESTAMPTZ
+);
+
+CREATE INDEX ON regrade_batch_items (batch_id, status);

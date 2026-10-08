@@ -7,6 +7,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"rating-service/internal/domain"
@@ -37,6 +38,12 @@ type RatingService struct {
 	dynamicsDays int
 	sizeSmallLOC int
 	sizeLargeLOC int
+
+	// analytics feeds the analytics tab and the export; nil until SetAnalytics.
+	analytics     domain.AnalyticsRepository
+	analyticsTTL  time.Duration
+	cacheRecorder CacheRecorder
+	cache         analyticsCache
 }
 
 // NewRatingService builds the service; dynamicsDays is the window of the score and place change

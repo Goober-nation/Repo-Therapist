@@ -280,6 +280,11 @@ func (f *fakeWrapper) ListAllPublicRepos(ctx context.Context, in *client.ListAll
 	return &client.ListAllPublicReposResponse{Repos: f.publicRepos}, nil
 }
 
+func (f *fakeWrapper) ListTopRatedRepos(ctx context.Context, in *client.ListTopRatedReposRequest, opts ...grpc.CallOption) (*client.ListTopRatedReposResponse, error) {
+	f.record(ctx)
+	return &client.ListTopRatedReposResponse{Repositories: f.publicRepos}, nil
+}
+
 func (f *fakeWrapper) GetMyRepos(ctx context.Context, in *client.GetMyReposRequest, opts ...grpc.CallOption) (*client.GetMyReposResponse, error) {
 	auth := f.record(ctx)
 	repos, ok := f.myRepos[auth]

@@ -1,6 +1,7 @@
 package scoring
 
 import (
+	"strings"
 	"testing"
 
 	"repo-therapist/grade-service/internal/config"
@@ -240,4 +241,81 @@ func repeatMarkers(freshCount int, freshAge float64, staleCount int, staleAge fl
 		markers = append(markers, Marker{File: "f.go", AgeDays: staleAge})
 	}
 	return markers
+}
+
+func unusedShareCfg() config.CategoryConfig {
+	return config.CategoryConfig{
+		Status: config.StatusCalculated,
+		Metrics: []config.MetricConfig{{
+			ID: "unused_private_share", Status: config.StatusCalculated, Weight: 0.40,
+			Aggregation: config.AggregationConfig{Type: "unused_private_share", MinSampleSize: 10},
+			Formula:     config.FormulaConfig{Type: "linear_clamp", Direction: "-", Critical: 0.08, Healthy: 0.005},
+		}},
+	}
+}
+
+func TestUnusedPrivateShare(t *testing.T) {
+	dead := &DeadCodeExport{PrivateTotal: 100, UnusedTotal: 4, Unused: []DeadFunction{
+		{File: "a.go", Name: "x"}, {File: "b.go", Name: "y"}, {File: "b.go", Name: "z"}, {File: "c.go", Name: "w"},
+	}}
+	m := ComputeCodeHealth(unusedShareCfg(), CodeHealthInputs{Available: true, DeadCode: dead}).Metrics[0]
+	if m.NoData || m.RawValue != 0.04 {
+		t.Fatalf("got %+v, want raw 0.04", m)
+	}
+	want := "Найдено 4 неиспользуемые приватные функции в файлах b.go, a.go, c.go. " +
+		"Удалите мёртвый код или используйте его — он усложняет чтение и сопровождение."
+	if m.Detail != want {
+		t.Fatalf("detail = %q", m.Detail)
+	}
+}
+
+func TestUnusedPrivateShare_NoData(t *testing.T) {
+	for name, dead := range map[string]*DeadCodeExport{
+		"missing export": nil,
+		"below sample":   {PrivateTotal: 9},
+	} {
+		m := ComputeCodeHealth(unusedShareCfg(), CodeHealthInputs{Available: true, DeadCode: dead}).Metrics[0]
+		if !m.NoData {
+			t.Errorf("%s: expected NoData", name)
+		}
+	}
+	m := ComputeCodeHealth(unusedShareCfg(), CodeHealthInputs{Available: true, DeadCode: &DeadCodeExport{PrivateTotal: 50}}).Metrics[0]
+	if m.NoData || m.Score != 1 || m.Detail != "" {
+		t.Fatalf("clean repo: got %+v, want perfect score, no detail", m)
+	}
+}
+
+func TestDeadCodeAdvice(t *testing.T) {
+	one := deadCodeAdvice(&DeadCodeExport{UnusedTotal: 1, Unused: []DeadFunction{{File: "x.rs"}}})
+	if !strings.HasPrefix(one, "Найдено 1 неиспользуемая приватная функция в файле x.rs. ") {
+		t.Errorf("one: %q", one)
+	}
+	var many []DeadFunction
+	for _, f := range []string{"a", "b", "c", "d"} {
+		many = append(many, DeadFunction{File: f})
+	}
+	got := deadCodeAdvice(&DeadCodeExport{UnusedTotal: 11, Unused: many})
+	if !strings.HasPrefix(got, "Найдено 11 неиспользуемых приватных функций в файлах a, b, c и других. ") {
+		t.Errorf("many: %q", got)
+	}
+	for n, want := range map[int]string{1: "1", 2: "2", 5: "5", 21: "1", 22: "2", 111: "5", 112: "5"} {
+		if g := ruPlural(n, "1", "2", "5"); g != want {
+			t.Errorf("ruPlural(%d) = %s, want %s", n, g, want)
+		}
+	}
+}
+
+func TestRecommendationUsesMetricDetail(t *testing.T) {
+	cats := map[string]CategoryResult{"code_health": {ID: "code_health", Metrics: []MetricResult{
+		{ID: "unused_private_share", Score: 0.5, Detail: "конкретный текст"},
+		{ID: "density_per_kloc", Score: 0.5},
+	}}}
+	catalog := map[string]config.RecommendationEntry{
+		"unused_private_share": {Priority: "medium", Text: "общий текст"},
+		"density_per_kloc":     {Priority: "medium", Text: "плотность"},
+	}
+	recs := BuildRecommendations(cats, []string{"code_health"}, catalog)
+	if len(recs) != 2 || recs[0].Text != "конкретный текст" || recs[1].Text != "плотность" {
+		t.Fatalf("recs = %+v", recs)
+	}
 }

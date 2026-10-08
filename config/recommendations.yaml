@@ -24,6 +24,7 @@ median_marker_age: {priority: low, text: "Маркеры TODO/FIXME подолг
 density_per_kloc: {priority: medium, text: "Высокая плотность TODO/FIXME относительно размера кода. Стоит погасить часть этого технического долга."}
 share_stale_markers: {priority: low, text: "Большая доля маркеров TODO/FIXME устарела. Старый маркер часто означает забытую задачу, а не низкий приоритет — их стоит пересмотреть."}
 worst_file_concentration: {priority: low, text: "Маркеры TODO/FIXME сосредоточены в одном файле. Этот файл — хороший кандидат для точечной чистки или рефакторинга."}
+unused_private_share: {priority: medium, text: "В коде есть неиспользуемые приватные функции. Удалите мёртвый код или используйте его — он усложняет чтение и сопровождение."}
 
 # --- Security (docs/grading/security.md; metric IDs hardcoded in internal/scoring/security.go) ---
 open_critical: {priority: critical, text: "Есть открытые находки критической важности. Это самый срочный риск безопасности, их нужно исправить в первую очередь."}

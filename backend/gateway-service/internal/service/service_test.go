@@ -87,6 +87,34 @@ func (f *fakeAggregator) RequestLLMRecommendations(ctx context.Context, in *agg.
 	return nil, f.err
 }
 
+func (f *fakeAggregator) RecordAudit(ctx context.Context, in *agg.RecordAuditRequest, opts ...grpc.CallOption) (*agg.RecordAuditResponse, error) {
+	return &agg.RecordAuditResponse{}, f.err
+}
+
+func (f *fakeAggregator) PreviewRegradeBatch(ctx context.Context, in *agg.PreviewRegradeBatchRequest, opts ...grpc.CallOption) (*agg.PreviewRegradeBatchResponse, error) {
+	return &agg.PreviewRegradeBatchResponse{}, f.err
+}
+
+func (f *fakeAggregator) StartRegradeBatch(ctx context.Context, in *agg.StartRegradeBatchRequest, opts ...grpc.CallOption) (*agg.StartRegradeBatchResponse, error) {
+	return &agg.StartRegradeBatchResponse{}, f.err
+}
+
+func (f *fakeAggregator) ControlRegradeBatch(ctx context.Context, in *agg.ControlRegradeBatchRequest, opts ...grpc.CallOption) (*agg.ControlRegradeBatchResponse, error) {
+	return &agg.ControlRegradeBatchResponse{}, f.err
+}
+
+func (f *fakeAggregator) GetRegradeBatch(ctx context.Context, in *agg.GetRegradeBatchRequest, opts ...grpc.CallOption) (*agg.GetRegradeBatchResponse, error) {
+	return &agg.GetRegradeBatchResponse{}, f.err
+}
+
+func (f *fakeAggregator) ListRegradeBatches(ctx context.Context, in *agg.ListRegradeBatchesRequest, opts ...grpc.CallOption) (*agg.ListRegradeBatchesResponse, error) {
+	return &agg.ListRegradeBatchesResponse{}, f.err
+}
+
+func (f *fakeAggregator) ListAudit(ctx context.Context, in *agg.ListAuditRequest, opts ...grpc.CallOption) (*agg.ListAuditResponse, error) {
+	return &agg.ListAuditResponse{}, f.err
+}
+
 func newService(aggregator *fakeAggregator) *GatewayService {
 	return NewGatewayService(aggregator, nil, nil, allowAll{}, nil, nil, time.Second, time.Second, time.Second)
 }

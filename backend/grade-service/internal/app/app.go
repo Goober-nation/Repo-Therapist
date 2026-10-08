@@ -146,6 +146,16 @@ func Grade(ctx context.Context, repoID, prefix string, cfg *config.Config, token
 		}
 		codeHealthInputs = scoring.CodeHealthInputs{Markers: export.Markers, TotalLOC: export.TotalLOC, ScannedFiles: export.ScannedFiles, Available: true}
 	}
+	if data, err := s3Client.GetObject(ctx, prefix+"/_meta/dead-functions.json"); err != nil {
+		log.Printf("dead-functions.json unavailable for %s: %v (unused_private_share will be no-data)", repoID, err)
+	} else {
+		var dead scoring.DeadCodeExport
+		if err := json.Unmarshal(data, &dead); err != nil {
+			log.Printf("decoding dead-functions.json for %s: %v (unused_private_share will be no-data)", repoID, err)
+		} else {
+			codeHealthInputs.DeadCode = &dead
+		}
+	}
 
 	codeHealthResult := scoring.CategoryResult{ID: "code_health", NoData: true}
 	if codeHealthCfg, ok := cfg.Categories["code_health"]; ok && codeHealthCfg.Status == config.StatusCalculated {

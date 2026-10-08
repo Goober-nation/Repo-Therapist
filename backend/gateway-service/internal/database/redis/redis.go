@@ -71,24 +71,21 @@ func (sr *SessionRepository) GetSession(
 	return userID, nil
 }
 
-//func (sr *SessionRepository) DeleteSession(
-//	ctx context.Context,
-//	sessionID string,
-//) error {
-//	key := sr.buildSessionKey(sessionID)
-//
-//	result, err := sr.client.Del(ctx, key).Result()
-//	if err != nil {
-//		return fmt.Errorf("delete session: %w", err)
-//	}
-//
-//	if result == 0 {
-//		return domain.ErrSessionNotFound
-//	}
-//
-//	return nil
-//}
-//
+// DeleteSession removes the session, so its cookie stops working at once. A missing session is
+// ErrSessionNotFound, which a logout treats as already done.
+func (sr *SessionRepository) DeleteSession(ctx context.Context, sessionID string) error {
+	removed, err := sr.client.Del(ctx, sr.buildSessionKey(sessionID)).Result()
+	if err != nil {
+		return fmt.Errorf("delete session: %w", err)
+	}
+
+	if removed == 0 {
+		return domain.ErrSessionNotFound
+	}
+
+	return nil
+}
+
 //func (sr *SessionRepository) UpdateSession(
 //	ctx context.Context,
 //	sessionID string,

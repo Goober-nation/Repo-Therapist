@@ -24,6 +24,13 @@ service Rating {
   // score) ranking. Read-only. NOT_FOUND when the repo is unknown or not public; ranked=false when
   // it has no grade yet.
   rpc GetPositionExplanation(GetPositionExplanationRequest) returns (GetPositionExplanationResponse);
+  // GetPlatformAnalytics returns aggregate statistics over all graded public repositories: score
+  // distribution, average score per language and per category, the most common advice items, the
+  // weekly trend and the most improved repositories. Public grades only; read-only; cached briefly.
+  rpc GetPlatformAnalytics(GetPlatformAnalyticsRequest) returns (GetPlatformAnalyticsResponse);
+  // ListPublicGrades returns one page of the public grades, ordered by org and repo slug, for the
+  // public export. Public grades only; read-only.
+  rpc ListPublicGrades(ListPublicGradesRequest) returns (ListPublicGradesResponse);
 }
 
 enum SortBy {
@@ -202,4 +209,112 @@ message GetPositionExplanationResponse {
   repeated CategoryComparison categories = 7;
   // The category with the most negative gap to the top-10 median; empty when none is below it.
   string weakest_category = 8;
+}
+
+message GetPlatformAnalyticsRequest {}
+
+message ScoreBucket {
+  // Inclusive bounds; the last bucket is 90-100.
+  int32 min_score = 1;
+  int32 max_score = 2;
+  int32 repos = 3;
+}
+
+message LevelCount {
+  // excellent (from 90), healthy (from 75), attention (from 60), at_risk (below 60).
+  string level = 1;
+  int32 repos = 2;
+}
+
+message LanguageStat {
+  string name = 1;
+  string color = 2;
+  int32 repos = 3;
+  double avg_score = 4;
+}
+
+message CategoryAverage {
+  string id = 1;
+  // Average over the repos that have data in this category (no-data is not counted as zero).
+  double avg_score = 2;
+  int32 repos = 3;
+}
+
+message AdviceStat {
+  string category_id = 1;
+  string metric_id = 2;
+  // The most common priority of this item across repos.
+  string priority = 3;
+  // How many repos have this item in their advice.
+  int32 repos = 4;
+}
+
+message TrendPoint {
+  google.protobuf.Timestamp week_start = 1;
+  // Average of the latest score of each repo graded that week.
+  double avg_score = 2;
+  int32 repos = 3;
+}
+
+message ImprovedRepo {
+  string org_slug = 1;
+  // Currently repo_slug.
+  string name = 2;
+  int32 score = 3;
+  int32 past_score = 4;
+  int32 change = 5;
+}
+
+message GetPlatformAnalyticsResponse {
+  int32 graded_repos = 1;
+  double avg_score = 2;
+  double median_score = 3;
+  // Ten buckets of ten points, lowest first.
+  repeated ScoreBucket distribution = 4;
+  repeated LevelCount levels = 5;
+  // Languages with at least min_language_repos graded repos, most repos first.
+  repeated LanguageStat languages = 6;
+  repeated CategoryAverage categories = 7;
+  // Most common advice items first.
+  repeated AdviceStat top_advice = 8;
+  // Oldest week first.
+  repeated TrendPoint trend = 9;
+  // Biggest score gain first; compared with the latest grade improved_days ago (RANKING_DYNAMICS_DAYS).
+  repeated ImprovedRepo most_improved = 10;
+  int32 improved_days = 11;
+  int32 min_language_repos = 12;
+  google.protobuf.Timestamp generated_at = 13;
+}
+
+message ListPublicGradesRequest {
+  // 1-based page number; 0 means the first page.
+  int32 page = 1;
+  // Entries per page; 0 means the default (1000), max 1000.
+  int32 page_size = 2;
+}
+
+message PublicGradeEntry {
+  string org_slug = 1;
+  // Currently repo_slug.
+  string name = 2;
+  // Empty when unknown.
+  string web_url = 3;
+  int32 score = 4;
+  // Empty when unknown.
+  string language = 5;
+  optional double likes = 6;
+  google.protobuf.Timestamp last_activity_at = 7;
+  google.protobuf.Timestamp graded_at = 8;
+  // Unset when unknown (grade stored before the flag).
+  optional bool low_confidence = 9;
+  // Sorted by id; a category without data has no score.
+  repeated CategoryScore categories = 10;
+}
+
+message ListPublicGradesResponse {
+  repeated PublicGradeEntry entries = 1;
+  // Number of graded public repos across all pages.
+  int32 total_count = 2;
+  int32 page = 3;
+  int32 page_size = 4;
 }

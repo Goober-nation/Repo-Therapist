@@ -1,9 +1,12 @@
 package config
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -17,7 +20,43 @@ type Config struct {
 	RateLimit  RateLimitConfig
 	// PublicAPIRateLimit is the per-IP budget of the public JSON score API.
 	PublicAPIRateLimit RateLimitConfig
-	Session            SessionConfig
+	// ExportRateLimit is the per-IP budget of the public grades export, which reads every grade.
+	ExportRateLimit RateLimitConfig
+	Session         SessionConfig
+	Admin           AdminConfig
+	Metrics         MetricsConfig
+}
+
+// MetricsConfig is the monitoring side (docs/metrics.md).
+type MetricsConfig struct {
+	// Address serves this service's /metrics for Prometheus (METRICS_ADDRESS); empty leaves it off.
+	// It is a separate port from the public HTTP one and is never published.
+	Address string
+	// PrometheusURL is where the graphs of the admin tab and the Analytics tab read their series
+	// (PROMETHEUS_URL); empty turns the graphs off.
+	PrometheusURL string
+	// SeriesCache is how long one graph answer is reused (SERIES_CACHE_SECONDS), so many viewers
+	// cost Prometheus one query.
+	SeriesCache time.Duration
+}
+
+// AdminConfig controls who may use the admin routes and how they are audited (docs/admin.md).
+type AdminConfig struct {
+	// YandexIDs are the Yandex IDs of the admins (ADMIN_YANDEX_IDS, comma-separated). Empty means
+	// there are no admins.
+	YandexIDs []string
+	// AuditHashSecret keys the HMAC that turns a Yandex ID into the actor hash in the audit log
+	// (AUDIT_HASH_SECRET). Optional: see HashSecret.
+	AuditHashSecret string
+	// DeniedLog caps how many denied admin attempts per client IP reach the audit log, so a flood of
+	// probes cannot fill it.
+	DeniedLog RateLimitConfig
+	// Password unlocks admin rights for a signed-in account (ADMIN_PASSWORD, plain text in the
+	// environment); empty turns the unlock off. UnlockMaxAttempts wrong passwords lock the client IP and
+	// the account for UnlockLock.
+	Password          string
+	UnlockMaxAttempts int
+	UnlockLock        time.Duration
 }
 type HTTPConfig struct {
 	Address           string
@@ -189,6 +228,35 @@ func LoadConfig() *Config {
 			),
 		},
 
+		ExportRateLimit: RateLimitConfig{
+			Limit: getEnvIntDefault(
+				"EXPORT_RATE_LIMIT",
+				5,
+			),
+			Window: getEnvDuration(
+				"EXPORT_RATE_LIMIT_WINDOW",
+				time.Minute,
+			),
+		},
+
+		Admin: AdminConfig{
+			YandexIDs:       getEnvList("ADMIN_YANDEX_IDS"),
+			AuditHashSecret: getEnvDefault("AUDIT_HASH_SECRET", ""),
+			DeniedLog: RateLimitConfig{
+				Limit:  getEnvIntDefault("ADMIN_DENIED_LOG_LIMIT", 5),
+				Window: getEnvDuration("ADMIN_DENIED_LOG_WINDOW", 10*time.Minute),
+			},
+			Password:          os.Getenv("ADMIN_PASSWORD"),
+			UnlockMaxAttempts: getEnvIntDefault("ADMIN_UNLOCK_MAX_ATTEMPTS", 5),
+			UnlockLock:        getEnvDuration("ADMIN_UNLOCK_LOCK", 15*time.Minute),
+		},
+
+		Metrics: MetricsConfig{
+			Address:       getEnvDefault("METRICS_ADDRESS", ""),
+			PrometheusURL: getEnvDefault("PROMETHEUS_URL", ""),
+			SeriesCache:   time.Duration(getEnvIntDefault("SERIES_CACHE_SECONDS", 60)) * time.Second,
+		},
+
 		Session: SessionConfig{
 			TTL: getEnvDuration(
 				"SESSION_TTL",
@@ -212,6 +280,38 @@ func getEnvDefault(
 	}
 
 	return value
+}
+
+// HashSecret is the key of the audit actor hash and of the unlock fingerprint. It is AUDIT_HASH_SECRET
+// when set. Otherwise it is derived from the admin password and the admin list, so setting only
+// ADMIN_PASSWORD (or only ADMIN_YANDEX_IDS) is enough to turn the admin tab on; the hashes then change
+// when those settings change, which AUDIT_HASH_SECRET avoids. Empty when there is nothing to derive from,
+// which keeps the admin routes off.
+func (a AdminConfig) HashSecret() string {
+	if a.AuditHashSecret != "" {
+		return a.AuditHashSecret
+	}
+
+	if a.Password == "" && len(a.YandexIDs) == 0 {
+		return ""
+	}
+
+	sum := sha256.Sum256([]byte("repo-health audit key v1\x00" + a.Password + "\x00" + strings.Join(a.YandexIDs, ",")))
+
+	return hex.EncodeToString(sum[:])
+}
+
+// getEnvList reads a comma-separated list, trimming blanks and dropping empty items.
+func getEnvList(key string) []string {
+	var items []string
+
+	for _, item := range strings.Split(os.Getenv(key), ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			items = append(items, item)
+		}
+	}
+
+	return items
 }
 
 func getEnvIntDefault(

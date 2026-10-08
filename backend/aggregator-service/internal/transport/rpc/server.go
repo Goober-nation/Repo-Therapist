@@ -45,6 +45,15 @@ type AggregatorService interface {
 	) (domain.RepoAnalytics, error)
 
 	GetRegradeStatus(ctx context.Context) domain.RegradeStatus
+
+	RecordAudit(ctx context.Context, event domain.AuditEvent) error
+	ListAudit(ctx context.Context, filter domain.AuditFilter) (domain.AuditPage, error)
+
+	PreviewBatch(ctx context.Context, filter domain.BatchFilter) (domain.BatchPreview, error)
+	StartBatch(ctx context.Context, actorHash string, filter domain.BatchFilter) (domain.Batch, error)
+	ControlBatch(ctx context.Context, actorHash string, id int64, action string) (domain.Batch, error)
+	BatchStatus(ctx context.Context, id int64) (domain.Batch, []domain.BatchItem, error)
+	ListBatches(ctx context.Context, limit int) ([]domain.Batch, error)
 }
 
 type Server struct {
@@ -180,6 +189,64 @@ func (s *Server) GetAnalytics(
 	response := &server.GetAnalyticsResponse{Analytics: analytics.Analytics}
 	if analytics.GradedAt != nil {
 		response.GradedAt = timestamppb.New(*analytics.GradedAt)
+	}
+
+	return response, nil
+}
+
+// RecordAudit stores one audit event reported by the Gateway.
+func (s *Server) RecordAudit(
+	ctx context.Context,
+	req *server.RecordAuditRequest,
+) (*server.RecordAuditResponse, error) {
+	err := s.service.RecordAudit(ctx, domain.AuditEvent{
+		ActorKind:  req.GetActorKind(),
+		ActorHash:  req.GetActorHash(),
+		Action:     req.GetAction(),
+		TargetKind: req.GetTargetKind(),
+		Target:     req.GetTarget(),
+		Outcome:    req.GetOutcome(),
+		Details:    req.GetDetails(),
+	})
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return &server.RecordAuditResponse{}, nil
+}
+
+// ListAudit returns one page of the audit log, newest first.
+func (s *Server) ListAudit(
+	ctx context.Context,
+	req *server.ListAuditRequest,
+) (*server.ListAuditResponse, error) {
+	page, err := s.service.ListAudit(ctx, domain.AuditFilter{
+		Limit:    int(req.GetLimit()),
+		BeforeID: req.GetBeforeId(),
+		Action:   req.GetAction(),
+		Outcome:  req.GetOutcome(),
+	})
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &server.ListAuditResponse{
+		Entries:      make([]*server.AuditEntry, 0, len(page.Entries)),
+		NextBeforeId: page.NextBeforeID,
+	}
+
+	for _, entry := range page.Entries {
+		response.Entries = append(response.Entries, &server.AuditEntry{
+			Id:         entry.ID,
+			OccurredAt: timestamppb.New(entry.OccurredAt),
+			ActorKind:  entry.ActorKind,
+			ActorHash:  entry.ActorHash,
+			Action:     entry.Action,
+			TargetKind: entry.TargetKind,
+			Target:     entry.Target,
+			Outcome:    entry.Outcome,
+			Details:    entry.Details,
+		})
 	}
 
 	return response, nil
@@ -323,6 +390,16 @@ const GradingRateLimitedPrefix = "grading rate limited, retry after seconds: "
 // GradingInterruptedMessage is the Aborted message for a grading that failed or was cut short.
 const GradingInterruptedMessage = "grading interrupted"
 
+// Reasons of a refused batch request; the Gateway reads them from the status message.
+const (
+	BatchReasonNothing  = "nothing_selected"
+	BatchReasonTooMany  = "too_many"
+	BatchReasonInvalid  = "invalid_filter"
+	BatchReasonActive   = "batch_active"
+	BatchReasonState    = "bad_state"
+	BatchReasonNotFound = "batch_not_found"
+)
+
 func mapError(err error) error {
 	var limited domain.RateLimitedError
 
@@ -385,6 +462,31 @@ func mapError(err error) error {
 			"grade is outdated",
 		)
 
+	case errors.Is(err, domain.ErrInvalidAudit):
+		return status.Error(
+			codes.InvalidArgument,
+			err.Error(),
+		)
+
+	// The batch errors carry a fixed reason word, not text: the Gateway passes it to the admin UI.
+	case errors.Is(err, domain.ErrBatchNothing):
+		return status.Error(codes.InvalidArgument, BatchReasonNothing)
+
+	case errors.Is(err, domain.ErrBatchTooMany):
+		return status.Error(codes.InvalidArgument, BatchReasonTooMany)
+
+	case errors.Is(err, domain.ErrInvalidBatch):
+		return status.Error(codes.InvalidArgument, BatchReasonInvalid)
+
+	case errors.Is(err, domain.ErrBatchActive):
+		return status.Error(codes.AlreadyExists, BatchReasonActive)
+
+	case errors.Is(err, domain.ErrBatchState):
+		return status.Error(codes.Aborted, BatchReasonState)
+
+	case errors.Is(err, domain.ErrBatchNotFound):
+		return status.Error(codes.NotFound, BatchReasonNotFound)
+
 	case errors.Is(err, domain.ErrRepoLocked):
 		return status.Error(
 			codes.Aborted,
@@ -422,4 +524,171 @@ func mapError(err error) error {
 			"internal server error",
 		)
 	}
+}
+
+func batchFilterFromProto(f *server.BatchFilter) domain.BatchFilter {
+	filter := domain.BatchFilter{
+		Languages: f.GetLanguages(),
+		Repos:     f.GetRepos(),
+		All:       f.GetAll(),
+		Force:     f.GetForce(),
+	}
+
+	if f.TopRated != nil {
+		v := int(f.GetTopRated())
+		filter.TopRated = &v
+	}
+
+	if f.MinScore != nil {
+		v := int(f.GetMinScore())
+		filter.MinScore = &v
+	}
+
+	if f.MaxScore != nil {
+		v := int(f.GetMaxScore())
+		filter.MaxScore = &v
+	}
+
+	if f.OlderThanDays != nil {
+		v := int(f.GetOlderThanDays())
+		filter.OlderThanDays = &v
+	}
+
+	return filter
+}
+
+func batchFilterToProto(f domain.BatchFilter) *server.BatchFilter {
+	out := &server.BatchFilter{Languages: f.Languages, Repos: f.Repos, All: f.All, Force: f.Force}
+
+	if f.TopRated != nil {
+		v := int32(*f.TopRated)
+		out.TopRated = &v
+	}
+
+	if f.MinScore != nil {
+		v := int32(*f.MinScore)
+		out.MinScore = &v
+	}
+
+	if f.MaxScore != nil {
+		v := int32(*f.MaxScore)
+		out.MaxScore = &v
+	}
+
+	if f.OlderThanDays != nil {
+		v := int32(*f.OlderThanDays)
+		out.OlderThanDays = &v
+	}
+
+	return out
+}
+
+func batchToProto(b domain.Batch) *server.RegradeBatch {
+	out := &server.RegradeBatch{
+		Id:        b.ID,
+		CreatedAt: timestamppb.New(b.CreatedAt),
+		Status:    b.Status,
+		ActorHash: b.ActorHash,
+		Filter:    batchFilterToProto(b.Filter),
+		Total:     int32(b.Total),
+		Pending:   int32(b.Pending),
+		Running:   int32(b.Running),
+		Ok:        int32(b.OK),
+		Failed:    int32(b.Failed),
+		Skipped:   int32(b.Skipped),
+	}
+
+	if b.FinishedAt != nil {
+		out.FinishedAt = timestamppb.New(*b.FinishedAt)
+	}
+
+	return out
+}
+
+// PreviewRegradeBatch is the dry run of a batch regrade.
+func (s *Server) PreviewRegradeBatch(
+	ctx context.Context,
+	req *server.PreviewRegradeBatchRequest,
+) (*server.PreviewRegradeBatchResponse, error) {
+	preview, err := s.service.PreviewBatch(ctx, batchFilterFromProto(req.GetFilter()))
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return &server.PreviewRegradeBatchResponse{
+		Count:           int32(preview.Count),
+		Capped:          preview.Capped,
+		Sample:          preview.Sample,
+		Unmatched:       preview.Unmatched,
+		EstimateSeconds: int32(preview.EstimateSeconds),
+		Inactive:        int32(preview.Inactive),
+	}, nil
+}
+
+// StartRegradeBatch creates a batch and starts it.
+func (s *Server) StartRegradeBatch(
+	ctx context.Context,
+	req *server.StartRegradeBatchRequest,
+) (*server.StartRegradeBatchResponse, error) {
+	batch, err := s.service.StartBatch(ctx, req.GetActorHash(), batchFilterFromProto(req.GetFilter()))
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return &server.StartRegradeBatchResponse{Batch: batchToProto(batch)}, nil
+}
+
+// ControlRegradeBatch pauses, resumes or cancels a batch.
+func (s *Server) ControlRegradeBatch(
+	ctx context.Context,
+	req *server.ControlRegradeBatchRequest,
+) (*server.ControlRegradeBatchResponse, error) {
+	batch, err := s.service.ControlBatch(ctx, req.GetActorHash(), req.GetBatchId(), req.GetAction())
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return &server.ControlRegradeBatchResponse{Batch: batchToProto(batch)}, nil
+}
+
+// GetRegradeBatch returns a batch and its failed repos.
+func (s *Server) GetRegradeBatch(
+	ctx context.Context,
+	req *server.GetRegradeBatchRequest,
+) (*server.GetRegradeBatchResponse, error) {
+	batch, failed, err := s.service.BatchStatus(ctx, req.GetBatchId())
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &server.GetRegradeBatchResponse{
+		Batch:    batchToProto(batch),
+		Failures: make([]*server.RegradeBatchFailure, 0, len(failed)),
+	}
+
+	for _, item := range failed {
+		response.Failures = append(response.Failures, &server.RegradeBatchFailure{
+			OrgSlug: item.OrgSlug, RepoSlug: item.RepoSlug, Error: item.Error,
+		})
+	}
+
+	return response, nil
+}
+
+// ListRegradeBatches returns the most recent batches.
+func (s *Server) ListRegradeBatches(
+	ctx context.Context,
+	req *server.ListRegradeBatchesRequest,
+) (*server.ListRegradeBatchesResponse, error) {
+	batches, err := s.service.ListBatches(ctx, int(req.GetLimit()))
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &server.ListRegradeBatchesResponse{Batches: make([]*server.RegradeBatch, 0, len(batches))}
+	for _, batch := range batches {
+		response.Batches = append(response.Batches, batchToProto(batch))
+	}
+
+	return response, nil
 }

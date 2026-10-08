@@ -7,9 +7,11 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"rating-service/internal/config"
 	"rating-service/internal/database"
+	"rating-service/internal/metrics"
 	"rating-service/internal/service"
 	pb "rating-service/internal/transport/gen"
 	"rating-service/internal/transport/rpc"
@@ -48,8 +50,13 @@ func StartApp() {
 	rankingRepo := database.NewRankingRepository(db)
 	ratingService := service.NewRatingService(rankingRepo, cfg.DynamicsDays)
 	ratingService.SetSizeBuckets(cfg.SizeSmallLOC, cfg.SizeLargeLOC)
+	ratingService.SetAnalytics(rankingRepo, time.Duration(cfg.AnalyticsCacheSeconds)*time.Second)
 
-	grpcServer := grpc.NewServer()
+	appMetrics := metrics.New()
+	appMetrics.Serve(ctx, cfg.MetricsAddress)
+	ratingService.SetCacheRecorder(appMetrics)
+
+	grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(appMetrics.UnaryServerInterceptor()))
 	pb.RegisterRatingServer(grpcServer, rpc.NewServer(ratingService))
 
 	listener, err := net.Listen("tcp", cfg.GRPC.Address)

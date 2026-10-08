@@ -7,13 +7,18 @@ import (
 )
 
 type Config struct {
-	GRPC     GRPCConfig
-	Database DatabaseConfig
+	GRPC GRPCConfig
+	// MetricsAddress serves /metrics for Prometheus (METRICS_ADDRESS); empty leaves it off. It is its own
+	// port, never published (docs/metrics.md).
+	MetricsAddress string
+	Database       DatabaseConfig
 	// DynamicsDays is the window of the score and place change in the ranking (RANKING_DYNAMICS_DAYS).
 	DynamicsDays int
 	// SizeSmallLOC and SizeLargeLOC are the size-filter limits in lines of code (RANKING_SIZE_SMALL_LOC,
 	// RANKING_SIZE_LARGE_LOC).
 	SizeSmallLOC, SizeLargeLOC int
+	// AnalyticsCacheSeconds is how long the platform analytics are reused (ANALYTICS_CACHE_SECONDS).
+	AnalyticsCacheSeconds int
 }
 
 type GRPCConfig struct {
@@ -67,10 +72,18 @@ func LoadConfig() *Config {
 		}
 	}
 
+	cacheSeconds, err := strconv.Atoi(getEnvDefault("ANALYTICS_CACHE_SECONDS", "300"))
+	if err != nil || cacheSeconds < 1 {
+		cacheSeconds = 300
+	}
+
 	return &Config{
-		DynamicsDays: dynamicsDays,
-		SizeSmallLOC: sizeSmall,
-		SizeLargeLOC: sizeLarge,
+		AnalyticsCacheSeconds: cacheSeconds,
+		DynamicsDays:          dynamicsDays,
+		SizeSmallLOC:          sizeSmall,
+		SizeLargeLOC:          sizeLarge,
+
+		MetricsAddress: getEnvDefault("METRICS_ADDRESS", ""),
 
 		GRPC: GRPCConfig{
 			Address: getEnvDefault("GRPC_ADDRESS", ":8086"),

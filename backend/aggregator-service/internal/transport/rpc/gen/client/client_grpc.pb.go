@@ -22,6 +22,7 @@ const (
 	CodeHealth_GetRepositoryBySlugs_FullMethodName = "/code_health.CodeHealth/GetRepositoryBySlugs"
 	CodeHealth_ListAllPublicRepos_FullMethodName   = "/code_health.CodeHealth/ListAllPublicRepos"
 	CodeHealth_GetMyRepos_FullMethodName           = "/code_health.CodeHealth/GetMyRepos"
+	CodeHealth_ListTopRatedRepos_FullMethodName    = "/code_health.CodeHealth/ListTopRatedRepos"
 	CodeHealth_GetMyOrgs_FullMethodName            = "/code_health.CodeHealth/GetMyOrgs"
 	CodeHealth_GetOrgRepos_FullMethodName          = "/code_health.CodeHealth/GetOrgRepos"
 )
@@ -33,6 +34,7 @@ type CodeHealthClient interface {
 	GetRepositoryBySlugs(ctx context.Context, in *GetRepositoryBySlugsRequest, opts ...grpc.CallOption) (*GetRepositoryBySlugsResponse, error)
 	ListAllPublicRepos(ctx context.Context, in *ListAllPublicReposRequest, opts ...grpc.CallOption) (*ListAllPublicReposResponse, error)
 	GetMyRepos(ctx context.Context, in *GetMyReposRequest, opts ...grpc.CallOption) (*GetMyReposResponse, error)
+	ListTopRatedRepos(ctx context.Context, in *ListTopRatedReposRequest, opts ...grpc.CallOption) (*ListTopRatedReposResponse, error)
 	GetMyOrgs(ctx context.Context, in *GetMyOrgsRequest, opts ...grpc.CallOption) (*GetMyOrgsResponse, error)
 	GetOrgRepos(ctx context.Context, in *GetOrgReposRequest, opts ...grpc.CallOption) (*GetOrgReposResponse, error)
 }
@@ -75,6 +77,16 @@ func (c *codeHealthClient) GetMyRepos(ctx context.Context, in *GetMyReposRequest
 	return out, nil
 }
 
+func (c *codeHealthClient) ListTopRatedRepos(ctx context.Context, in *ListTopRatedReposRequest, opts ...grpc.CallOption) (*ListTopRatedReposResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTopRatedReposResponse)
+	err := c.cc.Invoke(ctx, CodeHealth_ListTopRatedRepos_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *codeHealthClient) GetMyOrgs(ctx context.Context, in *GetMyOrgsRequest, opts ...grpc.CallOption) (*GetMyOrgsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetMyOrgsResponse)
@@ -102,6 +114,7 @@ type CodeHealthServer interface {
 	GetRepositoryBySlugs(context.Context, *GetRepositoryBySlugsRequest) (*GetRepositoryBySlugsResponse, error)
 	ListAllPublicRepos(context.Context, *ListAllPublicReposRequest) (*ListAllPublicReposResponse, error)
 	GetMyRepos(context.Context, *GetMyReposRequest) (*GetMyReposResponse, error)
+	ListTopRatedRepos(context.Context, *ListTopRatedReposRequest) (*ListTopRatedReposResponse, error)
 	GetMyOrgs(context.Context, *GetMyOrgsRequest) (*GetMyOrgsResponse, error)
 	GetOrgRepos(context.Context, *GetOrgReposRequest) (*GetOrgReposResponse, error)
 	mustEmbedUnimplementedCodeHealthServer()
@@ -122,6 +135,9 @@ func (UnimplementedCodeHealthServer) ListAllPublicRepos(context.Context, *ListAl
 }
 func (UnimplementedCodeHealthServer) GetMyRepos(context.Context, *GetMyReposRequest) (*GetMyReposResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMyRepos not implemented")
+}
+func (UnimplementedCodeHealthServer) ListTopRatedRepos(context.Context, *ListTopRatedReposRequest) (*ListTopRatedReposResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTopRatedRepos not implemented")
 }
 func (UnimplementedCodeHealthServer) GetMyOrgs(context.Context, *GetMyOrgsRequest) (*GetMyOrgsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMyOrgs not implemented")
@@ -204,6 +220,24 @@ func _CodeHealth_GetMyRepos_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CodeHealth_ListTopRatedRepos_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTopRatedReposRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CodeHealthServer).ListTopRatedRepos(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CodeHealth_ListTopRatedRepos_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CodeHealthServer).ListTopRatedRepos(ctx, req.(*ListTopRatedReposRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CodeHealth_GetMyOrgs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetMyOrgsRequest)
 	if err := dec(in); err != nil {
@@ -258,6 +292,10 @@ var CodeHealth_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMyRepos",
 			Handler:    _CodeHealth_GetMyRepos_Handler,
+		},
+		{
+			MethodName: "ListTopRatedRepos",
+			Handler:    _CodeHealth_ListTopRatedRepos_Handler,
 		},
 		{
 			MethodName: "GetMyOrgs",

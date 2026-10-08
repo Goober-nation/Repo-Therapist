@@ -6,6 +6,8 @@ import YandexSignIn from "./YandexSignIn"
 const pageTitles: Record<PageId, string> = {
   overview: "Анализ репозитория",
   ranking: "Рейтинг SourceCraft",
+  analytics: "Аналитика",
+  access: "Доступ админа",
   my: "Мои репозитории",
   rules: "Правила оценки",
 }
@@ -21,6 +23,7 @@ export default function TopBar({
   onOpenRepositoryLink,
   yandexProfile,
   onYandexSignIn,
+  onSignOut,
 }: {
   activePage: PageId
   repositoryName: string
@@ -32,6 +35,7 @@ export default function TopBar({
   onOpenRepositoryLink: (link: string) => boolean
   yandexProfile: YandexProfile | null
   onYandexSignIn: (profile: YandexProfile) => void
+  onSignOut: () => void
 }) {
   const [repositoryLink, setRepositoryLink] = useState("")
   const [isLinkInvalid, setIsLinkInvalid] = useState(false)
@@ -177,20 +181,25 @@ export default function TopBar({
           </span>
         </button>
         {yandexProfile ? (
-          <button
-            className="topbar__account"
-            type="button"
-            title="Мои репозитории"
-            onClick={() => onPageChange("my")}
-          >
-            <span className="user-avatar" aria-hidden="true">
-              {yandexProfile.name.trim().charAt(0).toLocaleUpperCase()}
-            </span>
-            <span className="topbar__user">
-              <strong>{yandexProfile.name}</strong>
-              <small>Мои репозитории</small>
-            </span>
-          </button>
+          <>
+            <button
+              className="topbar__account"
+              type="button"
+              title="Мои репозитории"
+              onClick={() => onPageChange("my")}
+            >
+              <span className="user-avatar" aria-hidden="true">
+                {yandexProfile.name.trim().charAt(0).toLocaleUpperCase()}
+              </span>
+              <span className="topbar__user">
+                <strong>{yandexProfile.name}</strong>
+                <small>Мои репозитории</small>
+              </span>
+            </button>
+            <button className="topbar__signout" type="button" title="Выйти из аккаунта" onClick={onSignOut}>
+              Выйти
+            </button>
+          </>
         ) : (
           <YandexSignIn
             theme={theme === "dark" ? "dark" : "light"}

@@ -492,7 +492,7 @@ test("top bar offers Yandex ID sign-in and toggles the workspace panel", () => {
   assert.doesNotMatch(sidebar, /Repo Therapist|Выйти|Яндекс/)
 })
 
-test("signed-in account displays the profile without a logout control", () => {
+test("signed-in account displays the profile with a sign-out button and no account menu", () => {
   const html = renderToStaticMarkup(
     createElement(TopBar, {
       activePage: "ranking",
@@ -508,11 +508,14 @@ test("signed-in account displays the profile without a logout control", () => {
       onToggleSidebar() {},
 
       yandexProfile: { id: "123", name: "Анна" },
+
+      onSignOut() {},
     }),
   )
 
   assert.match(html, /Анна/)
-  assert.doesNotMatch(html, /Выйти|topbar-account-menu/)
+  assert.match(html, /Выйти/)
+  assert.doesNotMatch(html, /topbar-account-menu/)
 })
 
 test("gateway HTTP errors preserve status without exposing the response body", async () => {

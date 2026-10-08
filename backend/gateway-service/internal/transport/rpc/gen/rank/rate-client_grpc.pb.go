@@ -24,6 +24,8 @@ const (
 	Rating_GetPublicSummary_FullMethodName       = "/rating.Rating/GetPublicSummary"
 	Rating_GetScoreHistory_FullMethodName        = "/rating.Rating/GetScoreHistory"
 	Rating_GetPositionExplanation_FullMethodName = "/rating.Rating/GetPositionExplanation"
+	Rating_GetPlatformAnalytics_FullMethodName   = "/rating.Rating/GetPlatformAnalytics"
+	Rating_ListPublicGrades_FullMethodName       = "/rating.Rating/ListPublicGrades"
 )
 
 // RatingClient is the client API for Rating service.
@@ -47,6 +49,13 @@ type RatingClient interface {
 	// score) ranking. Read-only. NOT_FOUND when the repo is unknown or not public; ranked=false when
 	// it has no grade yet.
 	GetPositionExplanation(ctx context.Context, in *GetPositionExplanationRequest, opts ...grpc.CallOption) (*GetPositionExplanationResponse, error)
+	// GetPlatformAnalytics returns aggregate statistics over all graded public repositories: score
+	// distribution, average score per language and per category, the most common advice items, the
+	// weekly trend and the most improved repositories. Public grades only; read-only; cached briefly.
+	GetPlatformAnalytics(ctx context.Context, in *GetPlatformAnalyticsRequest, opts ...grpc.CallOption) (*GetPlatformAnalyticsResponse, error)
+	// ListPublicGrades returns one page of the public grades, ordered by org and repo slug, for the
+	// public export. Public grades only; read-only.
+	ListPublicGrades(ctx context.Context, in *ListPublicGradesRequest, opts ...grpc.CallOption) (*ListPublicGradesResponse, error)
 }
 
 type ratingClient struct {
@@ -107,6 +116,26 @@ func (c *ratingClient) GetPositionExplanation(ctx context.Context, in *GetPositi
 	return out, nil
 }
 
+func (c *ratingClient) GetPlatformAnalytics(ctx context.Context, in *GetPlatformAnalyticsRequest, opts ...grpc.CallOption) (*GetPlatformAnalyticsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPlatformAnalyticsResponse)
+	err := c.cc.Invoke(ctx, Rating_GetPlatformAnalytics_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ratingClient) ListPublicGrades(ctx context.Context, in *ListPublicGradesRequest, opts ...grpc.CallOption) (*ListPublicGradesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPublicGradesResponse)
+	err := c.cc.Invoke(ctx, Rating_ListPublicGrades_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RatingServer is the server API for Rating service.
 // All implementations must embed UnimplementedRatingServer
 // for forward compatibility.
@@ -128,6 +157,13 @@ type RatingServer interface {
 	// score) ranking. Read-only. NOT_FOUND when the repo is unknown or not public; ranked=false when
 	// it has no grade yet.
 	GetPositionExplanation(context.Context, *GetPositionExplanationRequest) (*GetPositionExplanationResponse, error)
+	// GetPlatformAnalytics returns aggregate statistics over all graded public repositories: score
+	// distribution, average score per language and per category, the most common advice items, the
+	// weekly trend and the most improved repositories. Public grades only; read-only; cached briefly.
+	GetPlatformAnalytics(context.Context, *GetPlatformAnalyticsRequest) (*GetPlatformAnalyticsResponse, error)
+	// ListPublicGrades returns one page of the public grades, ordered by org and repo slug, for the
+	// public export. Public grades only; read-only.
+	ListPublicGrades(context.Context, *ListPublicGradesRequest) (*ListPublicGradesResponse, error)
 	mustEmbedUnimplementedRatingServer()
 }
 
@@ -152,6 +188,12 @@ func (UnimplementedRatingServer) GetScoreHistory(context.Context, *GetScoreHisto
 }
 func (UnimplementedRatingServer) GetPositionExplanation(context.Context, *GetPositionExplanationRequest) (*GetPositionExplanationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetPositionExplanation not implemented")
+}
+func (UnimplementedRatingServer) GetPlatformAnalytics(context.Context, *GetPlatformAnalyticsRequest) (*GetPlatformAnalyticsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPlatformAnalytics not implemented")
+}
+func (UnimplementedRatingServer) ListPublicGrades(context.Context, *ListPublicGradesRequest) (*ListPublicGradesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListPublicGrades not implemented")
 }
 func (UnimplementedRatingServer) mustEmbedUnimplementedRatingServer() {}
 func (UnimplementedRatingServer) testEmbeddedByValue()                {}
@@ -264,6 +306,42 @@ func _Rating_GetPositionExplanation_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Rating_GetPlatformAnalytics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPlatformAnalyticsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RatingServer).GetPlatformAnalytics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Rating_GetPlatformAnalytics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RatingServer).GetPlatformAnalytics(ctx, req.(*GetPlatformAnalyticsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Rating_ListPublicGrades_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPublicGradesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RatingServer).ListPublicGrades(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Rating_ListPublicGrades_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RatingServer).ListPublicGrades(ctx, req.(*ListPublicGradesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Rating_ServiceDesc is the grpc.ServiceDesc for Rating service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -290,6 +368,14 @@ var Rating_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPositionExplanation",
 			Handler:    _Rating_GetPositionExplanation_Handler,
+		},
+		{
+			MethodName: "GetPlatformAnalytics",
+			Handler:    _Rating_GetPlatformAnalytics_Handler,
+		},
+		{
+			MethodName: "ListPublicGrades",
+			Handler:    _Rating_ListPublicGrades_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

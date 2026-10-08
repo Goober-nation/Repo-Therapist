@@ -319,3 +319,102 @@ docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "sele
 низкая достоверность; документация с пометкой «Упрощённая оценка»; очень длинные названия и рекомендации.
 Приватный анализ на аккаунте с многими репозиториями требует увеличенных `AGGREGATOR_GRPC_TIMEOUT`,
 `GRPC_TIMEOUT` и `HTTP_WRITE_TIMEOUT` (см. README, «Ограничения»).
+
+## Аналитика платформы и выгрузка
+
+Описание: [platform-analytics.md](platform-analytics.md). Автотесты: `go test ./...` в
+`backend/rating-service` (агрегаты, кэш, страницы выгрузки), `backend/gateway-service` (маршруты
+`/stats` и `/export/*`, лимит, обрыв потока) и `frontend/tests/stats.test.js`.
+
+Живая проверка (стек запущен, у публичных репозиториев есть оценки):
+
+```bash
+curl -s localhost:8080/stats | head -c 400                        # агрегаты
+curl -s -D- localhost:8080/export/grades.csv | head -8            # attachment, text/csv, заголовок и строки
+curl -s localhost:8080/export/grades.json | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['total'], len(d['grades']))"
+for i in 1 2 3 4 5 6; do curl -s -o /dev/null -w "%{http_code} " localhost:8080/export/grades.csv; done   # после пятой — 429
+```
+
+Сверка: число строк выгрузки равно `graded_repos` из `/stats`; ни один репозиторий с видимостью не
+`public` в выгрузке нет.
+
+## Доступ админа и журнал действий
+
+Описание: [admin.md](admin.md). Автотесты: `go test ./...` в `backend/aggregator-service` (проверка и
+хранение событий, страницы с курсором, срок хранения, RPC), `backend/gateway-service` (проверка сессии и
+роли, запись отказов без утечек, лимит записи, защита заголовком, маршруты) и `frontend/tests/admin.test.js`.
+Тест хранилища журнала (`audit_integration_test.go`) пропускается без `POSTGRES_DSN`; с ним он работает на
+настоящей базе с применённой миграцией 000008:
+
+```bash
+POSTGRES_DSN="postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:8051/$POSTGRES_DB?sslmode=disable" \
+  go test ./internal/database/postgres-repositories/ -run Audit -v
+```
+
+Живая проверка и создание тестовой сессии описаны в разделе «Как проверить на своей машине» в admin.md.
+После проверки удалите созданные строки: `delete from audit_log; delete from users where yandex_id = '...'`.
+
+### Доступ админа по паролю
+
+Автотесты: `backend/gateway-service` (пароль и блокировка, отзыв прав при смене пароля, права только своей
+сессии, отсутствие гостевых учётных записей, утечки в журнале, маршруты `/admin/unlock` и `/admin/lock`,
+заголовок), `frontend/tests/access.test.js`. Тест хранилищ Redis пропускается без `REDIS_TEST_ADDRESS`; с ним
+он работает на настоящем Redis, включая скрипт блокировки:
+
+```bash
+REDIS_TEST_ADDRESS=localhost:8052 REDIS_TEST_PASSWORD=$REDIS_PASSWORD \
+  go test ./internal/database/redis/ -run 'AdminGrant|AttemptGuard' -v
+```
+
+Живая проверка: запустите Gateway с `ADMIN_PASSWORD` и коротким `ADMIN_UNLOCK_LOCK=20s`,
+создайте тестового пользователя и сессию (см. admin.md) и пройдите: неверный пароль — `403`, пять неверных —
+`429` с `Retry-After`, верный пароль во время блокировки — `429`, после блокировки — `200`, `/admin/audit` — `200`,
+`/admin/lock` — права сняты; после смены `ADMIN_PASSWORD` и перезапуска права снова нет.
+
+### Пакетная переоценка
+
+Автотесты: `backend/aggregator-service` (условия и их проверка, пробный расчёт, не больше трёх репозиториев
+одновременно, пауза, продолжение, отмена, ошибки по репозиториям, один пакет за раз, продолжение после перезапуска,
+пропуск репозитория, ставшего приватным; запускайте с `-race`), `backend/gateway-service` (маршруты, заголовок,
+`code` в ошибках, `current` без пакетов), `frontend/tests/regrade.test.js`. Тест хранилища
+(`batch_integration_test.go`) пропускается без `POSTGRES_DSN`; с ним он работает на настоящей базе с миграцией 000009
+и создаёт и удаляет свои репозитории в организации `zz-batch-test`:
+
+```bash
+POSTGRES_DSN="postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:8051/$POSTGRES_DB?sslmode=disable" \
+  go test ./internal/database/postgres-repositories/ -run Batch -v
+```
+
+Живая проверка без вреда для стенда: запустите свой Aggregator с другими темами Kafka
+(`KAFKA_GRADING_REQUESTS_TOPIC`, `KAFKA_GRADING_RESULTS_TOPIC` и группой потребителей), чтобы настоящие сервисы
+оценки их не видели, и коротким `BATCH_REGRADE_ITEM_TIMEOUT=25s`; добавьте в базу несколько публичных тестовых
+репозиториев в отдельной организации (строки в `repos` и `repo_lock`) и выбирайте их своим списком. Репозитории
+в таком запуске завершаются ошибкой «результат не пришёл вовремя»; успешный путь проверяют автотесты. После
+проверки удалите тестовые репозитории, пакеты, записи журнала и ключи Redis.
+
+### Метрики и графики
+
+Описание: [metrics.md](metrics.md). Автотесты: `go test ./...` в `backend/gateway-service` (пакеты `metrics` и `series`:
+метки по шаблону маршрута, неизвестный путь, перехватчики gRPC, известные ряды с нуля, запросы графиков к
+Prometheus, кэш, публичные запросы только по публичным оценкам, округление счётчиков, график заканчивается «сейчас»;
+маршруты `/stats/series` и `/admin/metrics`), `backend/aggregator-service` (счётчики запуска, результата и времени
+оценки, источник запуска `user`/`schedule`/`batch`, отказ по лимиту, LLM, пакеты) и `backend/rating-service` (кэш
+аналитики), `frontend/tests/series.test.js`.
+
+Живая проверка: поднимите Prometheus и сервисы, откройте `http://localhost:8056/targets` (три цели `UP`), потом
+сделайте запросы к Gateway и посмотрите `curl localhost:9101/metrics` изнутри контейнера: должны быть
+`gateway_http_requests_total` с шаблонами маршрутов и ни одного настоящего названия репозитория. Для графиков
+откройте вкладку «Аналитика» и вкладку «Доступ админа» администратором.
+
+### Выход из аккаунта
+
+Автотесты: `backend/gateway-service` (выход удаляет сессию и право по паролю, идемпотентность, лимит запросов, сбои
+хранилищ, `signed_in` без админских настроек, маршрут, заголовок, стирание куки), `frontend/tests/logout.test.js`
+(потерянная сессия, ответ для чужой личности, кнопка в верхней панели, запрос выхода). Удаление сессии в Redis
+проверяет `TestSessionDeleteRoundTrip` (нужен `REDIS_TEST_ADDRESS`, см. выше).
+
+Живая проверка: с тестовой сессией (см. admin.md) `POST /auth/logout` без заголовка — `403`; с заголовком — `200`
+и `Set-Cookie: session_id=; Max-Age=0`; после этого `GET /admin/me` с той же кукой даёт `signed_in: false`, а ключи
+`session:*` и `admin_grant:*` в Redis исчезают. В браузере: профиль в `sessionStorage` без сессии на сервере
+пропадает после загрузки страницы сам; с живой сессией кнопка «Выйти» очищает профиль, токен и куку и открывает рейтинг.
+

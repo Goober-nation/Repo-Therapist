@@ -27,10 +27,34 @@ const DefaultLLMRequestTTL = 2 * time.Minute
 // DefaultGradingTokenTTL matches the default GRADING_LOCK_TIMEOUT.
 const DefaultGradingTokenTTL = 20 * time.Minute
 
+// Recorder counts what the service does, for monitoring (docs/metrics.md). Visibility is public or
+// private; labels are fixed words, never slugs or users. A nil Recorder counts nothing.
+type Recorder interface {
+	GradingRequested(visibility, trigger string)
+	// GradingCompleted: duration is zero when the request was made before a restart.
+	GradingCompleted(visibility, outcome string, duration time.Duration)
+	GradeLimiterRejected()
+	LLMRequest(outcome string)
+	BatchItem(status string)
+	BatchEvent(event string)
+}
+
 type AggregatorService struct {
-	ReposRepo        domain.RepoRepository
-	GradesRepo       domain.GradesRepository
-	LLMRepo          domain.LLMRepository
+	ReposRepo  domain.RepoRepository
+	GradesRepo domain.GradesRepository
+	LLMRepo    domain.LLMRepository
+	// Metrics counts gradings, LLM requests and batches; nil counts nothing.
+	Metrics Recorder
+	// AuditRepo stores the audit log; nil leaves auditing off.
+	AuditRepo domain.AuditRepository
+	// BatchRepo stores admin regrade batches; nil leaves them off.
+	BatchRepo domain.BatchRepository
+	// BatchConcurrency, BatchMaxRepos, BatchItemTimeout and BatchPoll tune the batch regrade; zero
+	// values mean the defaults in regrade_batch.go.
+	BatchConcurrency int
+	BatchMaxRepos    int
+	BatchItemTimeout time.Duration
+	BatchPoll        time.Duration
 	ticker           *time.Ticker
 	clientRPC        client.CodeHealthClient
 	gradingPublisher domain.GradingPublisher
@@ -69,6 +93,12 @@ type AggregatorService struct {
 
 	regradeMu    sync.Mutex
 	regradeState regradeState
+
+	batches  batchRunner
+	batchCtx context.Context
+
+	// gradingStarts remembers when each repo's grading was requested, to time it at the result.
+	gradingStarts sync.Map
 }
 
 // regradeState is what the public regrade reports about itself; guarded by regradeMu.
@@ -113,6 +143,7 @@ func (as *AggregatorService) SaveLLMRecommendations(ctx context.Context, event d
 
 	if event.Error != "" {
 		as.llmFailed(key, event.Error)
+		as.countLLM("received_error")
 
 		return fmt.Errorf(
 			"%w: %v",
@@ -149,8 +180,15 @@ func (as *AggregatorService) SaveLLMRecommendations(ctx context.Context, event d
 	}
 
 	as.llmDone(key)
+	as.countLLM("received_ok")
 
 	return nil
+}
+
+func (as *AggregatorService) countLLM(outcome string) {
+	if as.Metrics != nil {
+		as.Metrics.LLMRequest(outcome)
+	}
 }
 
 // RequestLLMRecommendations returns the stored LLM response when it describes the current grade
@@ -233,6 +271,7 @@ func (as *AggregatorService) RequestLLMRecommendations(
 
 	if err := as.llmPublisher.Publish(ctx, event); err != nil {
 		as.llmDone(key)
+		as.countLLM("publish_failed")
 
 		return domain.RepoLLMResponse{}, fmt.Errorf(
 			"%w: publish llm recommendations request: %v",
@@ -240,6 +279,8 @@ func (as *AggregatorService) RequestLLMRecommendations(
 			err,
 		)
 	}
+
+	as.countLLM("requested")
 
 	return domain.RepoLLMResponse{}, domain.GradingPending
 }
@@ -451,6 +492,33 @@ func (as *AggregatorService) loadLLMResponse(ctx context.Context, repoID uuid.UU
 	return domain.RepoLLMResponse(resp), err
 }
 
+type triggerKey struct{}
+
+// withTrigger marks the gradings requested under ctx as started by trigger (batch), for the metrics.
+func withTrigger(ctx context.Context, trigger string) context.Context {
+	return context.WithValue(ctx, triggerKey{}, trigger)
+}
+
+func gradingTrigger(ctx context.Context, userInitiated bool) string {
+	if trigger, ok := ctx.Value(triggerKey{}).(string); ok {
+		return trigger
+	}
+
+	if userInitiated {
+		return "user"
+	}
+
+	return "schedule"
+}
+
+func visibilityLabel(private bool) string {
+	if private {
+		return domain.VisibilityPrivate
+	}
+
+	return domain.VisibilityPublic
+}
+
 // requestGrading takes the repo lock and publishes grading.requests. It returns GradingPending
 // both when it published and when the lock was already taken by a grading in flight.
 // requestGrading starts a grading unless one is already running for repo. Starts by users
@@ -473,6 +541,9 @@ func (as *AggregatorService) requestGrading(ctx context.Context, repo domain.Rep
 	if userInitiated {
 		if ok, retryAfter := as.GradeLimiter.Reserve(reservedAt); !ok {
 			_ = as.ReposRepo.ReleaseRepositoryLock(ctx, repo.SourcecraftUUID)
+			if as.Metrics != nil {
+				as.Metrics.GradeLimiterRejected()
+			}
 
 			return domain.RateLimitedError{RetryAfter: retryAfter}
 		}
@@ -520,6 +591,12 @@ func (as *AggregatorService) requestGrading(ctx context.Context, repo domain.Rep
 			domain.ErrGradingFailed,
 			err,
 		)
+	}
+
+	as.gradingStarts.Store(repo.SourcecraftUUID, as.now())
+
+	if as.Metrics != nil {
+		as.Metrics.GradingRequested(visibilityLabel(private), gradingTrigger(ctx, userInitiated))
 	}
 
 	return domain.GradingPending
@@ -684,6 +761,23 @@ func (as *AggregatorService) SaveGradingResult(ctx context.Context,
 			log.Printf("release repository lock %s: %v", grade.SourcecraftUUID, err)
 		}
 	}()
+
+	started, timed := as.gradingStarts.LoadAndDelete(grade.SourcecraftUUID)
+
+	var elapsed time.Duration
+
+	if at, ok := started.(time.Time); timed && ok {
+		elapsed = as.now().Sub(at)
+	}
+
+	if as.Metrics != nil && (gradeMode == domain.VisibilityPublic || gradeMode == domain.VisibilityPrivate) {
+		outcome := "ok"
+		if errorCode != "" {
+			outcome = "error"
+		}
+
+		as.Metrics.GradingCompleted(gradeMode, outcome, elapsed)
+	}
 
 	if errorCode != "" {
 		as.gradingFailed(llmKey(grade.SourcecraftUUID, gradeMode))

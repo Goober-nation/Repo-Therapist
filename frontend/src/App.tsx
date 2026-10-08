@@ -16,9 +16,14 @@ import { loadSavedProfile, saveProfile, type YandexProfile } from "./api/yandexA
 import { Button, Card } from "./components/Shell"
 import Sidebar from "./components/Sidebar"
 import TopBar from "./components/TopBar"
+import AdminAccessPage from "./pages/AdminAccessPage"
+import AnalyticsPage from "./pages/AnalyticsPage"
 import CompareRoute from "./pages/CompareRoute"
 import MyRepositoriesPage from "./pages/MyRepositoriesPage"
 import { useRegradeStatus } from "./useRegradeStatus"
+import { sessionLost } from "./session"
+import { useAdmin } from "./useAdmin"
+import { useStats } from "./useStats"
 import RankingPage, { DEFAULT_RANKING_QUERY, rankingFilters, type RankingQuery } from "./pages/RankingPage"
 import RepositoryOverviewPage from "./pages/RepositoryOverviewPage"
 import RulesPage from "./pages/RulesPage"
@@ -86,6 +91,9 @@ export default function App() {
   // Repositories ticked in the ranking for comparison (at most two).
   const [compareSelection, setCompareSelection] = useState<RepositorySummary[]>([])
   const regradeStatus = useRegradeStatus(api, route.page === "ranking")
+  const admin = useAdmin(api, profile)
+  const [statsAttempt, setStatsAttempt] = useState(0)
+  const stats = useStats(api, route.page === "analytics", statsAttempt)
   const [rankingAttempt, setRankingAttempt] = useState(0)
   const [ranking, setRanking] = useState<RepositoryList & { total: number; loadedKey?: string; dynamicsDays?: number }>({
     items: [],
@@ -355,6 +363,30 @@ export default function App() {
     document.title = repository ? `${repository.fullName} — Repo Therapist` : "Repo Therapist — здоровье репозиториев SourceCraft"
   }, [repository?.fullName])
 
+  // Signing out ends the Gateway session and forgets everything tied to the user in this tab: the saved
+  // profile, the SourceCraft token and the private data loaded with it. The local part never waits for
+  // the network, so a failed request cannot leave the user looking signed in.
+  const handleSignOut = useCallback(() => {
+    api.logout().catch(() => undefined)
+    saveProfile(null)
+    setProfile(null)
+    setPat(undefined)
+    setOrgs({ items: [], isLoading: false })
+    setMine({ items: [], isLoading: false })
+    setGradings({})
+    setAnalyticsByKey({})
+    setPublicViews({})
+    navigate({ page: "ranking" })
+  }, [navigate])
+
+  // The saved profile is display data kept in the tab; when the Gateway says the session is gone (it
+  // expired, or the server lost it), drop the profile so the interface stops claiming to be signed in.
+  useEffect(() => {
+    if (!sessionLost(profile, admin.status)) return
+    saveProfile(null)
+    setProfile(null)
+  }, [profile, admin.status])
+
   const handleSignIn = useCallback(
     (signedIn: YandexProfile) => {
       saveProfile(signedIn)
@@ -414,6 +446,7 @@ export default function App() {
         onOpenRepositoryLink={openRepositoryLink}
         yandexProfile={profile}
         onYandexSignIn={handleSignIn}
+        onSignOut={handleSignOut}
       />
       <div className="app-body">
         {isSidebarOpen && <Sidebar activePage={activePage} onPageChange={showPage} />}
@@ -436,6 +469,25 @@ export default function App() {
                 onQueryChange={setRankingQuery}
                 onRetry={() => setRankingAttempt((value) => value + 1)}
                 onSelectRepository={(item) => openRepository(item, false)}
+              />
+            )}
+            {route.page === "analytics" && (
+              <AnalyticsPage
+                api={api}
+                stats={stats.data}
+                isLoading={stats.isLoading}
+                error={stats.error}
+                onRetry={() => setStatsAttempt((value) => value + 1)}
+                onOpenRepository={(org, repo) => navigate({ page: "repository", org, repo, private: false })}
+              />
+            )}
+            {route.page === "access" && (
+              <AdminAccessPage
+                api={api}
+                status={admin.status}
+                error={admin.error}
+                onRetry={admin.retry}
+                onStatusChange={admin.setStatus}
               />
             )}
             {route.page === "my" && (

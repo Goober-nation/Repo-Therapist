@@ -13,6 +13,8 @@ import (
 	"gateway-service/internal/config"
 	"gateway-service/internal/database/postgres"
 	redis_repository "gateway-service/internal/database/redis"
+	"gateway-service/internal/metrics"
+	"gateway-service/internal/series"
 	"gateway-service/internal/service"
 	httptransport "gateway-service/internal/transport/http"
 	"gateway-service/internal/transport/rpc/gen/agg"
@@ -81,11 +83,15 @@ func StartApp() {
 		cfg.RateLimit.Limit,
 		cfg.RateLimit.Window,
 	)
+	appMetrics := metrics.New()
+	appMetrics.Serve(ctx, cfg.Metrics.Address)
+
 	aggregatorConn, err := grpc.Dial(
 		cfg.Aggregator.Address,
 		grpc.WithTransportCredentials(
 			insecure.NewCredentials(),
 		),
+		grpc.WithChainUnaryInterceptor(appMetrics.UnaryClientInterceptor("aggregator")),
 	)
 	if err != nil {
 		log.Fatalf(
@@ -109,6 +115,7 @@ func StartApp() {
 		grpc.WithTransportCredentials(
 			insecure.NewCredentials(),
 		),
+		grpc.WithChainUnaryInterceptor(appMetrics.UnaryClientInterceptor("rating")),
 	)
 	if err != nil {
 		log.Fatalf(
@@ -152,6 +159,46 @@ func StartApp() {
 		cfg.PublicAPIRateLimit.Window,
 	))
 
+	gatewayService.SetExportLimiter(service.NewRedisLimiter(
+		redisClient,
+		cfg.ExportRateLimit.Limit,
+		cfg.ExportRateLimit.Window,
+	))
+
+	gatewayService.SetMetrics(appMetrics)
+	if cfg.Metrics.PrometheusURL != "" {
+		gatewayService.SetSeries(series.NewClient(cfg.Metrics.PrometheusURL, cfg.Metrics.SeriesCache, nil))
+		log.Printf("graphs read metrics from %s", cfg.Metrics.PrometheusURL)
+	} else {
+		log.Println("graphs are off: set PROMETHEUS_URL to turn them on")
+	}
+	gatewayService.SetAdmin(
+		cfg.Admin.YandexIDs,
+		cfg.Admin.HashSecret(),
+		service.NewRedisLimiter(redisClient, cfg.Admin.DeniedLog.Limit, cfg.Admin.DeniedLog.Window),
+	)
+
+	gatewayService.SetAdminUnlock(
+		cfg.Admin.Password,
+		redis_repository.NewAdminGrantStore(redisClient),
+		redis_repository.NewAttemptGuard(redisClient, cfg.Admin.UnlockMaxAttempts, cfg.Admin.UnlockLock),
+		cfg.Session.TTL,
+	)
+
+	if gatewayService.UnlockAvailable() {
+		log.Printf("admin password unlock is on: %d wrong tries lock for %s", cfg.Admin.UnlockMaxAttempts, cfg.Admin.UnlockLock)
+	}
+
+	if cfg.Admin.AuditHashSecret == "" && gatewayService.AdminEnabled() {
+		log.Println("AUDIT_HASH_SECRET is not set: the audit hash key is derived from the admin settings and changes with them")
+	}
+
+	if gatewayService.AdminEnabled() {
+		log.Printf("admin routes are on for %d admin(s)", len(cfg.Admin.YandexIDs))
+	} else {
+		log.Println("admin routes are off: set ADMIN_PASSWORD or ADMIN_YANDEX_IDS to turn them on")
+	}
+
 	handler := httptransport.NewHandler(
 		gatewayService,
 	)
@@ -160,7 +207,7 @@ func StartApp() {
 
 	handler.Register(router)
 
-	loggedHandler := loggingMiddleware(router)
+	loggedHandler := loggingMiddleware(router, appMetrics.ObserveHTTP)
 
 	httpServer := &http.Server{
 		Addr:              cfg.HTTP.Address,
@@ -209,8 +256,11 @@ func StartApp() {
 	log.Println("gateway service stopped")
 }
 
+// loggingMiddleware logs every request and reports its matched route pattern, status and duration to
+// observe. The pattern is read after the mux has handled the request: it sets it on the request itself.
 func loggingMiddleware(
 	next http.Handler,
+	observe func(pattern string, status int, duration time.Duration),
 ) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -228,6 +278,8 @@ func loggingMiddleware(
 				recorder,
 				r,
 			)
+
+			observe(r.Pattern, recorder.statusCode, time.Since(start))
 
 			log.Printf(
 				"http request completed method=%s path=%s status=%d duration=%s remote=%s",

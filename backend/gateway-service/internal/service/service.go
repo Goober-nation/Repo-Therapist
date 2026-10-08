@@ -34,6 +34,22 @@ type GatewayService struct {
 
 	// publicAPILimiter limits the JSON score API per client IP; nil means no limit.
 	publicAPILimiter Limiter
+	// exportLimiter limits the public grades export per client IP; nil means no limit.
+	exportLimiter Limiter
+
+	// Admin access: the Yandex IDs of the admins, the key of the actor hash and the limiter of
+	// recorded denials (see SetAdmin).
+	adminIDs       map[string]struct{}
+	auditSecret    []byte
+	adminDeniedLog Limiter
+
+	// Password unlock (see SetAdminUnlock).
+	series        SeriesSource
+	adminMetrics  AdminMetrics
+	adminPassword string
+	adminGrants   domain.AdminGrantStore
+	attemptGuard  domain.AttemptGuard
+	grantTTL      time.Duration
 }
 
 func NewGatewayService(
@@ -133,6 +149,8 @@ func rpcError(op string, err error) error {
 		target = domain.ErrUnauthenticated
 	case codes.FailedPrecondition:
 		target = domain.ErrPending
+	case codes.AlreadyExists:
+		target = domain.ErrConflict
 	case codes.Aborted:
 		target = domain.ErrConflict
 		if status.Convert(err).Message() == gradingInterruptedMessage {

@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"gateway-service/internal/domain"
+	"gateway-service/internal/series"
 )
 
 const (
@@ -88,6 +89,21 @@ type GatewayService interface {
 		clientIP string,
 	) (domain.RegradeStatus, error)
 
+	Logout(ctx context.Context, clientIP, sessionID string) error
+	AdminStatus(ctx context.Context, sessionID string) (domain.AdminStatus, error)
+	UnlockAdmin(ctx context.Context, clientIP, sessionID, password string) error
+	LockAdmin(ctx context.Context, sessionID string) error
+	AuthenticateAdmin(ctx context.Context, clientIP, sessionID, route string) (domain.AdminIdentity, error)
+	ListAudit(ctx context.Context, filter domain.AuditFilter) (domain.AuditPage, error)
+	PublicSeries(ctx context.Context, clientIP, name string) (series.Result, error)
+	AdminSeries(ctx context.Context, name, rangeName string) (series.Result, error)
+	PreviewRegradeBatch(ctx context.Context, filter domain.BatchFilter) (domain.BatchPreview, error)
+	StartRegradeBatch(ctx context.Context, actorHash string, filter domain.BatchFilter) (domain.RegradeBatch, error)
+	ControlRegradeBatch(ctx context.Context, actorHash string, id int64, action string) (domain.RegradeBatch, error)
+	GetRegradeBatch(ctx context.Context, id int64) (domain.RegradeBatchDetail, error)
+	ListRegradeBatches(ctx context.Context, limit int32) ([]domain.RegradeBatch, error)
+	GetPlatformStats(ctx context.Context, clientIP string) (domain.PlatformStats, error)
+	ExportPublicGrades(ctx context.Context, clientIP string, emit func(domain.ExportPage) error) error
 	GetPositionExplanation(
 		ctx context.Context,
 		clientIP string,
@@ -136,6 +152,7 @@ func NewHandler(service GatewayService) *Handler {
 // Register mounts the gateway's routes on mux.
 func (h *Handler) Register(mux *stdhttp.ServeMux) {
 	mux.HandleFunc("POST /auth/yandex", h.LoginWithYandex)
+	mux.HandleFunc("POST /auth/logout", h.Logout)
 	mux.HandleFunc("GET /repos", h.GetMyRepos)
 	mux.HandleFunc("GET /orgs", h.GetMyOrgs)
 	mux.HandleFunc("GET /grading/{org}/{repo}", h.GetGrading)
@@ -148,6 +165,20 @@ func (h *Handler) Register(mux *stdhttp.ServeMux) {
 	mux.HandleFunc("GET /score/{org}/{repo}", h.GetScore)
 	mux.HandleFunc("GET /history/{org}/{repo}", h.GetHistory)
 	mux.HandleFunc("GET /position/{org}/{repo}", h.GetPosition)
+	mux.HandleFunc("GET /admin/me", h.GetAdminMe)
+	mux.HandleFunc("POST /admin/unlock", h.PostAdminUnlock)
+	mux.HandleFunc("POST /admin/lock", h.PostAdminLock)
+	mux.HandleFunc("GET /admin/audit", h.requireAdmin(h.GetAudit))
+	mux.HandleFunc("GET /admin/metrics/{name}", h.requireAdmin(h.GetAdminSeries))
+	mux.HandleFunc("GET /stats/series/{name}", h.GetPublicSeries)
+	mux.HandleFunc("POST /admin/regrade/preview", h.requireAdmin(h.PostRegradePreview))
+	mux.HandleFunc("POST /admin/regrade/batches", h.requireAdmin(h.PostRegradeBatch))
+	mux.HandleFunc("GET /admin/regrade/batches", h.requireAdmin(h.GetRegradeBatches))
+	mux.HandleFunc("GET /admin/regrade/batches/{id}", h.requireAdmin(h.GetRegradeBatch))
+	mux.HandleFunc("POST /admin/regrade/batches/{id}/{action}", h.requireAdmin(h.PostRegradeControl))
+	mux.HandleFunc("GET /stats", h.GetStats)
+	mux.HandleFunc("GET /export/grades.csv", h.ExportGradesCSV)
+	mux.HandleFunc("GET /export/grades.json", h.ExportGradesJSON)
 	mux.HandleFunc("GET /regrade-status", h.GetRegradeStatus)
 }
 
@@ -189,6 +220,36 @@ func (h *Handler) LoginWithYandex(
 			SessionID: result.SessionID,
 		},
 	)
+}
+
+// Logout serves POST /auth/logout: ends the session behind the cookie and clears the cookie. It is
+// idempotent, and like every state-changing route that trusts the cookie it needs the custom header,
+// so another site cannot sign a user out. Answers 200 whether or not a session existed.
+func (h *Handler) Logout(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+
+	if !checkAdminHeader(w, r) {
+		return
+	}
+
+	if err := h.service.Logout(r.Context(), clientIP(r), sessionCookie(r)); err != nil {
+		writeError(w, err)
+		return
+	}
+
+	stdhttp.SetCookie(w, &stdhttp.Cookie{
+		Name:     sessionCookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: stdhttp.SameSiteLaxMode,
+	})
+
+	writeJSON(w, stdhttp.StatusOK, struct {
+		SignedOut bool `json:"signed_out"`
+	}{SignedOut: true})
 }
 
 // yandexOAuthToken reads the Yandex OAuth token from an "OAuth: <token>" header, or from
@@ -837,6 +898,8 @@ func (e httpError) Unwrap() error {
 
 type errorResponse struct {
 	Error string `json:"error"`
+	// Code is a fixed reason word for a refused admin batch request; empty otherwise.
+	Code string `json:"code,omitempty"`
 }
 
 // writeError writes a pending result as 202 {"status":"PENDING"}, anything else as an error.
@@ -860,11 +923,24 @@ func writeError(
 		w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(limit.RetryAfter.Seconds()))))
 	}
 
+	var locked domain.AdminLockedError
+	if errors.As(err, &locked) {
+		w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(locked.RetryAfter.Seconds()))))
+	}
+
+	var reason domain.ReasonError
+
+	code := ""
+	if errors.As(err, &reason) {
+		code = reason.Reason
+	}
+
 	writeJSON(
 		w,
 		mapErrorStatus(err),
 		errorResponse{
 			Error: publicErrorMessage(err),
+			Code:  code,
 		},
 	)
 }
