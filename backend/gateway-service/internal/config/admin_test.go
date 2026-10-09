@@ -110,3 +110,15 @@ func TestUserAuditWindow(t *testing.T) {
 		t.Errorf("window = %s, want 0 (the audit of user actions off)", got)
 	}
 }
+
+func TestDevAuthBypassConfig(t *testing.T) {
+	t.Setenv("DEV_AUTH_BYPASS_USER_ID", "")
+	if got := LoadConfig().Yandex.DevBypassUserID; got != "" {
+		t.Errorf("default = %q, want off", got)
+	}
+
+	t.Setenv("DEV_AUTH_BYPASS_USER_ID", " debug-user ")
+	if got := LoadConfig().Yandex.DevBypassUserID; got != "debug-user" {
+		t.Errorf("bypass = %q, want debug-user", got)
+	}
+}

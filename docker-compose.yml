@@ -125,6 +125,8 @@ services:
       ANALYTICS_CACHE_SECONDS: ${ANALYTICS_CACHE_SECONDS:-300}
       # "Доступ админа" (docs/admin.md): off until ADMIN_PASSWORD or ADMIN_YANDEX_IDS is set; AUDIT_HASH_SECRET is optional.
       ADMIN_YANDEX_IDS: ${ADMIN_YANDEX_IDS:-}
+      # Testing stands only: any token signs in as this Yandex ID, session cookie not Secure. Empty = off.
+      DEV_AUTH_BYPASS_USER_ID: ${DEV_AUTH_BYPASS_USER_ID:-}
       AUDIT_HASH_SECRET: ${AUDIT_HASH_SECRET:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       ADMIN_UNLOCK_MAX_ATTEMPTS: ${ADMIN_UNLOCK_MAX_ATTEMPTS:-5}
@@ -188,6 +190,7 @@ services:
       args:
         VITE_YANDEX_CLIENT_ID: ${VITE_YANDEX_CLIENT_ID:-}
         VITE_PUBLIC_URL: ${VITE_PUBLIC_URL:-}
+        VITE_DEV_AUTH_BYPASS: ${VITE_DEV_AUTH_BYPASS:-}
     ports:
       - "8081:80"
     depends_on:

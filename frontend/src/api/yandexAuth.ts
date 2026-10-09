@@ -139,6 +139,16 @@ export async function initializeYandexButton(
   return result.handler
 }
 
+export const DEV_PROFILE: YandexProfile = { id: "dev", name: "Dev (bypass)" }
+
+// Testing stands only: the gateway (DEV_AUTH_BYPASS_USER_ID) accepts any token, so no Yandex call.
+export async function devSignIn(
+  fetcher: typeof fetch = fetch.bind(globalThis),
+): Promise<YandexProfile> {
+  await new HttpRepoHealthApi({ baseUrl: "/api", fetcher }).loginWithYandex("dev")
+  return DEV_PROFILE
+}
+
 export async function profileFromYandexResult(
   data: unknown,
   clientId: string,

@@ -109,6 +109,8 @@ type RedisConfig struct {
 type YandexConfig struct {
 	UserInfoURL string
 	Timeout     time.Duration
+	// DevBypassUserID, when set, accepts any token as this Yandex ID. Testing stands only.
+	DevBypassUserID string
 }
 
 type RateLimitConfig struct {
@@ -207,6 +209,10 @@ func LoadConfig() *Config {
 				"YANDEX_TIMEOUT",
 				5*time.Second,
 			),
+			DevBypassUserID: strings.TrimSpace(getEnvDefault(
+				"DEV_AUTH_BYPASS_USER_ID",
+				"",
+			)),
 		},
 
 		RateLimit: RateLimitConfig{

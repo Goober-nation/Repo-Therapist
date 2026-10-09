@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import {
+  devSignIn,
   initializeYandexButton,
   loadYandexSdk,
   profileFromYandexResult,
@@ -18,6 +19,8 @@ export default function YandexSignIn({
   const [status, setStatus] =
     useState<"loading" | "ready" | "verifying" | "error">("loading")
   const clientId = (import.meta.env.VITE_YANDEX_CLIENT_ID ?? "").trim()
+  const devBypass = import.meta.env.VITE_DEV_AUTH_BYPASS === "true"
+  const [devError, setDevError] = useState(false)
 
   useEffect(() => {
     if (!clientId || !container.current) return
@@ -25,7 +28,8 @@ export default function YandexSignIn({
     let initializing = false
     const controller = new AbortController()
     const host = document.createElement("div")
-    host.id = "yandex-sign-in-" + crypto.randomUUID()
+    // crypto.randomUUID exists only in secure contexts; plain http must still render.
+    host.id = "yandex-sign-in-" + Math.random().toString(36).slice(2)
     container.current.appendChild(host)
     setStatus("loading")
     // Loading is asynchronous, so StrictMode's discarded effect never calls init.
@@ -73,6 +77,28 @@ export default function YandexSignIn({
       if (!initializing) host.remove()
     }
   }, [clientId, theme, attempt, onSignIn])
+
+  if (devBypass) {
+    return (
+      <div className="yandex-sign-in">
+        <button
+          className="auth-button"
+          type="button"
+          onClick={() => {
+            setDevError(false)
+            devSignIn().then(onSignIn, () => setDevError(true))
+          }}
+        >
+          Войти (dev)
+        </button>
+        {devError && (
+          <small role="alert">
+            Dev-вход не удался: включён ли DEV_AUTH_BYPASS_USER_ID на шлюзе?
+          </small>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="yandex-sign-in">

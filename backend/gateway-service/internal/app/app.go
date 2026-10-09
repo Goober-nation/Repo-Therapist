@@ -138,8 +138,14 @@ func StartApp() {
 		Timeout: cfg.Yandex.Timeout,
 	}
 
-	yandexClient := httptransport.NewClient(
+	var yandexClient httptransport.YandexIDClient = httptransport.NewClient(
 		yandexHTTPClient, cfg.Yandex.UserInfoURL)
+	if cfg.Yandex.DevBypassUserID != "" {
+		log.Printf("WARNING: DEV_AUTH_BYPASS_USER_ID is set: any token signs in as Yandex ID %q "+
+			"and the session cookie is not Secure. Never enable this on a public instance.",
+			cfg.Yandex.DevBypassUserID)
+		yandexClient = httptransport.NewDevBypassClient(cfg.Yandex.DevBypassUserID)
+	}
 
 	gatewayService := service.NewGatewayService(
 		aggregatorClient,
@@ -206,6 +212,7 @@ func StartApp() {
 	handler := httptransport.NewHandler(
 		gatewayService,
 	)
+	handler.SetInsecureCookies(cfg.Yandex.DevBypassUserID != "")
 
 	router := http.NewServeMux()
 

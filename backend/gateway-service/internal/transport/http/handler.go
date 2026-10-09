@@ -146,12 +146,20 @@ type GatewayService interface {
 
 type Handler struct {
 	service GatewayService
+	// insecureCookies drops the Secure flag so the session works over plain http (dev bypass only).
+	insecureCookies bool
 }
 
 func NewHandler(service GatewayService) *Handler {
 	return &Handler{
 		service: service,
 	}
+}
+
+// SetInsecureCookies lets the session cookie travel over plain http; used only with the dev
+// auth bypass on testing stands.
+func (h *Handler) SetInsecureCookies(insecure bool) {
+	h.insecureCookies = insecure
 }
 
 // Register mounts the gateway's routes on mux.
@@ -217,7 +225,7 @@ func (h *Handler) LoginWithYandex(
 		Value:    result.SessionID,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   !h.insecureCookies,
 		SameSite: stdhttp.SameSiteLaxMode,
 	})
 
@@ -251,7 +259,7 @@ func (h *Handler) Logout(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   !h.insecureCookies,
 		SameSite: stdhttp.SameSiteLaxMode,
 	})
 

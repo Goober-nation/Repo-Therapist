@@ -14,6 +14,28 @@ import (
 type YandexIDClient interface {
 	GetUser(ctx context.Context, oauthToken string) (domain.YandexUser, error)
 }
+
+// DevBypassClient accepts any non-empty token as one fixed Yandex ID without calling Yandex.
+// It exists for testing stands only (DEV_AUTH_BYPASS_USER_ID).
+type DevBypassClient struct {
+	userID string
+}
+
+func NewDevBypassClient(userID string) *DevBypassClient {
+	return &DevBypassClient{userID: userID}
+}
+
+func (c *DevBypassClient) GetUser(
+	_ context.Context,
+	oauthToken string,
+) (domain.YandexUser, error) {
+	if strings.TrimSpace(oauthToken) == "" {
+		return domain.YandexUser{}, domain.ErrIdentityInvalid
+	}
+
+	return domain.YandexUser{ID: c.userID}, nil
+}
+
 type Client struct {
 	httpClient *http.Client
 	baseURL    string

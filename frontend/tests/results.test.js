@@ -99,7 +99,7 @@ const baseline = {
   },
 }
 
-const { initializeYandexButton, profileFromYandexResult, YANDEX_TOKEN_PAGE } =
+const { devSignIn, initializeYandexButton, profileFromYandexResult, YANDEX_TOKEN_PAGE } =
   await vite.ssrLoadModule("/src/api/yandexAuth.ts")
 
 const { default: Sidebar } = await vite.ssrLoadModule(
@@ -2010,4 +2010,16 @@ test("critical recommendations rank above high and keep their own label", () => 
     analysis: idleAnalysis,
   })
   assert.match(page, /Критический приоритет/)
+})
+
+test("dev sign-in opens a Gateway session without calling Yandex", async () => {
+  const calls = []
+  const profile = await devSignIn(async (url, init) => {
+    calls.push(url)
+    assert.equal(init.method, "POST")
+    assert.equal(init.headers.Authorization, "OAuth dev")
+    return Response.json({ session_id: "dev-session" })
+  })
+  assert.deepEqual(calls, ["/api/auth/yandex"])
+  assert.equal(profile.id, "dev")
 })
