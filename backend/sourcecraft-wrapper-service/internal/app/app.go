@@ -26,26 +26,10 @@ func StartApp() {
 	}
 	cfg := config.LoadConfig()
 	var client http.Client
-	timeout, err := strconv.Atoi(cfg.ClientTimeout)
-	if err != nil {
-		log.Println("Invalid client timeout: ", err)
-		return
-	}
-	retryAttempts, err := strconv.Atoi(cfg.RetryAttempts)
-	if err != nil {
-		log.Println("Invalid retry attempts: ", err)
-		return
-	}
-	retryWait, err := strconv.Atoi(cfg.RetryWaitSeconds)
-	if err != nil {
-		log.Println("Invalid retry wait: ", err)
-		return
-	}
-	maxPages, err := strconv.Atoi(cfg.MaxPages)
-	if err != nil || maxPages <= 0 {
-		log.Println("Invalid SOURCECRAFT_MAX_PAGES: ", cfg.MaxPages)
-		return
-	}
+	timeout := intSetting("CLIENT_TIMEOUT", cfg.ClientTimeout, 5, 1)
+	retryAttempts := intSetting("HTTP_RETRY_ATTEMPTS", cfg.RetryAttempts, 3, 1)
+	retryWait := intSetting("HTTP_RETRY_WAIT_SECONDS", cfg.RetryWaitSeconds, 1, 0)
+	maxPages := intSetting("SOURCECRAFT_MAX_PAGES", cfg.MaxPages, 50, 1)
 	// No Client.Timeout: it would cap all retry attempts together; the transport times each one.
 	client = http.Client{
 		Transport: &retry.Transport{
@@ -97,4 +81,15 @@ func StartApp() {
 	}
 
 	log.Println("Server exiting")
+}
+
+// intSetting parses a numeric setting; an invalid or too small value falls back to def with a log
+// line instead of stopping the service (the container's entrypoint stops every service when one exits).
+func intSetting(name, value string, def, min int) int {
+	n, err := strconv.Atoi(value)
+	if err != nil || n < min {
+		log.Printf("ignoring invalid %s=%q, using %d", name, value, def)
+		return def
+	}
+	return n
 }

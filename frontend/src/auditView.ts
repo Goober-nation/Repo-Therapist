@@ -12,11 +12,21 @@ const ACTION_LABELS: Record<string, string> = {
   "admin.denied": "Отказ в доступе администратора",
   "admin.unlock": "Вход по паролю администратора",
   "admin.lock": "Снятие прав администратора",
+  // Entries written before the rename keep their labels.
   "regrade.batch.start": "Запуск пакетной переоценки",
   "regrade.batch.pause": "Пауза пакетной переоценки",
   "regrade.batch.resume": "Продолжение пакетной переоценки",
   "regrade.batch.cancel": "Отмена пакетной переоценки",
   "regrade.batch.complete": "Пакетная переоценка завершена",
+  "batch_grading.start": "Запуск пакетной оценки",
+  "batch_grading.pause": "Пауза пакетной оценки",
+  "batch_grading.resume": "Продолжение пакетной оценки",
+  "batch_grading.cancel": "Отмена пакетной оценки",
+  "batch_grading.complete": "Пакетная оценка завершена",
+  "catalog.refresh.start": "Запуск обновления списка репозиториев",
+  "catalog.refresh.cancel": "Остановка обновления списка репозиториев",
+  "catalog.refresh.complete": "Список репозиториев обновлён",
+  "catalog.refresh.fail": "Обновление списка репозиториев не удалось",
   "grading.request": "Запрос оценки репозитория",
   "recommendations.request": "Запрос рекомендаций от модели",
 }
@@ -31,6 +41,7 @@ const TARGET_LABELS: Record<string, string> = {
   repo: "Репозиторий",
   batch: "Пакет",
   route: "Маршрут",
+  catalog: "Обновление списка",
 }
 
 const REASON_LABELS: Record<string, string> = {
@@ -44,6 +55,11 @@ const REASON_LABELS: Record<string, string> = {
   not_found: "репозиторий не найден",
   interrupted: "оценка прервана",
   failed: "сбой при выполнении",
+  wrapper_error: "SourceCraft не ответил",
+  too_many_pages: "список длиннее допустимого",
+  page_loop: "SourceCraft зациклил страницы",
+  store_error: "сбой базы данных",
+  empty_listing: "SourceCraft вернул пустой список",
 }
 
 const STATE_LABELS: Record<string, string> = {

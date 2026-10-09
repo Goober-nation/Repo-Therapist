@@ -91,24 +91,36 @@ func (f *fakeAggregator) RecordAudit(ctx context.Context, in *agg.RecordAuditReq
 	return &agg.RecordAuditResponse{}, f.err
 }
 
-func (f *fakeAggregator) PreviewRegradeBatch(ctx context.Context, in *agg.PreviewRegradeBatchRequest, opts ...grpc.CallOption) (*agg.PreviewRegradeBatchResponse, error) {
-	return &agg.PreviewRegradeBatchResponse{}, f.err
+func (f *fakeAggregator) PreviewGradingBatch(ctx context.Context, in *agg.PreviewGradingBatchRequest, opts ...grpc.CallOption) (*agg.PreviewGradingBatchResponse, error) {
+	return &agg.PreviewGradingBatchResponse{}, f.err
 }
 
-func (f *fakeAggregator) StartRegradeBatch(ctx context.Context, in *agg.StartRegradeBatchRequest, opts ...grpc.CallOption) (*agg.StartRegradeBatchResponse, error) {
-	return &agg.StartRegradeBatchResponse{}, f.err
+func (f *fakeAggregator) StartGradingBatch(ctx context.Context, in *agg.StartGradingBatchRequest, opts ...grpc.CallOption) (*agg.StartGradingBatchResponse, error) {
+	return &agg.StartGradingBatchResponse{}, f.err
 }
 
-func (f *fakeAggregator) ControlRegradeBatch(ctx context.Context, in *agg.ControlRegradeBatchRequest, opts ...grpc.CallOption) (*agg.ControlRegradeBatchResponse, error) {
-	return &agg.ControlRegradeBatchResponse{}, f.err
+func (f *fakeAggregator) ControlGradingBatch(ctx context.Context, in *agg.ControlGradingBatchRequest, opts ...grpc.CallOption) (*agg.ControlGradingBatchResponse, error) {
+	return &agg.ControlGradingBatchResponse{}, f.err
 }
 
-func (f *fakeAggregator) GetRegradeBatch(ctx context.Context, in *agg.GetRegradeBatchRequest, opts ...grpc.CallOption) (*agg.GetRegradeBatchResponse, error) {
-	return &agg.GetRegradeBatchResponse{}, f.err
+func (f *fakeAggregator) GetGradingBatch(ctx context.Context, in *agg.GetGradingBatchRequest, opts ...grpc.CallOption) (*agg.GetGradingBatchResponse, error) {
+	return &agg.GetGradingBatchResponse{}, f.err
 }
 
-func (f *fakeAggregator) ListRegradeBatches(ctx context.Context, in *agg.ListRegradeBatchesRequest, opts ...grpc.CallOption) (*agg.ListRegradeBatchesResponse, error) {
-	return &agg.ListRegradeBatchesResponse{}, f.err
+func (f *fakeAggregator) ListGradingBatches(ctx context.Context, in *agg.ListGradingBatchesRequest, opts ...grpc.CallOption) (*agg.ListGradingBatchesResponse, error) {
+	return &agg.ListGradingBatchesResponse{}, f.err
+}
+
+func (f *fakeAggregator) GetCatalogStatus(ctx context.Context, in *agg.GetCatalogStatusRequest, opts ...grpc.CallOption) (*agg.GetCatalogStatusResponse, error) {
+	return &agg.GetCatalogStatusResponse{}, f.err
+}
+
+func (f *fakeAggregator) RefreshCatalog(ctx context.Context, in *agg.RefreshCatalogRequest, opts ...grpc.CallOption) (*agg.RefreshCatalogResponse, error) {
+	return &agg.RefreshCatalogResponse{Refresh: &agg.CatalogRefresh{Id: 1, Status: "running", ActorHash: in.GetActorHash()}}, f.err
+}
+
+func (f *fakeAggregator) CancelCatalogRefresh(ctx context.Context, in *agg.CancelCatalogRefreshRequest, opts ...grpc.CallOption) (*agg.CancelCatalogRefreshResponse, error) {
+	return &agg.CancelCatalogRefreshResponse{Refresh: &agg.CatalogRefresh{Id: 1, Status: "cancelled"}}, f.err
 }
 
 func (f *fakeAggregator) ListAudit(ctx context.Context, in *agg.ListAuditRequest, opts ...grpc.CallOption) (*agg.ListAuditResponse, error) {

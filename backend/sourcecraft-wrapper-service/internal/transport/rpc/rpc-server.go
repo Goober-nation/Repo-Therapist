@@ -57,7 +57,7 @@ func (s *ServerRPC) GetRepositoryBySlugs(
 		Id:             repo.ID,
 		Name:           repo.Name,
 		Slug:           repo.Slug,
-		Description:    repo.Description,
+		Description:    repoDescription(repo.Description),
 		WebUrl:         repo.WebURL,
 		Visibility:     repo.Visibility,
 		LastActivityAt: lastActivityAt,
@@ -191,6 +191,21 @@ func (s *ServerRPC) ListTopRatedRepos(
 	}
 
 	return &pb.ListTopRatedReposResponse{
+		Repositories:  mapRepositories(page.Repositories),
+		NextPageToken: page.NextPageToken,
+	}, nil
+}
+
+func (s *ServerRPC) ListPublicReposPage(
+	ctx context.Context,
+	req *pb.ListPublicReposPageRequest,
+) (*pb.ListPublicReposPageResponse, error) {
+	page, err := s.service.ListPublicReposPage(ctx, req.GetPageToken())
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return &pb.ListPublicReposPageResponse{
 		Repositories:  mapRepositories(page.Repositories),
 		NextPageToken: page.NextPageToken,
 	}, nil

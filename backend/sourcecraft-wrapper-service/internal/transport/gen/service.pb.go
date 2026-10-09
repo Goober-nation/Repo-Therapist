@@ -634,6 +634,103 @@ func (x *ListTopRatedReposResponse) GetNextPageToken() string {
 	return ""
 }
 
+type ListPublicReposPageRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PageToken     string                 `protobuf:"bytes,1,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPublicReposPageRequest) Reset() {
+	*x = ListPublicReposPageRequest{}
+	mi := &file_service_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPublicReposPageRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPublicReposPageRequest) ProtoMessage() {}
+
+func (x *ListPublicReposPageRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPublicReposPageRequest.ProtoReflect.Descriptor instead.
+func (*ListPublicReposPageRequest) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ListPublicReposPageRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListPublicReposPageResponse struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Repositories []*Repository          `protobuf:"bytes,1,rep,name=repositories,proto3" json:"repositories,omitempty"`
+	// Empty on the last page.
+	NextPageToken string `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPublicReposPageResponse) Reset() {
+	*x = ListPublicReposPageResponse{}
+	mi := &file_service_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPublicReposPageResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPublicReposPageResponse) ProtoMessage() {}
+
+func (x *ListPublicReposPageResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPublicReposPageResponse.ProtoReflect.Descriptor instead.
+func (*ListPublicReposPageResponse) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ListPublicReposPageResponse) GetRepositories() []*Repository {
+	if x != nil {
+		return x.Repositories
+	}
+	return nil
+}
+
+func (x *ListPublicReposPageResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
 type GetOrgReposRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OrgSlug       string                 `protobuf:"bytes,1,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
@@ -644,7 +741,7 @@ type GetOrgReposRequest struct {
 
 func (x *GetOrgReposRequest) Reset() {
 	*x = GetOrgReposRequest{}
-	mi := &file_service_proto_msgTypes[13]
+	mi := &file_service_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -656,7 +753,7 @@ func (x *GetOrgReposRequest) String() string {
 func (*GetOrgReposRequest) ProtoMessage() {}
 
 func (x *GetOrgReposRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[13]
+	mi := &file_service_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -669,7 +766,7 @@ func (x *GetOrgReposRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOrgReposRequest.ProtoReflect.Descriptor instead.
 func (*GetOrgReposRequest) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{13}
+	return file_service_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetOrgReposRequest) GetOrgSlug() string {
@@ -696,7 +793,7 @@ type GetOrgReposResponse struct {
 
 func (x *GetOrgReposResponse) Reset() {
 	*x = GetOrgReposResponse{}
-	mi := &file_service_proto_msgTypes[14]
+	mi := &file_service_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -708,7 +805,7 @@ func (x *GetOrgReposResponse) String() string {
 func (*GetOrgReposResponse) ProtoMessage() {}
 
 func (x *GetOrgReposResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[14]
+	mi := &file_service_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -721,7 +818,7 @@ func (x *GetOrgReposResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOrgReposResponse.ProtoReflect.Descriptor instead.
 func (*GetOrgReposResponse) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{14}
+	return file_service_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetOrgReposResponse) GetRepositories() []*Repository {
@@ -757,7 +854,7 @@ type Repository struct {
 
 func (x *Repository) Reset() {
 	*x = Repository{}
-	mi := &file_service_proto_msgTypes[15]
+	mi := &file_service_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -769,7 +866,7 @@ func (x *Repository) String() string {
 func (*Repository) ProtoMessage() {}
 
 func (x *Repository) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[15]
+	mi := &file_service_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -782,7 +879,7 @@ func (x *Repository) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Repository.ProtoReflect.Descriptor instead.
 func (*Repository) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{15}
+	return file_service_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *Repository) GetId() string {
@@ -872,7 +969,7 @@ type Language struct {
 
 func (x *Language) Reset() {
 	*x = Language{}
-	mi := &file_service_proto_msgTypes[16]
+	mi := &file_service_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -884,7 +981,7 @@ func (x *Language) String() string {
 func (*Language) ProtoMessage() {}
 
 func (x *Language) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[16]
+	mi := &file_service_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -897,7 +994,7 @@ func (x *Language) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Language.ProtoReflect.Descriptor instead.
 func (*Language) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{16}
+	return file_service_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Language) GetName() string {
@@ -924,7 +1021,7 @@ type Organization struct {
 
 func (x *Organization) Reset() {
 	*x = Organization{}
-	mi := &file_service_proto_msgTypes[17]
+	mi := &file_service_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -936,7 +1033,7 @@ func (x *Organization) String() string {
 func (*Organization) ProtoMessage() {}
 
 func (x *Organization) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[17]
+	mi := &file_service_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -949,7 +1046,7 @@ func (x *Organization) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Organization.ProtoReflect.Descriptor instead.
 func (*Organization) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{17}
+	return file_service_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *Organization) GetId() string {
@@ -975,7 +1072,7 @@ type Logo struct {
 
 func (x *Logo) Reset() {
 	*x = Logo{}
-	mi := &file_service_proto_msgTypes[18]
+	mi := &file_service_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -987,7 +1084,7 @@ func (x *Logo) String() string {
 func (*Logo) ProtoMessage() {}
 
 func (x *Logo) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[18]
+	mi := &file_service_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1000,7 +1097,7 @@ func (x *Logo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Logo.ProtoReflect.Descriptor instead.
 func (*Logo) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{18}
+	return file_service_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *Logo) GetUrl() string {
@@ -1019,7 +1116,7 @@ type GetCiCDRunsRequest struct {
 
 func (x *GetCiCDRunsRequest) Reset() {
 	*x = GetCiCDRunsRequest{}
-	mi := &file_service_proto_msgTypes[19]
+	mi := &file_service_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1031,7 +1128,7 @@ func (x *GetCiCDRunsRequest) String() string {
 func (*GetCiCDRunsRequest) ProtoMessage() {}
 
 func (x *GetCiCDRunsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[19]
+	mi := &file_service_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1044,7 +1141,7 @@ func (x *GetCiCDRunsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCiCDRunsRequest.ProtoReflect.Descriptor instead.
 func (*GetCiCDRunsRequest) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{19}
+	return file_service_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetCiCDRunsRequest) GetRepoId() string {
@@ -1064,7 +1161,7 @@ type GetCiCDRunsResponse struct {
 
 func (x *GetCiCDRunsResponse) Reset() {
 	*x = GetCiCDRunsResponse{}
-	mi := &file_service_proto_msgTypes[20]
+	mi := &file_service_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1076,7 +1173,7 @@ func (x *GetCiCDRunsResponse) String() string {
 func (*GetCiCDRunsResponse) ProtoMessage() {}
 
 func (x *GetCiCDRunsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[20]
+	mi := &file_service_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1089,7 +1186,7 @@ func (x *GetCiCDRunsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCiCDRunsResponse.ProtoReflect.Descriptor instead.
 func (*GetCiCDRunsResponse) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{20}
+	return file_service_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *GetCiCDRunsResponse) GetRuns() []*Run {
@@ -1123,7 +1220,7 @@ type Run struct {
 
 func (x *Run) Reset() {
 	*x = Run{}
-	mi := &file_service_proto_msgTypes[21]
+	mi := &file_service_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1135,7 +1232,7 @@ func (x *Run) String() string {
 func (*Run) ProtoMessage() {}
 
 func (x *Run) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[21]
+	mi := &file_service_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1148,7 +1245,7 @@ func (x *Run) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Run.ProtoReflect.Descriptor instead.
 func (*Run) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{21}
+	return file_service_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *Run) GetId() string {
@@ -1230,7 +1327,7 @@ type Workflow struct {
 
 func (x *Workflow) Reset() {
 	*x = Workflow{}
-	mi := &file_service_proto_msgTypes[22]
+	mi := &file_service_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1242,7 +1339,7 @@ func (x *Workflow) String() string {
 func (*Workflow) ProtoMessage() {}
 
 func (x *Workflow) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[22]
+	mi := &file_service_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1255,7 +1352,7 @@ func (x *Workflow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Workflow.ProtoReflect.Descriptor instead.
 func (*Workflow) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{22}
+	return file_service_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *Workflow) GetId() string {
@@ -1330,7 +1427,7 @@ type Task struct {
 
 func (x *Task) Reset() {
 	*x = Task{}
-	mi := &file_service_proto_msgTypes[23]
+	mi := &file_service_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1342,7 +1439,7 @@ func (x *Task) String() string {
 func (*Task) ProtoMessage() {}
 
 func (x *Task) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[23]
+	mi := &file_service_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1355,7 +1452,7 @@ func (x *Task) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Task.ProtoReflect.Descriptor instead.
 func (*Task) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{23}
+	return file_service_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *Task) GetId() string {
@@ -1428,7 +1525,7 @@ type Cube struct {
 
 func (x *Cube) Reset() {
 	*x = Cube{}
-	mi := &file_service_proto_msgTypes[24]
+	mi := &file_service_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1440,7 +1537,7 @@ func (x *Cube) String() string {
 func (*Cube) ProtoMessage() {}
 
 func (x *Cube) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[24]
+	mi := &file_service_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1453,7 +1550,7 @@ func (x *Cube) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Cube.ProtoReflect.Descriptor instead.
 func (*Cube) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{24}
+	return file_service_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *Cube) GetId() string {
@@ -1508,7 +1605,7 @@ type Progress struct {
 
 func (x *Progress) Reset() {
 	*x = Progress{}
-	mi := &file_service_proto_msgTypes[25]
+	mi := &file_service_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1520,7 +1617,7 @@ func (x *Progress) String() string {
 func (*Progress) ProtoMessage() {}
 
 func (x *Progress) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[25]
+	mi := &file_service_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1533,7 +1630,7 @@ func (x *Progress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Progress.ProtoReflect.Descriptor instead.
 func (*Progress) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{25}
+	return file_service_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *Progress) GetPercent() float64 {
@@ -1563,7 +1660,7 @@ type Artifact struct {
 
 func (x *Artifact) Reset() {
 	*x = Artifact{}
-	mi := &file_service_proto_msgTypes[26]
+	mi := &file_service_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1575,7 +1672,7 @@ func (x *Artifact) String() string {
 func (*Artifact) ProtoMessage() {}
 
 func (x *Artifact) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[26]
+	mi := &file_service_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1588,7 +1685,7 @@ func (x *Artifact) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Artifact.ProtoReflect.Descriptor instead.
 func (*Artifact) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{26}
+	return file_service_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *Artifact) GetId() string {
@@ -1635,7 +1732,7 @@ type Relations struct {
 
 func (x *Relations) Reset() {
 	*x = Relations{}
-	mi := &file_service_proto_msgTypes[27]
+	mi := &file_service_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1647,7 +1744,7 @@ func (x *Relations) String() string {
 func (*Relations) ProtoMessage() {}
 
 func (x *Relations) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[27]
+	mi := &file_service_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1660,7 +1757,7 @@ func (x *Relations) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Relations.ProtoReflect.Descriptor instead.
 func (*Relations) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{27}
+	return file_service_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *Relations) GetNeeds() []*Relation {
@@ -1680,7 +1777,7 @@ type Relation struct {
 
 func (x *Relation) Reset() {
 	*x = Relation{}
-	mi := &file_service_proto_msgTypes[28]
+	mi := &file_service_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1692,7 +1789,7 @@ func (x *Relation) String() string {
 func (*Relation) ProtoMessage() {}
 
 func (x *Relation) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[28]
+	mi := &file_service_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1705,7 +1802,7 @@ func (x *Relation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Relation.ProtoReflect.Descriptor instead.
 func (*Relation) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{28}
+	return file_service_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *Relation) GetId() string {
@@ -1734,7 +1831,7 @@ type Dates struct {
 
 func (x *Dates) Reset() {
 	*x = Dates{}
-	mi := &file_service_proto_msgTypes[29]
+	mi := &file_service_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1746,7 +1843,7 @@ func (x *Dates) String() string {
 func (*Dates) ProtoMessage() {}
 
 func (x *Dates) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[29]
+	mi := &file_service_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1759,7 +1856,7 @@ func (x *Dates) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Dates.ProtoReflect.Descriptor instead.
 func (*Dates) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{29}
+	return file_service_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *Dates) GetCreatedAt() *timestamppb.Timestamp {
@@ -1800,7 +1897,7 @@ type Pull struct {
 
 func (x *Pull) Reset() {
 	*x = Pull{}
-	mi := &file_service_proto_msgTypes[30]
+	mi := &file_service_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1812,7 +1909,7 @@ func (x *Pull) String() string {
 func (*Pull) ProtoMessage() {}
 
 func (x *Pull) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[30]
+	mi := &file_service_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1825,7 +1922,7 @@ func (x *Pull) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Pull.ProtoReflect.Descriptor instead.
 func (*Pull) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{30}
+	return file_service_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *Pull) GetId() string {
@@ -1852,7 +1949,7 @@ type RunUser struct {
 
 func (x *RunUser) Reset() {
 	*x = RunUser{}
-	mi := &file_service_proto_msgTypes[31]
+	mi := &file_service_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1864,7 +1961,7 @@ func (x *RunUser) String() string {
 func (*RunUser) ProtoMessage() {}
 
 func (x *RunUser) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[31]
+	mi := &file_service_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1877,7 +1974,7 @@ func (x *RunUser) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunUser.ProtoReflect.Descriptor instead.
 func (*RunUser) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{31}
+	return file_service_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *RunUser) GetId() string {
@@ -1903,7 +2000,7 @@ type GetIssuesRequest struct {
 
 func (x *GetIssuesRequest) Reset() {
 	*x = GetIssuesRequest{}
-	mi := &file_service_proto_msgTypes[32]
+	mi := &file_service_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1915,7 +2012,7 @@ func (x *GetIssuesRequest) String() string {
 func (*GetIssuesRequest) ProtoMessage() {}
 
 func (x *GetIssuesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[32]
+	mi := &file_service_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1928,7 +2025,7 @@ func (x *GetIssuesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIssuesRequest.ProtoReflect.Descriptor instead.
 func (*GetIssuesRequest) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{32}
+	return file_service_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *GetIssuesRequest) GetRepoId() string {
@@ -1948,7 +2045,7 @@ type GetIssuesResponse struct {
 
 func (x *GetIssuesResponse) Reset() {
 	*x = GetIssuesResponse{}
-	mi := &file_service_proto_msgTypes[33]
+	mi := &file_service_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1960,7 +2057,7 @@ func (x *GetIssuesResponse) String() string {
 func (*GetIssuesResponse) ProtoMessage() {}
 
 func (x *GetIssuesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[33]
+	mi := &file_service_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1973,7 +2070,7 @@ func (x *GetIssuesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIssuesResponse.ProtoReflect.Descriptor instead.
 func (*GetIssuesResponse) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{33}
+	return file_service_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *GetIssuesResponse) GetIssues() []*Issue {
@@ -2017,7 +2114,7 @@ type Issue struct {
 
 func (x *Issue) Reset() {
 	*x = Issue{}
-	mi := &file_service_proto_msgTypes[34]
+	mi := &file_service_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2029,7 +2126,7 @@ func (x *Issue) String() string {
 func (*Issue) ProtoMessage() {}
 
 func (x *Issue) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[34]
+	mi := &file_service_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2042,7 +2139,7 @@ func (x *Issue) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Issue.ProtoReflect.Descriptor instead.
 func (*Issue) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{34}
+	return file_service_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *Issue) GetId() string {
@@ -2190,7 +2287,7 @@ type IssueStatus struct {
 
 func (x *IssueStatus) Reset() {
 	*x = IssueStatus{}
-	mi := &file_service_proto_msgTypes[35]
+	mi := &file_service_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2202,7 +2299,7 @@ func (x *IssueStatus) String() string {
 func (*IssueStatus) ProtoMessage() {}
 
 func (x *IssueStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[35]
+	mi := &file_service_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2215,7 +2312,7 @@ func (x *IssueStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueStatus.ProtoReflect.Descriptor instead.
 func (*IssueStatus) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{35}
+	return file_service_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *IssueStatus) GetId() string {
@@ -2256,7 +2353,7 @@ type IssueUser struct {
 
 func (x *IssueUser) Reset() {
 	*x = IssueUser{}
-	mi := &file_service_proto_msgTypes[36]
+	mi := &file_service_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2268,7 +2365,7 @@ func (x *IssueUser) String() string {
 func (*IssueUser) ProtoMessage() {}
 
 func (x *IssueUser) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[36]
+	mi := &file_service_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2281,7 +2378,7 @@ func (x *IssueUser) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueUser.ProtoReflect.Descriptor instead.
 func (*IssueUser) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{36}
+	return file_service_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *IssueUser) GetId() string {
@@ -2310,7 +2407,7 @@ type Label struct {
 
 func (x *Label) Reset() {
 	*x = Label{}
-	mi := &file_service_proto_msgTypes[37]
+	mi := &file_service_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2322,7 +2419,7 @@ func (x *Label) String() string {
 func (*Label) ProtoMessage() {}
 
 func (x *Label) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[37]
+	mi := &file_service_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2335,7 +2432,7 @@ func (x *Label) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Label.ProtoReflect.Descriptor instead.
 func (*Label) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{37}
+	return file_service_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *Label) GetId() string {
@@ -2376,7 +2473,7 @@ type LinkedPR struct {
 
 func (x *LinkedPR) Reset() {
 	*x = LinkedPR{}
-	mi := &file_service_proto_msgTypes[38]
+	mi := &file_service_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2388,7 +2485,7 @@ func (x *LinkedPR) String() string {
 func (*LinkedPR) ProtoMessage() {}
 
 func (x *LinkedPR) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[38]
+	mi := &file_service_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2401,7 +2498,7 @@ func (x *LinkedPR) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LinkedPR.ProtoReflect.Descriptor instead.
 func (*LinkedPR) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{38}
+	return file_service_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *LinkedPR) GetId() string {
@@ -2428,7 +2525,7 @@ type IssueMilestone struct {
 
 func (x *IssueMilestone) Reset() {
 	*x = IssueMilestone{}
-	mi := &file_service_proto_msgTypes[39]
+	mi := &file_service_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2440,7 +2537,7 @@ func (x *IssueMilestone) String() string {
 func (*IssueMilestone) ProtoMessage() {}
 
 func (x *IssueMilestone) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[39]
+	mi := &file_service_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2453,7 +2550,7 @@ func (x *IssueMilestone) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueMilestone.ProtoReflect.Descriptor instead.
 func (*IssueMilestone) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{39}
+	return file_service_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *IssueMilestone) GetId() string {
@@ -2481,7 +2578,7 @@ type RepositoryRef struct {
 
 func (x *RepositoryRef) Reset() {
 	*x = RepositoryRef{}
-	mi := &file_service_proto_msgTypes[40]
+	mi := &file_service_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2493,7 +2590,7 @@ func (x *RepositoryRef) String() string {
 func (*RepositoryRef) ProtoMessage() {}
 
 func (x *RepositoryRef) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[40]
+	mi := &file_service_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2506,7 +2603,7 @@ func (x *RepositoryRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RepositoryRef.ProtoReflect.Descriptor instead.
 func (*RepositoryRef) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{40}
+	return file_service_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *RepositoryRef) GetId() string {
@@ -2539,7 +2636,7 @@ type GetMilestonesRequest struct {
 
 func (x *GetMilestonesRequest) Reset() {
 	*x = GetMilestonesRequest{}
-	mi := &file_service_proto_msgTypes[41]
+	mi := &file_service_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2551,7 +2648,7 @@ func (x *GetMilestonesRequest) String() string {
 func (*GetMilestonesRequest) ProtoMessage() {}
 
 func (x *GetMilestonesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[41]
+	mi := &file_service_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2564,7 +2661,7 @@ func (x *GetMilestonesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMilestonesRequest.ProtoReflect.Descriptor instead.
 func (*GetMilestonesRequest) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{41}
+	return file_service_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *GetMilestonesRequest) GetRepoId() string {
@@ -2584,7 +2681,7 @@ type GetMilestonesResponse struct {
 
 func (x *GetMilestonesResponse) Reset() {
 	*x = GetMilestonesResponse{}
-	mi := &file_service_proto_msgTypes[42]
+	mi := &file_service_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2596,7 +2693,7 @@ func (x *GetMilestonesResponse) String() string {
 func (*GetMilestonesResponse) ProtoMessage() {}
 
 func (x *GetMilestonesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[42]
+	mi := &file_service_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2609,7 +2706,7 @@ func (x *GetMilestonesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMilestonesResponse.ProtoReflect.Descriptor instead.
 func (*GetMilestonesResponse) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{42}
+	return file_service_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *GetMilestonesResponse) GetItems() []*Milestone {
@@ -2645,7 +2742,7 @@ type Milestone struct {
 
 func (x *Milestone) Reset() {
 	*x = Milestone{}
-	mi := &file_service_proto_msgTypes[43]
+	mi := &file_service_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2657,7 +2754,7 @@ func (x *Milestone) String() string {
 func (*Milestone) ProtoMessage() {}
 
 func (x *Milestone) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[43]
+	mi := &file_service_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2670,7 +2767,7 @@ func (x *Milestone) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Milestone.ProtoReflect.Descriptor instead.
 func (*Milestone) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{43}
+	return file_service_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *Milestone) GetId() string {
@@ -2760,7 +2857,7 @@ type MilestoneUser struct {
 
 func (x *MilestoneUser) Reset() {
 	*x = MilestoneUser{}
-	mi := &file_service_proto_msgTypes[44]
+	mi := &file_service_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2772,7 +2869,7 @@ func (x *MilestoneUser) String() string {
 func (*MilestoneUser) ProtoMessage() {}
 
 func (x *MilestoneUser) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[44]
+	mi := &file_service_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2785,7 +2882,7 @@ func (x *MilestoneUser) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MilestoneUser.ProtoReflect.Descriptor instead.
 func (*MilestoneUser) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{44}
+	return file_service_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *MilestoneUser) GetId() string {
@@ -2812,7 +2909,7 @@ type GetRepositoryBySlugsRequest struct {
 
 func (x *GetRepositoryBySlugsRequest) Reset() {
 	*x = GetRepositoryBySlugsRequest{}
-	mi := &file_service_proto_msgTypes[45]
+	mi := &file_service_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2824,7 +2921,7 @@ func (x *GetRepositoryBySlugsRequest) String() string {
 func (*GetRepositoryBySlugsRequest) ProtoMessage() {}
 
 func (x *GetRepositoryBySlugsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[45]
+	mi := &file_service_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2837,7 +2934,7 @@ func (x *GetRepositoryBySlugsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRepositoryBySlugsRequest.ProtoReflect.Descriptor instead.
 func (*GetRepositoryBySlugsRequest) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{45}
+	return file_service_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *GetRepositoryBySlugsRequest) GetRepoSlug() string {
@@ -2865,7 +2962,7 @@ type Rating struct {
 
 func (x *Rating) Reset() {
 	*x = Rating{}
-	mi := &file_service_proto_msgTypes[46]
+	mi := &file_service_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2877,7 +2974,7 @@ func (x *Rating) String() string {
 func (*Rating) ProtoMessage() {}
 
 func (x *Rating) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[46]
+	mi := &file_service_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2890,7 +2987,7 @@ func (x *Rating) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Rating.ProtoReflect.Descriptor instead.
 func (*Rating) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{46}
+	return file_service_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *Rating) GetValue() float64 {
@@ -2924,7 +3021,7 @@ type ReactionCount struct {
 
 func (x *ReactionCount) Reset() {
 	*x = ReactionCount{}
-	mi := &file_service_proto_msgTypes[47]
+	mi := &file_service_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2936,7 +3033,7 @@ func (x *ReactionCount) String() string {
 func (*ReactionCount) ProtoMessage() {}
 
 func (x *ReactionCount) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[47]
+	mi := &file_service_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2949,7 +3046,7 @@ func (x *ReactionCount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReactionCount.ProtoReflect.Descriptor instead.
 func (*ReactionCount) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{47}
+	return file_service_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *ReactionCount) GetType() string {
@@ -2985,7 +3082,7 @@ type GetRepositoryBySlugsResponse struct {
 
 func (x *GetRepositoryBySlugsResponse) Reset() {
 	*x = GetRepositoryBySlugsResponse{}
-	mi := &file_service_proto_msgTypes[48]
+	mi := &file_service_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2997,7 +3094,7 @@ func (x *GetRepositoryBySlugsResponse) String() string {
 func (*GetRepositoryBySlugsResponse) ProtoMessage() {}
 
 func (x *GetRepositoryBySlugsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[48]
+	mi := &file_service_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3010,7 +3107,7 @@ func (x *GetRepositoryBySlugsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRepositoryBySlugsResponse.ProtoReflect.Descriptor instead.
 func (*GetRepositoryBySlugsResponse) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{48}
+	return file_service_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *GetRepositoryBySlugsResponse) GetId() string {
@@ -3101,7 +3198,7 @@ type GetPullRequestsRequest struct {
 
 func (x *GetPullRequestsRequest) Reset() {
 	*x = GetPullRequestsRequest{}
-	mi := &file_service_proto_msgTypes[49]
+	mi := &file_service_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3113,7 +3210,7 @@ func (x *GetPullRequestsRequest) String() string {
 func (*GetPullRequestsRequest) ProtoMessage() {}
 
 func (x *GetPullRequestsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[49]
+	mi := &file_service_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3126,7 +3223,7 @@ func (x *GetPullRequestsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPullRequestsRequest.ProtoReflect.Descriptor instead.
 func (*GetPullRequestsRequest) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{49}
+	return file_service_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *GetPullRequestsRequest) GetRepoId() string {
@@ -3152,7 +3249,7 @@ type GetPullRequestsResponse struct {
 
 func (x *GetPullRequestsResponse) Reset() {
 	*x = GetPullRequestsResponse{}
-	mi := &file_service_proto_msgTypes[50]
+	mi := &file_service_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3164,7 +3261,7 @@ func (x *GetPullRequestsResponse) String() string {
 func (*GetPullRequestsResponse) ProtoMessage() {}
 
 func (x *GetPullRequestsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[50]
+	mi := &file_service_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3177,7 +3274,7 @@ func (x *GetPullRequestsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPullRequestsResponse.ProtoReflect.Descriptor instead.
 func (*GetPullRequestsResponse) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{50}
+	return file_service_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *GetPullRequestsResponse) GetPullRequests() []*PullRequest {
@@ -3202,7 +3299,7 @@ type PullRequest struct {
 
 func (x *PullRequest) Reset() {
 	*x = PullRequest{}
-	mi := &file_service_proto_msgTypes[51]
+	mi := &file_service_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3214,7 +3311,7 @@ func (x *PullRequest) String() string {
 func (*PullRequest) ProtoMessage() {}
 
 func (x *PullRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[51]
+	mi := &file_service_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3227,7 +3324,7 @@ func (x *PullRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequest.ProtoReflect.Descriptor instead.
 func (*PullRequest) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{51}
+	return file_service_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *PullRequest) GetId() string {
@@ -3282,7 +3379,7 @@ type PullRequestUser struct {
 
 func (x *PullRequestUser) Reset() {
 	*x = PullRequestUser{}
-	mi := &file_service_proto_msgTypes[52]
+	mi := &file_service_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3294,7 +3391,7 @@ func (x *PullRequestUser) String() string {
 func (*PullRequestUser) ProtoMessage() {}
 
 func (x *PullRequestUser) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[52]
+	mi := &file_service_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3307,7 +3404,7 @@ func (x *PullRequestUser) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestUser.ProtoReflect.Descriptor instead.
 func (*PullRequestUser) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{52}
+	return file_service_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *PullRequestUser) GetId() string {
@@ -3333,7 +3430,7 @@ type GetPullRequestActivityRequest struct {
 
 func (x *GetPullRequestActivityRequest) Reset() {
 	*x = GetPullRequestActivityRequest{}
-	mi := &file_service_proto_msgTypes[53]
+	mi := &file_service_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3345,7 +3442,7 @@ func (x *GetPullRequestActivityRequest) String() string {
 func (*GetPullRequestActivityRequest) ProtoMessage() {}
 
 func (x *GetPullRequestActivityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[53]
+	mi := &file_service_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3358,7 +3455,7 @@ func (x *GetPullRequestActivityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPullRequestActivityRequest.ProtoReflect.Descriptor instead.
 func (*GetPullRequestActivityRequest) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{53}
+	return file_service_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *GetPullRequestActivityRequest) GetPullRequestId() string {
@@ -3378,7 +3475,7 @@ type GetPullRequestActivityResponse struct {
 
 func (x *GetPullRequestActivityResponse) Reset() {
 	*x = GetPullRequestActivityResponse{}
-	mi := &file_service_proto_msgTypes[54]
+	mi := &file_service_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3390,7 +3487,7 @@ func (x *GetPullRequestActivityResponse) String() string {
 func (*GetPullRequestActivityResponse) ProtoMessage() {}
 
 func (x *GetPullRequestActivityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[54]
+	mi := &file_service_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3403,7 +3500,7 @@ func (x *GetPullRequestActivityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPullRequestActivityResponse.ProtoReflect.Descriptor instead.
 func (*GetPullRequestActivityResponse) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{54}
+	return file_service_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *GetPullRequestActivityResponse) GetReviewers() []*PullRequestReviewer {
@@ -3432,7 +3529,7 @@ type PullRequestReviewer struct {
 
 func (x *PullRequestReviewer) Reset() {
 	*x = PullRequestReviewer{}
-	mi := &file_service_proto_msgTypes[55]
+	mi := &file_service_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3444,7 +3541,7 @@ func (x *PullRequestReviewer) String() string {
 func (*PullRequestReviewer) ProtoMessage() {}
 
 func (x *PullRequestReviewer) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[55]
+	mi := &file_service_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3457,7 +3554,7 @@ func (x *PullRequestReviewer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestReviewer.ProtoReflect.Descriptor instead.
 func (*PullRequestReviewer) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{55}
+	return file_service_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *PullRequestReviewer) GetUser() *PullRequestUser {
@@ -3496,7 +3593,7 @@ type PullRequestComment struct {
 
 func (x *PullRequestComment) Reset() {
 	*x = PullRequestComment{}
-	mi := &file_service_proto_msgTypes[56]
+	mi := &file_service_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3508,7 +3605,7 @@ func (x *PullRequestComment) String() string {
 func (*PullRequestComment) ProtoMessage() {}
 
 func (x *PullRequestComment) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[56]
+	mi := &file_service_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3521,7 +3618,7 @@ func (x *PullRequestComment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestComment.ProtoReflect.Descriptor instead.
 func (*PullRequestComment) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{56}
+	return file_service_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *PullRequestComment) GetAuthor() *PullRequestUser {
@@ -3568,7 +3665,7 @@ type GetIssueCommentsRequest struct {
 
 func (x *GetIssueCommentsRequest) Reset() {
 	*x = GetIssueCommentsRequest{}
-	mi := &file_service_proto_msgTypes[57]
+	mi := &file_service_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3580,7 +3677,7 @@ func (x *GetIssueCommentsRequest) String() string {
 func (*GetIssueCommentsRequest) ProtoMessage() {}
 
 func (x *GetIssueCommentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[57]
+	mi := &file_service_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3593,7 +3690,7 @@ func (x *GetIssueCommentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIssueCommentsRequest.ProtoReflect.Descriptor instead.
 func (*GetIssueCommentsRequest) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{57}
+	return file_service_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *GetIssueCommentsRequest) GetIssueId() string {
@@ -3612,7 +3709,7 @@ type GetIssueCommentsResponse struct {
 
 func (x *GetIssueCommentsResponse) Reset() {
 	*x = GetIssueCommentsResponse{}
-	mi := &file_service_proto_msgTypes[58]
+	mi := &file_service_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3624,7 +3721,7 @@ func (x *GetIssueCommentsResponse) String() string {
 func (*GetIssueCommentsResponse) ProtoMessage() {}
 
 func (x *GetIssueCommentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[58]
+	mi := &file_service_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3637,7 +3734,7 @@ func (x *GetIssueCommentsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIssueCommentsResponse.ProtoReflect.Descriptor instead.
 func (*GetIssueCommentsResponse) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{58}
+	return file_service_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *GetIssueCommentsResponse) GetComments() []*IssueCommentMeta {
@@ -3658,7 +3755,7 @@ type IssueCommentMeta struct {
 
 func (x *IssueCommentMeta) Reset() {
 	*x = IssueCommentMeta{}
-	mi := &file_service_proto_msgTypes[59]
+	mi := &file_service_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3670,7 +3767,7 @@ func (x *IssueCommentMeta) String() string {
 func (*IssueCommentMeta) ProtoMessage() {}
 
 func (x *IssueCommentMeta) ProtoReflect() protoreflect.Message {
-	mi := &file_service_proto_msgTypes[59]
+	mi := &file_service_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3683,7 +3780,7 @@ func (x *IssueCommentMeta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueCommentMeta.ProtoReflect.Descriptor instead.
 func (*IssueCommentMeta) Descriptor() ([]byte, []int) {
-	return file_service_proto_rawDescGZIP(), []int{59}
+	return file_service_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *IssueCommentMeta) GetAuthor() *IssueUser {
@@ -3735,6 +3832,12 @@ const file_service_proto_rawDesc = "" +
 	"\n" +
 	"page_token\x18\x01 \x01(\tR\tpageToken\"\x80\x01\n" +
 	"\x19ListTopRatedReposResponse\x12;\n" +
+	"\frepositories\x18\x01 \x03(\v2\x17.code_health.RepositoryR\frepositories\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\";\n" +
+	"\x1aListPublicReposPageRequest\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x01 \x01(\tR\tpageToken\"\x82\x01\n" +
+	"\x1bListPublicReposPageResponse\x12;\n" +
 	"\frepositories\x18\x01 \x03(\v2\x17.code_health.RepositoryR\frepositories\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"N\n" +
 	"\x12GetOrgReposRequest\x12\x19\n" +
@@ -3992,7 +4095,7 @@ const file_service_proto_rawDesc = "" +
 	"\x10IssueCommentMeta\x12.\n" +
 	"\x06author\x18\x01 \x01(\v2\x16.code_health.IssueUserR\x06author\x129\n" +
 	"\n" +
-	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\x86\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\xf0\n" +
 	"\n" +
 	"\n" +
 	"CodeHealth\x12k\n" +
@@ -4005,7 +4108,8 @@ const file_service_proto_rawDesc = "" +
 	"\x12ListAllPublicRepos\x12&.code_health.ListAllPublicReposRequest\x1a'.code_health.ListAllPublicReposResponse\x12M\n" +
 	"\n" +
 	"GetMyRepos\x12\x1e.code_health.GetMyReposRequest\x1a\x1f.code_health.GetMyReposResponse\x12b\n" +
-	"\x11ListTopRatedRepos\x12%.code_health.ListTopRatedReposRequest\x1a&.code_health.ListTopRatedReposResponse\x12J\n" +
+	"\x11ListTopRatedRepos\x12%.code_health.ListTopRatedReposRequest\x1a&.code_health.ListTopRatedReposResponse\x12h\n" +
+	"\x13ListPublicReposPage\x12'.code_health.ListPublicReposPageRequest\x1a(.code_health.ListPublicReposPageResponse\x12J\n" +
 	"\tGetMyOrgs\x12\x1d.code_health.GetMyOrgsRequest\x1a\x1e.code_health.GetMyOrgsResponse\x12P\n" +
 	"\vGetOrgRepos\x12\x1f.code_health.GetOrgReposRequest\x1a .code_health.GetOrgReposResponse\x12\\\n" +
 	"\x0fGetPullRequests\x12#.code_health.GetPullRequestsRequest\x1a$.code_health.GetPullRequestsResponse\x12q\n" +
@@ -4024,7 +4128,7 @@ func file_service_proto_rawDescGZIP() []byte {
 	return file_service_proto_rawDescData
 }
 
-var file_service_proto_msgTypes = make([]protoimpl.MessageInfo, 60)
+var file_service_proto_msgTypes = make([]protoimpl.MessageInfo, 62)
 var file_service_proto_goTypes = []any{
 	(*GetRepoIDBySlugsRequest)(nil),        // 0: code_health.GetRepoIDBySlugsRequest
 	(*GetRepoIDBySlugsResponse)(nil),       // 1: code_health.GetRepoIDBySlugsResponse
@@ -4039,160 +4143,165 @@ var file_service_proto_goTypes = []any{
 	(*UserOrganization)(nil),               // 10: code_health.UserOrganization
 	(*ListTopRatedReposRequest)(nil),       // 11: code_health.ListTopRatedReposRequest
 	(*ListTopRatedReposResponse)(nil),      // 12: code_health.ListTopRatedReposResponse
-	(*GetOrgReposRequest)(nil),             // 13: code_health.GetOrgReposRequest
-	(*GetOrgReposResponse)(nil),            // 14: code_health.GetOrgReposResponse
-	(*Repository)(nil),                     // 15: code_health.Repository
-	(*Language)(nil),                       // 16: code_health.Language
-	(*Organization)(nil),                   // 17: code_health.Organization
-	(*Logo)(nil),                           // 18: code_health.Logo
-	(*GetCiCDRunsRequest)(nil),             // 19: code_health.GetCiCDRunsRequest
-	(*GetCiCDRunsResponse)(nil),            // 20: code_health.GetCiCDRunsResponse
-	(*Run)(nil),                            // 21: code_health.Run
-	(*Workflow)(nil),                       // 22: code_health.Workflow
-	(*Task)(nil),                           // 23: code_health.Task
-	(*Cube)(nil),                           // 24: code_health.Cube
-	(*Progress)(nil),                       // 25: code_health.Progress
-	(*Artifact)(nil),                       // 26: code_health.Artifact
-	(*Relations)(nil),                      // 27: code_health.Relations
-	(*Relation)(nil),                       // 28: code_health.Relation
-	(*Dates)(nil),                          // 29: code_health.Dates
-	(*Pull)(nil),                           // 30: code_health.Pull
-	(*RunUser)(nil),                        // 31: code_health.RunUser
-	(*GetIssuesRequest)(nil),               // 32: code_health.GetIssuesRequest
-	(*GetIssuesResponse)(nil),              // 33: code_health.GetIssuesResponse
-	(*Issue)(nil),                          // 34: code_health.Issue
-	(*IssueStatus)(nil),                    // 35: code_health.IssueStatus
-	(*IssueUser)(nil),                      // 36: code_health.IssueUser
-	(*Label)(nil),                          // 37: code_health.Label
-	(*LinkedPR)(nil),                       // 38: code_health.LinkedPR
-	(*IssueMilestone)(nil),                 // 39: code_health.IssueMilestone
-	(*RepositoryRef)(nil),                  // 40: code_health.RepositoryRef
-	(*GetMilestonesRequest)(nil),           // 41: code_health.GetMilestonesRequest
-	(*GetMilestonesResponse)(nil),          // 42: code_health.GetMilestonesResponse
-	(*Milestone)(nil),                      // 43: code_health.Milestone
-	(*MilestoneUser)(nil),                  // 44: code_health.MilestoneUser
-	(*GetRepositoryBySlugsRequest)(nil),    // 45: code_health.GetRepositoryBySlugsRequest
-	(*Rating)(nil),                         // 46: code_health.Rating
-	(*ReactionCount)(nil),                  // 47: code_health.ReactionCount
-	(*GetRepositoryBySlugsResponse)(nil),   // 48: code_health.GetRepositoryBySlugsResponse
-	(*GetPullRequestsRequest)(nil),         // 49: code_health.GetPullRequestsRequest
-	(*GetPullRequestsResponse)(nil),        // 50: code_health.GetPullRequestsResponse
-	(*PullRequest)(nil),                    // 51: code_health.PullRequest
-	(*PullRequestUser)(nil),                // 52: code_health.PullRequestUser
-	(*GetPullRequestActivityRequest)(nil),  // 53: code_health.GetPullRequestActivityRequest
-	(*GetPullRequestActivityResponse)(nil), // 54: code_health.GetPullRequestActivityResponse
-	(*PullRequestReviewer)(nil),            // 55: code_health.PullRequestReviewer
-	(*PullRequestComment)(nil),             // 56: code_health.PullRequestComment
-	(*GetIssueCommentsRequest)(nil),        // 57: code_health.GetIssueCommentsRequest
-	(*GetIssueCommentsResponse)(nil),       // 58: code_health.GetIssueCommentsResponse
-	(*IssueCommentMeta)(nil),               // 59: code_health.IssueCommentMeta
-	(*timestamppb.Timestamp)(nil),          // 60: google.protobuf.Timestamp
+	(*ListPublicReposPageRequest)(nil),     // 13: code_health.ListPublicReposPageRequest
+	(*ListPublicReposPageResponse)(nil),    // 14: code_health.ListPublicReposPageResponse
+	(*GetOrgReposRequest)(nil),             // 15: code_health.GetOrgReposRequest
+	(*GetOrgReposResponse)(nil),            // 16: code_health.GetOrgReposResponse
+	(*Repository)(nil),                     // 17: code_health.Repository
+	(*Language)(nil),                       // 18: code_health.Language
+	(*Organization)(nil),                   // 19: code_health.Organization
+	(*Logo)(nil),                           // 20: code_health.Logo
+	(*GetCiCDRunsRequest)(nil),             // 21: code_health.GetCiCDRunsRequest
+	(*GetCiCDRunsResponse)(nil),            // 22: code_health.GetCiCDRunsResponse
+	(*Run)(nil),                            // 23: code_health.Run
+	(*Workflow)(nil),                       // 24: code_health.Workflow
+	(*Task)(nil),                           // 25: code_health.Task
+	(*Cube)(nil),                           // 26: code_health.Cube
+	(*Progress)(nil),                       // 27: code_health.Progress
+	(*Artifact)(nil),                       // 28: code_health.Artifact
+	(*Relations)(nil),                      // 29: code_health.Relations
+	(*Relation)(nil),                       // 30: code_health.Relation
+	(*Dates)(nil),                          // 31: code_health.Dates
+	(*Pull)(nil),                           // 32: code_health.Pull
+	(*RunUser)(nil),                        // 33: code_health.RunUser
+	(*GetIssuesRequest)(nil),               // 34: code_health.GetIssuesRequest
+	(*GetIssuesResponse)(nil),              // 35: code_health.GetIssuesResponse
+	(*Issue)(nil),                          // 36: code_health.Issue
+	(*IssueStatus)(nil),                    // 37: code_health.IssueStatus
+	(*IssueUser)(nil),                      // 38: code_health.IssueUser
+	(*Label)(nil),                          // 39: code_health.Label
+	(*LinkedPR)(nil),                       // 40: code_health.LinkedPR
+	(*IssueMilestone)(nil),                 // 41: code_health.IssueMilestone
+	(*RepositoryRef)(nil),                  // 42: code_health.RepositoryRef
+	(*GetMilestonesRequest)(nil),           // 43: code_health.GetMilestonesRequest
+	(*GetMilestonesResponse)(nil),          // 44: code_health.GetMilestonesResponse
+	(*Milestone)(nil),                      // 45: code_health.Milestone
+	(*MilestoneUser)(nil),                  // 46: code_health.MilestoneUser
+	(*GetRepositoryBySlugsRequest)(nil),    // 47: code_health.GetRepositoryBySlugsRequest
+	(*Rating)(nil),                         // 48: code_health.Rating
+	(*ReactionCount)(nil),                  // 49: code_health.ReactionCount
+	(*GetRepositoryBySlugsResponse)(nil),   // 50: code_health.GetRepositoryBySlugsResponse
+	(*GetPullRequestsRequest)(nil),         // 51: code_health.GetPullRequestsRequest
+	(*GetPullRequestsResponse)(nil),        // 52: code_health.GetPullRequestsResponse
+	(*PullRequest)(nil),                    // 53: code_health.PullRequest
+	(*PullRequestUser)(nil),                // 54: code_health.PullRequestUser
+	(*GetPullRequestActivityRequest)(nil),  // 55: code_health.GetPullRequestActivityRequest
+	(*GetPullRequestActivityResponse)(nil), // 56: code_health.GetPullRequestActivityResponse
+	(*PullRequestReviewer)(nil),            // 57: code_health.PullRequestReviewer
+	(*PullRequestComment)(nil),             // 58: code_health.PullRequestComment
+	(*GetIssueCommentsRequest)(nil),        // 59: code_health.GetIssueCommentsRequest
+	(*GetIssueCommentsResponse)(nil),       // 60: code_health.GetIssueCommentsResponse
+	(*IssueCommentMeta)(nil),               // 61: code_health.IssueCommentMeta
+	(*timestamppb.Timestamp)(nil),          // 62: google.protobuf.Timestamp
 }
 var file_service_proto_depIdxs = []int32{
-	15, // 0: code_health.ListAllPublicReposResponse.repos:type_name -> code_health.Repository
-	15, // 1: code_health.GetMyReposResponse.repositories:type_name -> code_health.Repository
+	17, // 0: code_health.ListAllPublicReposResponse.repos:type_name -> code_health.Repository
+	17, // 1: code_health.GetMyReposResponse.repositories:type_name -> code_health.Repository
 	10, // 2: code_health.GetMyOrgsResponse.organizations:type_name -> code_health.UserOrganization
-	15, // 3: code_health.ListTopRatedReposResponse.repositories:type_name -> code_health.Repository
-	15, // 4: code_health.GetOrgReposResponse.repositories:type_name -> code_health.Repository
-	17, // 5: code_health.Repository.organization:type_name -> code_health.Organization
-	18, // 6: code_health.Repository.logo:type_name -> code_health.Logo
-	46, // 7: code_health.Repository.rating:type_name -> code_health.Rating
-	16, // 8: code_health.Repository.language:type_name -> code_health.Language
-	21, // 9: code_health.GetCiCDRunsResponse.runs:type_name -> code_health.Run
-	29, // 10: code_health.Run.dates:type_name -> code_health.Dates
-	22, // 11: code_health.Run.workflows:type_name -> code_health.Workflow
-	30, // 12: code_health.Run.pull:type_name -> code_health.Pull
-	31, // 13: code_health.Run.user:type_name -> code_health.RunUser
-	29, // 14: code_health.Workflow.dates:type_name -> code_health.Dates
-	23, // 15: code_health.Workflow.tasks:type_name -> code_health.Task
-	25, // 16: code_health.Workflow.progress:type_name -> code_health.Progress
-	29, // 17: code_health.Task.dates:type_name -> code_health.Dates
-	24, // 18: code_health.Task.cubes:type_name -> code_health.Cube
-	25, // 19: code_health.Task.progress:type_name -> code_health.Progress
-	27, // 20: code_health.Task.relations:type_name -> code_health.Relations
-	29, // 21: code_health.Cube.dates:type_name -> code_health.Dates
-	26, // 22: code_health.Cube.artifacts:type_name -> code_health.Artifact
-	27, // 23: code_health.Cube.relations:type_name -> code_health.Relations
-	24, // 24: code_health.Progress.current_cube:type_name -> code_health.Cube
-	29, // 25: code_health.Artifact.dates:type_name -> code_health.Dates
-	28, // 26: code_health.Relations.needs:type_name -> code_health.Relation
-	60, // 27: code_health.Dates.created_at:type_name -> google.protobuf.Timestamp
-	60, // 28: code_health.Dates.started_at:type_name -> google.protobuf.Timestamp
-	60, // 29: code_health.Dates.finished_at:type_name -> google.protobuf.Timestamp
-	60, // 30: code_health.Dates.updated_at:type_name -> google.protobuf.Timestamp
-	34, // 31: code_health.GetIssuesResponse.issues:type_name -> code_health.Issue
-	35, // 32: code_health.Issue.status:type_name -> code_health.IssueStatus
-	36, // 33: code_health.Issue.author:type_name -> code_health.IssueUser
-	36, // 34: code_health.Issue.updated_by:type_name -> code_health.IssueUser
-	60, // 35: code_health.Issue.created_at:type_name -> google.protobuf.Timestamp
-	60, // 36: code_health.Issue.updated_at:type_name -> google.protobuf.Timestamp
-	36, // 37: code_health.Issue.assignee:type_name -> code_health.IssueUser
-	37, // 38: code_health.Issue.labels:type_name -> code_health.Label
-	38, // 39: code_health.Issue.linked_prs:type_name -> code_health.LinkedPR
-	39, // 40: code_health.Issue.milestone:type_name -> code_health.IssueMilestone
-	60, // 41: code_health.Issue.deadline:type_name -> google.protobuf.Timestamp
-	60, // 42: code_health.Issue.started_at:type_name -> google.protobuf.Timestamp
-	60, // 43: code_health.Issue.completed_at:type_name -> google.protobuf.Timestamp
-	40, // 44: code_health.Issue.repository:type_name -> code_health.RepositoryRef
-	17, // 45: code_health.RepositoryRef.organization:type_name -> code_health.Organization
-	43, // 46: code_health.GetMilestonesResponse.items:type_name -> code_health.Milestone
-	60, // 47: code_health.Milestone.start_date:type_name -> google.protobuf.Timestamp
-	60, // 48: code_health.Milestone.deadline:type_name -> google.protobuf.Timestamp
-	44, // 49: code_health.Milestone.author:type_name -> code_health.MilestoneUser
-	44, // 50: code_health.Milestone.updated_by:type_name -> code_health.MilestoneUser
-	60, // 51: code_health.Milestone.created_at:type_name -> google.protobuf.Timestamp
-	60, // 52: code_health.Milestone.updated_at:type_name -> google.protobuf.Timestamp
-	47, // 53: code_health.Rating.reaction_counts:type_name -> code_health.ReactionCount
-	17, // 54: code_health.GetRepositoryBySlugsResponse.organization:type_name -> code_health.Organization
-	18, // 55: code_health.GetRepositoryBySlugsResponse.logo:type_name -> code_health.Logo
-	46, // 56: code_health.GetRepositoryBySlugsResponse.rating:type_name -> code_health.Rating
-	16, // 57: code_health.GetRepositoryBySlugsResponse.language:type_name -> code_health.Language
-	51, // 58: code_health.GetPullRequestsResponse.pull_requests:type_name -> code_health.PullRequest
-	52, // 59: code_health.PullRequest.author:type_name -> code_health.PullRequestUser
-	60, // 60: code_health.PullRequest.created_at:type_name -> google.protobuf.Timestamp
-	60, // 61: code_health.PullRequest.updated_at:type_name -> google.protobuf.Timestamp
-	55, // 62: code_health.GetPullRequestActivityResponse.reviewers:type_name -> code_health.PullRequestReviewer
-	56, // 63: code_health.GetPullRequestActivityResponse.comments:type_name -> code_health.PullRequestComment
-	52, // 64: code_health.PullRequestReviewer.user:type_name -> code_health.PullRequestUser
-	60, // 65: code_health.PullRequestReviewer.created_at:type_name -> google.protobuf.Timestamp
-	52, // 66: code_health.PullRequestComment.author:type_name -> code_health.PullRequestUser
-	60, // 67: code_health.PullRequestComment.created_at:type_name -> google.protobuf.Timestamp
-	59, // 68: code_health.GetIssueCommentsResponse.comments:type_name -> code_health.IssueCommentMeta
-	36, // 69: code_health.IssueCommentMeta.author:type_name -> code_health.IssueUser
-	60, // 70: code_health.IssueCommentMeta.created_at:type_name -> google.protobuf.Timestamp
-	45, // 71: code_health.CodeHealth.GetRepositoryBySlugs:input_type -> code_health.GetRepositoryBySlugsRequest
-	0,  // 72: code_health.CodeHealth.GetRepoIDBySlugs:input_type -> code_health.GetRepoIDBySlugsRequest
-	2,  // 73: code_health.CodeHealth.GetGitURL:input_type -> code_health.GetGitURLRequest
-	19, // 74: code_health.CodeHealth.GetCiCDRuns:input_type -> code_health.GetCiCDRunsRequest
-	32, // 75: code_health.CodeHealth.GetIssues:input_type -> code_health.GetIssuesRequest
-	41, // 76: code_health.CodeHealth.GetMilestones:input_type -> code_health.GetMilestonesRequest
-	4,  // 77: code_health.CodeHealth.ListAllPublicRepos:input_type -> code_health.ListAllPublicReposRequest
-	6,  // 78: code_health.CodeHealth.GetMyRepos:input_type -> code_health.GetMyReposRequest
-	11, // 79: code_health.CodeHealth.ListTopRatedRepos:input_type -> code_health.ListTopRatedReposRequest
-	8,  // 80: code_health.CodeHealth.GetMyOrgs:input_type -> code_health.GetMyOrgsRequest
-	13, // 81: code_health.CodeHealth.GetOrgRepos:input_type -> code_health.GetOrgReposRequest
-	49, // 82: code_health.CodeHealth.GetPullRequests:input_type -> code_health.GetPullRequestsRequest
-	53, // 83: code_health.CodeHealth.GetPullRequestActivity:input_type -> code_health.GetPullRequestActivityRequest
-	57, // 84: code_health.CodeHealth.GetIssueComments:input_type -> code_health.GetIssueCommentsRequest
-	48, // 85: code_health.CodeHealth.GetRepositoryBySlugs:output_type -> code_health.GetRepositoryBySlugsResponse
-	1,  // 86: code_health.CodeHealth.GetRepoIDBySlugs:output_type -> code_health.GetRepoIDBySlugsResponse
-	3,  // 87: code_health.CodeHealth.GetGitURL:output_type -> code_health.GetGitURLResponse
-	20, // 88: code_health.CodeHealth.GetCiCDRuns:output_type -> code_health.GetCiCDRunsResponse
-	33, // 89: code_health.CodeHealth.GetIssues:output_type -> code_health.GetIssuesResponse
-	42, // 90: code_health.CodeHealth.GetMilestones:output_type -> code_health.GetMilestonesResponse
-	5,  // 91: code_health.CodeHealth.ListAllPublicRepos:output_type -> code_health.ListAllPublicReposResponse
-	7,  // 92: code_health.CodeHealth.GetMyRepos:output_type -> code_health.GetMyReposResponse
-	12, // 93: code_health.CodeHealth.ListTopRatedRepos:output_type -> code_health.ListTopRatedReposResponse
-	9,  // 94: code_health.CodeHealth.GetMyOrgs:output_type -> code_health.GetMyOrgsResponse
-	14, // 95: code_health.CodeHealth.GetOrgRepos:output_type -> code_health.GetOrgReposResponse
-	50, // 96: code_health.CodeHealth.GetPullRequests:output_type -> code_health.GetPullRequestsResponse
-	54, // 97: code_health.CodeHealth.GetPullRequestActivity:output_type -> code_health.GetPullRequestActivityResponse
-	58, // 98: code_health.CodeHealth.GetIssueComments:output_type -> code_health.GetIssueCommentsResponse
-	85, // [85:99] is the sub-list for method output_type
-	71, // [71:85] is the sub-list for method input_type
-	71, // [71:71] is the sub-list for extension type_name
-	71, // [71:71] is the sub-list for extension extendee
-	0,  // [0:71] is the sub-list for field type_name
+	17, // 3: code_health.ListTopRatedReposResponse.repositories:type_name -> code_health.Repository
+	17, // 4: code_health.ListPublicReposPageResponse.repositories:type_name -> code_health.Repository
+	17, // 5: code_health.GetOrgReposResponse.repositories:type_name -> code_health.Repository
+	19, // 6: code_health.Repository.organization:type_name -> code_health.Organization
+	20, // 7: code_health.Repository.logo:type_name -> code_health.Logo
+	48, // 8: code_health.Repository.rating:type_name -> code_health.Rating
+	18, // 9: code_health.Repository.language:type_name -> code_health.Language
+	23, // 10: code_health.GetCiCDRunsResponse.runs:type_name -> code_health.Run
+	31, // 11: code_health.Run.dates:type_name -> code_health.Dates
+	24, // 12: code_health.Run.workflows:type_name -> code_health.Workflow
+	32, // 13: code_health.Run.pull:type_name -> code_health.Pull
+	33, // 14: code_health.Run.user:type_name -> code_health.RunUser
+	31, // 15: code_health.Workflow.dates:type_name -> code_health.Dates
+	25, // 16: code_health.Workflow.tasks:type_name -> code_health.Task
+	27, // 17: code_health.Workflow.progress:type_name -> code_health.Progress
+	31, // 18: code_health.Task.dates:type_name -> code_health.Dates
+	26, // 19: code_health.Task.cubes:type_name -> code_health.Cube
+	27, // 20: code_health.Task.progress:type_name -> code_health.Progress
+	29, // 21: code_health.Task.relations:type_name -> code_health.Relations
+	31, // 22: code_health.Cube.dates:type_name -> code_health.Dates
+	28, // 23: code_health.Cube.artifacts:type_name -> code_health.Artifact
+	29, // 24: code_health.Cube.relations:type_name -> code_health.Relations
+	26, // 25: code_health.Progress.current_cube:type_name -> code_health.Cube
+	31, // 26: code_health.Artifact.dates:type_name -> code_health.Dates
+	30, // 27: code_health.Relations.needs:type_name -> code_health.Relation
+	62, // 28: code_health.Dates.created_at:type_name -> google.protobuf.Timestamp
+	62, // 29: code_health.Dates.started_at:type_name -> google.protobuf.Timestamp
+	62, // 30: code_health.Dates.finished_at:type_name -> google.protobuf.Timestamp
+	62, // 31: code_health.Dates.updated_at:type_name -> google.protobuf.Timestamp
+	36, // 32: code_health.GetIssuesResponse.issues:type_name -> code_health.Issue
+	37, // 33: code_health.Issue.status:type_name -> code_health.IssueStatus
+	38, // 34: code_health.Issue.author:type_name -> code_health.IssueUser
+	38, // 35: code_health.Issue.updated_by:type_name -> code_health.IssueUser
+	62, // 36: code_health.Issue.created_at:type_name -> google.protobuf.Timestamp
+	62, // 37: code_health.Issue.updated_at:type_name -> google.protobuf.Timestamp
+	38, // 38: code_health.Issue.assignee:type_name -> code_health.IssueUser
+	39, // 39: code_health.Issue.labels:type_name -> code_health.Label
+	40, // 40: code_health.Issue.linked_prs:type_name -> code_health.LinkedPR
+	41, // 41: code_health.Issue.milestone:type_name -> code_health.IssueMilestone
+	62, // 42: code_health.Issue.deadline:type_name -> google.protobuf.Timestamp
+	62, // 43: code_health.Issue.started_at:type_name -> google.protobuf.Timestamp
+	62, // 44: code_health.Issue.completed_at:type_name -> google.protobuf.Timestamp
+	42, // 45: code_health.Issue.repository:type_name -> code_health.RepositoryRef
+	19, // 46: code_health.RepositoryRef.organization:type_name -> code_health.Organization
+	45, // 47: code_health.GetMilestonesResponse.items:type_name -> code_health.Milestone
+	62, // 48: code_health.Milestone.start_date:type_name -> google.protobuf.Timestamp
+	62, // 49: code_health.Milestone.deadline:type_name -> google.protobuf.Timestamp
+	46, // 50: code_health.Milestone.author:type_name -> code_health.MilestoneUser
+	46, // 51: code_health.Milestone.updated_by:type_name -> code_health.MilestoneUser
+	62, // 52: code_health.Milestone.created_at:type_name -> google.protobuf.Timestamp
+	62, // 53: code_health.Milestone.updated_at:type_name -> google.protobuf.Timestamp
+	49, // 54: code_health.Rating.reaction_counts:type_name -> code_health.ReactionCount
+	19, // 55: code_health.GetRepositoryBySlugsResponse.organization:type_name -> code_health.Organization
+	20, // 56: code_health.GetRepositoryBySlugsResponse.logo:type_name -> code_health.Logo
+	48, // 57: code_health.GetRepositoryBySlugsResponse.rating:type_name -> code_health.Rating
+	18, // 58: code_health.GetRepositoryBySlugsResponse.language:type_name -> code_health.Language
+	53, // 59: code_health.GetPullRequestsResponse.pull_requests:type_name -> code_health.PullRequest
+	54, // 60: code_health.PullRequest.author:type_name -> code_health.PullRequestUser
+	62, // 61: code_health.PullRequest.created_at:type_name -> google.protobuf.Timestamp
+	62, // 62: code_health.PullRequest.updated_at:type_name -> google.protobuf.Timestamp
+	57, // 63: code_health.GetPullRequestActivityResponse.reviewers:type_name -> code_health.PullRequestReviewer
+	58, // 64: code_health.GetPullRequestActivityResponse.comments:type_name -> code_health.PullRequestComment
+	54, // 65: code_health.PullRequestReviewer.user:type_name -> code_health.PullRequestUser
+	62, // 66: code_health.PullRequestReviewer.created_at:type_name -> google.protobuf.Timestamp
+	54, // 67: code_health.PullRequestComment.author:type_name -> code_health.PullRequestUser
+	62, // 68: code_health.PullRequestComment.created_at:type_name -> google.protobuf.Timestamp
+	61, // 69: code_health.GetIssueCommentsResponse.comments:type_name -> code_health.IssueCommentMeta
+	38, // 70: code_health.IssueCommentMeta.author:type_name -> code_health.IssueUser
+	62, // 71: code_health.IssueCommentMeta.created_at:type_name -> google.protobuf.Timestamp
+	47, // 72: code_health.CodeHealth.GetRepositoryBySlugs:input_type -> code_health.GetRepositoryBySlugsRequest
+	0,  // 73: code_health.CodeHealth.GetRepoIDBySlugs:input_type -> code_health.GetRepoIDBySlugsRequest
+	2,  // 74: code_health.CodeHealth.GetGitURL:input_type -> code_health.GetGitURLRequest
+	21, // 75: code_health.CodeHealth.GetCiCDRuns:input_type -> code_health.GetCiCDRunsRequest
+	34, // 76: code_health.CodeHealth.GetIssues:input_type -> code_health.GetIssuesRequest
+	43, // 77: code_health.CodeHealth.GetMilestones:input_type -> code_health.GetMilestonesRequest
+	4,  // 78: code_health.CodeHealth.ListAllPublicRepos:input_type -> code_health.ListAllPublicReposRequest
+	6,  // 79: code_health.CodeHealth.GetMyRepos:input_type -> code_health.GetMyReposRequest
+	11, // 80: code_health.CodeHealth.ListTopRatedRepos:input_type -> code_health.ListTopRatedReposRequest
+	13, // 81: code_health.CodeHealth.ListPublicReposPage:input_type -> code_health.ListPublicReposPageRequest
+	8,  // 82: code_health.CodeHealth.GetMyOrgs:input_type -> code_health.GetMyOrgsRequest
+	15, // 83: code_health.CodeHealth.GetOrgRepos:input_type -> code_health.GetOrgReposRequest
+	51, // 84: code_health.CodeHealth.GetPullRequests:input_type -> code_health.GetPullRequestsRequest
+	55, // 85: code_health.CodeHealth.GetPullRequestActivity:input_type -> code_health.GetPullRequestActivityRequest
+	59, // 86: code_health.CodeHealth.GetIssueComments:input_type -> code_health.GetIssueCommentsRequest
+	50, // 87: code_health.CodeHealth.GetRepositoryBySlugs:output_type -> code_health.GetRepositoryBySlugsResponse
+	1,  // 88: code_health.CodeHealth.GetRepoIDBySlugs:output_type -> code_health.GetRepoIDBySlugsResponse
+	3,  // 89: code_health.CodeHealth.GetGitURL:output_type -> code_health.GetGitURLResponse
+	22, // 90: code_health.CodeHealth.GetCiCDRuns:output_type -> code_health.GetCiCDRunsResponse
+	35, // 91: code_health.CodeHealth.GetIssues:output_type -> code_health.GetIssuesResponse
+	44, // 92: code_health.CodeHealth.GetMilestones:output_type -> code_health.GetMilestonesResponse
+	5,  // 93: code_health.CodeHealth.ListAllPublicRepos:output_type -> code_health.ListAllPublicReposResponse
+	7,  // 94: code_health.CodeHealth.GetMyRepos:output_type -> code_health.GetMyReposResponse
+	12, // 95: code_health.CodeHealth.ListTopRatedRepos:output_type -> code_health.ListTopRatedReposResponse
+	14, // 96: code_health.CodeHealth.ListPublicReposPage:output_type -> code_health.ListPublicReposPageResponse
+	9,  // 97: code_health.CodeHealth.GetMyOrgs:output_type -> code_health.GetMyOrgsResponse
+	16, // 98: code_health.CodeHealth.GetOrgRepos:output_type -> code_health.GetOrgReposResponse
+	52, // 99: code_health.CodeHealth.GetPullRequests:output_type -> code_health.GetPullRequestsResponse
+	56, // 100: code_health.CodeHealth.GetPullRequestActivity:output_type -> code_health.GetPullRequestActivityResponse
+	60, // 101: code_health.CodeHealth.GetIssueComments:output_type -> code_health.GetIssueCommentsResponse
+	87, // [87:102] is the sub-list for method output_type
+	72, // [72:87] is the sub-list for method input_type
+	72, // [72:72] is the sub-list for extension type_name
+	72, // [72:72] is the sub-list for extension extendee
+	0,  // [0:72] is the sub-list for field type_name
 }
 
 func init() { file_service_proto_init() }
@@ -4206,7 +4315,7 @@ func file_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_proto_rawDesc), len(file_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   60,
+			NumMessages:   62,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

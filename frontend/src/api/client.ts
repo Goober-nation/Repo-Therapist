@@ -1,4 +1,4 @@
-import { batchErrorMessage } from "../regradeView"
+import { batchErrorMessage } from "../gradingBatchView"
 import { seriesErrorMessage } from "../seriesView"
 import type {
   AdminMeResponse,
@@ -6,6 +6,8 @@ import type {
   AuditResponse,
   BatchFilterBody,
   BatchPreviewResponse,
+  CatalogRefreshResponse,
+  CatalogStatusResponse,
   CurrentBatchResponse,
   GatewayRankingResponse,
   GradingResponse,
@@ -15,9 +17,9 @@ import type {
   PositionResponse,
   PublicScoreResponse,
   RecommendationsResponse,
-  RegradeBatchDetailResponse,
-  RegradeBatchListResponse,
-  RegradeBatchResponse,
+  GradingBatchDetailResponse,
+  GradingBatchListResponse,
+  GradingBatchResponse,
   RegradeStatusResponse,
   SeriesResponse,
   StatsResponse,
@@ -257,34 +259,49 @@ export class HttpRepoHealthApi {
     }
   }
 
-  /** Dry run of a batch regrade: what the filter would regrade. Starts nothing; admins only. */
+  /** Dry run of a batch grading: what the filter would regrade. Starts nothing; admins only. */
   previewBatch(filter: BatchFilterBody): Promise<BatchPreviewResponse> {
-    return this.batchRequest("/admin/regrade/preview", { method: "POST", headers: REQUEST_GUARD_HEADER, body: JSON.stringify(filter) })
+    return this.batchRequest("/admin/grading/preview", { method: "POST", headers: REQUEST_GUARD_HEADER, body: JSON.stringify(filter) })
   }
 
-  /** Starts a batch regrade for the filter. */
-  startBatch(filter: BatchFilterBody): Promise<RegradeBatchResponse> {
-    return this.batchRequest("/admin/regrade/batches", { method: "POST", headers: REQUEST_GUARD_HEADER, body: JSON.stringify(filter) })
+  /** Starts a batch grading for the filter. */
+  startBatch(filter: BatchFilterBody): Promise<GradingBatchResponse> {
+    return this.batchRequest("/admin/grading/batches", { method: "POST", headers: REQUEST_GUARD_HEADER, body: JSON.stringify(filter) })
   }
 
   /** Pauses, resumes or cancels a batch. */
-  controlBatch(id: number, action: "pause" | "resume" | "cancel"): Promise<RegradeBatchResponse> {
-    return this.batchRequest(`/admin/regrade/batches/${id}/${action}`, { method: "POST", headers: REQUEST_GUARD_HEADER })
+  controlBatch(id: number, action: "pause" | "resume" | "cancel"): Promise<GradingBatchResponse> {
+    return this.batchRequest(`/admin/grading/batches/${id}/${action}`, { method: "POST", headers: REQUEST_GUARD_HEADER })
   }
 
   /** A batch with its failed repos. */
-  getBatch(id: number): Promise<RegradeBatchDetailResponse> {
-    return this.batchRequest(`/admin/regrade/batches/${id}`)
+  getBatch(id: number): Promise<GradingBatchDetailResponse> {
+    return this.batchRequest(`/admin/grading/batches/${id}`)
   }
 
   /** The active batch, or the latest one; its `batch` is null on a stand that has never run one. */
   getCurrentBatch(): Promise<CurrentBatchResponse> {
-    return this.batchRequest("/admin/regrade/batches/current")
+    return this.batchRequest("/admin/grading/batches/current")
   }
 
   /** The most recent batches, newest first. */
-  listBatches(limit = 10): Promise<RegradeBatchListResponse> {
-    return this.batchRequest(`/admin/regrade/batches?limit=${limit}`)
+  listBatches(limit = 10): Promise<GradingBatchListResponse> {
+    return this.batchRequest(`/admin/grading/batches?limit=${limit}`)
+  }
+
+  /** The public repository catalog: its size, age and refreshes; admins only. */
+  getCatalog(): Promise<CatalogStatusResponse> {
+    return this.batchRequest("/admin/catalog")
+  }
+
+  /** Starts fetching the full public repository list; the catalog in use stays until the new one is complete. */
+  refreshCatalog(): Promise<CatalogRefreshResponse> {
+    return this.batchRequest("/admin/catalog/refresh", { method: "POST", headers: REQUEST_GUARD_HEADER })
+  }
+
+  /** Stops the running catalog refresh; the catalog in use is untouched. */
+  cancelCatalogRefresh(): Promise<CatalogRefreshResponse> {
+    return this.batchRequest("/admin/catalog/refresh/cancel", { method: "POST", headers: REQUEST_GUARD_HEADER })
   }
 
   /** Batch routes answer with Russian wording: admin denial, or the Gateway's reason word. */

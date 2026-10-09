@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -258,6 +259,13 @@ type fakeWrapper struct {
 	orgRepos     *client.GetOrgReposResponse
 	orgReposErr  error
 	orgReposSeen []*client.GetOrgReposRequest
+
+	// publicPages are the catalog listing's pages; page i+1's token is "p<i+1>". pageErrAt fails the
+	// page with that index (1-based) when set; loopPages makes the last page point back to page 2.
+	publicPages [][]*client.Repository
+	pageErrAt   int
+	loopPages   bool
+	pageGate    chan struct{}
 }
 
 func (f *fakeWrapper) record(ctx context.Context) string {
@@ -280,9 +288,39 @@ func (f *fakeWrapper) ListAllPublicRepos(ctx context.Context, in *client.ListAll
 	return &client.ListAllPublicReposResponse{Repos: f.publicRepos}, nil
 }
 
-func (f *fakeWrapper) ListTopRatedRepos(ctx context.Context, in *client.ListTopRatedReposRequest, opts ...grpc.CallOption) (*client.ListTopRatedReposResponse, error) {
+func (f *fakeWrapper) ListPublicReposPage(ctx context.Context, in *client.ListPublicReposPageRequest, opts ...grpc.CallOption) (*client.ListPublicReposPageResponse, error) {
 	f.record(ctx)
-	return &client.ListTopRatedReposResponse{Repositories: f.publicRepos}, nil
+
+	if f.pageGate != nil {
+		select {
+		case <-f.pageGate:
+		case <-ctx.Done():
+			return nil, status.Error(codes.Canceled, "cancelled")
+		}
+	}
+
+	page := 1
+	if in.GetPageToken() != "" {
+		fmt.Sscanf(in.GetPageToken(), "p%d", &page)
+	}
+
+	if page == f.pageErrAt {
+		return nil, status.Error(codes.Unavailable, "down")
+	}
+
+	resp := &client.ListPublicReposPageResponse{}
+	if page <= len(f.publicPages) {
+		resp.Repositories = f.publicPages[page-1]
+	}
+
+	switch {
+	case page < len(f.publicPages):
+		resp.NextPageToken = fmt.Sprintf("p%d", page+1)
+	case f.loopPages:
+		resp.NextPageToken = "p2"
+	}
+
+	return resp, nil
 }
 
 func (f *fakeWrapper) GetMyRepos(ctx context.Context, in *client.GetMyReposRequest, opts ...grpc.CallOption) (*client.GetMyReposResponse, error) {

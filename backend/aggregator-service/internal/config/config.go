@@ -22,14 +22,16 @@ type Config struct {
 	MetricsAddress string
 }
 
-// BatchConfig tunes the admin batch regrade (docs/admin.md).
+// BatchConfig tunes the admin batch grading (docs/admin.md).
 type BatchConfig struct {
 	// Concurrency is how many repos of a batch are graded at once.
 	Concurrency int
-	// MaxRepos caps one batch; a filter that matches more is refused.
-	MaxRepos int
 	// ItemTimeout is how long one repo may take before it counts as failed.
 	ItemTimeout time.Duration
+	// MaxLimit caps the limit an admin may ask for in one batch; 0 means no cap.
+	MaxLimit int
+	// CatalogMaxPages bounds one public repo catalog refresh, at 100 repos a page.
+	CatalogMaxPages int
 }
 
 // AuditConfig is the audit log's retention (docs/admin.md).
@@ -125,9 +127,10 @@ func LoadConfig() *Config {
 		MetricsAddress: getEnvDefault("METRICS_ADDRESS", ""),
 
 		Batch: BatchConfig{
-			Concurrency: getEnvInt("BATCH_REGRADE_CONCURRENCY", 3),
-			MaxRepos:    getEnvInt("BATCH_REGRADE_MAX_REPOS", 500),
-			ItemTimeout: getEnvDuration("BATCH_REGRADE_ITEM_TIMEOUT", 15*time.Minute),
+			Concurrency:     getEnvInt("BATCH_GRADING_CONCURRENCY", 3),
+			ItemTimeout:     getEnvDuration("BATCH_GRADING_ITEM_TIMEOUT", 15*time.Minute),
+			MaxLimit:        getEnvInt("BATCH_GRADING_MAX_LIMIT", 0),
+			CatalogMaxPages: getEnvInt("CATALOG_MAX_PAGES", 2000),
 		},
 
 		Redis: RedisConfig{
@@ -234,7 +237,7 @@ func LoadConfig() *Config {
 			),
 			RegradeLimit: getEnvInt(
 				"GRADING_REGRADE_LIMIT",
-				20,
+				500,
 			),
 			RegradeListTimeout: getEnvDuration(
 				"GRADING_REGRADE_LIST_TIMEOUT",
@@ -340,4 +343,21 @@ func splitComma(value string) []string {
 	result = append(result, current)
 
 	return result
+}
+
+// LockTimeoutWarning explains why lockTimeout is too short for one grading, or returns "" when it
+// is fine. CLONE_TIMEOUT and GRADE_TIMEOUT belong to repository-service and grade-service; they are
+// read here with those services' defaults (10m, 4m) only to check the sum. 0 turns the lock
+// timeout off, which is never too short.
+func LockTimeoutWarning(lockTimeout time.Duration) string {
+	clone := getEnvDuration("CLONE_TIMEOUT", 10*time.Minute)
+	grade := getEnvDuration("GRADE_TIMEOUT", 4*time.Minute)
+	if lockTimeout <= 0 || lockTimeout > clone+grade {
+		return ""
+	}
+
+	return fmt.Sprintf(
+		"GRADING_LOCK_TIMEOUT (%s) is not above CLONE_TIMEOUT + GRADE_TIMEOUT (%s): a running grading can lose its repo lock and private token",
+		lockTimeout, clone+grade,
+	)
 }

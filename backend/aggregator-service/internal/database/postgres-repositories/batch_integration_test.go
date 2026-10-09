@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Needs a Postgres with migration 000009 applied; skipped without POSTGRES_DSN. It creates three public
+// Needs a Postgres with migrations up to 000011 applied; skipped without POSTGRES_DSN. It creates three public
 // repos and one private repo in the organisation "zz-batch-test" and removes them (and its batches)
 // afterwards. Every selection is limited to those slugs, so real repos are never touched.
 func TestBatchRepositoryLifecycle(t *testing.T) {
@@ -32,7 +32,7 @@ func TestBatchRepositoryLifecycle(t *testing.T) {
 	const org = "zz-batch-test"
 
 	cleanup := func() {
-		_, _ = pool.Exec(ctx, `DELETE FROM regrade_batches WHERE actor_hash = 'feedfacefeedface'`)
+		_, _ = pool.Exec(ctx, `DELETE FROM grading_batches WHERE actor_hash = 'feedfacefeedface'`)
 		_, _ = pool.Exec(ctx, `DELETE FROM repo_grades_public WHERE sourcecraft_uuid IN (SELECT sourcecraft_uuid FROM repos WHERE org_slug = $1)`, org)
 		_, _ = pool.Exec(ctx, `DELETE FROM repos WHERE org_slug = $1`, org)
 	}
@@ -43,15 +43,16 @@ func TestBatchRepositoryLifecycle(t *testing.T) {
 		slug, visibility, language string
 		score                      *int
 		ageDays                    int
+		rating                     float64
 	}
 
 	score := func(v int) *int { return &v }
 
 	seeds := []seed{
-		{"go-low", "public", "Go", score(30), 40},
-		{"go-high", "public", "Go", score(90), 2},
-		{"rust-never", "public", "Rust", nil, 0},
-		{"private-go", "private", "Go", score(30), 40},
+		{"go-low", "public", "Go", score(30), 40, 5},
+		{"go-high", "public", "Go", score(90), 2, 1},
+		{"rust-never", "public", "Rust", nil, 0, 3},
+		{"private-go", "private", "Go", score(30), 40, 9},
 	}
 
 	ids := map[string]uuid.UUID{}
@@ -60,8 +61,8 @@ func TestBatchRepositoryLifecycle(t *testing.T) {
 		id := uuid.New()
 		ids[s.slug] = id
 
-		if _, err := pool.Exec(ctx, `INSERT INTO repos (sourcecraft_uuid, org_slug, repo_slug, visibility, main_language) VALUES ($1, $2, $3, $4, $5)`,
-			id, org, s.slug, s.visibility, s.language); err != nil {
+		if _, err := pool.Exec(ctx, `INSERT INTO repos (sourcecraft_uuid, org_slug, repo_slug, visibility, main_language, sourcecraft_rating) VALUES ($1, $2, $3, $4, $5, $6)`,
+			id, org, s.slug, s.visibility, s.language, s.rating); err != nil {
 			t.Fatal(err)
 		}
 
@@ -77,11 +78,11 @@ func TestBatchRepositoryLifecycle(t *testing.T) {
 	picked := []string{org + "/go-low", org + "/go-high", org + "/rust-never", org + "/private-go"}
 
 	slugsOf := func(f domain.BatchFilter) []string {
-		f.Repos = picked
+		f.Repos, f.Limit = picked, 50
 
-		got, capped, err := repo.SelectBatchRepos(ctx, f, 50)
-		if err != nil || capped {
-			t.Fatalf("select %+v: %v capped=%v", f, err, capped)
+		got, matched, err := repo.SelectBatchRepos(ctx, f)
+		if err != nil || matched != len(got) {
+			t.Fatalf("select %+v: %v matched=%d of %d", f, err, matched, len(got))
 		}
 
 		var out []string
@@ -106,15 +107,17 @@ func TestBatchRepositoryLifecycle(t *testing.T) {
 		}
 	}
 
-	same("picked only: private is never selected", slugsOf(domain.BatchFilter{}), "go-high", "go-low", "rust-never")
-	same("language, case-insensitive", slugsOf(domain.BatchFilter{Languages: []string{"go"}}), "go-high", "go-low")
+	same("picked only, highest rating first: private is never selected", slugsOf(domain.BatchFilter{}), "go-low", "rust-never", "go-high")
+	same("language, case-insensitive", slugsOf(domain.BatchFilter{Languages: []string{"go"}}), "go-low", "go-high")
 	same("score range", slugsOf(domain.BatchFilter{MinScore: score(10), MaxScore: score(50)}), "go-low")
-	same("min score skips ungraded", slugsOf(domain.BatchFilter{MinScore: score(0)}), "go-high", "go-low")
+	same("min score skips ungraded", slugsOf(domain.BatchFilter{MinScore: score(0)}), "go-low", "go-high")
 	same("older than 30 days includes never graded", slugsOf(domain.BatchFilter{OlderThanDays: score(30)}), "go-low", "rust-never")
+	same("only regrade skips never graded", slugsOf(domain.BatchFilter{OnlyRegrade: true}), "go-low", "go-high")
+	same("only regrade with age", slugsOf(domain.BatchFilter{OnlyRegrade: true, OlderThanDays: score(30)}), "go-low")
 
-	capped, wasCapped, err := repo.SelectBatchRepos(ctx, domain.BatchFilter{Repos: picked}, 2)
-	if err != nil || !wasCapped || len(capped) != 2 {
-		t.Fatalf("cap: %v %v %v", capped, wasCapped, err)
+	limited, matched, err := repo.SelectBatchRepos(ctx, domain.BatchFilter{Repos: picked, Limit: 2})
+	if err != nil || matched != 3 || len(limited) != 2 || limited[0].RepoSlug != "go-low" || limited[1].RepoSlug != "rust-never" {
+		t.Fatalf("limit: %v matched=%d %v", limited, matched, err)
 	}
 
 	// Columns the full repository loader cannot scan (NULL) must not matter to the batch.
@@ -127,14 +130,14 @@ func TestBatchRepositoryLifecycle(t *testing.T) {
 		t.Fatalf("unknown repo: %v", err)
 	}
 
-	candidates, _, _ := repo.SelectBatchRepos(ctx, domain.BatchFilter{Repos: picked}, 50)
+	candidates, _, _ := repo.SelectBatchRepos(ctx, domain.BatchFilter{Repos: picked, Limit: 50})
 
-	id, err := repo.CreateBatch(ctx, "feedfacefeedface", domain.BatchFilter{Languages: []string{"go"}, Repos: picked}, candidates)
+	id, err := repo.CreateBatch(ctx, "feedfacefeedface", domain.BatchFilter{Languages: []string{"go"}, Repos: picked, Limit: 50}, candidates)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := repo.CreateBatch(ctx, "feedfacefeedface", domain.BatchFilter{All: true}, candidates); !errors.Is(err, domain.ErrBatchActive) {
+	if _, err := repo.CreateBatch(ctx, "feedfacefeedface", domain.BatchFilter{Limit: 10}, candidates); !errors.Is(err, domain.ErrBatchActive) {
 		t.Fatalf("second active batch: %v", err)
 	}
 
@@ -225,7 +228,7 @@ func TestBatchRepositoryLifecycle(t *testing.T) {
 	}
 
 	// A new batch is allowed once the old one is over.
-	if _, err := repo.CreateBatch(ctx, "feedfacefeedface", domain.BatchFilter{All: true}, candidates[:1]); err != nil {
+	if _, err := repo.CreateBatch(ctx, "feedfacefeedface", domain.BatchFilter{Limit: 1}, candidates[:1]); err != nil {
 		t.Fatalf("batch after a finished one: %v", err)
 	}
 }

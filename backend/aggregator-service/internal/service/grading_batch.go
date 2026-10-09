@@ -12,15 +12,13 @@ import (
 	"time"
 
 	"aggregator-service/internal/domain"
-	"aggregator-service/internal/transport/rpc/gen/client"
 
 	"github.com/google/uuid"
 )
 
-// Defaults of the admin batch regrade (config BATCH_REGRADE_*).
+// Defaults of the admin batch grading (config BATCH_GRADING_*).
 const (
 	DefaultBatchConcurrency = 3
-	DefaultBatchMaxRepos    = 500
 	DefaultBatchItemTimeout = 15 * time.Minute
 	DefaultBatchPoll        = 2 * time.Second
 	// DefaultBatchEstimateSeconds is the guess for one grading until batches have measured real ones.
@@ -46,14 +44,6 @@ func (as *AggregatorService) batchConcurrency() int {
 	return DefaultBatchConcurrency
 }
 
-func (as *AggregatorService) batchMaxRepos() int {
-	if as.BatchMaxRepos > 0 {
-		return as.BatchMaxRepos
-	}
-
-	return DefaultBatchMaxRepos
-}
-
 func (as *AggregatorService) batchItemTimeout() time.Duration {
 	if as.BatchItemTimeout > 0 {
 		return as.BatchItemTimeout
@@ -72,21 +62,23 @@ func (as *AggregatorService) batchPoll() time.Duration {
 
 func (as *AggregatorService) requireBatches() error {
 	if as.BatchRepo == nil {
-		return fmt.Errorf("%w: batch regrade is not configured", domain.ErrInvalidBatch)
+		return fmt.Errorf("%w: batch grading is not configured", domain.ErrInvalidBatch)
 	}
 
 	return nil
 }
 
-// batchSelection is what a filter selected. Fetched holds the SourceCraft metadata of a top-rated
-// selection, saved to repos when the batch starts (the repos may be new to the service).
+// batchSelection is what a filter selected: up to the filter's limit, highest SourceCraft rating first,
+// out of Matched repos. Fetched holds the metadata of repos taken from the catalog, saved to repos when
+// the batch starts (they may be new to the service).
 type batchSelection struct {
 	Repos   []domain.BatchCandidate
 	Fetched []domain.Repo
-	Capped  bool
+	Matched int
 }
 
-// selectForBatch validates the filter and returns the repos it selects, public ones only.
+// selectForBatch validates the filter and returns the repos it selects, public ones only: from the
+// stored catalog, or, before its first successful refresh, from the repos the service already knows.
 func (as *AggregatorService) selectForBatch(ctx context.Context, filter domain.BatchFilter) (domain.BatchFilter, batchSelection, error) {
 	if err := as.requireBatches(); err != nil {
 		return filter, batchSelection{}, err
@@ -97,131 +89,47 @@ func (as *AggregatorService) selectForBatch(ctx context.Context, filter domain.B
 		return filter, batchSelection{}, err
 	}
 
-	if filter.TopRated != nil {
-		sel, err := as.selectTopRated(ctx, filter, as.batchMaxRepos())
+	if as.BatchMaxLimit > 0 && filter.Limit > as.BatchMaxLimit {
+		return filter, batchSelection{}, fmt.Errorf("%w (%d)", domain.ErrBatchLimitTooHigh, as.BatchMaxLimit)
+	}
+
+	if as.catalogInUse(ctx) {
+		sel, err := as.selectFromCatalog(ctx, filter)
 
 		return filter, sel, err
 	}
 
-	repos, capped, err := as.BatchRepo.SelectBatchRepos(ctx, filter, as.batchMaxRepos())
+	repos, matched, err := as.BatchRepo.SelectBatchRepos(ctx, filter)
 	if err != nil {
 		return filter, batchSelection{}, err
 	}
 
-	return filter, batchSelection{Repos: repos, Capped: capped}, nil
+	return filter, batchSelection{Repos: repos, Matched: matched}, nil
 }
 
-// TopRatedScanPages bounds how deep into SourceCraft's rating order a top-N selection looks, at 100
-// repos a page: with narrow criteria fewer than N repos may match within it.
-const TopRatedScanPages = 50
-
-// selectTopRated walks SourceCraft's repos from the highest rating down and keeps the first
-// filter.TopRated public ones that match the other criteria. Language and hand-picked slugs are
-// checked on the listing; score and age on the stored grade, with the same rules as SelectBatchRepos.
-func (as *AggregatorService) selectTopRated(ctx context.Context, filter domain.BatchFilter, limit int) (batchSelection, error) {
-	want := *filter.TopRated
-
-	languages := make(map[string]bool, len(filter.Languages))
-	for _, language := range filter.Languages {
-		languages[language] = true
+// selectFromCatalog selects from the stored public repo catalog. Catalog repos may be new to the
+// service, so they are all returned as Fetched.
+func (as *AggregatorService) selectFromCatalog(ctx context.Context, filter domain.BatchFilter) (batchSelection, error) {
+	entries, matched, err := as.CatalogRepo.Select(ctx, domain.CatalogFilter{
+		Languages: filter.Languages, MinScore: filter.MinScore, MaxScore: filter.MaxScore,
+		OlderThanDays: filter.OlderThanDays, Repos: filter.Repos, OnlyRegrade: filter.OnlyRegrade,
+	}, filter.Limit)
+	if err != nil {
+		return batchSelection{}, err
 	}
 
-	picks := make(map[string]bool, len(filter.Repos))
-	for _, slug := range filter.Repos {
-		picks[lowerASCII(slug)] = true
-	}
+	sel := batchSelection{Matched: matched}
 
-	var (
-		sel       batchSelection
-		pageToken string
-	)
-
-	for page := 0; page < TopRatedScanPages && len(sel.Repos) < want; page++ {
-		cont, cancel := context.WithTimeout(as.wrapperContext(ctx), as.RPCTimeout)
-		response, err := as.clientRPC.ListTopRatedRepos(cont, &client.ListTopRatedReposRequest{PageToken: pageToken})
-		cancel()
-
-		if err != nil {
-			return batchSelection{}, wrapperError("list top-rated repositories", err)
-		}
-
-		var (
-			matched []domain.Repo
-			ids     []uuid.UUID
-		)
-
-		for _, pbRepo := range response.GetRepositories() {
-			repo, err := repoFromWrapper(pbRepo)
-			if err != nil || repo.Visibility != domain.VisibilityPublic {
-				continue
-			}
-
-			if len(languages) > 0 && !languages[strings.ToLower(repo.Language.Name)] {
-				continue
-			}
-
-			if len(picks) > 0 && !picks[lowerASCII(repo.OrgSlug+"/"+repo.RepoSlug)] {
-				continue
-			}
-
-			matched = append(matched, repo)
-			ids = append(ids, repo.SourcecraftUUID)
-		}
-
-		grades, err := as.BatchRepo.BatchGradeInfo(ctx, ids)
-		if err != nil {
-			return batchSelection{}, err
-		}
-
-		for _, repo := range matched {
-			grade, graded := grades[repo.SourcecraftUUID]
-			if !matchesGradeCriteria(filter, grade, graded, as.now()) {
-				continue
-			}
-
-			sel.Repos = append(sel.Repos, domain.BatchCandidate{
-				RepoID: repo.SourcecraftUUID, OrgSlug: repo.OrgSlug, RepoSlug: repo.RepoSlug,
-				LastActivityAt: repo.LastActivityAt, GradedAt: grade.GradedAt,
-			})
-			sel.Fetched = append(sel.Fetched, repo)
-
-			if len(sel.Repos) == want {
-				break
-			}
-		}
-
-		pageToken = response.GetNextPageToken()
-		if pageToken == "" {
-			break
-		}
-	}
-
-	if len(sel.Repos) > limit {
-		sel.Repos, sel.Fetched, sel.Capped = sel.Repos[:limit], sel.Fetched[:limit], true
+	for _, entry := range entries {
+		repo := entry.Repo
+		sel.Repos = append(sel.Repos, domain.BatchCandidate{
+			RepoID: repo.SourcecraftUUID, OrgSlug: repo.OrgSlug, RepoSlug: repo.RepoSlug,
+			LastActivityAt: repo.LastActivityAt, GradedAt: entry.GradedAt,
+		})
+		sel.Fetched = append(sel.Fetched, repo)
 	}
 
 	return sel, nil
-}
-
-// matchesGradeCriteria applies the score and age criteria to a stored grade: a score bound never
-// matches a repo without a grade, the age one always does.
-func matchesGradeCriteria(filter domain.BatchFilter, grade domain.BatchGrade, graded bool, now time.Time) bool {
-	scored := graded && grade.Score != nil
-
-	if filter.MinScore != nil && (!scored || *grade.Score < *filter.MinScore) {
-		return false
-	}
-
-	if filter.MaxScore != nil && (!scored || *grade.Score > *filter.MaxScore) {
-		return false
-	}
-
-	if filter.OlderThanDays != nil && graded && grade.GradedAt != nil &&
-		!grade.GradedAt.Before(now.AddDate(0, 0, -*filter.OlderThanDays)) {
-		return false
-	}
-
-	return true
 }
 
 // PreviewBatch is the dry run: how many public repos the filter selects, a sample of them, the
@@ -232,8 +140,8 @@ func (as *AggregatorService) PreviewBatch(ctx context.Context, filter domain.Bat
 		return domain.BatchPreview{}, err
 	}
 
-	repos, capped := sel.Repos, sel.Capped
-	preview := domain.BatchPreview{Count: len(repos), Capped: capped}
+	repos := sel.Repos
+	preview := domain.BatchPreview{Matched: sel.Matched, Count: len(repos)}
 
 	if !filter.Force {
 		for _, repo := range repos {
@@ -251,7 +159,8 @@ func (as *AggregatorService) PreviewBatch(ctx context.Context, filter domain.Bat
 		preview.Sample = append(preview.Sample, repo.Slug())
 	}
 
-	if !capped {
+	// With the limit cutting the matches, a missing pick may just be below the cut: not reported then.
+	if sel.Matched == len(repos) {
 		preview.Unmatched = unmatchedPicks(filter.Repos, repos)
 	}
 
@@ -294,21 +203,16 @@ func lowerASCII(s string) string {
 }
 
 // StartBatch creates a batch for the filter and starts working on it. Only one batch can be
-// unfinished at a time (ErrBatchActive). A filter that selects nothing, or more than the batch cap, is
-// refused: narrowing it is the admin's decision, not a silent cut.
+// unfinished at a time (ErrBatchActive); a filter that selects nothing is refused.
 func (as *AggregatorService) StartBatch(ctx context.Context, actorHash string, filter domain.BatchFilter) (domain.Batch, error) {
 	filter, sel, err := as.selectForBatch(ctx, filter)
 	if err != nil {
 		return domain.Batch{}, err
 	}
 
-	repos, capped := sel.Repos, sel.Capped
-
-	switch {
-	case len(repos) == 0:
+	repos := sel.Repos
+	if len(repos) == 0 {
 		return domain.Batch{}, domain.ErrBatchNothing
-	case capped:
-		return domain.Batch{}, domain.ErrBatchTooMany
 	}
 
 	// A cancelled batch's worker is alive until its in-flight repos finish; starting another before then
@@ -317,7 +221,7 @@ func (as *AggregatorService) StartBatch(ctx context.Context, actorHash string, f
 		return domain.Batch{}, domain.ErrBatchActive
 	}
 
-	// A top-rated selection may hold repos the service has never seen; the items need their rows.
+	// A catalog selection may hold repos the service has never seen; the items need their rows.
 	for _, repo := range sel.Fetched {
 		if err := as.upsertRepo(ctx, repo); err != nil {
 			return domain.Batch{}, fmt.Errorf("save repository %s/%s: %w", repo.OrgSlug, repo.RepoSlug, err)
@@ -329,7 +233,7 @@ func (as *AggregatorService) StartBatch(ctx context.Context, actorHash string, f
 		return domain.Batch{}, err
 	}
 
-	as.auditBatch(ctx, actorHash, domain.AuditActorAdmin, "regrade.batch.start", id, map[string]any{
+	as.auditBatch(ctx, actorHash, domain.AuditActorAdmin, "batch_grading.start", id, map[string]any{
 		"total": len(repos), "filter": filterSummary(filter),
 	})
 
@@ -390,7 +294,7 @@ func (as *AggregatorService) ControlBatch(ctx context.Context, actorHash string,
 		return domain.Batch{}, fmt.Errorf("%w: unknown action %q", domain.ErrInvalidBatch, action)
 	}
 
-	as.auditBatch(ctx, actorHash, domain.AuditActorAdmin, "regrade.batch."+action, id, nil)
+	as.auditBatch(ctx, actorHash, domain.AuditActorAdmin, "batch_grading."+action, id, nil)
 
 	return as.BatchRepo.GetBatch(ctx, id)
 }
@@ -445,6 +349,9 @@ func (as *AggregatorService) BatchStatus(ctx context.Context, id int64) (domain.
 	return batch, failed, nil
 }
 
+// MaxBatchLimit is the stand's cap on one batch's limit; 0 means none.
+func (as *AggregatorService) MaxBatchLimit() int { return as.BatchMaxLimit }
+
 // ListBatches returns the most recent batches, newest first.
 func (as *AggregatorService) ListBatches(ctx context.Context, limit int) ([]domain.Batch, error) {
 	if err := as.requireBatches(); err != nil {
@@ -468,7 +375,7 @@ func (as *AggregatorService) ResumeBatch(ctx context.Context) {
 	as.batchCtx = ctx
 
 	if err := as.BatchRepo.SkipOrphanedItems(ctx); err != nil {
-		log.Printf("resume regrade batch: %v", err)
+		log.Printf("resume grading batch: %v", err)
 	}
 
 	batch, err := as.BatchRepo.GetActiveBatch(ctx)
@@ -477,18 +384,18 @@ func (as *AggregatorService) ResumeBatch(ctx context.Context) {
 	}
 
 	if err != nil {
-		log.Printf("resume regrade batch: %v", err)
+		log.Printf("resume grading batch: %v", err)
 
 		return
 	}
 
 	if err := as.BatchRepo.RequeueRunningItems(ctx, batch.ID); err != nil {
-		log.Printf("resume regrade batch %d: %v", batch.ID, err)
+		log.Printf("resume grading batch %d: %v", batch.ID, err)
 
 		return
 	}
 
-	log.Printf("regrade batch %d is %s, %d repositories left", batch.ID, batch.Status, batch.Pending+batch.Running)
+	log.Printf("grading batch %d is %s, %d repositories left", batch.ID, batch.Status, batch.Pending+batch.Running)
 
 	if batch.Status == domain.BatchRunning {
 		as.startBatchRunner(batch.ID)
@@ -557,7 +464,7 @@ loop:
 			<-slots
 
 			if err != nil && ctx.Err() == nil {
-				log.Printf("regrade batch %d: claim: %v", id, err)
+				log.Printf("grading batch %d: claim: %v", id, err)
 			}
 
 			if !as.batchShouldWait(ctx, id) {
@@ -618,12 +525,12 @@ func (as *AggregatorService) completeBatch(ctx context.Context, id int64) {
 	}
 
 	if err := as.BatchRepo.FinishBatch(ctx, id, domain.BatchCompleted); err != nil {
-		log.Printf("finish regrade batch %d: %v", id, err)
+		log.Printf("finish grading batch %d: %v", id, err)
 
 		return
 	}
 
-	as.auditBatch(ctx, "", domain.AuditActorSystem, "regrade.batch.complete", id, map[string]any{
+	as.auditBatch(ctx, "", domain.AuditActorSystem, "batch_grading.complete", id, map[string]any{
 		"total": batch.Total, "ok": batch.OK, "failed": batch.Failed,
 	})
 }
@@ -638,7 +545,7 @@ func (as *AggregatorService) processBatchItem(ctx context.Context, batchID int64
 	}
 
 	if err := as.BatchRepo.FinishBatchItem(ctx, batchID, item.RepoID, status, code); err != nil {
-		log.Printf("regrade batch %d: record %s/%s: %v", batchID, item.OrgSlug, item.RepoSlug, err)
+		log.Printf("grading batch %d: record %s/%s: %v", batchID, item.OrgSlug, item.RepoSlug, err)
 	}
 
 	if as.Metrics != nil {
@@ -650,7 +557,7 @@ func (as *AggregatorService) gradeBatchItem(ctx context.Context, repoID uuid.UUI
 	repo, err := as.BatchRepo.GetBatchRepo(ctx, repoID)
 	if err != nil {
 		if ctx.Err() == nil {
-			log.Printf("regrade batch: load repository %s: %v", repoID, err)
+			log.Printf("grading batch: load repository %s: %v", repoID, err)
 		}
 
 		return domain.BatchItemFailed, domain.BatchErrorRequest
@@ -665,7 +572,7 @@ func (as *AggregatorService) gradeBatchItem(ctx context.Context, repoID uuid.UUI
 		active, err := as.batchRepoActive(ctx, repo)
 		if err != nil {
 			// An unanswered check never skips: the repo is graded as if forced.
-			log.Printf("regrade batch: activity check %s/%s: %v (grading anyway)", repo.OrgSlug, repo.RepoSlug, err)
+			log.Printf("grading batch: activity check %s/%s: %v (grading anyway)", repo.OrgSlug, repo.RepoSlug, err)
 		} else if !active {
 			return domain.BatchItemSkipped, domain.BatchSkipNoActivity
 		}
@@ -677,7 +584,7 @@ func (as *AggregatorService) gradeBatchItem(ctx context.Context, repoID uuid.UUI
 	startedAt := as.now()
 
 	if err := as.requestGrading(withTrigger(ctx, "batch"), repo, false, false); !errors.Is(err, domain.GradingPending) {
-		log.Printf("regrade batch: request %s/%s: %v", repo.OrgSlug, repo.RepoSlug, err)
+		log.Printf("grading batch: request %s/%s: %v", repo.OrgSlug, repo.RepoSlug, err)
 
 		return domain.BatchItemFailed, domain.BatchErrorRequest
 	}
@@ -730,19 +637,16 @@ func (as *AggregatorService) batchRepoActive(ctx context.Context, repo domain.Re
 		return true, fmt.Errorf("load grade: %w", err)
 	}
 
-	fresh, err := as.resolveRepo(ctx, repo.OrgSlug, repo.RepoSlug)
-	if err != nil {
-		return true, err
-	}
+	_, active, err := as.freshActivity(ctx, repo, grade.GradedAt)
 
-	return domain.HasNewActivity(fresh.LastActivityAt, grade.GradedAt), nil
+	return active, err
 }
 
 // auditBatch records a batch action. It is best effort: the batch is already changed, and a failed
 // audit write is logged rather than undoing it.
 func (as *AggregatorService) auditBatch(ctx context.Context, actorHash, actorKind, action string, id int64, details map[string]any) {
 	if as.Metrics != nil {
-		as.Metrics.BatchEvent(strings.TrimPrefix(action, "regrade.batch."))
+		as.Metrics.BatchEvent(strings.TrimPrefix(action, "batch_grading."))
 	}
 
 	if as.AuditRepo == nil {
@@ -774,10 +678,6 @@ func (as *AggregatorService) auditBatch(ctx context.Context, actorHash, actorKin
 func filterSummary(filter domain.BatchFilter) map[string]any {
 	summary := map[string]any{}
 
-	if filter.All {
-		summary["all"] = true
-	}
-
 	if len(filter.Languages) > 0 {
 		summary["languages"] = filter.Languages
 	}
@@ -798,8 +698,10 @@ func filterSummary(filter domain.BatchFilter) map[string]any {
 		summary["picked"] = len(filter.Repos)
 	}
 
-	if filter.TopRated != nil {
-		summary["top_rated"] = *filter.TopRated
+	summary["limit"] = filter.Limit
+
+	if filter.OnlyRegrade {
+		summary["only_regrade"] = true
 	}
 
 	if filter.Force {

@@ -54,6 +54,11 @@ type AggregatorService interface {
 	ControlBatch(ctx context.Context, actorHash string, id int64, action string) (domain.Batch, error)
 	BatchStatus(ctx context.Context, id int64) (domain.Batch, []domain.BatchItem, error)
 	ListBatches(ctx context.Context, limit int) ([]domain.Batch, error)
+	MaxBatchLimit() int
+
+	CatalogStatus(ctx context.Context) (domain.CatalogStatus, error)
+	RefreshCatalog(ctx context.Context, actorHash string) (domain.CatalogRefresh, error)
+	CancelCatalogRefresh(ctx context.Context, actorHash string) (domain.CatalogRefresh, error)
 }
 
 type Server struct {
@@ -394,11 +399,15 @@ const GradingInterruptedMessage = "grading interrupted"
 // Reasons of a refused batch request; the Gateway reads them from the status message.
 const (
 	BatchReasonNothing  = "nothing_selected"
-	BatchReasonTooMany  = "too_many"
+	BatchReasonTooHigh  = "limit_too_high"
 	BatchReasonInvalid  = "invalid_filter"
 	BatchReasonActive   = "batch_active"
 	BatchReasonState    = "bad_state"
 	BatchReasonNotFound = "batch_not_found"
+
+	// Reasons of a refused catalog request.
+	CatalogReasonActive     = "refresh_active"
+	CatalogReasonNotRunning = "refresh_not_running"
 )
 
 func mapError(err error) error {
@@ -470,11 +479,11 @@ func mapError(err error) error {
 		)
 
 	// The batch errors carry a fixed reason word, not text: the Gateway passes it to the admin UI.
+	case errors.Is(err, domain.ErrBatchLimitTooHigh):
+		return status.Error(codes.InvalidArgument, BatchReasonTooHigh)
+
 	case errors.Is(err, domain.ErrBatchNothing):
 		return status.Error(codes.InvalidArgument, BatchReasonNothing)
-
-	case errors.Is(err, domain.ErrBatchTooMany):
-		return status.Error(codes.InvalidArgument, BatchReasonTooMany)
 
 	case errors.Is(err, domain.ErrInvalidBatch):
 		return status.Error(codes.InvalidArgument, BatchReasonInvalid)
@@ -487,6 +496,12 @@ func mapError(err error) error {
 
 	case errors.Is(err, domain.ErrBatchNotFound):
 		return status.Error(codes.NotFound, BatchReasonNotFound)
+
+	case errors.Is(err, domain.ErrCatalogRefreshActive):
+		return status.Error(codes.AlreadyExists, CatalogReasonActive)
+
+	case errors.Is(err, domain.ErrCatalogRefreshNotRunning):
+		return status.Error(codes.Aborted, CatalogReasonNotRunning)
 
 	case errors.Is(err, domain.ErrRepoLocked):
 		return status.Error(
@@ -529,15 +544,11 @@ func mapError(err error) error {
 
 func batchFilterFromProto(f *server.BatchFilter) domain.BatchFilter {
 	filter := domain.BatchFilter{
-		Languages: f.GetLanguages(),
-		Repos:     f.GetRepos(),
-		All:       f.GetAll(),
-		Force:     f.GetForce(),
-	}
-
-	if f.TopRated != nil {
-		v := int(f.GetTopRated())
-		filter.TopRated = &v
+		Languages:   f.GetLanguages(),
+		Repos:       f.GetRepos(),
+		Force:       f.GetForce(),
+		Limit:       int(f.GetLimit()),
+		OnlyRegrade: f.GetOnlyRegrade(),
 	}
 
 	if f.MinScore != nil {
@@ -559,12 +570,8 @@ func batchFilterFromProto(f *server.BatchFilter) domain.BatchFilter {
 }
 
 func batchFilterToProto(f domain.BatchFilter) *server.BatchFilter {
-	out := &server.BatchFilter{Languages: f.Languages, Repos: f.Repos, All: f.All, Force: f.Force}
-
-	if f.TopRated != nil {
-		v := int32(*f.TopRated)
-		out.TopRated = &v
-	}
+	out := &server.BatchFilter{Languages: f.Languages, Repos: f.Repos, Force: f.Force,
+		Limit: int32(f.Limit), OnlyRegrade: f.OnlyRegrade}
 
 	if f.MinScore != nil {
 		v := int32(*f.MinScore)
@@ -584,8 +591,8 @@ func batchFilterToProto(f domain.BatchFilter) *server.BatchFilter {
 	return out
 }
 
-func batchToProto(b domain.Batch) *server.RegradeBatch {
-	out := &server.RegradeBatch{
+func batchToProto(b domain.Batch) *server.GradingBatch {
+	out := &server.GradingBatch{
 		Id:        b.ID,
 		CreatedAt: timestamppb.New(b.CreatedAt),
 		Status:    b.Status,
@@ -606,19 +613,19 @@ func batchToProto(b domain.Batch) *server.RegradeBatch {
 	return out
 }
 
-// PreviewRegradeBatch is the dry run of a batch regrade.
-func (s *Server) PreviewRegradeBatch(
+// PreviewGradingBatch is the dry run of a batch grading.
+func (s *Server) PreviewGradingBatch(
 	ctx context.Context,
-	req *server.PreviewRegradeBatchRequest,
-) (*server.PreviewRegradeBatchResponse, error) {
+	req *server.PreviewGradingBatchRequest,
+) (*server.PreviewGradingBatchResponse, error) {
 	preview, err := s.service.PreviewBatch(ctx, batchFilterFromProto(req.GetFilter()))
 	if err != nil {
 		return nil, mapError(err)
 	}
 
-	return &server.PreviewRegradeBatchResponse{
+	return &server.PreviewGradingBatchResponse{
+		Matched:         int32(preview.Matched),
 		Count:           int32(preview.Count),
-		Capped:          preview.Capped,
 		Sample:          preview.Sample,
 		Unmatched:       preview.Unmatched,
 		EstimateSeconds: int32(preview.EstimateSeconds),
@@ -626,49 +633,49 @@ func (s *Server) PreviewRegradeBatch(
 	}, nil
 }
 
-// StartRegradeBatch creates a batch and starts it.
-func (s *Server) StartRegradeBatch(
+// StartGradingBatch creates a batch and starts it.
+func (s *Server) StartGradingBatch(
 	ctx context.Context,
-	req *server.StartRegradeBatchRequest,
-) (*server.StartRegradeBatchResponse, error) {
+	req *server.StartGradingBatchRequest,
+) (*server.StartGradingBatchResponse, error) {
 	batch, err := s.service.StartBatch(ctx, req.GetActorHash(), batchFilterFromProto(req.GetFilter()))
 	if err != nil {
 		return nil, mapError(err)
 	}
 
-	return &server.StartRegradeBatchResponse{Batch: batchToProto(batch)}, nil
+	return &server.StartGradingBatchResponse{Batch: batchToProto(batch)}, nil
 }
 
-// ControlRegradeBatch pauses, resumes or cancels a batch.
-func (s *Server) ControlRegradeBatch(
+// ControlGradingBatch pauses, resumes or cancels a batch.
+func (s *Server) ControlGradingBatch(
 	ctx context.Context,
-	req *server.ControlRegradeBatchRequest,
-) (*server.ControlRegradeBatchResponse, error) {
+	req *server.ControlGradingBatchRequest,
+) (*server.ControlGradingBatchResponse, error) {
 	batch, err := s.service.ControlBatch(ctx, req.GetActorHash(), req.GetBatchId(), req.GetAction())
 	if err != nil {
 		return nil, mapError(err)
 	}
 
-	return &server.ControlRegradeBatchResponse{Batch: batchToProto(batch)}, nil
+	return &server.ControlGradingBatchResponse{Batch: batchToProto(batch)}, nil
 }
 
-// GetRegradeBatch returns a batch and its failed repos.
-func (s *Server) GetRegradeBatch(
+// GetGradingBatch returns a batch and its failed repos.
+func (s *Server) GetGradingBatch(
 	ctx context.Context,
-	req *server.GetRegradeBatchRequest,
-) (*server.GetRegradeBatchResponse, error) {
+	req *server.GetGradingBatchRequest,
+) (*server.GetGradingBatchResponse, error) {
 	batch, failed, err := s.service.BatchStatus(ctx, req.GetBatchId())
 	if err != nil {
 		return nil, mapError(err)
 	}
 
-	response := &server.GetRegradeBatchResponse{
+	response := &server.GetGradingBatchResponse{
 		Batch:    batchToProto(batch),
-		Failures: make([]*server.RegradeBatchFailure, 0, len(failed)),
+		Failures: make([]*server.GradingBatchFailure, 0, len(failed)),
 	}
 
 	for _, item := range failed {
-		response.Failures = append(response.Failures, &server.RegradeBatchFailure{
+		response.Failures = append(response.Failures, &server.GradingBatchFailure{
 			OrgSlug: item.OrgSlug, RepoSlug: item.RepoSlug, Error: item.Error,
 		})
 	}
@@ -676,20 +683,95 @@ func (s *Server) GetRegradeBatch(
 	return response, nil
 }
 
-// ListRegradeBatches returns the most recent batches.
-func (s *Server) ListRegradeBatches(
+// ListGradingBatches returns the most recent batches.
+func (s *Server) ListGradingBatches(
 	ctx context.Context,
-	req *server.ListRegradeBatchesRequest,
-) (*server.ListRegradeBatchesResponse, error) {
+	req *server.ListGradingBatchesRequest,
+) (*server.ListGradingBatchesResponse, error) {
 	batches, err := s.service.ListBatches(ctx, int(req.GetLimit()))
 	if err != nil {
 		return nil, mapError(err)
 	}
 
-	response := &server.ListRegradeBatchesResponse{Batches: make([]*server.RegradeBatch, 0, len(batches))}
+	response := &server.ListGradingBatchesResponse{
+		Batches:  make([]*server.GradingBatch, 0, len(batches)),
+		MaxLimit: int32(s.service.MaxBatchLimit()),
+	}
 	for _, batch := range batches {
 		response.Batches = append(response.Batches, batchToProto(batch))
 	}
 
 	return response, nil
+}
+
+func catalogRefreshToProto(r *domain.CatalogRefresh) *server.CatalogRefresh {
+	if r == nil {
+		return nil
+	}
+
+	out := &server.CatalogRefresh{
+		Id:        r.ID,
+		StartedAt: timestamppb.New(r.StartedAt),
+		Status:    r.Status,
+		Trigger:   r.Trigger,
+		ActorHash: r.ActorHash,
+		Pages:     int32(r.Pages),
+		Repos:     int32(r.Repos),
+		Error:     r.Error,
+	}
+
+	if r.FinishedAt != nil {
+		out.FinishedAt = timestamppb.New(*r.FinishedAt)
+	}
+
+	return out
+}
+
+// GetCatalogStatus reports the public repo catalog and its refreshes.
+func (s *Server) GetCatalogStatus(
+	ctx context.Context,
+	_ *server.GetCatalogStatusRequest,
+) (*server.GetCatalogStatusResponse, error) {
+	catalog, err := s.service.CatalogStatus(ctx)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &server.GetCatalogStatusResponse{
+		Size:          int32(catalog.Size),
+		Current:       catalogRefreshToProto(catalog.Current),
+		LastCompleted: catalogRefreshToProto(catalog.LastCompleted),
+	}
+
+	if catalog.UpdatedAt != nil {
+		response.UpdatedAt = timestamppb.New(*catalog.UpdatedAt)
+	}
+
+	return response, nil
+}
+
+// RefreshCatalog starts a catalog refresh.
+func (s *Server) RefreshCatalog(
+	ctx context.Context,
+	req *server.RefreshCatalogRequest,
+) (*server.RefreshCatalogResponse, error) {
+	refresh, err := s.service.RefreshCatalog(ctx, req.GetActorHash())
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return &server.RefreshCatalogResponse{Refresh: catalogRefreshToProto(&refresh)}, nil
+}
+
+// CancelCatalogRefresh stops the running catalog refresh.
+func (s *Server) CancelCatalogRefresh(
+	ctx context.Context,
+	req *server.CancelCatalogRefreshRequest,
+) (*server.CancelCatalogRefreshResponse, error) {
+	refresh, err := s.service.CancelCatalogRefresh(ctx, req.GetActorHash())
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return &server.CancelCatalogRefreshResponse{Refresh: catalogRefreshToProto(&refresh)}, nil
 }

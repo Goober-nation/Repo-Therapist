@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -17,15 +16,14 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// batchWrapper answers the two wrapper calls batches make: the repo lookup of the activity check
-// and the rating-ordered listing. Unset methods panic through the nil embedded client.
+// batchWrapper answers the wrapper call batches make: the repo lookup of the activity check. Unset
+// methods panic through the nil embedded client.
 type batchWrapper struct {
 	client.CodeHealthClient
 
 	mu       sync.Mutex
 	activity map[string]time.Time // slug -> last_updated
 	failSlug string
-	pages    [][]*client.Repository
 	lookups  []string
 }
 
@@ -49,24 +47,6 @@ func (b *batchWrapper) GetRepositoryBySlugs(_ context.Context, in *client.GetRep
 		Id: uuid.NewString(), Slug: in.GetRepoSlug(), Organization: &client.Organization{Slug: in.GetOrgSlug()},
 		Visibility: domain.VisibilityPublic, LastActivityAt: last.Format(time.RFC3339Nano),
 	}, nil
-}
-
-func (b *batchWrapper) ListTopRatedRepos(_ context.Context, in *client.ListTopRatedReposRequest, _ ...grpc.CallOption) (*client.ListTopRatedReposResponse, error) {
-	page := 0
-	if in.GetPageToken() != "" {
-		fmt.Sscan(in.GetPageToken(), &page)
-	}
-
-	if page >= len(b.pages) {
-		return &client.ListTopRatedReposResponse{}, nil
-	}
-
-	resp := &client.ListTopRatedReposResponse{Repositories: b.pages[page]}
-	if page+1 < len(b.pages) {
-		resp.NextPageToken = fmt.Sprint(page + 1)
-	}
-
-	return resp, nil
 }
 
 func (w *batchWorld) idOf(slug string) uuid.UUID {
@@ -146,7 +126,7 @@ func TestForcedBatchRegradesWithoutActivityCheck(t *testing.T) {
 	wrapper := &batchWrapper{activity: map[string]time.Time{"org/quiet": gradedAt.Add(-time.Hour)}}
 	w.svc.clientRPC = wrapper
 
-	batch, err := w.svc.StartBatch(context.Background(), "abc", domain.BatchFilter{All: true, Force: true})
+	batch, err := w.svc.StartBatch(context.Background(), "abc", domain.BatchFilter{Limit: 10, Force: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,92 +142,22 @@ func TestForcedBatchRegradesWithoutActivityCheck(t *testing.T) {
 	}
 }
 
-func pbRepo(id uuid.UUID, slug, visibility, language string, lastActivity time.Time) *client.Repository {
-	org, name, _ := strings.Cut(slug, "/")
-
-	return &client.Repository{
-		Id: id.String(), Slug: name, Organization: &client.Organization{Slug: org}, Visibility: visibility,
-		Language: &client.Language{Name: language}, LastActivityAt: lastActivity.Format(time.RFC3339Nano),
-	}
-}
-
-func TestTopRatedSelectionKeepsRatingOrderAndCombinesCriteria(t *testing.T) {
-	w, batches, _ := newBatchWorld(t)
-	now := time.Now()
-
-	ids := map[string]uuid.UUID{}
-	for _, slug := range []string{"a/go1", "b/private", "c/py", "d/go-low", "e/go-new", "f/go2", "g/go3"} {
-		ids[slug] = uuid.New()
-	}
-
-	scores := map[uuid.UUID]int{ids["a/go1"]: 90, ids["d/go-low"]: 20, ids["f/go2"]: 75, ids["g/go3"]: 80}
-	gradedAt := now.Add(-24 * time.Hour)
-	batches.gradeInfo = func(id uuid.UUID) (domain.BatchGrade, bool) {
-		score, ok := scores[id]
-
-		return domain.BatchGrade{Score: &score, GradedAt: &gradedAt}, ok
-	}
-
-	w.svc.clientRPC = &batchWrapper{pages: [][]*client.Repository{
-		{
-			pbRepo(ids["a/go1"], "a/go1", "public", "Go", now),          // active since grade
-			pbRepo(ids["b/private"], "b/private", "private", "Go", now), // not public
-			pbRepo(ids["c/py"], "c/py", "public", "Python", now),        // other language
-			pbRepo(ids["d/go-low"], "d/go-low", "public", "Go", now),    // score too low
-		},
-		{
-			pbRepo(ids["e/go-new"], "e/go-new", "public", "go", now),                // never graded: no score
-			pbRepo(ids["f/go2"], "f/go2", "public", "Go", gradedAt.Add(-time.Hour)), // inactive
-			pbRepo(ids["g/go3"], "g/go3", "public", "Go", now),                      // beyond top 2
-		},
-	}}
-
-	top, minScore := 2, 50
-	filter := domain.BatchFilter{TopRated: &top, Languages: []string{"Go"}, MinScore: &minScore}
-
-	preview, err := w.svc.PreviewBatch(context.Background(), filter)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if strings.Join(preview.Sample, ",") != "a/go1,f/go2" || preview.Inactive != 1 || preview.Capped {
-		t.Fatalf("preview = %+v", preview)
-	}
-
-	filter.Force = true
-
-	forced, err := w.svc.PreviewBatch(context.Background(), filter)
-	if err != nil || forced.Inactive != 0 {
-		t.Fatalf("forced preview = %+v, %v", forced, err)
-	}
-
-	// Without a score bound the never-graded repo qualifies in its rating position.
-	noScore := domain.BatchFilter{TopRated: &top, Languages: []string{"go"}}
-
-	preview, err = w.svc.PreviewBatch(context.Background(), noScore)
-	if err != nil || strings.Join(preview.Sample, ",") != "a/go1,d/go-low" {
-		t.Fatalf("preview = %+v, %v", preview, err)
-	}
-}
-
-func TestTopRatedBatchSavesNewReposBeforeStarting(t *testing.T) {
+func TestCatalogBatchSavesNewReposBeforeStarting(t *testing.T) {
 	w, _, _ := newBatchWorld(t)
 	saved := &savingRepos{worldRepos: worldRepos{w}}
 	w.svc.ReposRepo = saved
 
-	id := uuid.New()
-	w.svc.clientRPC = &batchWrapper{pages: [][]*client.Repository{{pbRepo(id, "new/repo", "public", "Go", time.Now())}}}
+	fresh := catalogRepoN(1, 5, "Go")
+	w.svc.CatalogRepo = newMemCatalog(fresh)
 
-	top := 1
-
-	if _, err := w.svc.StartBatch(context.Background(), "abc", domain.BatchFilter{TopRated: &top}); err != nil {
+	if _, err := w.svc.StartBatch(context.Background(), "abc", domain.BatchFilter{Limit: 1}); err != nil {
 		t.Fatal(err)
 	}
 
 	saved.mu.Lock()
 	defer saved.mu.Unlock()
 
-	if len(saved.created) != 1 || saved.created[0].SourcecraftUUID != id {
+	if len(saved.created) != 1 || saved.created[0].SourcecraftUUID != fresh.SourcecraftUUID {
 		t.Fatalf("created = %+v", saved.created)
 	}
 }
@@ -269,23 +179,4 @@ func (s *savingRepos) CreateRepository(_ context.Context, repo domain.Repo) (uui
 	s.created = append(s.created, repo)
 
 	return repo.SourcecraftUUID, nil
-}
-
-func TestTopRatedValidation(t *testing.T) {
-	zero, tooMany, ok := 0, domain.MaxBatchTopRated+1, 10
-
-	for name, filter := range map[string]domain.BatchFilter{
-		"zero":                        {TopRated: &zero},
-		"too many":                    {TopRated: &tooMany},
-		"with all":                    {TopRated: &ok, All: true},
-		"force alone is no criterion": {Force: true},
-	} {
-		if err := filter.Validate(); err == nil {
-			t.Errorf("%s: accepted", name)
-		}
-	}
-
-	if err := (domain.BatchFilter{TopRated: &ok, Force: true}).Validate(); err != nil {
-		t.Fatal(err)
-	}
 }

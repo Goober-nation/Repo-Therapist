@@ -631,6 +631,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .regrade-active, .regrade-finished { display: grid; gap: 10px; margin-top: 14px; }
 .regrade-summary { display: grid; gap: 8px; }
 .regrade-summary__head { display: flex; align-items: center; gap: 10px; }
+.catalog-refresh { flex-wrap: wrap; }
 .regrade-summary p, .regrade-counts { margin: 0; }
 .regrade-failures ul { display: grid; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; }
 .regrade-failures li { display: flex; flex-wrap: wrap; gap: 4px 12px; overflow-wrap: anywhere; }

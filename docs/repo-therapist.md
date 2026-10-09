@@ -219,8 +219,8 @@ curl -s "https://repo-therapist.alo.quest/api/score/likosov-ilia/vidpulse"
   429 с `Retry-After`. Плановый пересчёт в лимит не входит.
 - Клонирование идёт в `/dev/shm`, при нехватке места — на диск; `CLONE_TIMEOUT` и `GRADE_TIMEOUT`
   ограничивают время на один репозиторий.
-- Периодический пересчёт (`GRADING_REGRADE_INTERVAL`) можно ограничить топом N репозиториев
-  (`GRADING_REGRADE_LIMIT`). Время до следующего запуска видно на странице рейтинга (`GET /api/regrade-status`).
+- Периодический пересчёт (`GRADING_REGRADE_INTERVAL`) ограничен топом N репозиториев
+  (`GRADING_REGRADE_LIMIT`, по умолчанию 500); оценённый репозиторий пересчитывается только после новой активности. Время до следующего запуска видно на странице рейтинга (`GET /api/regrade-status`).
 - Запросы к SourceCraft и AppSec повторяются при ответах 429/5xx и сетевых ошибках.
 
 ## Ограничения

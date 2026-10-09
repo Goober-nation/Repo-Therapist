@@ -52,7 +52,7 @@ func mapRepositories(repos []domain.Repository) []*pb.Repository {
 			},
 
 			Slug:        repo.Slug,
-			Description: repo.Description,
+			Description: repoDescription(repo.Description),
 
 			Logo: &pb.Logo{
 				Url: repo.Logo.URL,
@@ -421,4 +421,25 @@ func tokenFromContext(ctx context.Context) (string, error) {
 		return "", ErrMissingToken
 	}
 	return values[0], nil
+}
+
+// MaxRepoDescriptionRunes caps a repository description. SourceCraft does not bound it (one public repo
+// has 8.5 MB), and one such repo would push a whole page past gRPC's 4 MB message limit. Consumers use
+// it for display and the ranking's topic search only.
+const MaxRepoDescriptionRunes = 2000
+
+func repoDescription(description string) string {
+	if len(description) <= MaxRepoDescriptionRunes {
+		return description
+	}
+
+	runes := 0
+	for i := range description {
+		if runes == MaxRepoDescriptionRunes {
+			return description[:i]
+		}
+		runes++
+	}
+
+	return description
 }

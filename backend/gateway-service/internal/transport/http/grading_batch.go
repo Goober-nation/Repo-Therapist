@@ -20,19 +20,19 @@ type batchFilterBody struct {
 	MaxScore      *int32   `json:"max_score"`
 	OlderThanDays *int32   `json:"older_than_days"`
 	Repos         []string `json:"repos"`
-	TopRated      *int32   `json:"top_rated"`
-	All           bool     `json:"all"`
 	Force         bool     `json:"force"`
+	Limit         int32    `json:"limit"`
+	OnlyRegrade   bool     `json:"only_regrade"`
 }
 
 func (b batchFilterBody) domain() domain.BatchFilter {
 	return domain.BatchFilter{Languages: b.Languages, MinScore: b.MinScore, MaxScore: b.MaxScore,
-		OlderThanDays: b.OlderThanDays, Repos: b.Repos, TopRated: b.TopRated, All: b.All, Force: b.Force}
+		OlderThanDays: b.OlderThanDays, Repos: b.Repos, Force: b.Force, Limit: b.Limit, OnlyRegrade: b.OnlyRegrade}
 }
 
 func filterBody(f domain.BatchFilter) batchFilterBody {
 	return batchFilterBody{Languages: f.Languages, MinScore: f.MinScore, MaxScore: f.MaxScore,
-		OlderThanDays: f.OlderThanDays, Repos: f.Repos, TopRated: f.TopRated, All: f.All, Force: f.Force}
+		OlderThanDays: f.OlderThanDays, Repos: f.Repos, Force: f.Force, Limit: f.Limit, OnlyRegrade: f.OnlyRegrade}
 }
 
 type batchResponse struct {
@@ -50,7 +50,7 @@ type batchResponse struct {
 	Skipped    int32           `json:"skipped"`
 }
 
-func batchBody(b domain.RegradeBatch) batchResponse {
+func batchBody(b domain.GradingBatch) batchResponse {
 	return batchResponse{ID: b.ID, CreatedAt: b.CreatedAt, FinishedAt: b.FinishedAt, Status: b.Status, Actor: b.ActorHash,
 		Filter: filterBody(b.Filter), Total: b.Total, Pending: b.Pending, Running: b.Running, OK: b.OK,
 		Failed: b.Failed, Skipped: b.Skipped}
@@ -70,14 +70,14 @@ func readFilter(w stdhttp.ResponseWriter, r *stdhttp.Request) (domain.BatchFilte
 	return body.domain(), true
 }
 
-// PostRegradePreview serves POST /admin/regrade/preview: the dry run of a filter. Starts nothing.
-func (h *Handler) PostRegradePreview(w stdhttp.ResponseWriter, r *stdhttp.Request, _ domain.AdminIdentity) {
+// PostGradingPreview serves POST /admin/grading/preview: the dry run of a filter. Starts nothing.
+func (h *Handler) PostGradingPreview(w stdhttp.ResponseWriter, r *stdhttp.Request, _ domain.AdminIdentity) {
 	filter, ok := readFilter(w, r)
 	if !ok {
 		return
 	}
 
-	p, err := h.service.PreviewRegradeBatch(r.Context(), filter)
+	p, err := h.service.PreviewGradingBatch(r.Context(), filter)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -91,20 +91,20 @@ func (h *Handler) PostRegradePreview(w stdhttp.ResponseWriter, r *stdhttp.Reques
 	}
 
 	writeJSON(w, stdhttp.StatusOK, map[string]any{
-		"count": p.Count, "capped": p.Capped, "sample": nonNil(p.Sample),
+		"matched": p.Matched, "count": p.Count, "sample": nonNil(p.Sample),
 		"unmatched": nonNil(p.Unmatched), "estimate_seconds": p.EstimateSeconds,
 		"inactive": p.Inactive,
 	})
 }
 
-// PostRegradeBatch serves POST /admin/regrade/batches: starts a batch.
-func (h *Handler) PostRegradeBatch(w stdhttp.ResponseWriter, r *stdhttp.Request, admin domain.AdminIdentity) {
+// PostGradingBatch serves POST /admin/grading/batches: starts a batch.
+func (h *Handler) PostGradingBatch(w stdhttp.ResponseWriter, r *stdhttp.Request, admin domain.AdminIdentity) {
 	filter, ok := readFilter(w, r)
 	if !ok {
 		return
 	}
 
-	batch, err := h.service.StartRegradeBatch(r.Context(), admin.ActorHash, filter)
+	batch, err := h.service.StartGradingBatch(r.Context(), admin.ActorHash, filter)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -113,8 +113,9 @@ func (h *Handler) PostRegradeBatch(w stdhttp.ResponseWriter, r *stdhttp.Request,
 	writeJSON(w, stdhttp.StatusCreated, batchBody(batch))
 }
 
-// GetRegradeBatches serves GET /admin/regrade/batches?limit=: recent batches, newest first.
-func (h *Handler) GetRegradeBatches(w stdhttp.ResponseWriter, r *stdhttp.Request, _ domain.AdminIdentity) {
+// GetGradingBatches serves GET /admin/grading/batches?limit=: recent batches, newest first, and the
+// stand's cap on one batch's limit (max_limit, 0 means none).
+func (h *Handler) GetGradingBatches(w stdhttp.ResponseWriter, r *stdhttp.Request, _ domain.AdminIdentity) {
 	var limit int32
 
 	if v := r.URL.Query().Get("limit"); v != "" {
@@ -127,29 +128,29 @@ func (h *Handler) GetRegradeBatches(w stdhttp.ResponseWriter, r *stdhttp.Request
 		limit = int32(n)
 	}
 
-	batches, err := h.service.ListRegradeBatches(r.Context(), limit)
+	list, err := h.service.ListGradingBatches(r.Context(), limit)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
 
-	out := make([]batchResponse, 0, len(batches))
-	for _, b := range batches {
+	out := make([]batchResponse, 0, len(list.Batches))
+	for _, b := range list.Batches {
 		out = append(out, batchBody(b))
 	}
 
-	writeJSON(w, stdhttp.StatusOK, map[string]any{"batches": out})
+	writeJSON(w, stdhttp.StatusOK, map[string]any{"batches": out, "max_limit": list.MaxLimit})
 }
 
-// GetRegradeBatch serves GET /admin/regrade/batches/{id}; id "current" is the active batch, or the latest
+// GetGradingBatch serves GET /admin/grading/batches/{id}; id "current" is the active batch, or the latest
 // (200 with a null batch when there has never been one).
-func (h *Handler) GetRegradeBatch(w stdhttp.ResponseWriter, r *stdhttp.Request, _ domain.AdminIdentity) {
+func (h *Handler) GetGradingBatch(w stdhttp.ResponseWriter, r *stdhttp.Request, _ domain.AdminIdentity) {
 	id, ok := batchID(w, r)
 	if !ok {
 		return
 	}
 
-	detail, err := h.service.GetRegradeBatch(r.Context(), id)
+	detail, err := h.service.GetGradingBatch(r.Context(), id)
 	if err != nil {
 		// "current" before the first batch is the normal state of a fresh stand, not an error.
 		if id == 0 && errors.Is(err, domain.ErrNotFound) {
@@ -169,8 +170,8 @@ func (h *Handler) GetRegradeBatch(w stdhttp.ResponseWriter, r *stdhttp.Request, 
 	writeJSON(w, stdhttp.StatusOK, map[string]any{"batch": batchBody(detail.Batch), "failures": failures})
 }
 
-// PostRegradeControl serves POST /admin/regrade/batches/{id}/{action} for pause, resume and cancel.
-func (h *Handler) PostRegradeControl(w stdhttp.ResponseWriter, r *stdhttp.Request, admin domain.AdminIdentity) {
+// PostGradingControl serves POST /admin/grading/batches/{id}/{action} for pause, resume and cancel.
+func (h *Handler) PostGradingControl(w stdhttp.ResponseWriter, r *stdhttp.Request, admin domain.AdminIdentity) {
 	id, ok := batchID(w, r)
 	if !ok || id == 0 {
 		if ok {
@@ -179,7 +180,7 @@ func (h *Handler) PostRegradeControl(w stdhttp.ResponseWriter, r *stdhttp.Reques
 		return
 	}
 
-	batch, err := h.service.ControlRegradeBatch(r.Context(), admin.ActorHash, id, r.PathValue("action"))
+	batch, err := h.service.ControlGradingBatch(r.Context(), admin.ActorHash, id, r.PathValue("action"))
 	if err != nil {
 		writeError(w, err)
 		return

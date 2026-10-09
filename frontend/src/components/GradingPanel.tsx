@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import type { HttpRepoHealthApi } from "../api/client"
-import type { BatchPreviewResponse, RegradeBatchDetailResponse, RegradeBatchResponse } from "../api/contracts"
+import type { BatchPreviewResponse, GradingBatchDetailResponse, GradingBatchResponse } from "../api/contracts"
 import { formatDateTime } from "../metrics"
 import {
   batchProgress,
@@ -11,20 +11,20 @@ import {
   isActive,
   itemErrorLabel,
   MAX_BATCH_REPOS,
-  MAX_BATCH_TOP_RATED,
   statusLabel,
   type BatchForm,
-} from "../regradeView"
-import { useRegradeBatch } from "../useRegradeBatch"
+} from "../gradingBatchView"
+import { useGradingBatch } from "../useGradingBatch"
 import { Badge, Button, Card, Label, ScoreBar } from "./Shell"
 
 /**
- * Batch regrade for admins: pick public repositories by language, score, age of the last grade or a
- * hand-picked list, check the dry run, start, and follow, pause or cancel the batch. Private
- * repositories are never part of a batch.
+ * Batch grading for admins: pick public repositories from the full list by language, score, age of the
+ * last grade or a hand-picked list, take at most N of them by SourceCraft rating, optionally only those
+ * already graded, check the dry run, start, and follow, pause or cancel the batch. Private repositories
+ * are never part of a batch.
  */
-export default function RegradePanel({ api, onChanged }: { api: HttpRepoHealthApi; onChanged?: () => void }) {
-  const batches = useRegradeBatch(api)
+export default function GradingPanel({ api, onChanged }: { api: HttpRepoHealthApi; onChanged?: () => void }) {
+  const batches = useGradingBatch(api)
   const current = batches.detail
   const active = current && isActive(current.batch)
 
@@ -39,10 +39,11 @@ export default function RegradePanel({ api, onChanged }: { api: HttpRepoHealthAp
 
   return (
     <Card>
-      <Label>Пакетная переоценка</Label>
-      <h2 className="regrade-title">Переоценка публичных репозиториев</h2>
+      <Label>Пакетная оценка</Label>
+      <h2 className="regrade-title">Оценка публичных репозиториев</h2>
       <p className="muted">
-        Репозитории оцениваются заново по очереди, не больше трёх одновременно. Приватные репозитории в пакет не попадают.
+        Репозитории выбираются из полного списка публичных репозиториев и оцениваются по очереди, не больше трёх
+        одновременно. Приватные репозитории в пакет не попадают.
       </p>
 
       {batches.error && (
@@ -61,7 +62,7 @@ export default function RegradePanel({ api, onChanged }: { api: HttpRepoHealthAp
 
       {!batches.isLoading && !batches.error && !active && (
         <>
-          <BatchForm api={api} onStarted={() => void batches.refresh()} />
+          <BatchForm api={api} maxLimit={batches.maxLimit} onStarted={() => void batches.refresh()} />
           {current && <FinishedBatch detail={current} />}
         </>
       )}
@@ -71,7 +72,7 @@ export default function RegradePanel({ api, onChanged }: { api: HttpRepoHealthAp
   )
 }
 
-function BatchForm({ api, onStarted }: { api: HttpRepoHealthApi; onStarted: () => void }) {
+function BatchForm({ api, maxLimit, onStarted }: { api: HttpRepoHealthApi; maxLimit: number; onStarted: () => void }) {
   const [form, setForm] = useState<BatchForm>(EMPTY_BATCH_FORM)
   const [preview, setPreview] = useState<BatchPreviewResponse>()
   const [isBusy, setIsBusy] = useState(false)
@@ -84,7 +85,7 @@ function BatchForm({ api, onStarted }: { api: HttpRepoHealthApi; onStarted: () =
     setError(undefined)
   }
 
-  const built = buildFilter(form)
+  const built = buildFilter(form, maxLimit)
 
   const check = () => {
     if (!built.filter) return setError(built.problem)
@@ -108,20 +109,14 @@ function BatchForm({ api, onStarted }: { api: HttpRepoHealthApi; onStarted: () =
       .finally(() => setIsBusy(false))
   }
 
-  const canStart = Boolean(preview && preview.count > 0 && !preview.capped && !isBusy)
-  const criteria = form.mode === "criteria"
+  const canStart = Boolean(preview && preview.count > 0 && !isBusy)
 
   return (
     <form className="access-form regrade-form" onSubmit={(event) => event.preventDefault()}>
-      <label className="regrade-form__all">
-        <input type="checkbox" checked={!criteria} onChange={(event) => change({ mode: event.target.checked ? "all" : "criteria" })} />
-        <span>Все публичные репозитории</span>
-      </label>
-
-      <fieldset className="regrade-form__fields" disabled={!criteria || isBusy}>
+      <fieldset className="regrade-form__fields" disabled={isBusy}>
         <label className="access-form__field">
-          <span>Топ по рейтингу SourceCraft (до {MAX_BATCH_TOP_RATED})</span>
-          <input inputMode="numeric" value={form.topRated} placeholder="100" onChange={(event) => change({ topRated: event.target.value })} />
+          <span>Не больше репозиториев (обязательно{maxLimit > 0 ? `, до ${maxLimit} на этом стенде` : ""})</span>
+          <input inputMode="numeric" required value={form.limit} placeholder="100" onChange={(event) => change({ limit: event.target.value })} />
         </label>
         <label className="access-form__field">
           <span>Языки</span>
@@ -142,24 +137,34 @@ function BatchForm({ api, onStarted }: { api: HttpRepoHealthApi; onStarted: () =
           </label>
         </div>
         <label className="access-form__field">
-          <span>Свой список (до {MAX_BATCH_REPOS}): организация/репозиторий через пробел, запятую или с новой строки</span>
-          <textarea rows={3} value={form.repos} placeholder="org/repo-one org/repo-two" onChange={(event) => change({ repos: event.target.value })} />
+          <span>Свой список (до {MAX_BATCH_REPOS}): организация/репозиторий или ссылка на репозиторий через пробел, запятую или с новой строки</span>
+          <textarea rows={3} value={form.repos} placeholder="org/repo-one https://sourcecraft.dev/org/repo-two" onChange={(event) => change({ repos: event.target.value })} />
         </label>
       </fieldset>
       <p className="muted">
-        Условия складываются: репозиторий должен подходить под все заданные. Репозитории без оценки подходят только под
-        условия по давности и по рейтингу. С условием «топ» берутся первые подходящие репозитории в порядке рейтинга
-        SourceCraft (среди первых 5000).
+        Условия необязательны и складываются: репозиторий должен подходить под все заданные. Из подошедших берутся
+        первые по рейтингу SourceCraft, не больше указанного числа. Репозитории без оценки подходят только под условие
+        по давности.
+      </p>
+
+      <label className="regrade-form__all">
+        <input type="checkbox" checked={form.onlyRegrade} disabled={isBusy} onChange={(event) => change({ onlyRegrade: event.target.checked })} />
+        <span>Только переоценка</span>
+      </label>
+      <p className="muted">
+        {form.onlyRegrade
+          ? "Берутся только репозитории, у которых уже есть оценка; новые не оцениваются."
+          : "Репозитории, которые ещё не оценивались, тоже попадут в пакет и будут оценены впервые."}
       </p>
 
       <label className="regrade-form__all">
         <input type="checkbox" checked={form.force} disabled={isBusy} onChange={(event) => change({ force: event.target.checked })} />
-        <span>Принудительная переоценка</span>
+        <span>Принудительная оценка</span>
       </label>
       <p className="muted">
         {form.force
           ? "Все выбранные репозитории будут оценены заново, даже без изменений."
-          : "Перед оценкой каждый репозиторий проверяется на новую активность в SourceCraft (коммиты, задачи и другие изменения) с момента последней оценки; без неё он пропускается."}
+          : "Перед оценкой каждый уже оценённый репозиторий проверяется на новую активность в SourceCraft (коммиты, задачи и другие изменения) с момента последней оценки; без неё он пропускается."}
       </p>
 
       {error && (
@@ -189,16 +194,17 @@ function Preview({ preview }: { preview: BatchPreviewResponse }) {
         <strong>Под условия не подошёл ни один публичный репозиторий.</strong>
       ) : (
         <strong>
-          {preview.capped ? `Подошло больше ${preview.count} репозиториев: пакет не запустится, сузьте условия.` : `Будет переоценено: ${preview.count}`}
+          Будет оценено: {preview.count}
+          {preview.matched > preview.count ? ` из ${preview.matched} подошедших (первые по рейтингу)` : ""}
         </strong>
       )}
-      {preview.count > 0 && !preview.capped && preview.inactive > 0 && (
+      {preview.count > 0 && preview.inactive > 0 && (
         <p className="muted">
           Без новой активности, скорее всего, будут пропущены: {preview.inactive}. Проверка повторяется перед оценкой каждого
           репозитория.
         </p>
       )}
-      {preview.count > 0 && !preview.capped && <p className="muted">Ориентировочное время: {formatEstimate(preview.estimate_seconds)}.</p>}
+      {preview.count > 0 && <p className="muted">Ориентировочное время: {formatEstimate(preview.estimate_seconds)}.</p>}
       {preview.sample.length > 0 && (
         <p className="muted regrade-sample">
           {preview.sample.join(", ")}
@@ -212,7 +218,7 @@ function Preview({ preview }: { preview: BatchPreviewResponse }) {
   )
 }
 
-function ActiveBatch({ api, detail, onChange }: { api: HttpRepoHealthApi; detail: RegradeBatchDetailResponse; onChange: () => void }) {
+function ActiveBatch({ api, detail, onChange }: { api: HttpRepoHealthApi; detail: GradingBatchDetailResponse; onChange: () => void }) {
   const { batch } = detail
   const [isBusy, setIsBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -278,7 +284,7 @@ function ActiveBatch({ api, detail, onChange }: { api: HttpRepoHealthApi; detail
   )
 }
 
-function FinishedBatch({ detail }: { detail: RegradeBatchDetailResponse }) {
+function FinishedBatch({ detail }: { detail: GradingBatchDetailResponse }) {
   return (
     <div className="regrade-finished">
       <Label>Последний пакет</Label>
@@ -288,7 +294,7 @@ function FinishedBatch({ detail }: { detail: RegradeBatchDetailResponse }) {
   )
 }
 
-function BatchSummary({ batch }: { batch: RegradeBatchResponse }) {
+function BatchSummary({ batch }: { batch: GradingBatchResponse }) {
   const { done, percent } = batchProgress(batch)
   const status = statusLabel(batch.status)
 
@@ -309,7 +315,7 @@ function BatchSummary({ batch }: { batch: RegradeBatchResponse }) {
   )
 }
 
-function Failures({ failures }: { failures: RegradeBatchDetailResponse["failures"] }) {
+function Failures({ failures }: { failures: GradingBatchDetailResponse["failures"] }) {
   if (failures.length === 0) return null
 
   return (
@@ -327,7 +333,7 @@ function Failures({ failures }: { failures: RegradeBatchDetailResponse["failures
   )
 }
 
-function History({ batches }: { batches: RegradeBatchResponse[] }) {
+function History({ batches }: { batches: GradingBatchResponse[] }) {
   return (
     <div className="regrade-history">
       <Label>История пакетов</Label>

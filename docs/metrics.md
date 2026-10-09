@@ -54,7 +54,7 @@ llm-summary-service :9105 ┘
 | `aggregator_grading_duration_seconds{visibility,outcome}` | Aggregator | время от запроса до результата |
 | `aggregator_grade_limiter_rejections_total` | Aggregator | оценок отклонено общим лимитом |
 | `aggregator_llm_requests_total{outcome}` | Aggregator | запросы рекомендаций: `requested`, `publish_failed`, `received_ok`, `received_error` |
-| `aggregator_regrade_batch_items_total{status}`, `..._events_total{event}` | Aggregator | репозитории и события пакетной переоценки |
+| `aggregator_grading_batch_items_total{status}`, `..._events_total{event}` | Aggregator | репозитории и события пакетной оценки (до 2026-10-09 — `aggregator_regrade_batch_*`) |
 | `aggregator_scheduled_regrade_*` | Aggregator | ход плановой переоценки (идёт ли, всего, обработано) |
 | `aggregator_grpc_requests_total{method,code}` и `..._duration_seconds` | Aggregator | запросы к самому Aggregator |
 | `rating_grpc_requests_total{method,code}` и `..._duration_seconds` | Rating | запросы к Rating |

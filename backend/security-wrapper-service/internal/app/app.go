@@ -27,32 +27,12 @@ func StartApp() {
 	}
 	cfg := config.LoadConfig()
 
-	clientTimeout, err := strconv.Atoi(cfg.ClientTimeout)
-	if err != nil {
-		log.Println("Invalid client timeout: ", err)
-		return
-	}
-	pollInterval, err := strconv.Atoi(cfg.PollIntervalSeconds)
-	if err != nil {
-		log.Println("Invalid report poll interval: ", err)
-		return
-	}
-	pollTimeout, err := strconv.Atoi(cfg.PollTimeoutSeconds)
-	if err != nil {
-		log.Println("Invalid report poll timeout: ", err)
-		return
-	}
+	clientTimeout := intSetting("CLIENT_TIMEOUT", cfg.ClientTimeout, 5, 1)
+	pollInterval := intSetting("REPORT_POLL_INTERVAL_SECONDS", cfg.PollIntervalSeconds, 2, 1)
+	pollTimeout := intSetting("REPORT_POLL_TIMEOUT_SECONDS", cfg.PollTimeoutSeconds, 60, 1)
 
-	retryAttempts, err := strconv.Atoi(cfg.RetryAttempts)
-	if err != nil {
-		log.Println("Invalid retry attempts: ", err)
-		return
-	}
-	retryWait, err := strconv.Atoi(cfg.RetryWaitSeconds)
-	if err != nil {
-		log.Println("Invalid retry wait: ", err)
-		return
-	}
+	retryAttempts := intSetting("HTTP_RETRY_ATTEMPTS", cfg.RetryAttempts, 3, 1)
+	retryWait := intSetting("HTTP_RETRY_WAIT_SECONDS", cfg.RetryWaitSeconds, 1, 0)
 
 	// No Client.Timeout: it would cap all retry attempts together; the transport times each one.
 	httpClient := http.Client{Transport: &retry.Transport{
@@ -107,4 +87,15 @@ func StartApp() {
 	}
 
 	log.Println("Server exiting")
+}
+
+// intSetting parses a numeric setting; an invalid or too small value falls back to def with a log
+// line instead of stopping the service (the container's entrypoint stops every service when one exits).
+func intSetting(name, value string, def, min int) int {
+	n, err := strconv.Atoi(value)
+	if err != nil || n < min {
+		log.Printf("ignoring invalid %s=%q, using %d", name, value, def)
+		return def
+	}
+	return n
 }

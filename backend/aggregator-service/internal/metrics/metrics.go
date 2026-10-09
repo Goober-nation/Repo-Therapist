@@ -64,12 +64,12 @@ func New() *Metrics {
 			Help: "LLM recommendation requests by outcome (requested, publish_failed, received_ok, received_error).",
 		}, []string{"outcome"}),
 		batchItems: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "aggregator_regrade_batch_items_total",
-			Help: "Batch regrade repositories by final status (ok, failed, skipped).",
+			Name: "aggregator_grading_batch_items_total",
+			Help: "Batch grading repositories by final status (ok, failed, skipped).",
 		}, []string{"status"}),
 		batchEvents: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "aggregator_regrade_batch_events_total",
-			Help: "Batch regrade events (start, pause, resume, cancel, complete).",
+			Name: "aggregator_grading_batch_events_total",
+			Help: "Batch grading events (start, pause, resume, cancel, complete).",
 		}, []string{"event"}),
 	}
 

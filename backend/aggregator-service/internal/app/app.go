@@ -57,6 +57,7 @@ func StartApp() {
 	llmRepo := postgres_repositories.NewLLMRepository(db)
 	auditRepo := postgres_repositories.NewAuditRepository(db)
 	batchRepo := postgres_repositories.NewBatchRepository(db)
+	catalogRepo := postgres_repositories.NewCatalogRepository(db)
 
 	redisClient := goredis.NewClient(&goredis.Options{
 		Addr:     cfg.Redis.Address,
@@ -115,11 +116,16 @@ func StartApp() {
 	aggregatorService.Metrics = appMetrics
 	aggregatorService.AuditRepo = auditRepo
 	aggregatorService.BatchRepo = batchRepo
+	aggregatorService.CatalogRepo = catalogRepo
+	aggregatorService.CatalogMaxPages = cfg.Batch.CatalogMaxPages
 	aggregatorService.BatchConcurrency = cfg.Batch.Concurrency
-	aggregatorService.BatchMaxRepos = cfg.Batch.MaxRepos
 	aggregatorService.BatchItemTimeout = cfg.Batch.ItemTimeout
+	aggregatorService.BatchMaxLimit = cfg.Batch.MaxLimit
 	aggregatorService.TokenStore = redis_repositories.NewTokenStore(redisClient)
 	aggregatorService.TokenTTL = cfg.Grading.LockTimeout
+	if warning := config.LockTimeoutWarning(cfg.Grading.LockTimeout); warning != "" {
+		log.Println(warning)
+	}
 	aggregatorService.RegradeLimit = cfg.Grading.RegradeLimit
 	aggregatorService.RegradeListTimeout = cfg.Grading.RegradeListTimeout
 	aggregatorService.RegradeMissingAnalytics = cfg.Grading.RegradeMissingAnalytics
@@ -170,6 +176,7 @@ func StartApp() {
 
 	aggregatorService.StartAuditRetention(ctx, cfg.Audit.RetentionDays)
 	aggregatorService.ResumeBatch(ctx)
+	aggregatorService.StartCatalog(ctx)
 
 	aggregatorService.StartPublicGrading(
 		ctx,

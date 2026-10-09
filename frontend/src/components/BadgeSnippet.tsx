@@ -10,6 +10,23 @@ export const BADGE_CATEGORIES = [
   "code_health",
 ] as const
 
+/**
+ * Origin used in badge links: VITE_PUBLIC_URL (set per deployment, e.g. https://example.org) or,
+ * when unset or invalid, the page's own origin.
+ */
+export function publicOrigin(configured: string | undefined, fallback: string): string {
+  const value = (configured ?? "").trim()
+  if (value) {
+    try {
+      const url = new URL(value)
+      if (url.protocol === "http:" || url.protocol === "https:") return url.origin
+    } catch {
+      // Invalid value: use the page origin.
+    }
+  }
+  return fallback
+}
+
 function repoPath(org: string, repo: string): string {
   return `${encodeURIComponent(org)}/${encodeURIComponent(repo)}`
 }
@@ -122,7 +139,10 @@ export default function BadgeSnippet({
   repo: string
 }) {
   // Absent outside the browser (server-side rendering in tests).
-  const origin = typeof window === "undefined" ? "" : window.location.origin
+  const origin = publicOrigin(
+    import.meta.env.VITE_PUBLIC_URL,
+    typeof window === "undefined" ? "" : window.location.origin,
+  )
   const path = repoPath(org, repo)
   // Collapsed by default: the snippets are a reference, and nothing below loads until asked for.
   const [open, setOpen] = useState(false)

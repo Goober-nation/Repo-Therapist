@@ -38,8 +38,8 @@ func TestAuditRepositoryInsertListAndPurge(t *testing.T) {
 
 	events := []domain.AuditEvent{
 		{ActorKind: "admin", ActorHash: marker, Action: "admin.denied", TargetKind: "route", Target: "/admin/audit", Outcome: "denied", Details: []byte(`{"reason":"not_admin"}`)},
-		{ActorKind: "admin", ActorHash: marker, Action: "regrade.batch.start", TargetKind: "batch", Target: "b1", Outcome: "ok"},
-		{ActorKind: "admin", ActorHash: marker, Action: "regrade.batch.cancel", TargetKind: "batch", Target: "b1", Outcome: "ok"},
+		{ActorKind: "admin", ActorHash: marker, Action: "batch_grading.start", TargetKind: "batch", Target: "b1", Outcome: "ok"},
+		{ActorKind: "admin", ActorHash: marker, Action: "batch_grading.cancel", TargetKind: "batch", Target: "b1", Outcome: "ok"},
 	}
 
 	for _, event := range events {
@@ -61,7 +61,7 @@ func TestAuditRepositoryInsertListAndPurge(t *testing.T) {
 		}
 	}
 
-	if len(mine) != 3 || mine[0].Action != "regrade.batch.cancel" || mine[2].Action != "admin.denied" {
+	if len(mine) != 3 || mine[0].Action != "batch_grading.cancel" || mine[2].Action != "admin.denied" {
 		t.Fatalf("newest-first order broken: %+v", mine)
 	}
 
@@ -157,7 +157,7 @@ func TestAuditRepositoryScopeSplitsUserActionsFromTheAdminJournal(t *testing.T) 
 
 	repo := NewAuditRepository(pool)
 
-	for _, action := range []string{"grading.request", "recommendations.request", "admin.denied", "regrade.batch.start", "gradingx.other"} {
+	for _, action := range []string{"grading.request", "recommendations.request", "admin.denied", "batch_grading.start", "gradingx.other"} {
 		if err := repo.InsertAudit(ctx, domain.AuditEvent{ActorKind: "user", ActorHash: marker, Action: action, Outcome: "ok"}); err != nil {
 			t.Fatalf("insert %s: %v", action, err)
 		}
@@ -186,7 +186,7 @@ func TestAuditRepositoryScopeSplitsUserActionsFromTheAdminJournal(t *testing.T) 
 		t.Errorf("users scope = %v, want exactly the two user actions", users)
 	}
 
-	if len(admin) != 3 || users["admin.denied"] || !admin["admin.denied"] || !admin["regrade.batch.start"] || !admin["gradingx.other"] {
+	if len(admin) != 3 || users["admin.denied"] || !admin["admin.denied"] || !admin["batch_grading.start"] || !admin["gradingx.other"] {
 		t.Errorf("admin scope = %v, want the other three", admin)
 	}
 

@@ -52,17 +52,26 @@ func (b *batchStub) ListBatches(context.Context, int) ([]domain.Batch, error) {
 	return []domain.Batch{b.batch}, b.err
 }
 
-func TestStartRegradeBatchMapsFilterAndBatch(t *testing.T) {
+func (b *batchStub) MaxBatchLimit() int { return 250 }
+
+func TestListGradingBatchesCarriesTheStandMaximum(t *testing.T) {
+	resp, err := NewServer(&batchStub{}).ListGradingBatches(context.Background(), &server.ListGradingBatchesRequest{})
+	if err != nil || resp.GetMaxLimit() != 250 {
+		t.Fatalf("max_limit = %d, %v", resp.GetMaxLimit(), err)
+	}
+}
+
+func TestStartGradingBatchMapsFilterAndBatch(t *testing.T) {
 	finished := time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
 	stub := &batchStub{batch: domain.Batch{ID: 7, Status: domain.BatchRunning, Total: 5, Pending: 3, OK: 1, Failed: 1, FinishedAt: &finished,
 		Filter: domain.BatchFilter{Languages: []string{"go"}}}}
 
 	min, max, days := int32(10), int32(60), int32(30)
 
-	resp, err := NewServer(stub).StartRegradeBatch(context.Background(), &server.StartRegradeBatchRequest{
+	resp, err := NewServer(stub).StartGradingBatch(context.Background(), &server.StartGradingBatchRequest{
 		ActorHash: "abc123",
 		Filter: &server.BatchFilter{Languages: []string{"go"}, MinScore: &min, MaxScore: &max, OlderThanDays: &days,
-			Repos: []string{"org/repo"}},
+			Repos: []string{"org/repo"}, Limit: 250, OnlyRegrade: true},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +79,7 @@ func TestStartRegradeBatchMapsFilterAndBatch(t *testing.T) {
 
 	f := stub.filter
 	if stub.actor != "abc123" || f.MinScore == nil || *f.MinScore != 10 || *f.MaxScore != 60 || *f.OlderThanDays != 30 ||
-		len(f.Languages) != 1 || len(f.Repos) != 1 || f.All {
+		len(f.Languages) != 1 || len(f.Repos) != 1 || f.Limit != 250 || !f.OnlyRegrade {
 		t.Errorf("filter = %+v, actor %q", f, stub.actor)
 	}
 
@@ -84,13 +93,13 @@ func TestStartRegradeBatchMapsFilterAndBatch(t *testing.T) {
 func TestBatchFilterUnsetScoresStayUnset(t *testing.T) {
 	stub := &batchStub{}
 
-	if _, err := NewServer(stub).PreviewRegradeBatch(context.Background(), &server.PreviewRegradeBatchRequest{
-		Filter: &server.BatchFilter{All: true},
+	if _, err := NewServer(stub).PreviewGradingBatch(context.Background(), &server.PreviewGradingBatchRequest{
+		Filter: &server.BatchFilter{Limit: 5},
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	if f := stub.filter; !f.All || f.MinScore != nil || f.MaxScore != nil || f.OlderThanDays != nil {
+	if f := stub.filter; f.Limit != 5 || f.OnlyRegrade || f.MinScore != nil || f.MaxScore != nil || f.OlderThanDays != nil {
 		t.Errorf("filter = %+v: an unset bound must not become 0", f)
 	}
 }
@@ -103,7 +112,7 @@ func TestBatchErrorsMapToStatusCodes(t *testing.T) {
 	}{
 		{domain.ErrInvalidBatch, codes.InvalidArgument, BatchReasonInvalid},
 		{domain.ErrBatchNothing, codes.InvalidArgument, BatchReasonNothing},
-		{domain.ErrBatchTooMany, codes.InvalidArgument, BatchReasonTooMany},
+		{fmt.Errorf("%w (50)", domain.ErrBatchLimitTooHigh), codes.InvalidArgument, BatchReasonTooHigh},
 		{domain.ErrBatchActive, codes.AlreadyExists, BatchReasonActive},
 		{domain.ErrBatchState, codes.Aborted, BatchReasonState},
 		{domain.ErrBatchNotFound, codes.NotFound, BatchReasonNotFound},
@@ -113,17 +122,17 @@ func TestBatchErrorsMapToStatusCodes(t *testing.T) {
 	for _, tc := range cases {
 		stub := &batchStub{err: tc.cause}
 
-		_, err := NewServer(stub).ControlRegradeBatch(context.Background(), &server.ControlRegradeBatchRequest{BatchId: 1, Action: "pause"})
+		_, err := NewServer(stub).ControlGradingBatch(context.Background(), &server.ControlGradingBatchRequest{BatchId: 1, Action: "pause"})
 		if status.Code(err) != tc.code || status.Convert(err).Message() != tc.reason {
 			t.Errorf("%v: got %v %q, want %v %q", tc.cause, status.Code(err), status.Convert(err).Message(), tc.code, tc.reason)
 		}
 	}
 }
 
-func TestControlRegradeBatchPassesActionAndActor(t *testing.T) {
+func TestControlGradingBatchPassesActionAndActor(t *testing.T) {
 	stub := &batchStub{batch: domain.Batch{ID: 3}}
 
-	if _, err := NewServer(stub).ControlRegradeBatch(context.Background(), &server.ControlRegradeBatchRequest{BatchId: 3, Action: "cancel", ActorHash: "ff00"}); err != nil {
+	if _, err := NewServer(stub).ControlGradingBatch(context.Background(), &server.ControlGradingBatchRequest{BatchId: 3, Action: "cancel", ActorHash: "ff00"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -132,13 +141,13 @@ func TestControlRegradeBatchPassesActionAndActor(t *testing.T) {
 	}
 }
 
-func TestGetRegradeBatchReturnsFailures(t *testing.T) {
+func TestGetGradingBatchReturnsFailures(t *testing.T) {
 	stub := &batchStub{
 		batch:  domain.Batch{ID: 9, Status: domain.BatchCompleted},
 		failed: []domain.BatchItem{{OrgSlug: "org", RepoSlug: "bad", Error: domain.BatchErrorTimeout}},
 	}
 
-	resp, err := NewServer(stub).GetRegradeBatch(context.Background(), &server.GetRegradeBatchRequest{})
+	resp, err := NewServer(stub).GetGradingBatch(context.Background(), &server.GetGradingBatchRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +157,7 @@ func TestGetRegradeBatchReturnsFailures(t *testing.T) {
 	}
 
 	stub.err = errors.New("db down")
-	if _, err := NewServer(stub).GetRegradeBatch(context.Background(), &server.GetRegradeBatchRequest{}); status.Code(err) != codes.Internal {
+	if _, err := NewServer(stub).GetGradingBatch(context.Background(), &server.GetGradingBatchRequest{}); status.Code(err) != codes.Internal {
 		t.Errorf("code = %v, want Internal", status.Code(err))
 	}
 }

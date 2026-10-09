@@ -12,22 +12,25 @@ type ReasonError struct {
 func (e ReasonError) Error() string { return e.Err.Error() }
 func (e ReasonError) Unwrap() error { return e.Err }
 
-// BatchFilter says which public repositories a batch regrade covers (mirrors the Aggregator's rules).
+// BatchFilter says which public repositories a batch grading covers (mirrors the Aggregator's rules).
 type BatchFilter struct {
 	Languages     []string
 	MinScore      *int32
 	MaxScore      *int32
 	OlderThanDays *int32
 	Repos         []string
-	TopRated      *int32
-	All           bool
 	Force         bool
+	// Limit is how many matching repos are graded, highest SourceCraft rating first; required.
+	Limit int32
+	// OnlyRegrade keeps only repos that already have a public grade.
+	OnlyRegrade bool
 }
 
 // BatchPreview is the dry run of a batch.
 type BatchPreview struct {
+	// Matched is how many repos the criteria match; Count how many of them the limit takes.
+	Matched         int32
 	Count           int32
-	Capped          bool
 	Sample          []string
 	Unmatched       []string
 	EstimateSeconds int32
@@ -41,8 +44,8 @@ const (
 	BatchActionCancel = "cancel"
 )
 
-// RegradeBatch is one batch with its item counts.
-type RegradeBatch struct {
+// GradingBatch is one batch with its item counts.
+type GradingBatch struct {
 	ID         int64
 	CreatedAt  time.Time
 	FinishedAt *time.Time
@@ -57,15 +60,21 @@ type RegradeBatch struct {
 	Skipped    int32
 }
 
-// RegradeBatchFailure is a repo that failed in a batch, with a fixed error code.
-type RegradeBatchFailure struct {
+// GradingBatchFailure is a repo that failed in a batch, with a fixed error code.
+type GradingBatchFailure struct {
 	OrgSlug  string
 	RepoSlug string
 	Error    string
 }
 
-// RegradeBatchDetail is a batch with the repos that failed in it.
-type RegradeBatchDetail struct {
-	Batch    RegradeBatch
-	Failures []RegradeBatchFailure
+// GradingBatchList is the recent batches and the stand's cap on one batch's limit (0 means none).
+type GradingBatchList struct {
+	Batches  []GradingBatch
+	MaxLimit int32
+}
+
+// GradingBatchDetail is a batch with the repos that failed in it.
+type GradingBatchDetail struct {
+	Batch    GradingBatch
+	Failures []GradingBatchFailure
 }

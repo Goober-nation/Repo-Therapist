@@ -26,6 +26,7 @@ type SCService interface {
 	ListAllPublicRepos(ctx context.Context) ([]domain.Repository, error)
 	GetMyRepos(ctx context.Context) (domain.MyRepositoriesResponse, error)
 	ListTopRatedRepos(ctx context.Context, pageToken string) (domain.MyRepositoriesResponse, error)
+	ListPublicReposPage(ctx context.Context, pageToken string) (domain.MyRepositoriesResponse, error)
 	GetMyOrgs(ctx context.Context) (domain.MyOrganizations, error)
 	GetOrgRepos(ctx context.Context, orgSlug, pageToken string) (domain.MyRepositoriesResponse, error)
 	GetPullRequests(ctx context.Context, repoID string, limit int) (domain.PullRequests, error)
@@ -253,12 +254,25 @@ func (scw *SCWrapper) GetMilestones(ctx context.Context, repoID string) (domain.
 // ListTopRatedRepos returns one page (100) of GET /repos sorted by SourceCraft rating, highest
 // first, starting at pageToken.
 func (scw *SCWrapper) ListTopRatedRepos(ctx context.Context, pageToken string) (domain.MyRepositoriesResponse, error) {
+	return scw.listReposPage(ctx, pageToken, "-rating")
+}
+
+// ListPublicReposPage returns one page (100) of GET /repos in the platform's own order, starting at
+// pageToken. Unlike the rating order, it does not shift while a full listing pages through it.
+func (scw *SCWrapper) ListPublicReposPage(ctx context.Context, pageToken string) (domain.MyRepositoriesResponse, error) {
+	return scw.listReposPage(ctx, pageToken, "")
+}
+
+func (scw *SCWrapper) listReposPage(ctx context.Context, pageToken, sortBy string) (domain.MyRepositoriesResponse, error) {
 	token, err := tokenFromContext(ctx)
 	if err != nil {
 		return domain.MyRepositoriesResponse{}, fmt.Errorf("%w: %w", domain.ErrUnauthenticated, err)
 	}
 
-	params := url2.Values{"page_size": {"100"}, "sort_by": {"-rating"}}
+	params := url2.Values{"page_size": {"100"}}
+	if sortBy != "" {
+		params.Set("sort_by", sortBy)
+	}
 	if pageToken != "" {
 		params.Set("page_token", pageToken)
 	}
@@ -321,10 +335,10 @@ func (scw *SCWrapper) ListAllPublicRepos(
 	pageToken := ""
 
 	for page := 0; page < scw.MaxPages; page++ {
-		url := fmt.Sprintf("%s/repos", scw.apiURL)
+		url := fmt.Sprintf("%s/repos?page_size=100", scw.apiURL)
 
 		if pageToken != "" {
-			url += "?page_token=" + url2.QueryEscape(pageToken)
+			url += "&page_token=" + url2.QueryEscape(pageToken)
 		}
 
 		req, err := http.NewRequestWithContext(

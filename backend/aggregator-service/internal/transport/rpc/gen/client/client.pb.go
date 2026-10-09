@@ -365,27 +365,27 @@ func (x *GetMyReposResponse) GetNextPageToken() string {
 	return ""
 }
 
-type ListTopRatedReposRequest struct {
+type ListPublicReposPageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PageToken     string                 `protobuf:"bytes,1,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListTopRatedReposRequest) Reset() {
-	*x = ListTopRatedReposRequest{}
+func (x *ListPublicReposPageRequest) Reset() {
+	*x = ListPublicReposPageRequest{}
 	mi := &file_internal_transport_rpc_client_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListTopRatedReposRequest) String() string {
+func (x *ListPublicReposPageRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListTopRatedReposRequest) ProtoMessage() {}
+func (*ListPublicReposPageRequest) ProtoMessage() {}
 
-func (x *ListTopRatedReposRequest) ProtoReflect() protoreflect.Message {
+func (x *ListPublicReposPageRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_internal_transport_rpc_client_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -397,40 +397,41 @@ func (x *ListTopRatedReposRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListTopRatedReposRequest.ProtoReflect.Descriptor instead.
-func (*ListTopRatedReposRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListPublicReposPageRequest.ProtoReflect.Descriptor instead.
+func (*ListPublicReposPageRequest) Descriptor() ([]byte, []int) {
 	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *ListTopRatedReposRequest) GetPageToken() string {
+func (x *ListPublicReposPageRequest) GetPageToken() string {
 	if x != nil {
 		return x.PageToken
 	}
 	return ""
 }
 
-type ListTopRatedReposResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Repositories  []*Repository          `protobuf:"bytes,1,rep,name=repositories,proto3" json:"repositories,omitempty"`
-	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+type ListPublicReposPageResponse struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Repositories []*Repository          `protobuf:"bytes,1,rep,name=repositories,proto3" json:"repositories,omitempty"`
+	// Empty on the last page.
+	NextPageToken string `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListTopRatedReposResponse) Reset() {
-	*x = ListTopRatedReposResponse{}
+func (x *ListPublicReposPageResponse) Reset() {
+	*x = ListPublicReposPageResponse{}
 	mi := &file_internal_transport_rpc_client_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListTopRatedReposResponse) String() string {
+func (x *ListPublicReposPageResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListTopRatedReposResponse) ProtoMessage() {}
+func (*ListPublicReposPageResponse) ProtoMessage() {}
 
-func (x *ListTopRatedReposResponse) ProtoReflect() protoreflect.Message {
+func (x *ListPublicReposPageResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_internal_transport_rpc_client_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -442,19 +443,19 @@ func (x *ListTopRatedReposResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListTopRatedReposResponse.ProtoReflect.Descriptor instead.
-func (*ListTopRatedReposResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListPublicReposPageResponse.ProtoReflect.Descriptor instead.
+func (*ListPublicReposPageResponse) Descriptor() ([]byte, []int) {
 	return file_internal_transport_rpc_client_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *ListTopRatedReposResponse) GetRepositories() []*Repository {
+func (x *ListPublicReposPageResponse) GetRepositories() []*Repository {
 	if x != nil {
 		return x.Repositories
 	}
 	return nil
 }
 
-func (x *ListTopRatedReposResponse) GetNextPageToken() string {
+func (x *ListPublicReposPageResponse) GetNextPageToken() string {
 	if x != nil {
 		return x.NextPageToken
 	}
@@ -1134,11 +1135,11 @@ const file_internal_transport_rpc_client_proto_rawDesc = "" +
 	"\x11GetMyReposRequest\"y\n" +
 	"\x12GetMyReposResponse\x12;\n" +
 	"\frepositories\x18\x01 \x03(\v2\x17.code_health.RepositoryR\frepositories\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"9\n" +
-	"\x18ListTopRatedReposRequest\x12\x1d\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\";\n" +
+	"\x1aListPublicReposPageRequest\x12\x1d\n" +
 	"\n" +
-	"page_token\x18\x01 \x01(\tR\tpageToken\"\x80\x01\n" +
-	"\x19ListTopRatedReposResponse\x12;\n" +
+	"page_token\x18\x01 \x01(\tR\tpageToken\"\x82\x01\n" +
+	"\x1bListPublicReposPageResponse\x12;\n" +
 	"\frepositories\x18\x01 \x03(\v2\x17.code_health.RepositoryR\frepositories\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x12\n" +
 	"\x10GetMyOrgsRequest\"\x82\x01\n" +
@@ -1189,14 +1190,14 @@ const file_internal_transport_rpc_client_proto_rawDesc = "" +
 	"\x0freaction_counts\x18\x03 \x03(\v2\x1a.code_health.ReactionCountR\x0ereactionCounts\"9\n" +
 	"\rReactionCount\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x14\n" +
-	"\x05count\x18\x02 \x01(\tR\x05count2\xb1\x04\n" +
+	"\x05count\x18\x02 \x01(\tR\x05count2\xb7\x04\n" +
 	"\n" +
 	"CodeHealth\x12k\n" +
 	"\x14GetRepositoryBySlugs\x12(.code_health.GetRepositoryBySlugsRequest\x1a).code_health.GetRepositoryBySlugsResponse\x12e\n" +
 	"\x12ListAllPublicRepos\x12&.code_health.ListAllPublicReposRequest\x1a'.code_health.ListAllPublicReposResponse\x12M\n" +
 	"\n" +
-	"GetMyRepos\x12\x1e.code_health.GetMyReposRequest\x1a\x1f.code_health.GetMyReposResponse\x12b\n" +
-	"\x11ListTopRatedRepos\x12%.code_health.ListTopRatedReposRequest\x1a&.code_health.ListTopRatedReposResponse\x12J\n" +
+	"GetMyRepos\x12\x1e.code_health.GetMyReposRequest\x1a\x1f.code_health.GetMyReposResponse\x12h\n" +
+	"\x13ListPublicReposPage\x12'.code_health.ListPublicReposPageRequest\x1a(.code_health.ListPublicReposPageResponse\x12J\n" +
 	"\tGetMyOrgs\x12\x1d.code_health.GetMyOrgsRequest\x1a\x1e.code_health.GetMyOrgsResponse\x12P\n" +
 	"\vGetOrgRepos\x12\x1f.code_health.GetOrgReposRequest\x1a .code_health.GetOrgReposResponseB2Z0aggregator-service/internal/transport/rpc/gen;pbb\x06proto3"
 
@@ -1220,8 +1221,8 @@ var file_internal_transport_rpc_client_proto_goTypes = []any{
 	(*ListAllPublicReposResponse)(nil),   // 3: code_health.ListAllPublicReposResponse
 	(*GetMyReposRequest)(nil),            // 4: code_health.GetMyReposRequest
 	(*GetMyReposResponse)(nil),           // 5: code_health.GetMyReposResponse
-	(*ListTopRatedReposRequest)(nil),     // 6: code_health.ListTopRatedReposRequest
-	(*ListTopRatedReposResponse)(nil),    // 7: code_health.ListTopRatedReposResponse
+	(*ListPublicReposPageRequest)(nil),   // 6: code_health.ListPublicReposPageRequest
+	(*ListPublicReposPageResponse)(nil),  // 7: code_health.ListPublicReposPageResponse
 	(*GetMyOrgsRequest)(nil),             // 8: code_health.GetMyOrgsRequest
 	(*GetMyOrgsResponse)(nil),            // 9: code_health.GetMyOrgsResponse
 	(*UserOrganization)(nil),             // 10: code_health.UserOrganization
@@ -1241,7 +1242,7 @@ var file_internal_transport_rpc_client_proto_depIdxs = []int32{
 	14, // 3: code_health.GetRepositoryBySlugsResponse.language:type_name -> code_health.Language
 	13, // 4: code_health.ListAllPublicReposResponse.repos:type_name -> code_health.Repository
 	13, // 5: code_health.GetMyReposResponse.repositories:type_name -> code_health.Repository
-	13, // 6: code_health.ListTopRatedReposResponse.repositories:type_name -> code_health.Repository
+	13, // 6: code_health.ListPublicReposPageResponse.repositories:type_name -> code_health.Repository
 	10, // 7: code_health.GetMyOrgsResponse.organizations:type_name -> code_health.UserOrganization
 	13, // 8: code_health.GetOrgReposResponse.repositories:type_name -> code_health.Repository
 	15, // 9: code_health.Repository.organization:type_name -> code_health.Organization
@@ -1252,13 +1253,13 @@ var file_internal_transport_rpc_client_proto_depIdxs = []int32{
 	0,  // 14: code_health.CodeHealth.GetRepositoryBySlugs:input_type -> code_health.GetRepositoryBySlugsRequest
 	2,  // 15: code_health.CodeHealth.ListAllPublicRepos:input_type -> code_health.ListAllPublicReposRequest
 	4,  // 16: code_health.CodeHealth.GetMyRepos:input_type -> code_health.GetMyReposRequest
-	6,  // 17: code_health.CodeHealth.ListTopRatedRepos:input_type -> code_health.ListTopRatedReposRequest
+	6,  // 17: code_health.CodeHealth.ListPublicReposPage:input_type -> code_health.ListPublicReposPageRequest
 	8,  // 18: code_health.CodeHealth.GetMyOrgs:input_type -> code_health.GetMyOrgsRequest
 	11, // 19: code_health.CodeHealth.GetOrgRepos:input_type -> code_health.GetOrgReposRequest
 	1,  // 20: code_health.CodeHealth.GetRepositoryBySlugs:output_type -> code_health.GetRepositoryBySlugsResponse
 	3,  // 21: code_health.CodeHealth.ListAllPublicRepos:output_type -> code_health.ListAllPublicReposResponse
 	5,  // 22: code_health.CodeHealth.GetMyRepos:output_type -> code_health.GetMyReposResponse
-	7,  // 23: code_health.CodeHealth.ListTopRatedRepos:output_type -> code_health.ListTopRatedReposResponse
+	7,  // 23: code_health.CodeHealth.ListPublicReposPage:output_type -> code_health.ListPublicReposPageResponse
 	9,  // 24: code_health.CodeHealth.GetMyOrgs:output_type -> code_health.GetMyOrgsResponse
 	12, // 25: code_health.CodeHealth.GetOrgRepos:output_type -> code_health.GetOrgReposResponse
 	20, // [20:26] is the sub-list for method output_type

@@ -34,23 +34,34 @@ service Aggregator {
   // ListAudit returns one page of the audit log, newest first, with a cursor for the next page.
   rpc ListAudit(ListAuditRequest) returns (ListAuditResponse);
 
-  // PreviewRegradeBatch is the dry run of an admin batch regrade: how many public repos a filter
-  // selects, a sample, the hand-picked ones that matched nothing and a rough duration. Writes nothing.
+  // PreviewGradingBatch is the dry run of an admin batch grading: how many public repos a filter
+  // matches and the limit takes, a sample, the hand-picked ones that matched nothing and a rough duration. Writes nothing.
   // INVALID_ARGUMENT for a filter that breaks the rules.
-  rpc PreviewRegradeBatch(PreviewRegradeBatchRequest) returns (PreviewRegradeBatchResponse);
-  // StartRegradeBatch creates a batch and starts it. ALREADY_EXISTS (batch_active) while another batch
-  // is running or paused; INVALID_ARGUMENT (invalid_filter | nothing_selected | too_many) for a bad
-  // filter or one that selects nothing or too many repos. The start is recorded in the audit log
+  rpc PreviewGradingBatch(PreviewGradingBatchRequest) returns (PreviewGradingBatchResponse);
+  // StartGradingBatch creates a batch and starts it. ALREADY_EXISTS (batch_active) while another batch
+  // is running or paused; INVALID_ARGUMENT (invalid_filter | nothing_selected |
+  // limit_too_high) for a bad filter, one that selects nothing or a limit above the stand's cap. The start is recorded in the audit log
   // under actor_hash.
-  rpc StartRegradeBatch(StartRegradeBatchRequest) returns (StartRegradeBatchResponse);
-  // ControlRegradeBatch pauses, resumes or cancels a batch. ABORTED (bad_state) when the action does
+  rpc StartGradingBatch(StartGradingBatchRequest) returns (StartGradingBatchResponse);
+  // ControlGradingBatch pauses, resumes or cancels a batch. ABORTED (bad_state) when the action does
   // not fit the batch's state, NOT_FOUND (batch_not_found) for an unknown batch.
-  rpc ControlRegradeBatch(ControlRegradeBatchRequest) returns (ControlRegradeBatchResponse);
-  // GetRegradeBatch returns a batch and the repos that failed in it. batch_id 0 means the active
+  rpc ControlGradingBatch(ControlGradingBatchRequest) returns (ControlGradingBatchResponse);
+  // GetGradingBatch returns a batch and the repos that failed in it. batch_id 0 means the active
   // batch, or the latest one when none is active; NOT_FOUND when there has never been one.
-  rpc GetRegradeBatch(GetRegradeBatchRequest) returns (GetRegradeBatchResponse);
-  // ListRegradeBatches returns the most recent batches, newest first.
-  rpc ListRegradeBatches(ListRegradeBatchesRequest) returns (ListRegradeBatchesResponse);
+  rpc GetGradingBatch(GetGradingBatchRequest) returns (GetGradingBatchResponse);
+  // ListGradingBatches returns the most recent batches, newest first.
+  rpc ListGradingBatches(ListGradingBatchesRequest) returns (ListGradingBatchesResponse);
+
+  // GetCatalogStatus reports the public repo catalog: its size and age, the running (or latest)
+  // refresh and the one that produced the catalog in use. Read-only.
+  rpc GetCatalogStatus(GetCatalogStatusRequest) returns (GetCatalogStatusResponse);
+  // RefreshCatalog starts fetching the full public repo listing; the catalog in use stays until the
+  // new one is complete. ALREADY_EXISTS (refresh_active) while a refresh is running. The start is
+  // recorded in the audit log under actor_hash.
+  rpc RefreshCatalog(RefreshCatalogRequest) returns (RefreshCatalogResponse);
+  // CancelCatalogRefresh stops the running refresh; the catalog in use is untouched. ABORTED
+  // (refresh_not_running) when none runs.
+  rpc CancelCatalogRefresh(CancelCatalogRefreshRequest) returns (CancelCatalogRefreshResponse);
 }
 
 message GetRegradeStatusRequest {}
@@ -226,72 +237,78 @@ message BatchFilter {
   optional int32 older_than_days = 4;
   // Hand-picked "org/repo" slugs.
   repeated string repos = 5;
-  // Every public repository; cannot be combined with the criteria above.
-  bool all = 6;
-  // The first N matching public repos in SourceCraft rating order (highest first).
-  optional int32 top_rated = 7;
-  // Regrade every selected repo, skipping the "new activity since the last grade" check.
+  reserved 6, 7;
+  reserved "all", "top_rated";
+  // Grade every selected repo, skipping the "new activity since the last grade" check.
   bool force = 8;
+  // How many matching repos are graded, highest SourceCraft rating first; required, at least 1.
+  int32 limit = 9;
+  // Only repos that already have a public grade; otherwise never-graded repos are graded too.
+  bool only_regrade = 10;
 }
 
-message PreviewRegradeBatchRequest {
+message PreviewGradingBatchRequest {
   BatchFilter filter = 1;
 }
 
-message PreviewRegradeBatchResponse {
-  // Repos selected, at most the batch cap.
+message PreviewGradingBatchResponse {
+  // Repos the limit takes from the matches.
   int32 count = 1;
-  // More repos matched than the cap: the batch could not start.
-  bool capped = 2;
+  reserved 2;
+  reserved "capped";
   repeated string sample = 3;
   // Hand-picked slugs that are not public repositories known to the service.
   repeated string unmatched = 4;
   int32 estimate_seconds = 5;
   // Estimated repos the activity check will skip (0 with force).
   int32 inactive = 6;
+  // Public repos the criteria match before the limit.
+  int32 matched = 7;
 }
 
-message StartRegradeBatchRequest {
+message StartGradingBatchRequest {
   BatchFilter filter = 1;
   // The starting admin's actor hash, for the audit log and the batch record.
   string actor_hash = 2;
 }
 
-message StartRegradeBatchResponse {
-  RegradeBatch batch = 1;
+message StartGradingBatchResponse {
+  GradingBatch batch = 1;
 }
 
-message ControlRegradeBatchRequest {
+message ControlGradingBatchRequest {
   int64 batch_id = 1;
   // pause | resume | cancel.
   string action = 2;
   string actor_hash = 3;
 }
 
-message ControlRegradeBatchResponse {
-  RegradeBatch batch = 1;
+message ControlGradingBatchResponse {
+  GradingBatch batch = 1;
 }
 
-message GetRegradeBatchRequest {
+message GetGradingBatchRequest {
   int64 batch_id = 1;
 }
 
-message GetRegradeBatchResponse {
-  RegradeBatch batch = 1;
+message GetGradingBatchResponse {
+  GradingBatch batch = 1;
   // Repos that failed, with a fixed error code; at most 100.
-  repeated RegradeBatchFailure failures = 2;
+  repeated GradingBatchFailure failures = 2;
 }
 
-message ListRegradeBatchesRequest {
+message ListGradingBatchesRequest {
   // 0 means 10, at most 50.
   int32 limit = 1;
 }
 
-message ListRegradeBatchesResponse {
-  repeated RegradeBatch batches = 1;
+message ListGradingBatchesResponse {
+  repeated GradingBatch batches = 1;
+  // The stand's cap on one batch's limit (BATCH_GRADING_MAX_LIMIT); 0 means none.
+  int32 max_limit = 2;
 }
 
-message RegradeBatch {
+message GradingBatch {
   int64 id = 1;
   google.protobuf.Timestamp created_at = 2;
   // Unset while the batch is unfinished.
@@ -308,9 +325,55 @@ message RegradeBatch {
   int32 skipped = 12;
 }
 
-message RegradeBatchFailure {
+message GradingBatchFailure {
   string org_slug = 1;
   string repo_slug = 2;
   // request_failed | grading_failed | timeout | no_new_grade.
   string error = 3;
+}
+
+message GetCatalogStatusRequest {}
+
+message GetCatalogStatusResponse {
+  // Repos in the catalog in use; 0 before the first successful refresh.
+  int32 size = 1;
+  // When the catalog in use was stored; unset before the first successful refresh.
+  google.protobuf.Timestamp updated_at = 2;
+  // The running refresh, or the latest one; unset when there has never been one.
+  CatalogRefresh current = 3;
+  // The refresh that produced the catalog in use; unset before the first successful one.
+  CatalogRefresh last_completed = 4;
+}
+
+message RefreshCatalogRequest {
+  string actor_hash = 1;
+}
+
+message RefreshCatalogResponse {
+  CatalogRefresh refresh = 1;
+}
+
+message CancelCatalogRefreshRequest {
+  string actor_hash = 1;
+}
+
+message CancelCatalogRefreshResponse {
+  CatalogRefresh refresh = 1;
+}
+
+message CatalogRefresh {
+  int64 id = 1;
+  google.protobuf.Timestamp started_at = 2;
+  // Unset while the refresh runs.
+  google.protobuf.Timestamp finished_at = 3;
+  // running | completed | failed | cancelled.
+  string status = 4;
+  // admin | startup (the automatic first refresh of an empty catalog).
+  string trigger = 5;
+  string actor_hash = 6;
+  int32 pages = 7;
+  // Repos fetched so far; once completed, repos in the new catalog.
+  int32 repos = 8;
+  // wrapper_error | too_many_pages | page_loop | store_error | interrupted | empty_listing; empty otherwise.
+  string error = 9;
 }

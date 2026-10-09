@@ -59,7 +59,7 @@ func CloneAndUpload(ctx context.Context, org, repo, jobID, token string) (res *R
 		return nil, err
 	}
 
-	scClient, err := scwrapper.Dial(envOrDefault("SC_WRAPPER_ADDR", "localhost:8083"), pat)
+	scClient, err := scwrapper.Dial(envOrDefault("SC_WRAPPER_ADDR", "localhost:8082"), pat)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to sourcecraft-wrapper-service: %w", err)
 	}

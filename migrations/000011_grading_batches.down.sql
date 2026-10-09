@@ -1,0 +1,13 @@
+ALTER TABLE grading_batches RENAME CONSTRAINT grading_batches_status_check TO regrade_batches_status_check;
+ALTER TABLE grading_batch_items RENAME CONSTRAINT grading_batch_items_status_check TO regrade_batch_items_status_check;
+ALTER TABLE grading_batch_items RENAME CONSTRAINT grading_batch_items_batch_id_fkey TO regrade_batch_items_batch_id_fkey;
+ALTER TABLE grading_batch_items RENAME CONSTRAINT grading_batch_items_repo_id_fkey TO regrade_batch_items_repo_id_fkey;
+
+ALTER INDEX grading_batch_items_batch_id_status_idx RENAME TO regrade_batch_items_batch_id_status_idx;
+ALTER INDEX grading_batch_items_pkey RENAME TO regrade_batch_items_pkey;
+ALTER INDEX grading_batches_one_active RENAME TO regrade_batches_one_active;
+ALTER INDEX grading_batches_pkey RENAME TO regrade_batches_pkey;
+ALTER SEQUENCE grading_batches_id_seq RENAME TO regrade_batches_id_seq;
+
+ALTER TABLE grading_batch_items RENAME TO regrade_batch_items;
+ALTER TABLE grading_batches RENAME TO regrade_batches;

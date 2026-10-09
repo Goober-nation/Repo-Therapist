@@ -16,38 +16,38 @@ import (
 type batchAggregator struct {
 	fakeAggregator
 
-	startIn   *agg.StartRegradeBatchRequest
-	controlIn *agg.ControlRegradeBatchRequest
+	startIn   *agg.StartGradingBatchRequest
+	controlIn *agg.ControlGradingBatchRequest
 	startErr  error
 }
 
-func (b *batchAggregator) StartRegradeBatch(_ context.Context, in *agg.StartRegradeBatchRequest, _ ...grpc.CallOption) (*agg.StartRegradeBatchResponse, error) {
+func (b *batchAggregator) StartGradingBatch(_ context.Context, in *agg.StartGradingBatchRequest, _ ...grpc.CallOption) (*agg.StartGradingBatchResponse, error) {
 	b.startIn = in
 	if b.startErr != nil {
 		return nil, b.startErr
 	}
 
-	return &agg.StartRegradeBatchResponse{Batch: &agg.RegradeBatch{Id: 4, Status: "running", Total: 3, Pending: 3}}, nil
+	return &agg.StartGradingBatchResponse{Batch: &agg.GradingBatch{Id: 4, Status: "running", Total: 3, Pending: 3}}, nil
 }
 
-func (b *batchAggregator) ControlRegradeBatch(_ context.Context, in *agg.ControlRegradeBatchRequest, _ ...grpc.CallOption) (*agg.ControlRegradeBatchResponse, error) {
+func (b *batchAggregator) ControlGradingBatch(_ context.Context, in *agg.ControlGradingBatchRequest, _ ...grpc.CallOption) (*agg.ControlGradingBatchResponse, error) {
 	b.controlIn = in
-	return &agg.ControlRegradeBatchResponse{Batch: &agg.RegradeBatch{Id: in.BatchId}}, nil
+	return &agg.ControlGradingBatchResponse{Batch: &agg.GradingBatch{Id: in.BatchId}}, nil
 }
 
-func (b *batchAggregator) GetRegradeBatch(context.Context, *agg.GetRegradeBatchRequest, ...grpc.CallOption) (*agg.GetRegradeBatchResponse, error) {
-	return &agg.GetRegradeBatchResponse{
-		Batch:    &agg.RegradeBatch{Id: 4},
-		Failures: []*agg.RegradeBatchFailure{{OrgSlug: "o", RepoSlug: "r", Error: "timeout"}},
+func (b *batchAggregator) GetGradingBatch(context.Context, *agg.GetGradingBatchRequest, ...grpc.CallOption) (*agg.GetGradingBatchResponse, error) {
+	return &agg.GetGradingBatchResponse{
+		Batch:    &agg.GradingBatch{Id: 4},
+		Failures: []*agg.GradingBatchFailure{{OrgSlug: "o", RepoSlug: "r", Error: "timeout"}},
 	}, nil
 }
 
-func TestStartRegradeBatchForwardsFilterAndActor(t *testing.T) {
+func TestStartGradingBatchForwardsFilterAndActor(t *testing.T) {
 	a := &batchAggregator{}
 	svc := NewGatewayService(a, nil, nil, nil, nil, nil, 0, 0, 0)
 	min := int32(10)
 
-	batch, err := svc.StartRegradeBatch(context.Background(), "abc123", domain.BatchFilter{Languages: []string{"go"}, MinScore: &min})
+	batch, err := svc.StartGradingBatch(context.Background(), "abc123", domain.BatchFilter{Languages: []string{"go"}, MinScore: &min})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,8 @@ func TestBatchErrorsKeepTheReasonWord(t *testing.T) {
 		is   error
 	}{
 		"batch_active":     {codes.AlreadyExists, domain.ErrConflict},
-		"too_many":         {codes.InvalidArgument, domain.ErrInvalidRequest},
+		"refresh_active":   {codes.AlreadyExists, domain.ErrConflict},
+		"limit_too_high":   {codes.InvalidArgument, domain.ErrInvalidRequest},
 		"bad_state":        {codes.Aborted, domain.ErrConflict},
 		"batch_not_found":  {codes.NotFound, domain.ErrNotFound},
 		"nothing_selected": {codes.InvalidArgument, domain.ErrInvalidRequest},
@@ -74,7 +75,7 @@ func TestBatchErrorsKeepTheReasonWord(t *testing.T) {
 		a := &batchAggregator{startErr: status.Error(tc.code, reason)}
 		svc := NewGatewayService(a, nil, nil, nil, nil, nil, 0, 0, 0)
 
-		_, err := svc.StartRegradeBatch(context.Background(), "abc123", domain.BatchFilter{All: true})
+		_, err := svc.StartGradingBatch(context.Background(), "abc123", domain.BatchFilter{Limit: 10})
 
 		var got domain.ReasonError
 		if !errors.As(err, &got) || got.Reason != reason || !errors.Is(err, tc.is) {
@@ -86,16 +87,16 @@ func TestBatchErrorsKeepTheReasonWord(t *testing.T) {
 	svc := NewGatewayService(a, nil, nil, nil, nil, nil, 0, 0, 0)
 
 	var got domain.ReasonError
-	if _, err := svc.StartRegradeBatch(context.Background(), "abc123", domain.BatchFilter{All: true}); errors.As(err, &got) {
+	if _, err := svc.StartGradingBatch(context.Background(), "abc123", domain.BatchFilter{Limit: 10}); errors.As(err, &got) {
 		t.Errorf("an unknown message must not become a reason: %v", err)
 	}
 }
 
-func TestControlRegradeBatchChecksTheAction(t *testing.T) {
+func TestControlGradingBatchChecksTheAction(t *testing.T) {
 	a := &batchAggregator{}
 	svc := NewGatewayService(a, nil, nil, nil, nil, nil, 0, 0, 0)
 
-	if _, err := svc.ControlRegradeBatch(context.Background(), "abc123", 4, "explode"); !errors.Is(err, domain.ErrInvalidRequest) {
+	if _, err := svc.ControlGradingBatch(context.Background(), "abc123", 4, "explode"); !errors.Is(err, domain.ErrInvalidRequest) {
 		t.Fatalf("unknown action: %v", err)
 	}
 
@@ -103,15 +104,15 @@ func TestControlRegradeBatchChecksTheAction(t *testing.T) {
 		t.Fatal("an unknown action must not reach the Aggregator")
 	}
 
-	if _, err := svc.ControlRegradeBatch(context.Background(), "abc123", 4, "pause"); err != nil || a.controlIn.Action != "pause" || a.controlIn.ActorHash != "abc123" {
+	if _, err := svc.ControlGradingBatch(context.Background(), "abc123", 4, "pause"); err != nil || a.controlIn.Action != "pause" || a.controlIn.ActorHash != "abc123" {
 		t.Fatalf("pause: %v %+v", err, a.controlIn)
 	}
 }
 
-func TestGetRegradeBatchMapsFailures(t *testing.T) {
+func TestGetGradingBatchMapsFailures(t *testing.T) {
 	svc := NewGatewayService(&batchAggregator{}, nil, nil, nil, nil, nil, 0, 0, 0)
 
-	detail, err := svc.GetRegradeBatch(context.Background(), 0)
+	detail, err := svc.GetGradingBatch(context.Background(), 0)
 	if err != nil || len(detail.Failures) != 1 || detail.Failures[0].Error != "timeout" {
 		t.Fatalf("%+v %v", detail, err)
 	}

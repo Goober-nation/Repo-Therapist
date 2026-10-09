@@ -15,16 +15,21 @@ const vite = await createServer({
 
 after(() => vite.close())
 
-const view = await vite.ssrLoadModule("/src/regradeView.ts")
+const view = await vite.ssrLoadModule("/src/gradingBatchView.ts")
 const audit = await vite.ssrLoadModule("/src/auditView.ts")
 const { HttpRepoHealthApi, ApiRequestError } = await vite.ssrLoadModule("/src/api/client.ts")
-const { default: RegradePanel } = await vite.ssrLoadModule("/src/components/RegradePanel.tsx")
+const { default: GradingPanel } = await vite.ssrLoadModule("/src/components/GradingPanel.tsx")
 
-const form = (patch = {}) => ({ ...view.EMPTY_BATCH_FORM, ...patch })
+// Every valid form needs the limit; the base form has one.
+const form = (patch = {}) => ({ ...view.EMPTY_BATCH_FORM, limit: "100", ...patch })
 
-test("an empty form is refused with a hint, 'all' needs no conditions", () => {
-  assert.match(view.buildFilter(form()).problem, /хотя бы одно условие/)
-  assert.deepEqual(view.buildFilter(form({ mode: "all", languages: "go" })).filter, { all: true })
+test("the limit is required; with it alone every public repository qualifies", () => {
+  assert.match(view.buildFilter(form({ limit: "" })).problem, /сколько репозиториев/)
+  assert.match(view.buildFilter(form({ limit: "0" })).problem, /Не больше репозиториев/)
+  assert.match(view.buildFilter(form({ limit: "abc" })).problem, /целое/)
+  assert.deepEqual(view.buildFilter(form()).filter, { limit: 100 })
+  // No business upper bound.
+  assert.deepEqual(view.buildFilter(form({ limit: "30000" })).filter, { limit: 30000 })
 })
 
 test("the form turns into a filter: trimmed, de-duplicated, numbers parsed", () => {
@@ -32,6 +37,7 @@ test("the form turns into a filter: trimmed, de-duplicated, numbers parsed", () 
     form({ languages: " Go, go ;Rust\n", minScore: "10", maxScore: "60", olderThanDays: "30", repos: "org/a, org/b\norg/a" }),
   )
   assert.deepEqual(built.filter, {
+    limit: 100,
     languages: ["Go", "Rust"],
     repos: ["org/a", "org/b"],
     min_score: 10,
@@ -85,18 +91,20 @@ test("estimates, statuses and error codes read as Russian", () => {
 })
 
 test("filter summaries describe the conditions", () => {
-  const f = (patch) => ({ languages: null, min_score: null, max_score: null, older_than_days: null, repos: null, all: false, ...patch })
-  assert.equal(view.filterSummary(f({ all: true })), "Все публичные репозитории")
+  const f = (patch) => ({ languages: null, min_score: null, max_score: null, older_than_days: null, repos: null, limit: 0, only_regrade: false, force: false, ...patch })
   assert.equal(
     view.filterSummary(f({ languages: ["Go"], min_score: 10, max_score: 60, older_than_days: 30, repos: ["a/b"] })),
     "языки: Go; оценка 10–60; оценке больше 30 дн. или её нет; список: 1",
   )
+  assert.equal(view.filterSummary(f({ limit: 500, only_regrade: true })), "не больше 500 по рейтингу SourceCraft; только переоценка")
+  // A batch from before the limit existed shows no limit.
+  assert.equal(view.filterSummary(f({})), "—")
   assert.equal(view.filterSummary(f({ max_score: 40 })), "оценка до 40")
 })
 
 test("refusal reasons map to wording; denial gets the admin message", () => {
   assert.match(view.batchErrorMessage(409, "batch_active"), /уже выполняется/)
-  assert.match(view.batchErrorMessage(400, "too_many"), /Сузьте/)
+  assert.equal(view.batchErrorMessage(400, "too_many"), undefined)
   assert.match(view.batchErrorMessage(403, ""), /администратор/)
   assert.equal(view.batchErrorMessage(500, ""), undefined)
 })
@@ -109,8 +117,8 @@ test("batch calls use the admin routes, the guard header and a JSON body", async
       return new Response(JSON.stringify({ batches: [] }), { status: 200 })
     },
   })
-  await api.previewBatch({ all: true })
-  await api.startBatch({ languages: ["go"] })
+  await api.previewBatch({ limit: 10 })
+  await api.startBatch({ limit: 10, languages: ["go"] })
   await api.controlBatch(7, "pause")
   await api.getCurrentBatch()
   await api.getBatch(7)
@@ -118,15 +126,15 @@ test("batch calls use the admin routes, the guard header and a JSON body", async
   assert.deepEqual(
     calls.map((c) => [c.method, c.url, c.guard]),
     [
-      ["POST", "/api/admin/regrade/preview", "1"],
-      ["POST", "/api/admin/regrade/batches", "1"],
-      ["POST", "/api/admin/regrade/batches/7/pause", "1"],
-      ["GET", "/api/admin/regrade/batches/current", undefined],
-      ["GET", "/api/admin/regrade/batches/7", undefined],
-      ["GET", "/api/admin/regrade/batches?limit=5", undefined],
+      ["POST", "/api/admin/grading/preview", "1"],
+      ["POST", "/api/admin/grading/batches", "1"],
+      ["POST", "/api/admin/grading/batches/7/pause", "1"],
+      ["GET", "/api/admin/grading/batches/current", undefined],
+      ["GET", "/api/admin/grading/batches/7", undefined],
+      ["GET", "/api/admin/grading/batches?limit=5", undefined],
     ],
   )
-  assert.equal(calls[1].body, JSON.stringify({ languages: ["go"] }))
+  assert.equal(calls[1].body, JSON.stringify({ limit: 10, languages: ["go"] }))
 })
 
 test("a refused batch request keeps its reason code and gets Russian wording", async () => {
@@ -134,7 +142,7 @@ test("a refused batch request keeps its reason code and gets Russian wording", a
     fetcher: async () => new Response(JSON.stringify({ error: "conflict", code: "batch_active" }), { status: 409 }),
   })
   await assert.rejects(
-    () => api.startBatch({ all: true }),
+    () => api.startBatch({ limit: 10 }),
     (error) => error instanceof ApiRequestError && error.status === 409 && error.code === "batch_active" && /уже выполняется/.test(error.message),
   )
 
@@ -151,37 +159,59 @@ test("a refused batch request keeps its reason code and gets Russian wording", a
   )
 })
 
-test("batch actions have audit-log labels", () => {
+test("batch actions have audit-log labels, old entries keep theirs", () => {
   for (const action of ["start", "pause", "resume", "cancel", "complete"]) {
+    assert.match(audit.actionLabel(`batch_grading.${action}`), /пакетн.. оценк/i)
     assert.match(audit.actionLabel(`regrade.batch.${action}`), /переоценк/)
   }
 })
 
 test("the panel starts in its loading state and says private repos are excluded", () => {
   const api = new HttpRepoHealthApi({ fetcher: async () => new Response("{}", { status: 200 }) })
-  const html = renderToStaticMarkup(createElement(RegradePanel, { api }))
-  assert.match(html, /Пакетная переоценка/)
+  const html = renderToStaticMarkup(createElement(GradingPanel, { api }))
+  assert.match(html, /Пакетная оценка/)
   assert.match(html, /Приватные репозитории в пакет не попадают/)
   assert.match(html, /Загружаем/)
   assert.doesNotMatch(html, /админк/i)
 })
 
-test("top by rating and force go into the filter; force also applies to 'all'", () => {
-  assert.deepEqual(view.buildFilter(form({ topRated: "100", languages: "Go" })).filter, {
-    languages: ["Go"],
-    top_rated: 100,
-  })
-  assert.deepEqual(view.buildFilter(form({ topRated: "5", force: true })).filter, { top_rated: 5, force: true })
-  assert.deepEqual(view.buildFilter(form({ mode: "all", force: true })).filter, { all: true, force: true })
-  assert.match(view.buildFilter(form({ force: true })).problem, /хотя бы одно условие/)
-  assert.match(view.buildFilter(form({ topRated: "0" })).problem, /Топ по рейтингу.*от 1 до 1000/)
-  assert.match(view.buildFilter(form({ topRated: "1001" })).problem, /от 1 до 1000/)
+test("the own list takes SourceCraft links as well as slugs, de-duplicated after conversion", () => {
+  const built = view.buildFilter(
+    form({
+      repos: "org/a https://sourcecraft.dev/org/b\nsourcecraft.dev/Org/A www.sourcecraft.dev/org/c.git, http://sourcecraft.dev/org/d/tree/main",
+    }),
+  )
+  assert.deepEqual(built.filter, { limit: 100, repos: ["org/a", "org/b", "org/c", "org/d"] })
+
+  for (const bad of ["https://sourcecraft.dev/org", "https://github.com/org/repo", "just-a-name"]) {
+    const refused = view.buildFilter(form({ repos: bad }))
+    assert.equal(refused.filter, undefined, bad)
+    assert.match(refused.problem, /организация\/репозиторий или ссылка/, bad)
+  }
+
+  // The 200 limit counts repositories, not entries: a link and a slug for one repository count once.
+  const many = Array.from({ length: 200 }, (_, i) => `o/r${i}`).join(" ")
+  assert.equal(view.buildFilter(form({ repos: `${many} https://sourcecraft.dev/o/r0` })).filter.repos.length, 200)
 })
 
-test("the summary names the top and a forced batch; a skipped repo is explained", () => {
-  const base = { languages: null, min_score: null, max_score: null, older_than_days: null, repos: null, top_rated: null, all: false, force: false }
-  assert.equal(view.filterSummary({ ...base, top_rated: 50, languages: ["go"] }), "топ 50 по рейтингу SourceCraft; языки: go")
-  assert.equal(view.filterSummary({ ...base, all: true, force: true }), "Все публичные репозитории; принудительно")
-  assert.equal(view.filterSummary({ ...base, top_rated: 10, force: true }), "топ 10 по рейтингу SourceCraft; принудительно")
+test("a stand maximum bounds the limit; 0 means none", () => {
+  assert.deepEqual(view.buildFilter(form({ limit: "50" }), 50).filter, { limit: 50 })
+  assert.match(view.buildFilter(form({ limit: "51" }), 50).problem, /Не больше репозиториев: от 1 до 50/)
+  assert.deepEqual(view.buildFilter(form({ limit: "100000" }), 0).filter, { limit: 100000 })
+  assert.match(view.batchErrorMessage(400, "limit_too_high"), /этом стенде/)
+})
+
+test("only regrade and force go into the filter", () => {
+  assert.deepEqual(view.buildFilter(form({ onlyRegrade: true, languages: "Go" })).filter, {
+    limit: 100,
+    languages: ["Go"],
+    only_regrade: true,
+  })
+  assert.deepEqual(view.buildFilter(form({ force: true })).filter, { limit: 100, force: true })
+})
+
+test("the summary names a forced batch; a skipped repo is explained", () => {
+  const base = { languages: null, min_score: null, max_score: null, older_than_days: null, repos: null, limit: 10, only_regrade: false, force: true }
+  assert.equal(view.filterSummary(base), "не больше 10 по рейтингу SourceCraft; принудительно")
   assert.equal(view.itemErrorLabel("no_activity"), "нет новой активности с последней оценки")
 })

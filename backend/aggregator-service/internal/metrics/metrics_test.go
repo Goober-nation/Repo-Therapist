@@ -72,8 +72,8 @@ func TestLLMAndBatchCounters(t *testing.T) {
 	mustContain(t, scrape(t, m),
 		`aggregator_llm_requests_total{outcome="requested"} 1`,
 		`aggregator_llm_requests_total{outcome="received_ok"} 1`,
-		`aggregator_regrade_batch_items_total{status="failed"} 1`,
-		`aggregator_regrade_batch_events_total{event="start"} 1`,
+		`aggregator_grading_batch_items_total{status="failed"} 1`,
+		`aggregator_grading_batch_events_total{event="start"} 1`,
 	)
 }
 
@@ -134,8 +134,8 @@ func TestKnownSeriesStartAtZeroSoTheFirstEventCounts(t *testing.T) {
 		`aggregator_gradings_completed_total{outcome="error",visibility="private"} 0`,
 		`aggregator_gradings_requested_total{trigger="batch",visibility="public"} 0`,
 		`aggregator_llm_requests_total{outcome="received_ok"} 0`,
-		`aggregator_regrade_batch_items_total{status="failed"} 0`,
-		`aggregator_regrade_batch_events_total{event="complete"} 0`,
+		`aggregator_grading_batch_items_total{status="failed"} 0`,
+		`aggregator_grading_batch_events_total{event="complete"} 0`,
 		`aggregator_grading_duration_seconds_count{outcome="ok",visibility="public"} 0`,
 	)
 }

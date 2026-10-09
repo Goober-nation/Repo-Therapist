@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -24,8 +25,8 @@ type memBatches struct {
 	public  []domain.BatchCandidate // what SelectBatchRepos returns, whatever the filter
 	avg     float64
 	lookup  func(uuid.UUID) (domain.Repo, bool)
-	// gradeInfo answers BatchGradeInfo; nil means no repo has a grade.
-	gradeInfo func(uuid.UUID) (domain.BatchGrade, bool)
+	// lastFilter is the filter SelectBatchRepos saw last.
+	lastFilter domain.BatchFilter
 }
 
 func (m *memBatches) GetBatchRepo(_ context.Context, id uuid.UUID) (domain.Repo, error) {
@@ -40,31 +41,26 @@ func newMemBatches(public ...domain.BatchCandidate) *memBatches {
 	return &memBatches{batches: map[int64]*domain.Batch{}, items: map[int64][]*domain.BatchItem{}, public: public}
 }
 
-func (m *memBatches) SelectBatchRepos(_ context.Context, _ domain.BatchFilter, limit int) ([]domain.BatchCandidate, bool, error) {
-	if len(m.public) > limit {
-		return m.public[:limit], true, nil
+// SelectBatchRepos applies only the limit and the hand-picked list; public is already in rating order.
+func (m *memBatches) SelectBatchRepos(_ context.Context, filter domain.BatchFilter) ([]domain.BatchCandidate, int, error) {
+	m.lastFilter = filter
+
+	var matched []domain.BatchCandidate
+
+	for _, c := range m.public {
+		if len(filter.Repos) == 0 || slices.ContainsFunc(filter.Repos, func(pick string) bool { return lowerASCII(pick) == lowerASCII(c.Slug()) }) {
+			matched = append(matched, c)
+		}
 	}
 
-	return m.public, false, nil
+	if len(matched) > filter.Limit {
+		return matched[:filter.Limit], len(matched), nil
+	}
+
+	return matched, len(matched), nil
 }
 
 func (m *memBatches) AvgGradeSeconds(context.Context) (float64, error) { return m.avg, nil }
-
-func (m *memBatches) BatchGradeInfo(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]domain.BatchGrade, error) {
-	out := map[uuid.UUID]domain.BatchGrade{}
-
-	for _, id := range ids {
-		if m.gradeInfo == nil {
-			continue
-		}
-
-		if g, ok := m.gradeInfo(id); ok {
-			out[id] = g
-		}
-	}
-
-	return out, nil
-}
 
 func (m *memBatches) CreateBatch(_ context.Context, actor string, filter domain.BatchFilter, repos []domain.BatchCandidate) (int64, error) {
 	m.mu.Lock()
@@ -504,7 +500,8 @@ func batchStatus(t *testing.T, s *AggregatorService, id int64) domain.Batch {
 	return b
 }
 
-var allFilter = domain.BatchFilter{All: true}
+// allFilter matches every repo; the limit is far above any test's repo count.
+var allFilter = domain.BatchFilter{Limit: 1000}
 
 func TestPreviewBatchCountsSamplesAndEstimates(t *testing.T) {
 	slugs := make([]string, 25)
@@ -520,7 +517,7 @@ func TestPreviewBatchCountsSamplesAndEstimates(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if preview.Count != 25 || preview.Capped || len(preview.Sample) != domain.PreviewSampleSize || preview.Sample[0] != "org/repo00" {
+	if preview.Count != 25 || preview.Matched != 25 || len(preview.Sample) != domain.PreviewSampleSize || preview.Sample[0] != "org/repo00" {
 		t.Fatalf("preview = %+v", preview)
 	}
 
@@ -537,7 +534,7 @@ func TestPreviewBatchCountsSamplesAndEstimates(t *testing.T) {
 func TestPreviewBatchUsesDefaultEstimateAndReportsUnmatchedPicks(t *testing.T) {
 	w, _, _ := newBatchWorld(t, "org/a", "org/b")
 
-	preview, err := w.svc.PreviewBatch(context.Background(), domain.BatchFilter{Repos: []string{"org/a", "ORG/B", "org/missing"}})
+	preview, err := w.svc.PreviewBatch(context.Background(), domain.BatchFilter{Limit: 10, Repos: []string{"org/a", "ORG/B", "org/missing"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -551,17 +548,53 @@ func TestPreviewBatchUsesDefaultEstimateAndReportsUnmatchedPicks(t *testing.T) {
 	}
 }
 
-func TestPreviewBatchReportsCapAndRefusesInvalidFilters(t *testing.T) {
-	w, _, _ := newBatchWorld(t, "org/a", "org/b", "org/c")
-	w.svc.BatchMaxRepos = 2
+func TestBatchLimitAboveTheStandMaximumIsRefused(t *testing.T) {
+	w, batches, _ := newBatchWorld(t, "org/a", "org/b", "org/c")
+	w.svc.BatchMaxLimit = 2
 
-	preview, err := w.svc.PreviewBatch(context.Background(), allFilter)
-	if err != nil || !preview.Capped || preview.Count != 2 {
-		t.Fatalf("preview = %+v, err %v", preview, err)
+	for _, call := range []func() error{
+		func() error {
+			_, err := w.svc.PreviewBatch(context.Background(), domain.BatchFilter{Limit: 3})
+			return err
+		},
+		func() error {
+			_, err := w.svc.StartBatch(context.Background(), "abc", domain.BatchFilter{Limit: 3})
+			return err
+		},
+	} {
+		if err := call(); !errors.Is(err, domain.ErrBatchLimitTooHigh) || !errors.Is(err, domain.ErrInvalidBatch) {
+			t.Fatalf("limit 3 over max 2: %v", err)
+		}
 	}
 
-	if _, err := w.svc.PreviewBatch(context.Background(), domain.BatchFilter{}); !errors.Is(err, domain.ErrInvalidBatch) {
-		t.Fatalf("empty filter: %v", err)
+	if len(batches.batches) != 0 {
+		t.Fatal("a refused start must not create a batch")
+	}
+
+	if batch, err := w.svc.StartBatch(context.Background(), "abc", domain.BatchFilter{Limit: 2}); err != nil || batch.Total != 2 {
+		t.Fatalf("limit at the max: total %d, %v", batch.Total, err)
+	}
+}
+
+func TestPreviewBatchTakesTheLimitAndRefusesInvalidFilters(t *testing.T) {
+	w, batches, _ := newBatchWorld(t, "org/a", "org/b", "org/c")
+
+	preview, err := w.svc.PreviewBatch(context.Background(), domain.BatchFilter{Limit: 2, OnlyRegrade: true})
+	if err != nil || preview.Matched != 3 || preview.Count != 2 || strings.Join(preview.Sample, ",") != "org/a,org/b" {
+		t.Fatalf("preview = %+v, err %v", preview, err)
+	}
+	if !batches.lastFilter.OnlyRegrade {
+		t.Error("only_regrade must reach the selection")
+	}
+
+	// A pick below the limit's cut is not reported as missing.
+	preview, err = w.svc.PreviewBatch(context.Background(), domain.BatchFilter{Limit: 1, Repos: []string{"org/a", "org/c"}})
+	if err != nil || preview.Count != 1 || len(preview.Unmatched) != 0 {
+		t.Fatalf("cut picks: %+v, err %v", preview, err)
+	}
+
+	if _, err := w.svc.PreviewBatch(context.Background(), domain.BatchFilter{Languages: []string{"go"}}); !errors.Is(err, domain.ErrInvalidBatch) {
+		t.Fatalf("no limit: %v", err)
 	}
 
 	w.svc.BatchRepo = nil
@@ -612,7 +645,7 @@ func TestStartBatchRunsEveryRepoWithBoundedConcurrency(t *testing.T) {
 		actions = append(actions, e.Action+"/"+e.ActorKind)
 	}
 
-	if strings.Join(actions, ",") != "regrade.batch.start/admin,regrade.batch.complete/system" {
+	if strings.Join(actions, ",") != "batch_grading.start/admin,batch_grading.complete/system" {
 		t.Fatalf("audit = %v", actions)
 	}
 
@@ -683,15 +716,21 @@ func TestStartBatchRefusesEmptyAndOversizedSelections(t *testing.T) {
 		t.Fatalf("nothing selected: %v", err)
 	}
 
-	w, batches, _ = newBatchWorld(t, "org/a", "org/b", "org/c")
-	w.svc.BatchMaxRepos = 2
-
-	if _, err := w.svc.StartBatch(context.Background(), "abc123", allFilter); !errors.Is(err, domain.ErrInvalidBatch) {
-		t.Fatalf("too many: %v", err)
-	}
-
 	if len(batches.batches) != 0 {
 		t.Fatal("a refused start must not create a batch")
+	}
+
+	// No batch cap: a large match is cut by the limit, never refused.
+	slugs := make([]string, 600)
+	for i := range slugs {
+		slugs[i] = fmt.Sprintf("org/r%03d", i)
+	}
+
+	w, batches, _ = newBatchWorld(t, slugs...)
+
+	batch, err := w.svc.StartBatch(context.Background(), "abc123", domain.BatchFilter{Limit: 550})
+	if err != nil || batch.Total != 550 {
+		t.Fatalf("limit 550 of 600: total %d, %v", batch.Total, err)
 	}
 }
 
@@ -751,7 +790,7 @@ func TestPauseStopsNewGradingsAndResumeContinues(t *testing.T) {
 
 	sort.Strings(actions)
 
-	if strings.Join(actions, ",") != "regrade.batch.complete,regrade.batch.pause,regrade.batch.resume,regrade.batch.start" {
+	if strings.Join(actions, ",") != "batch_grading.complete,batch_grading.pause,batch_grading.resume,batch_grading.start" {
 		t.Fatalf("audit = %v", actions)
 	}
 }

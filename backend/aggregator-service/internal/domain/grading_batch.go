@@ -13,16 +13,17 @@ import (
 
 var (
 	// ErrInvalidBatch is returned for a batch filter or request that breaks the rules below.
-	ErrInvalidBatch = errors.New("invalid regrade batch")
-	// ErrBatchNothing and ErrBatchTooMany are the two ways a valid filter still cannot start a batch.
+	ErrInvalidBatch = errors.New("invalid grading batch")
+	// ErrBatchLimitTooHigh: the limit is above the stand's cap (BATCH_GRADING_MAX_LIMIT).
+	ErrBatchLimitTooHigh = fmt.Errorf("%w: the limit is above this stand's maximum", ErrInvalidBatch)
+	// ErrBatchNothing: a valid filter that matches no public repository cannot start a batch.
 	ErrBatchNothing = fmt.Errorf("%w: no public repositories match", ErrInvalidBatch)
-	ErrBatchTooMany = fmt.Errorf("%w: more repositories match than one batch may hold", ErrInvalidBatch)
 	// ErrBatchActive: another batch is still running or paused; only one runs at a time.
-	ErrBatchActive = errors.New("a regrade batch is already active")
+	ErrBatchActive = errors.New("a grading batch is already active")
 	// ErrBatchNotFound: no batch with that id.
-	ErrBatchNotFound = errors.New("regrade batch not found")
+	ErrBatchNotFound = errors.New("grading batch not found")
 	// ErrBatchState: the action does not fit the batch's current status (resume of a running batch).
-	ErrBatchState = errors.New("regrade batch is in the wrong state for this action")
+	ErrBatchState = errors.New("grading batch is in the wrong state for this action")
 )
 
 // Batch statuses. A batch is "active" while it is running or paused.
@@ -63,8 +64,6 @@ const (
 	MaxBatchLanguages = 20
 	MaxBatchRepos     = 200
 	MaxBatchDays      = 3650
-	// MaxBatchTopRated bounds the "top N by SourceCraft rating" criterion.
-	MaxBatchTopRated = 1000
 	// PreviewSampleSize is how many repos a preview names.
 	PreviewSampleSize = 20
 	// MaxBatchFailuresShown bounds the per-repo failures one status call returns.
@@ -73,8 +72,9 @@ const (
 
 var batchRepoPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,100}/[A-Za-z0-9._-]{1,100}$`)
 
-// BatchFilter says which public repositories a batch regrades. Every set criterion must hold. A filter
-// with no criterion is refused unless All is set: regrading the whole platform has to be asked for.
+// BatchFilter says which public repositories a batch grades. Every set criterion must hold; none set
+// means every public repository. Limit is required: of the matches, the Limit with the highest
+// SourceCraft rating are taken.
 type BatchFilter struct {
 	// Languages matches the main language, case-insensitively.
 	Languages []string `json:"languages,omitempty"`
@@ -85,11 +85,11 @@ type BatchFilter struct {
 	OlderThanDays *int `json:"older_than_days,omitempty"`
 	// Repos is a hand-picked list of "org/repo" slugs.
 	Repos []string `json:"repos,omitempty"`
-	// TopRated keeps the first N matching public repos in SourceCraft's rating order (highest
-	// first); combined with the criteria above it is the top N among the repos they match.
-	TopRated *int `json:"top_rated,omitempty"`
-	// All selects every public repository.
-	All bool `json:"all,omitempty"`
+	// Limit is how many of the matching repos are graded, highest SourceCraft rating first; at least 1.
+	Limit int `json:"limit"`
+	// OnlyRegrade keeps only repos that already have a public grade; without it never-graded repos
+	// are graded for the first time.
+	OnlyRegrade bool `json:"only_regrade,omitempty"`
 	// Force regrades every selected repo; without it a repo with no SourceCraft activity since its
 	// last grade is skipped. Not a criterion: it never selects anything on its own.
 	Force bool `json:"force,omitempty"`
@@ -130,14 +130,9 @@ func uniqueTrimmed(values []string, lower bool) []string {
 
 // Validate checks a normalized filter.
 func (f BatchFilter) Validate() error {
-	hasCriterion := len(f.Languages) > 0 || f.MinScore != nil || f.MaxScore != nil ||
-		f.OlderThanDays != nil || len(f.Repos) > 0 || f.TopRated != nil
-
 	switch {
-	case f.All && hasCriterion:
-		return fmt.Errorf("%w: \"all\" cannot be combined with other criteria", ErrInvalidBatch)
-	case !f.All && !hasCriterion:
-		return fmt.Errorf("%w: choose at least one criterion or select all repositories", ErrInvalidBatch)
+	case f.Limit < 1:
+		return fmt.Errorf("%w: the repository limit is required and at least 1", ErrInvalidBatch)
 	case len(f.Languages) > MaxBatchLanguages:
 		return fmt.Errorf("%w: at most %d languages", ErrInvalidBatch, MaxBatchLanguages)
 	case len(f.Repos) > MaxBatchRepos:
@@ -164,10 +159,6 @@ func (f BatchFilter) Validate() error {
 
 	if f.MinScore != nil && f.MaxScore != nil && *f.MinScore > *f.MaxScore {
 		return fmt.Errorf("%w: the minimum score is above the maximum", ErrInvalidBatch)
-	}
-
-	if f.TopRated != nil && (*f.TopRated < 1 || *f.TopRated > MaxBatchTopRated) {
-		return fmt.Errorf("%w: top by rating is between 1 and %d", ErrInvalidBatch, MaxBatchTopRated)
 	}
 
 	if f.OlderThanDays != nil && (*f.OlderThanDays < 1 || *f.OlderThanDays > MaxBatchDays) {
@@ -200,17 +191,11 @@ func HasNewActivity(lastActivityAt, gradedAt *time.Time) bool {
 
 func (c BatchCandidate) Slug() string { return c.OrgSlug + "/" + c.RepoSlug }
 
-// BatchGrade is a repo's last public grade, as the batch filters see it.
-type BatchGrade struct {
-	Score    *int
-	GradedAt *time.Time
-}
-
 // BatchPreview is the dry run: what a filter would regrade, without starting anything.
 type BatchPreview struct {
-	// Count is the number of repos selected, at most the batch cap; Capped says more matched.
-	Count  int
-	Capped bool
+	// Matched is how many public repos the criteria match; Count how many of them the limit takes.
+	Matched int
+	Count   int
 	// Sample names the first repos.
 	Sample []string
 	// Unmatched are hand-picked slugs that are not public repositories known to the service.
@@ -222,7 +207,7 @@ type BatchPreview struct {
 	Inactive int
 }
 
-// Batch is one regrade batch with its item counts.
+// Batch is one grading batch with its item counts.
 type Batch struct {
 	ID         int64
 	CreatedAt  time.Time
@@ -250,12 +235,9 @@ type BatchItem struct {
 
 // BatchRepository stores batches. Only the Aggregator writes them.
 type BatchRepository interface {
-	// BatchGradeInfo returns, for the given repos known to the service, their last public grade
-	// (score, graded_at); a repo missing from the result is unknown or never graded.
-	BatchGradeInfo(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]BatchGrade, error)
-	// SelectBatchRepos returns the public repos matching the filter, ordered by slug, up to limit.
-	// capped is true when more than limit matched.
-	SelectBatchRepos(ctx context.Context, filter BatchFilter, limit int) (repos []BatchCandidate, capped bool, err error)
+	// SelectBatchRepos returns up to filter.Limit known public repos matching the filter, highest
+	// SourceCraft rating first, and how many matched in all.
+	SelectBatchRepos(ctx context.Context, filter BatchFilter) (repos []BatchCandidate, matched int, err error)
 	// GetBatchRepo loads the few columns a grading request needs (ids, slugs, visibility), whatever the
 	// other columns hold; ErrRepositoryNotFound when the repo is gone.
 	GetBatchRepo(ctx context.Context, id uuid.UUID) (Repo, error)

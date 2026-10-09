@@ -32,7 +32,7 @@ export const ADMIN_SERIES: SeriesInfo[] = [
   { name: "grading_p95_seconds", title: "Время оценки", description: "95% оценок завершаются быстрее этого времени." },
   { name: "limiter_rejections", title: "Отказы по лимиту оценок", description: "Сколько оценок отклонено общим лимитом за час." },
   { name: "llm_requests", title: "Запросы к LLM", description: "Запросы рекомендаций и ответы за час." },
-  { name: "batch_items", title: "Пакетная переоценка", description: "Репозиториев пакетов по итогу за час." },
+  { name: "batch_items", title: "Пакетная оценка", description: "Репозиториев пакетов по итогу за час." },
   { name: "admin_denied", title: "Отказы администратору", description: "Попытки зайти в админские маршруты без прав, за час." },
 ]
 

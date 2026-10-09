@@ -28,11 +28,14 @@ const (
 	Aggregator_GetRegradeStatus_FullMethodName          = "/aggregator.Aggregator/GetRegradeStatus"
 	Aggregator_RecordAudit_FullMethodName               = "/aggregator.Aggregator/RecordAudit"
 	Aggregator_ListAudit_FullMethodName                 = "/aggregator.Aggregator/ListAudit"
-	Aggregator_PreviewRegradeBatch_FullMethodName       = "/aggregator.Aggregator/PreviewRegradeBatch"
-	Aggregator_StartRegradeBatch_FullMethodName         = "/aggregator.Aggregator/StartRegradeBatch"
-	Aggregator_ControlRegradeBatch_FullMethodName       = "/aggregator.Aggregator/ControlRegradeBatch"
-	Aggregator_GetRegradeBatch_FullMethodName           = "/aggregator.Aggregator/GetRegradeBatch"
-	Aggregator_ListRegradeBatches_FullMethodName        = "/aggregator.Aggregator/ListRegradeBatches"
+	Aggregator_PreviewGradingBatch_FullMethodName       = "/aggregator.Aggregator/PreviewGradingBatch"
+	Aggregator_StartGradingBatch_FullMethodName         = "/aggregator.Aggregator/StartGradingBatch"
+	Aggregator_ControlGradingBatch_FullMethodName       = "/aggregator.Aggregator/ControlGradingBatch"
+	Aggregator_GetGradingBatch_FullMethodName           = "/aggregator.Aggregator/GetGradingBatch"
+	Aggregator_ListGradingBatches_FullMethodName        = "/aggregator.Aggregator/ListGradingBatches"
+	Aggregator_GetCatalogStatus_FullMethodName          = "/aggregator.Aggregator/GetCatalogStatus"
+	Aggregator_RefreshCatalog_FullMethodName            = "/aggregator.Aggregator/RefreshCatalog"
+	Aggregator_CancelCatalogRefresh_FullMethodName      = "/aggregator.Aggregator/CancelCatalogRefresh"
 )
 
 // AggregatorClient is the client API for Aggregator service.
@@ -57,23 +60,33 @@ type AggregatorClient interface {
 	RecordAudit(ctx context.Context, in *RecordAuditRequest, opts ...grpc.CallOption) (*RecordAuditResponse, error)
 	// ListAudit returns one page of the audit log, newest first, with a cursor for the next page.
 	ListAudit(ctx context.Context, in *ListAuditRequest, opts ...grpc.CallOption) (*ListAuditResponse, error)
-	// PreviewRegradeBatch is the dry run of an admin batch regrade: how many public repos a filter
-	// selects, a sample, the hand-picked ones that matched nothing and a rough duration. Writes nothing.
+	// PreviewGradingBatch is the dry run of an admin batch grading: how many public repos a filter
+	// matches and the limit takes, a sample, the hand-picked ones that matched nothing and a rough duration. Writes nothing.
 	// INVALID_ARGUMENT for a filter that breaks the rules.
-	PreviewRegradeBatch(ctx context.Context, in *PreviewRegradeBatchRequest, opts ...grpc.CallOption) (*PreviewRegradeBatchResponse, error)
-	// StartRegradeBatch creates a batch and starts it. ALREADY_EXISTS (batch_active) while another batch
-	// is running or paused; INVALID_ARGUMENT (invalid_filter | nothing_selected | too_many) for a bad
-	// filter or one that selects nothing or too many repos. The start is recorded in the audit log
+	PreviewGradingBatch(ctx context.Context, in *PreviewGradingBatchRequest, opts ...grpc.CallOption) (*PreviewGradingBatchResponse, error)
+	// StartGradingBatch creates a batch and starts it. ALREADY_EXISTS (batch_active) while another batch
+	// is running or paused; INVALID_ARGUMENT (invalid_filter | nothing_selected |
+	// limit_too_high) for a bad filter, one that selects nothing or a limit above the stand's cap. The start is recorded in the audit log
 	// under actor_hash.
-	StartRegradeBatch(ctx context.Context, in *StartRegradeBatchRequest, opts ...grpc.CallOption) (*StartRegradeBatchResponse, error)
-	// ControlRegradeBatch pauses, resumes or cancels a batch. ABORTED (bad_state) when the action does
+	StartGradingBatch(ctx context.Context, in *StartGradingBatchRequest, opts ...grpc.CallOption) (*StartGradingBatchResponse, error)
+	// ControlGradingBatch pauses, resumes or cancels a batch. ABORTED (bad_state) when the action does
 	// not fit the batch's state, NOT_FOUND (batch_not_found) for an unknown batch.
-	ControlRegradeBatch(ctx context.Context, in *ControlRegradeBatchRequest, opts ...grpc.CallOption) (*ControlRegradeBatchResponse, error)
-	// GetRegradeBatch returns a batch and the repos that failed in it. batch_id 0 means the active
+	ControlGradingBatch(ctx context.Context, in *ControlGradingBatchRequest, opts ...grpc.CallOption) (*ControlGradingBatchResponse, error)
+	// GetGradingBatch returns a batch and the repos that failed in it. batch_id 0 means the active
 	// batch, or the latest one when none is active; NOT_FOUND when there has never been one.
-	GetRegradeBatch(ctx context.Context, in *GetRegradeBatchRequest, opts ...grpc.CallOption) (*GetRegradeBatchResponse, error)
-	// ListRegradeBatches returns the most recent batches, newest first.
-	ListRegradeBatches(ctx context.Context, in *ListRegradeBatchesRequest, opts ...grpc.CallOption) (*ListRegradeBatchesResponse, error)
+	GetGradingBatch(ctx context.Context, in *GetGradingBatchRequest, opts ...grpc.CallOption) (*GetGradingBatchResponse, error)
+	// ListGradingBatches returns the most recent batches, newest first.
+	ListGradingBatches(ctx context.Context, in *ListGradingBatchesRequest, opts ...grpc.CallOption) (*ListGradingBatchesResponse, error)
+	// GetCatalogStatus reports the public repo catalog: its size and age, the running (or latest)
+	// refresh and the one that produced the catalog in use. Read-only.
+	GetCatalogStatus(ctx context.Context, in *GetCatalogStatusRequest, opts ...grpc.CallOption) (*GetCatalogStatusResponse, error)
+	// RefreshCatalog starts fetching the full public repo listing; the catalog in use stays until the
+	// new one is complete. ALREADY_EXISTS (refresh_active) while a refresh is running. The start is
+	// recorded in the audit log under actor_hash.
+	RefreshCatalog(ctx context.Context, in *RefreshCatalogRequest, opts ...grpc.CallOption) (*RefreshCatalogResponse, error)
+	// CancelCatalogRefresh stops the running refresh; the catalog in use is untouched. ABORTED
+	// (refresh_not_running) when none runs.
+	CancelCatalogRefresh(ctx context.Context, in *CancelCatalogRefreshRequest, opts ...grpc.CallOption) (*CancelCatalogRefreshResponse, error)
 }
 
 type aggregatorClient struct {
@@ -174,50 +187,80 @@ func (c *aggregatorClient) ListAudit(ctx context.Context, in *ListAuditRequest, 
 	return out, nil
 }
 
-func (c *aggregatorClient) PreviewRegradeBatch(ctx context.Context, in *PreviewRegradeBatchRequest, opts ...grpc.CallOption) (*PreviewRegradeBatchResponse, error) {
+func (c *aggregatorClient) PreviewGradingBatch(ctx context.Context, in *PreviewGradingBatchRequest, opts ...grpc.CallOption) (*PreviewGradingBatchResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(PreviewRegradeBatchResponse)
-	err := c.cc.Invoke(ctx, Aggregator_PreviewRegradeBatch_FullMethodName, in, out, cOpts...)
+	out := new(PreviewGradingBatchResponse)
+	err := c.cc.Invoke(ctx, Aggregator_PreviewGradingBatch_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *aggregatorClient) StartRegradeBatch(ctx context.Context, in *StartRegradeBatchRequest, opts ...grpc.CallOption) (*StartRegradeBatchResponse, error) {
+func (c *aggregatorClient) StartGradingBatch(ctx context.Context, in *StartGradingBatchRequest, opts ...grpc.CallOption) (*StartGradingBatchResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(StartRegradeBatchResponse)
-	err := c.cc.Invoke(ctx, Aggregator_StartRegradeBatch_FullMethodName, in, out, cOpts...)
+	out := new(StartGradingBatchResponse)
+	err := c.cc.Invoke(ctx, Aggregator_StartGradingBatch_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *aggregatorClient) ControlRegradeBatch(ctx context.Context, in *ControlRegradeBatchRequest, opts ...grpc.CallOption) (*ControlRegradeBatchResponse, error) {
+func (c *aggregatorClient) ControlGradingBatch(ctx context.Context, in *ControlGradingBatchRequest, opts ...grpc.CallOption) (*ControlGradingBatchResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ControlRegradeBatchResponse)
-	err := c.cc.Invoke(ctx, Aggregator_ControlRegradeBatch_FullMethodName, in, out, cOpts...)
+	out := new(ControlGradingBatchResponse)
+	err := c.cc.Invoke(ctx, Aggregator_ControlGradingBatch_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *aggregatorClient) GetRegradeBatch(ctx context.Context, in *GetRegradeBatchRequest, opts ...grpc.CallOption) (*GetRegradeBatchResponse, error) {
+func (c *aggregatorClient) GetGradingBatch(ctx context.Context, in *GetGradingBatchRequest, opts ...grpc.CallOption) (*GetGradingBatchResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetRegradeBatchResponse)
-	err := c.cc.Invoke(ctx, Aggregator_GetRegradeBatch_FullMethodName, in, out, cOpts...)
+	out := new(GetGradingBatchResponse)
+	err := c.cc.Invoke(ctx, Aggregator_GetGradingBatch_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *aggregatorClient) ListRegradeBatches(ctx context.Context, in *ListRegradeBatchesRequest, opts ...grpc.CallOption) (*ListRegradeBatchesResponse, error) {
+func (c *aggregatorClient) ListGradingBatches(ctx context.Context, in *ListGradingBatchesRequest, opts ...grpc.CallOption) (*ListGradingBatchesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListRegradeBatchesResponse)
-	err := c.cc.Invoke(ctx, Aggregator_ListRegradeBatches_FullMethodName, in, out, cOpts...)
+	out := new(ListGradingBatchesResponse)
+	err := c.cc.Invoke(ctx, Aggregator_ListGradingBatches_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aggregatorClient) GetCatalogStatus(ctx context.Context, in *GetCatalogStatusRequest, opts ...grpc.CallOption) (*GetCatalogStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetCatalogStatusResponse)
+	err := c.cc.Invoke(ctx, Aggregator_GetCatalogStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aggregatorClient) RefreshCatalog(ctx context.Context, in *RefreshCatalogRequest, opts ...grpc.CallOption) (*RefreshCatalogResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RefreshCatalogResponse)
+	err := c.cc.Invoke(ctx, Aggregator_RefreshCatalog_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aggregatorClient) CancelCatalogRefresh(ctx context.Context, in *CancelCatalogRefreshRequest, opts ...grpc.CallOption) (*CancelCatalogRefreshResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelCatalogRefreshResponse)
+	err := c.cc.Invoke(ctx, Aggregator_CancelCatalogRefresh_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -246,23 +289,33 @@ type AggregatorServer interface {
 	RecordAudit(context.Context, *RecordAuditRequest) (*RecordAuditResponse, error)
 	// ListAudit returns one page of the audit log, newest first, with a cursor for the next page.
 	ListAudit(context.Context, *ListAuditRequest) (*ListAuditResponse, error)
-	// PreviewRegradeBatch is the dry run of an admin batch regrade: how many public repos a filter
-	// selects, a sample, the hand-picked ones that matched nothing and a rough duration. Writes nothing.
+	// PreviewGradingBatch is the dry run of an admin batch grading: how many public repos a filter
+	// matches and the limit takes, a sample, the hand-picked ones that matched nothing and a rough duration. Writes nothing.
 	// INVALID_ARGUMENT for a filter that breaks the rules.
-	PreviewRegradeBatch(context.Context, *PreviewRegradeBatchRequest) (*PreviewRegradeBatchResponse, error)
-	// StartRegradeBatch creates a batch and starts it. ALREADY_EXISTS (batch_active) while another batch
-	// is running or paused; INVALID_ARGUMENT (invalid_filter | nothing_selected | too_many) for a bad
-	// filter or one that selects nothing or too many repos. The start is recorded in the audit log
+	PreviewGradingBatch(context.Context, *PreviewGradingBatchRequest) (*PreviewGradingBatchResponse, error)
+	// StartGradingBatch creates a batch and starts it. ALREADY_EXISTS (batch_active) while another batch
+	// is running or paused; INVALID_ARGUMENT (invalid_filter | nothing_selected |
+	// limit_too_high) for a bad filter, one that selects nothing or a limit above the stand's cap. The start is recorded in the audit log
 	// under actor_hash.
-	StartRegradeBatch(context.Context, *StartRegradeBatchRequest) (*StartRegradeBatchResponse, error)
-	// ControlRegradeBatch pauses, resumes or cancels a batch. ABORTED (bad_state) when the action does
+	StartGradingBatch(context.Context, *StartGradingBatchRequest) (*StartGradingBatchResponse, error)
+	// ControlGradingBatch pauses, resumes or cancels a batch. ABORTED (bad_state) when the action does
 	// not fit the batch's state, NOT_FOUND (batch_not_found) for an unknown batch.
-	ControlRegradeBatch(context.Context, *ControlRegradeBatchRequest) (*ControlRegradeBatchResponse, error)
-	// GetRegradeBatch returns a batch and the repos that failed in it. batch_id 0 means the active
+	ControlGradingBatch(context.Context, *ControlGradingBatchRequest) (*ControlGradingBatchResponse, error)
+	// GetGradingBatch returns a batch and the repos that failed in it. batch_id 0 means the active
 	// batch, or the latest one when none is active; NOT_FOUND when there has never been one.
-	GetRegradeBatch(context.Context, *GetRegradeBatchRequest) (*GetRegradeBatchResponse, error)
-	// ListRegradeBatches returns the most recent batches, newest first.
-	ListRegradeBatches(context.Context, *ListRegradeBatchesRequest) (*ListRegradeBatchesResponse, error)
+	GetGradingBatch(context.Context, *GetGradingBatchRequest) (*GetGradingBatchResponse, error)
+	// ListGradingBatches returns the most recent batches, newest first.
+	ListGradingBatches(context.Context, *ListGradingBatchesRequest) (*ListGradingBatchesResponse, error)
+	// GetCatalogStatus reports the public repo catalog: its size and age, the running (or latest)
+	// refresh and the one that produced the catalog in use. Read-only.
+	GetCatalogStatus(context.Context, *GetCatalogStatusRequest) (*GetCatalogStatusResponse, error)
+	// RefreshCatalog starts fetching the full public repo listing; the catalog in use stays until the
+	// new one is complete. ALREADY_EXISTS (refresh_active) while a refresh is running. The start is
+	// recorded in the audit log under actor_hash.
+	RefreshCatalog(context.Context, *RefreshCatalogRequest) (*RefreshCatalogResponse, error)
+	// CancelCatalogRefresh stops the running refresh; the catalog in use is untouched. ABORTED
+	// (refresh_not_running) when none runs.
+	CancelCatalogRefresh(context.Context, *CancelCatalogRefreshRequest) (*CancelCatalogRefreshResponse, error)
 	mustEmbedUnimplementedAggregatorServer()
 }
 
@@ -300,20 +353,29 @@ func (UnimplementedAggregatorServer) RecordAudit(context.Context, *RecordAuditRe
 func (UnimplementedAggregatorServer) ListAudit(context.Context, *ListAuditRequest) (*ListAuditResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListAudit not implemented")
 }
-func (UnimplementedAggregatorServer) PreviewRegradeBatch(context.Context, *PreviewRegradeBatchRequest) (*PreviewRegradeBatchResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method PreviewRegradeBatch not implemented")
+func (UnimplementedAggregatorServer) PreviewGradingBatch(context.Context, *PreviewGradingBatchRequest) (*PreviewGradingBatchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PreviewGradingBatch not implemented")
 }
-func (UnimplementedAggregatorServer) StartRegradeBatch(context.Context, *StartRegradeBatchRequest) (*StartRegradeBatchResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method StartRegradeBatch not implemented")
+func (UnimplementedAggregatorServer) StartGradingBatch(context.Context, *StartGradingBatchRequest) (*StartGradingBatchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartGradingBatch not implemented")
 }
-func (UnimplementedAggregatorServer) ControlRegradeBatch(context.Context, *ControlRegradeBatchRequest) (*ControlRegradeBatchResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ControlRegradeBatch not implemented")
+func (UnimplementedAggregatorServer) ControlGradingBatch(context.Context, *ControlGradingBatchRequest) (*ControlGradingBatchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ControlGradingBatch not implemented")
 }
-func (UnimplementedAggregatorServer) GetRegradeBatch(context.Context, *GetRegradeBatchRequest) (*GetRegradeBatchResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetRegradeBatch not implemented")
+func (UnimplementedAggregatorServer) GetGradingBatch(context.Context, *GetGradingBatchRequest) (*GetGradingBatchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetGradingBatch not implemented")
 }
-func (UnimplementedAggregatorServer) ListRegradeBatches(context.Context, *ListRegradeBatchesRequest) (*ListRegradeBatchesResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListRegradeBatches not implemented")
+func (UnimplementedAggregatorServer) ListGradingBatches(context.Context, *ListGradingBatchesRequest) (*ListGradingBatchesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListGradingBatches not implemented")
+}
+func (UnimplementedAggregatorServer) GetCatalogStatus(context.Context, *GetCatalogStatusRequest) (*GetCatalogStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCatalogStatus not implemented")
+}
+func (UnimplementedAggregatorServer) RefreshCatalog(context.Context, *RefreshCatalogRequest) (*RefreshCatalogResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RefreshCatalog not implemented")
+}
+func (UnimplementedAggregatorServer) CancelCatalogRefresh(context.Context, *CancelCatalogRefreshRequest) (*CancelCatalogRefreshResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CancelCatalogRefresh not implemented")
 }
 func (UnimplementedAggregatorServer) mustEmbedUnimplementedAggregatorServer() {}
 func (UnimplementedAggregatorServer) testEmbeddedByValue()                    {}
@@ -498,92 +560,146 @@ func _Aggregator_ListAudit_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Aggregator_PreviewRegradeBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PreviewRegradeBatchRequest)
+func _Aggregator_PreviewGradingBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PreviewGradingBatchRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AggregatorServer).PreviewRegradeBatch(ctx, in)
+		return srv.(AggregatorServer).PreviewGradingBatch(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Aggregator_PreviewRegradeBatch_FullMethodName,
+		FullMethod: Aggregator_PreviewGradingBatch_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AggregatorServer).PreviewRegradeBatch(ctx, req.(*PreviewRegradeBatchRequest))
+		return srv.(AggregatorServer).PreviewGradingBatch(ctx, req.(*PreviewGradingBatchRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Aggregator_StartRegradeBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StartRegradeBatchRequest)
+func _Aggregator_StartGradingBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartGradingBatchRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AggregatorServer).StartRegradeBatch(ctx, in)
+		return srv.(AggregatorServer).StartGradingBatch(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Aggregator_StartRegradeBatch_FullMethodName,
+		FullMethod: Aggregator_StartGradingBatch_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AggregatorServer).StartRegradeBatch(ctx, req.(*StartRegradeBatchRequest))
+		return srv.(AggregatorServer).StartGradingBatch(ctx, req.(*StartGradingBatchRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Aggregator_ControlRegradeBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ControlRegradeBatchRequest)
+func _Aggregator_ControlGradingBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ControlGradingBatchRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AggregatorServer).ControlRegradeBatch(ctx, in)
+		return srv.(AggregatorServer).ControlGradingBatch(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Aggregator_ControlRegradeBatch_FullMethodName,
+		FullMethod: Aggregator_ControlGradingBatch_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AggregatorServer).ControlRegradeBatch(ctx, req.(*ControlRegradeBatchRequest))
+		return srv.(AggregatorServer).ControlGradingBatch(ctx, req.(*ControlGradingBatchRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Aggregator_GetRegradeBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetRegradeBatchRequest)
+func _Aggregator_GetGradingBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetGradingBatchRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AggregatorServer).GetRegradeBatch(ctx, in)
+		return srv.(AggregatorServer).GetGradingBatch(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Aggregator_GetRegradeBatch_FullMethodName,
+		FullMethod: Aggregator_GetGradingBatch_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AggregatorServer).GetRegradeBatch(ctx, req.(*GetRegradeBatchRequest))
+		return srv.(AggregatorServer).GetGradingBatch(ctx, req.(*GetGradingBatchRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Aggregator_ListRegradeBatches_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListRegradeBatchesRequest)
+func _Aggregator_ListGradingBatches_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListGradingBatchesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AggregatorServer).ListRegradeBatches(ctx, in)
+		return srv.(AggregatorServer).ListGradingBatches(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Aggregator_ListRegradeBatches_FullMethodName,
+		FullMethod: Aggregator_ListGradingBatches_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AggregatorServer).ListRegradeBatches(ctx, req.(*ListRegradeBatchesRequest))
+		return srv.(AggregatorServer).ListGradingBatches(ctx, req.(*ListGradingBatchesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Aggregator_GetCatalogStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCatalogStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregatorServer).GetCatalogStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Aggregator_GetCatalogStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregatorServer).GetCatalogStatus(ctx, req.(*GetCatalogStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Aggregator_RefreshCatalog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RefreshCatalogRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregatorServer).RefreshCatalog(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Aggregator_RefreshCatalog_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregatorServer).RefreshCatalog(ctx, req.(*RefreshCatalogRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Aggregator_CancelCatalogRefresh_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelCatalogRefreshRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregatorServer).CancelCatalogRefresh(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Aggregator_CancelCatalogRefresh_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregatorServer).CancelCatalogRefresh(ctx, req.(*CancelCatalogRefreshRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -632,24 +748,36 @@ var Aggregator_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Aggregator_ListAudit_Handler,
 		},
 		{
-			MethodName: "PreviewRegradeBatch",
-			Handler:    _Aggregator_PreviewRegradeBatch_Handler,
+			MethodName: "PreviewGradingBatch",
+			Handler:    _Aggregator_PreviewGradingBatch_Handler,
 		},
 		{
-			MethodName: "StartRegradeBatch",
-			Handler:    _Aggregator_StartRegradeBatch_Handler,
+			MethodName: "StartGradingBatch",
+			Handler:    _Aggregator_StartGradingBatch_Handler,
 		},
 		{
-			MethodName: "ControlRegradeBatch",
-			Handler:    _Aggregator_ControlRegradeBatch_Handler,
+			MethodName: "ControlGradingBatch",
+			Handler:    _Aggregator_ControlGradingBatch_Handler,
 		},
 		{
-			MethodName: "GetRegradeBatch",
-			Handler:    _Aggregator_GetRegradeBatch_Handler,
+			MethodName: "GetGradingBatch",
+			Handler:    _Aggregator_GetGradingBatch_Handler,
 		},
 		{
-			MethodName: "ListRegradeBatches",
-			Handler:    _Aggregator_ListRegradeBatches_Handler,
+			MethodName: "ListGradingBatches",
+			Handler:    _Aggregator_ListGradingBatches_Handler,
+		},
+		{
+			MethodName: "GetCatalogStatus",
+			Handler:    _Aggregator_GetCatalogStatus_Handler,
+		},
+		{
+			MethodName: "RefreshCatalog",
+			Handler:    _Aggregator_RefreshCatalog_Handler,
+		},
+		{
+			MethodName: "CancelCatalogRefresh",
+			Handler:    _Aggregator_CancelCatalogRefresh_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

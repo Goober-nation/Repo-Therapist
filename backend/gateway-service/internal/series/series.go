@@ -108,7 +108,7 @@ var Catalog = []Definition{
 	},
 	{
 		Name: "batch_items", Unit: "count",
-		Query: `round(sum by (status) (increase(aggregator_regrade_batch_items_total[1h])))`,
+		Query: `round(sum by (status) (increase(aggregator_grading_batch_items_total[1h])))`,
 	},
 	// The LLM service's own counters: tokens as the provider reports them, never money, never per repository.
 	{

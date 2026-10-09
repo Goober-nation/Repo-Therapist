@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"slices"
 	"sort"
 	"strings"
@@ -47,14 +48,19 @@ type AggregatorService struct {
 	Metrics Recorder
 	// AuditRepo stores the audit log; nil leaves auditing off.
 	AuditRepo domain.AuditRepository
-	// BatchRepo stores admin regrade batches; nil leaves them off.
+	// BatchRepo stores admin grading batches; nil leaves them off.
 	BatchRepo domain.BatchRepository
-	// BatchConcurrency, BatchMaxRepos, BatchItemTimeout and BatchPoll tune the batch regrade; zero
-	// values mean the defaults in regrade_batch.go.
+	// BatchConcurrency, BatchItemTimeout and BatchPoll tune the batch grading; zero
+	// values mean the defaults in grading_batch.go.
 	BatchConcurrency int
-	BatchMaxRepos    int
 	BatchItemTimeout time.Duration
 	BatchPoll        time.Duration
+	// BatchMaxLimit caps the limit of one batch (config BATCH_GRADING_MAX_LIMIT); 0 means no cap.
+	BatchMaxLimit int
+	// CatalogRepo stores the public repo catalog; nil leaves it off and the live listings in use.
+	CatalogRepo domain.CatalogRepository
+	// CatalogMaxPages bounds one catalog refresh; 0 means DefaultCatalogMaxPages.
+	CatalogMaxPages  int
 	ticker           *time.Ticker
 	clientRPC        client.CodeHealthClient
 	gradingPublisher domain.GradingPublisher
@@ -96,6 +102,9 @@ type AggregatorService struct {
 
 	batches  batchRunner
 	batchCtx context.Context
+
+	catalog    catalogRunner
+	catalogCtx context.Context
 
 	// gradingStarts remembers when each repo's grading was requested, to time it at the result.
 	gradingStarts sync.Map
@@ -954,6 +963,62 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 		return nil
 	}
 
+	repos, failed, err := as.publicReposToRegrade(ctx)
+	if err != nil {
+		return err
+	}
+
+	listed := len(repos) + failed
+
+	as.regradeMu.Lock()
+	as.regradeState.total = len(repos)
+	as.regradeMu.Unlock()
+
+	for _, repo := range repos {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		if err := as.regradeRepo(ctx, repo); err != nil {
+			failed++
+			log.Printf("regrade %s/%s: %v", repo.OrgSlug, repo.RepoSlug, err)
+		}
+
+		as.regradeMu.Lock()
+		as.regradeState.done++
+		as.regradeMu.Unlock()
+	}
+
+	if failed > 0 {
+		return fmt.Errorf(
+			"%w: %d of %d public repositories failed",
+			domain.ErrGradingFailed,
+			failed,
+			listed,
+		)
+	}
+
+	return nil
+}
+
+// publicReposToRegrade is the top RegradeLimit public repos by SourceCraft rating (all with 0): from
+// the stored catalog, or, before its first successful refresh, from a live listing. invalid counts
+// the listed repos that could not be read.
+func (as *AggregatorService) publicReposToRegrade(ctx context.Context) (repos []domain.Repo, invalid int, err error) {
+	if as.catalogInUse(ctx) {
+		limit := as.RegradeLimit
+		if limit <= 0 {
+			limit = math.MaxInt32
+		}
+
+		repos, err = as.CatalogRepo.TopRated(ctx, limit)
+		if err != nil {
+			return nil, 0, fmt.Errorf("%w: read public repo catalog: %v", domain.ErrGradingFailed, err)
+		}
+
+		return repos, 0, nil
+	}
+
 	listTimeout := as.RPCTimeout
 	if as.RegradeListTimeout > 0 {
 		listTimeout = as.RegradeListTimeout
@@ -967,41 +1032,22 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 		&client.ListAllPublicReposRequest{},
 	)
 	if err != nil {
-		return wrapperError("list public repositories", err)
+		return nil, 0, wrapperError("list public repositories", err)
 	}
 
-	repos := topPublicRepos(response.GetRepos(), as.RegradeLimit)
-	failed := 0
-
-	as.regradeMu.Lock()
-	as.regradeState.total = len(repos)
-	as.regradeMu.Unlock()
-
-	for _, pbRepo := range repos {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-
-		if err := as.regradeRepo(ctx, pbRepo); err != nil {
-			failed++
+	for _, pbRepo := range topPublicRepos(response.GetRepos(), as.RegradeLimit) {
+		repo, err := repoFromWrapper(pbRepo)
+		if err != nil {
+			invalid++
 			log.Printf("regrade %s/%s: %v", pbRepo.GetOrganization().GetSlug(), pbRepo.GetSlug(), err)
+
+			continue
 		}
 
-		as.regradeMu.Lock()
-		as.regradeState.done++
-		as.regradeMu.Unlock()
+		repos = append(repos, repo)
 	}
 
-	if failed > 0 {
-		return fmt.Errorf(
-			"%w: %d of %d public repositories failed",
-			domain.ErrGradingFailed,
-			failed,
-			len(repos),
-		)
-	}
-
-	return nil
+	return repos, invalid, nil
 }
 
 // topPublicRepos keeps the public repos, highest SourceCraft rating first (listing order breaks
@@ -1025,18 +1071,12 @@ func topPublicRepos(repos []*client.Repository, limit int) []*client.Repository 
 	return public
 }
 
-func (as *AggregatorService) regradeRepo(ctx context.Context, pbRepo *client.Repository) error {
-	repo, err := repoFromWrapper(pbRepo)
-	if err != nil {
-		return err
-	}
-
+// regradeRepo requests a public grading for a repo of the scheduled regrade. A graded repo is
+// regraded only when SourceCraft reports activity since its grade (asked now: the catalog's own
+// activity date is as old as the catalog) or its grade lacks newer data; an unanswered check grades it.
+func (as *AggregatorService) regradeRepo(ctx context.Context, repo domain.Repo) error {
 	if repo.Visibility != domain.VisibilityPublic {
 		return nil
-	}
-
-	if err := as.upsertRepo(ctx, repo); err != nil {
-		return fmt.Errorf("save repository: %w", err)
 	}
 
 	grade, err := as.GradesRepo.GetPublicGradeByRepoID(ctx, repo.SourcecraftUUID)
@@ -1044,8 +1084,21 @@ func (as *AggregatorService) regradeRepo(ctx context.Context, pbRepo *client.Rep
 		return fmt.Errorf("get grade: %w", err)
 	}
 
-	if err == nil && !as.needsRegrade(ctx, repo, false, grade) {
-		return nil
+	if err == nil {
+		fresh, active, checkErr := as.freshActivity(ctx, repo, grade.GradedAt)
+
+		switch {
+		case checkErr != nil:
+			log.Printf("regrade %s/%s: activity check: %v (grading anyway)", repo.OrgSlug, repo.RepoSlug, checkErr)
+		case fresh.Visibility != domain.VisibilityPublic:
+			return nil
+		case !active && !as.needsRegrade(ctx, fresh, false, grade):
+			return nil
+		default:
+			repo = fresh
+		}
+	} else if err := as.upsertRepo(ctx, repo); err != nil {
+		return fmt.Errorf("save repository: %w", err)
 	}
 
 	if err := as.requestGrading(ctx, repo, false, false); !errors.Is(err, domain.GradingPending) {
@@ -1053,6 +1106,17 @@ func (as *AggregatorService) regradeRepo(ctx context.Context, pbRepo *client.Rep
 	}
 
 	return nil
+}
+
+// freshActivity looks the repo up in SourceCraft now (saving what it finds) and reports whether it
+// was active after gradedAt. On an error it returns the repo as given, counted as active.
+func (as *AggregatorService) freshActivity(ctx context.Context, repo domain.Repo, gradedAt *time.Time) (domain.Repo, bool, error) {
+	fresh, err := as.resolveRepo(ctx, repo.OrgSlug, repo.RepoSlug)
+	if err != nil {
+		return repo, true, err
+	}
+
+	return fresh, domain.HasNewActivity(fresh.LastActivityAt, gradedAt), nil
 }
 
 // wrapperRepo is what the wrapper's repository messages have in common.

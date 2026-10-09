@@ -37,6 +37,11 @@ service CodeHealth {
   rpc ListTopRatedRepos(ListTopRatedReposRequest)
       returns (ListTopRatedReposResponse);
 
+  // ListPublicReposPage returns one page (100) of GET /repos in the platform's own order, for the
+  // Aggregator's public repo catalog refresh.
+  rpc ListPublicReposPage(ListPublicReposPageRequest)
+      returns (ListPublicReposPageResponse);
+
   // GetMyOrgs lists the caller's organizations (GET /me/orgs) and picks a default:
   // the personal org (slug equal to the GET /user username), else the first one.
   rpc GetMyOrgs(GetMyOrgsRequest)
@@ -111,6 +116,16 @@ message ListTopRatedReposRequest {
 
 message ListTopRatedReposResponse {
   repeated Repository repositories = 1;
+  string next_page_token = 2;
+}
+
+message ListPublicReposPageRequest {
+  string page_token = 1;
+}
+
+message ListPublicReposPageResponse {
+  repeated Repository repositories = 1;
+  // Empty on the last page.
   string next_page_token = 2;
 }
 

@@ -76,24 +76,36 @@ func (f *fakeService) AdminSeries(context.Context, string, string) (series.Resul
 	return series.Result{}, nil
 }
 
-func (f *fakeService) PreviewRegradeBatch(context.Context, domain.BatchFilter) (domain.BatchPreview, error) {
+func (f *fakeService) PreviewGradingBatch(context.Context, domain.BatchFilter) (domain.BatchPreview, error) {
 	return domain.BatchPreview{}, nil
 }
 
-func (f *fakeService) StartRegradeBatch(context.Context, string, domain.BatchFilter) (domain.RegradeBatch, error) {
-	return domain.RegradeBatch{}, nil
+func (f *fakeService) StartGradingBatch(context.Context, string, domain.BatchFilter) (domain.GradingBatch, error) {
+	return domain.GradingBatch{}, nil
 }
 
-func (f *fakeService) ControlRegradeBatch(context.Context, string, int64, string) (domain.RegradeBatch, error) {
-	return domain.RegradeBatch{}, nil
+func (f *fakeService) ControlGradingBatch(context.Context, string, int64, string) (domain.GradingBatch, error) {
+	return domain.GradingBatch{}, nil
 }
 
-func (f *fakeService) GetRegradeBatch(context.Context, int64) (domain.RegradeBatchDetail, error) {
-	return domain.RegradeBatchDetail{}, nil
+func (f *fakeService) GetGradingBatch(context.Context, int64) (domain.GradingBatchDetail, error) {
+	return domain.GradingBatchDetail{}, nil
 }
 
-func (f *fakeService) ListRegradeBatches(context.Context, int32) ([]domain.RegradeBatch, error) {
-	return nil, nil
+func (f *fakeService) ListGradingBatches(context.Context, int32) (domain.GradingBatchList, error) {
+	return domain.GradingBatchList{MaxLimit: 250}, nil
+}
+
+func (f *fakeService) GetCatalogStatus(context.Context) (domain.CatalogStatus, error) {
+	return domain.CatalogStatus{}, f.err
+}
+
+func (f *fakeService) RefreshCatalog(_ context.Context, actorHash string) (domain.CatalogRefresh, error) {
+	return domain.CatalogRefresh{ID: 1, Status: "running", Trigger: "admin", ActorHash: actorHash}, f.err
+}
+
+func (f *fakeService) CancelCatalogRefresh(context.Context, string) (domain.CatalogRefresh, error) {
+	return domain.CatalogRefresh{ID: 1, Status: "cancelled"}, f.err
 }
 
 func (f *fakeService) ListAudit(ctx context.Context, filter domain.AuditFilter) (domain.AuditPage, error) {

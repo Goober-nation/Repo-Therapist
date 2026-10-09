@@ -14,8 +14,10 @@ service CodeHealth {
   rpc GetMyRepos(GetMyReposRequest)
       returns (GetMyReposResponse);
 
-  rpc ListTopRatedRepos(ListTopRatedReposRequest)
-      returns (ListTopRatedReposResponse);
+  // ListPublicReposPage returns one page (100) of GET /repos in the platform's own order, for the
+  // Aggregator's public repo catalog refresh.
+  rpc ListPublicReposPage(ListPublicReposPageRequest)
+      returns (ListPublicReposPageResponse);
 
   rpc GetMyOrgs(GetMyOrgsRequest)
       returns (GetMyOrgsResponse);
@@ -56,12 +58,13 @@ message GetMyReposResponse {
   string next_page_token = 2;
 }
 
-message ListTopRatedReposRequest {
+message ListPublicReposPageRequest {
   string page_token = 1;
 }
 
-message ListTopRatedReposResponse {
+message ListPublicReposPageResponse {
   repeated Repository repositories = 1;
+  // Empty on the last page.
   string next_page_token = 2;
 }
 

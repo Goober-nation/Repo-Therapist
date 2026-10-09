@@ -1760,6 +1760,18 @@ test("the README snippets are a dropdown that starts collapsed and loads nothing
   assert.doesNotMatch(html, /badge-snippet__item|<img|api\/badge|api\/widget|api\/score/)
 })
 
+test("badge links use VITE_PUBLIC_URL's origin and fall back to the page origin", async () => {
+  const { publicOrigin } = await vite.ssrLoadModule("/src/components/BadgeSnippet.tsx")
+  const page = "http://localhost:5173"
+
+  assert.equal(publicOrigin("https://repo-therapist.alo.quest/", page), "https://repo-therapist.alo.quest")
+  assert.equal(publicOrigin("  http://localhost:8081/x?y  ", page), "http://localhost:8081")
+  assert.equal(publicOrigin(undefined, page), page)
+  assert.equal(publicOrigin("", page), page)
+  assert.equal(publicOrigin("not a url", page), page)
+  assert.equal(publicOrigin("javascript:alert(1)", page), page)
+})
+
 const analyticsBody = {
   status: "FINISHED",
   graded_at: "2026-10-01T12:00:00Z",

@@ -1548,12 +1548,12 @@ type BatchFilter struct {
 	OlderThanDays *int32 `protobuf:"varint,4,opt,name=older_than_days,json=olderThanDays,proto3,oneof" json:"older_than_days,omitempty"`
 	// Hand-picked "org/repo" slugs.
 	Repos []string `protobuf:"bytes,5,rep,name=repos,proto3" json:"repos,omitempty"`
-	// Every public repository; cannot be combined with the criteria above.
-	All bool `protobuf:"varint,6,opt,name=all,proto3" json:"all,omitempty"`
-	// The first N matching public repos in SourceCraft rating order (highest first).
-	TopRated *int32 `protobuf:"varint,7,opt,name=top_rated,json=topRated,proto3,oneof" json:"top_rated,omitempty"`
-	// Regrade every selected repo, skipping the "new activity since the last grade" check.
-	Force         bool `protobuf:"varint,8,opt,name=force,proto3" json:"force,omitempty"`
+	// Grade every selected repo, skipping the "new activity since the last grade" check.
+	Force bool `protobuf:"varint,8,opt,name=force,proto3" json:"force,omitempty"`
+	// How many matching repos are graded, highest SourceCraft rating first; required, at least 1.
+	Limit int32 `protobuf:"varint,9,opt,name=limit,proto3" json:"limit,omitempty"`
+	// Only repos that already have a public grade; otherwise never-graded repos are graded too.
+	OnlyRegrade   bool `protobuf:"varint,10,opt,name=only_regrade,json=onlyRegrade,proto3" json:"only_regrade,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1623,20 +1623,6 @@ func (x *BatchFilter) GetRepos() []string {
 	return nil
 }
 
-func (x *BatchFilter) GetAll() bool {
-	if x != nil {
-		return x.All
-	}
-	return false
-}
-
-func (x *BatchFilter) GetTopRated() int32 {
-	if x != nil && x.TopRated != nil {
-		return *x.TopRated
-	}
-	return 0
-}
-
 func (x *BatchFilter) GetForce() bool {
 	if x != nil {
 		return x.Force
@@ -1644,27 +1630,41 @@ func (x *BatchFilter) GetForce() bool {
 	return false
 }
 
-type PreviewRegradeBatchRequest struct {
+func (x *BatchFilter) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *BatchFilter) GetOnlyRegrade() bool {
+	if x != nil {
+		return x.OnlyRegrade
+	}
+	return false
+}
+
+type PreviewGradingBatchRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Filter        *BatchFilter           `protobuf:"bytes,1,opt,name=filter,proto3" json:"filter,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *PreviewRegradeBatchRequest) Reset() {
-	*x = PreviewRegradeBatchRequest{}
+func (x *PreviewGradingBatchRequest) Reset() {
+	*x = PreviewGradingBatchRequest{}
 	mi := &file_agg_client_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *PreviewRegradeBatchRequest) String() string {
+func (x *PreviewGradingBatchRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PreviewRegradeBatchRequest) ProtoMessage() {}
+func (*PreviewGradingBatchRequest) ProtoMessage() {}
 
-func (x *PreviewRegradeBatchRequest) ProtoReflect() protoreflect.Message {
+func (x *PreviewGradingBatchRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_agg_client_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1676,48 +1676,48 @@ func (x *PreviewRegradeBatchRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PreviewRegradeBatchRequest.ProtoReflect.Descriptor instead.
-func (*PreviewRegradeBatchRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use PreviewGradingBatchRequest.ProtoReflect.Descriptor instead.
+func (*PreviewGradingBatchRequest) Descriptor() ([]byte, []int) {
 	return file_agg_client_proto_rawDescGZIP(), []int{26}
 }
 
-func (x *PreviewRegradeBatchRequest) GetFilter() *BatchFilter {
+func (x *PreviewGradingBatchRequest) GetFilter() *BatchFilter {
 	if x != nil {
 		return x.Filter
 	}
 	return nil
 }
 
-type PreviewRegradeBatchResponse struct {
+type PreviewGradingBatchResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Repos selected, at most the batch cap.
-	Count int32 `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
-	// More repos matched than the cap: the batch could not start.
-	Capped bool     `protobuf:"varint,2,opt,name=capped,proto3" json:"capped,omitempty"`
+	// Repos the limit takes from the matches.
+	Count  int32    `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
 	Sample []string `protobuf:"bytes,3,rep,name=sample,proto3" json:"sample,omitempty"`
 	// Hand-picked slugs that are not public repositories known to the service.
 	Unmatched       []string `protobuf:"bytes,4,rep,name=unmatched,proto3" json:"unmatched,omitempty"`
 	EstimateSeconds int32    `protobuf:"varint,5,opt,name=estimate_seconds,json=estimateSeconds,proto3" json:"estimate_seconds,omitempty"`
 	// Estimated repos the activity check will skip (0 with force).
-	Inactive      int32 `protobuf:"varint,6,opt,name=inactive,proto3" json:"inactive,omitempty"`
+	Inactive int32 `protobuf:"varint,6,opt,name=inactive,proto3" json:"inactive,omitempty"`
+	// Public repos the criteria match before the limit.
+	Matched       int32 `protobuf:"varint,7,opt,name=matched,proto3" json:"matched,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *PreviewRegradeBatchResponse) Reset() {
-	*x = PreviewRegradeBatchResponse{}
+func (x *PreviewGradingBatchResponse) Reset() {
+	*x = PreviewGradingBatchResponse{}
 	mi := &file_agg_client_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *PreviewRegradeBatchResponse) String() string {
+func (x *PreviewGradingBatchResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PreviewRegradeBatchResponse) ProtoMessage() {}
+func (*PreviewGradingBatchResponse) ProtoMessage() {}
 
-func (x *PreviewRegradeBatchResponse) ProtoReflect() protoreflect.Message {
+func (x *PreviewGradingBatchResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_agg_client_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1729,54 +1729,54 @@ func (x *PreviewRegradeBatchResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PreviewRegradeBatchResponse.ProtoReflect.Descriptor instead.
-func (*PreviewRegradeBatchResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use PreviewGradingBatchResponse.ProtoReflect.Descriptor instead.
+func (*PreviewGradingBatchResponse) Descriptor() ([]byte, []int) {
 	return file_agg_client_proto_rawDescGZIP(), []int{27}
 }
 
-func (x *PreviewRegradeBatchResponse) GetCount() int32 {
+func (x *PreviewGradingBatchResponse) GetCount() int32 {
 	if x != nil {
 		return x.Count
 	}
 	return 0
 }
 
-func (x *PreviewRegradeBatchResponse) GetCapped() bool {
-	if x != nil {
-		return x.Capped
-	}
-	return false
-}
-
-func (x *PreviewRegradeBatchResponse) GetSample() []string {
+func (x *PreviewGradingBatchResponse) GetSample() []string {
 	if x != nil {
 		return x.Sample
 	}
 	return nil
 }
 
-func (x *PreviewRegradeBatchResponse) GetUnmatched() []string {
+func (x *PreviewGradingBatchResponse) GetUnmatched() []string {
 	if x != nil {
 		return x.Unmatched
 	}
 	return nil
 }
 
-func (x *PreviewRegradeBatchResponse) GetEstimateSeconds() int32 {
+func (x *PreviewGradingBatchResponse) GetEstimateSeconds() int32 {
 	if x != nil {
 		return x.EstimateSeconds
 	}
 	return 0
 }
 
-func (x *PreviewRegradeBatchResponse) GetInactive() int32 {
+func (x *PreviewGradingBatchResponse) GetInactive() int32 {
 	if x != nil {
 		return x.Inactive
 	}
 	return 0
 }
 
-type StartRegradeBatchRequest struct {
+func (x *PreviewGradingBatchResponse) GetMatched() int32 {
+	if x != nil {
+		return x.Matched
+	}
+	return 0
+}
+
+type StartGradingBatchRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Filter *BatchFilter           `protobuf:"bytes,1,opt,name=filter,proto3" json:"filter,omitempty"`
 	// The starting admin's actor hash, for the audit log and the batch record.
@@ -1785,20 +1785,20 @@ type StartRegradeBatchRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *StartRegradeBatchRequest) Reset() {
-	*x = StartRegradeBatchRequest{}
+func (x *StartGradingBatchRequest) Reset() {
+	*x = StartGradingBatchRequest{}
 	mi := &file_agg_client_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *StartRegradeBatchRequest) String() string {
+func (x *StartGradingBatchRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*StartRegradeBatchRequest) ProtoMessage() {}
+func (*StartGradingBatchRequest) ProtoMessage() {}
 
-func (x *StartRegradeBatchRequest) ProtoReflect() protoreflect.Message {
+func (x *StartGradingBatchRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_agg_client_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1810,46 +1810,46 @@ func (x *StartRegradeBatchRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StartRegradeBatchRequest.ProtoReflect.Descriptor instead.
-func (*StartRegradeBatchRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use StartGradingBatchRequest.ProtoReflect.Descriptor instead.
+func (*StartGradingBatchRequest) Descriptor() ([]byte, []int) {
 	return file_agg_client_proto_rawDescGZIP(), []int{28}
 }
 
-func (x *StartRegradeBatchRequest) GetFilter() *BatchFilter {
+func (x *StartGradingBatchRequest) GetFilter() *BatchFilter {
 	if x != nil {
 		return x.Filter
 	}
 	return nil
 }
 
-func (x *StartRegradeBatchRequest) GetActorHash() string {
+func (x *StartGradingBatchRequest) GetActorHash() string {
 	if x != nil {
 		return x.ActorHash
 	}
 	return ""
 }
 
-type StartRegradeBatchResponse struct {
+type StartGradingBatchResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Batch         *RegradeBatch          `protobuf:"bytes,1,opt,name=batch,proto3" json:"batch,omitempty"`
+	Batch         *GradingBatch          `protobuf:"bytes,1,opt,name=batch,proto3" json:"batch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *StartRegradeBatchResponse) Reset() {
-	*x = StartRegradeBatchResponse{}
+func (x *StartGradingBatchResponse) Reset() {
+	*x = StartGradingBatchResponse{}
 	mi := &file_agg_client_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *StartRegradeBatchResponse) String() string {
+func (x *StartGradingBatchResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*StartRegradeBatchResponse) ProtoMessage() {}
+func (*StartGradingBatchResponse) ProtoMessage() {}
 
-func (x *StartRegradeBatchResponse) ProtoReflect() protoreflect.Message {
+func (x *StartGradingBatchResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_agg_client_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1861,19 +1861,19 @@ func (x *StartRegradeBatchResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StartRegradeBatchResponse.ProtoReflect.Descriptor instead.
-func (*StartRegradeBatchResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use StartGradingBatchResponse.ProtoReflect.Descriptor instead.
+func (*StartGradingBatchResponse) Descriptor() ([]byte, []int) {
 	return file_agg_client_proto_rawDescGZIP(), []int{29}
 }
 
-func (x *StartRegradeBatchResponse) GetBatch() *RegradeBatch {
+func (x *StartGradingBatchResponse) GetBatch() *GradingBatch {
 	if x != nil {
 		return x.Batch
 	}
 	return nil
 }
 
-type ControlRegradeBatchRequest struct {
+type ControlGradingBatchRequest struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	BatchId int64                  `protobuf:"varint,1,opt,name=batch_id,json=batchId,proto3" json:"batch_id,omitempty"`
 	// pause | resume | cancel.
@@ -1883,20 +1883,20 @@ type ControlRegradeBatchRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ControlRegradeBatchRequest) Reset() {
-	*x = ControlRegradeBatchRequest{}
+func (x *ControlGradingBatchRequest) Reset() {
+	*x = ControlGradingBatchRequest{}
 	mi := &file_agg_client_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ControlRegradeBatchRequest) String() string {
+func (x *ControlGradingBatchRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ControlRegradeBatchRequest) ProtoMessage() {}
+func (*ControlGradingBatchRequest) ProtoMessage() {}
 
-func (x *ControlRegradeBatchRequest) ProtoReflect() protoreflect.Message {
+func (x *ControlGradingBatchRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_agg_client_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1908,53 +1908,53 @@ func (x *ControlRegradeBatchRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ControlRegradeBatchRequest.ProtoReflect.Descriptor instead.
-func (*ControlRegradeBatchRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ControlGradingBatchRequest.ProtoReflect.Descriptor instead.
+func (*ControlGradingBatchRequest) Descriptor() ([]byte, []int) {
 	return file_agg_client_proto_rawDescGZIP(), []int{30}
 }
 
-func (x *ControlRegradeBatchRequest) GetBatchId() int64 {
+func (x *ControlGradingBatchRequest) GetBatchId() int64 {
 	if x != nil {
 		return x.BatchId
 	}
 	return 0
 }
 
-func (x *ControlRegradeBatchRequest) GetAction() string {
+func (x *ControlGradingBatchRequest) GetAction() string {
 	if x != nil {
 		return x.Action
 	}
 	return ""
 }
 
-func (x *ControlRegradeBatchRequest) GetActorHash() string {
+func (x *ControlGradingBatchRequest) GetActorHash() string {
 	if x != nil {
 		return x.ActorHash
 	}
 	return ""
 }
 
-type ControlRegradeBatchResponse struct {
+type ControlGradingBatchResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Batch         *RegradeBatch          `protobuf:"bytes,1,opt,name=batch,proto3" json:"batch,omitempty"`
+	Batch         *GradingBatch          `protobuf:"bytes,1,opt,name=batch,proto3" json:"batch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ControlRegradeBatchResponse) Reset() {
-	*x = ControlRegradeBatchResponse{}
+func (x *ControlGradingBatchResponse) Reset() {
+	*x = ControlGradingBatchResponse{}
 	mi := &file_agg_client_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ControlRegradeBatchResponse) String() string {
+func (x *ControlGradingBatchResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ControlRegradeBatchResponse) ProtoMessage() {}
+func (*ControlGradingBatchResponse) ProtoMessage() {}
 
-func (x *ControlRegradeBatchResponse) ProtoReflect() protoreflect.Message {
+func (x *ControlGradingBatchResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_agg_client_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1966,39 +1966,39 @@ func (x *ControlRegradeBatchResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ControlRegradeBatchResponse.ProtoReflect.Descriptor instead.
-func (*ControlRegradeBatchResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use ControlGradingBatchResponse.ProtoReflect.Descriptor instead.
+func (*ControlGradingBatchResponse) Descriptor() ([]byte, []int) {
 	return file_agg_client_proto_rawDescGZIP(), []int{31}
 }
 
-func (x *ControlRegradeBatchResponse) GetBatch() *RegradeBatch {
+func (x *ControlGradingBatchResponse) GetBatch() *GradingBatch {
 	if x != nil {
 		return x.Batch
 	}
 	return nil
 }
 
-type GetRegradeBatchRequest struct {
+type GetGradingBatchRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	BatchId       int64                  `protobuf:"varint,1,opt,name=batch_id,json=batchId,proto3" json:"batch_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetRegradeBatchRequest) Reset() {
-	*x = GetRegradeBatchRequest{}
+func (x *GetGradingBatchRequest) Reset() {
+	*x = GetGradingBatchRequest{}
 	mi := &file_agg_client_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetRegradeBatchRequest) String() string {
+func (x *GetGradingBatchRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetRegradeBatchRequest) ProtoMessage() {}
+func (*GetGradingBatchRequest) ProtoMessage() {}
 
-func (x *GetRegradeBatchRequest) ProtoReflect() protoreflect.Message {
+func (x *GetGradingBatchRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_agg_client_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2010,41 +2010,41 @@ func (x *GetRegradeBatchRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetRegradeBatchRequest.ProtoReflect.Descriptor instead.
-func (*GetRegradeBatchRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetGradingBatchRequest.ProtoReflect.Descriptor instead.
+func (*GetGradingBatchRequest) Descriptor() ([]byte, []int) {
 	return file_agg_client_proto_rawDescGZIP(), []int{32}
 }
 
-func (x *GetRegradeBatchRequest) GetBatchId() int64 {
+func (x *GetGradingBatchRequest) GetBatchId() int64 {
 	if x != nil {
 		return x.BatchId
 	}
 	return 0
 }
 
-type GetRegradeBatchResponse struct {
+type GetGradingBatchResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	Batch *RegradeBatch          `protobuf:"bytes,1,opt,name=batch,proto3" json:"batch,omitempty"`
+	Batch *GradingBatch          `protobuf:"bytes,1,opt,name=batch,proto3" json:"batch,omitempty"`
 	// Repos that failed, with a fixed error code; at most 100.
-	Failures      []*RegradeBatchFailure `protobuf:"bytes,2,rep,name=failures,proto3" json:"failures,omitempty"`
+	Failures      []*GradingBatchFailure `protobuf:"bytes,2,rep,name=failures,proto3" json:"failures,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetRegradeBatchResponse) Reset() {
-	*x = GetRegradeBatchResponse{}
+func (x *GetGradingBatchResponse) Reset() {
+	*x = GetGradingBatchResponse{}
 	mi := &file_agg_client_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetRegradeBatchResponse) String() string {
+func (x *GetGradingBatchResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetRegradeBatchResponse) ProtoMessage() {}
+func (*GetGradingBatchResponse) ProtoMessage() {}
 
-func (x *GetRegradeBatchResponse) ProtoReflect() protoreflect.Message {
+func (x *GetGradingBatchResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_agg_client_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2056,26 +2056,26 @@ func (x *GetRegradeBatchResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetRegradeBatchResponse.ProtoReflect.Descriptor instead.
-func (*GetRegradeBatchResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetGradingBatchResponse.ProtoReflect.Descriptor instead.
+func (*GetGradingBatchResponse) Descriptor() ([]byte, []int) {
 	return file_agg_client_proto_rawDescGZIP(), []int{33}
 }
 
-func (x *GetRegradeBatchResponse) GetBatch() *RegradeBatch {
+func (x *GetGradingBatchResponse) GetBatch() *GradingBatch {
 	if x != nil {
 		return x.Batch
 	}
 	return nil
 }
 
-func (x *GetRegradeBatchResponse) GetFailures() []*RegradeBatchFailure {
+func (x *GetGradingBatchResponse) GetFailures() []*GradingBatchFailure {
 	if x != nil {
 		return x.Failures
 	}
 	return nil
 }
 
-type ListRegradeBatchesRequest struct {
+type ListGradingBatchesRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 0 means 10, at most 50.
 	Limit         int32 `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
@@ -2083,20 +2083,20 @@ type ListRegradeBatchesRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListRegradeBatchesRequest) Reset() {
-	*x = ListRegradeBatchesRequest{}
+func (x *ListGradingBatchesRequest) Reset() {
+	*x = ListGradingBatchesRequest{}
 	mi := &file_agg_client_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListRegradeBatchesRequest) String() string {
+func (x *ListGradingBatchesRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListRegradeBatchesRequest) ProtoMessage() {}
+func (*ListGradingBatchesRequest) ProtoMessage() {}
 
-func (x *ListRegradeBatchesRequest) ProtoReflect() protoreflect.Message {
+func (x *ListGradingBatchesRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_agg_client_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2108,39 +2108,41 @@ func (x *ListRegradeBatchesRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListRegradeBatchesRequest.ProtoReflect.Descriptor instead.
-func (*ListRegradeBatchesRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListGradingBatchesRequest.ProtoReflect.Descriptor instead.
+func (*ListGradingBatchesRequest) Descriptor() ([]byte, []int) {
 	return file_agg_client_proto_rawDescGZIP(), []int{34}
 }
 
-func (x *ListRegradeBatchesRequest) GetLimit() int32 {
+func (x *ListGradingBatchesRequest) GetLimit() int32 {
 	if x != nil {
 		return x.Limit
 	}
 	return 0
 }
 
-type ListRegradeBatchesResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Batches       []*RegradeBatch        `protobuf:"bytes,1,rep,name=batches,proto3" json:"batches,omitempty"`
+type ListGradingBatchesResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Batches []*GradingBatch        `protobuf:"bytes,1,rep,name=batches,proto3" json:"batches,omitempty"`
+	// The stand's cap on one batch's limit (BATCH_GRADING_MAX_LIMIT); 0 means none.
+	MaxLimit      int32 `protobuf:"varint,2,opt,name=max_limit,json=maxLimit,proto3" json:"max_limit,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListRegradeBatchesResponse) Reset() {
-	*x = ListRegradeBatchesResponse{}
+func (x *ListGradingBatchesResponse) Reset() {
+	*x = ListGradingBatchesResponse{}
 	mi := &file_agg_client_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListRegradeBatchesResponse) String() string {
+func (x *ListGradingBatchesResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListRegradeBatchesResponse) ProtoMessage() {}
+func (*ListGradingBatchesResponse) ProtoMessage() {}
 
-func (x *ListRegradeBatchesResponse) ProtoReflect() protoreflect.Message {
+func (x *ListGradingBatchesResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_agg_client_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2152,19 +2154,26 @@ func (x *ListRegradeBatchesResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListRegradeBatchesResponse.ProtoReflect.Descriptor instead.
-func (*ListRegradeBatchesResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListGradingBatchesResponse.ProtoReflect.Descriptor instead.
+func (*ListGradingBatchesResponse) Descriptor() ([]byte, []int) {
 	return file_agg_client_proto_rawDescGZIP(), []int{35}
 }
 
-func (x *ListRegradeBatchesResponse) GetBatches() []*RegradeBatch {
+func (x *ListGradingBatchesResponse) GetBatches() []*GradingBatch {
 	if x != nil {
 		return x.Batches
 	}
 	return nil
 }
 
-type RegradeBatch struct {
+func (x *ListGradingBatchesResponse) GetMaxLimit() int32 {
+	if x != nil {
+		return x.MaxLimit
+	}
+	return 0
+}
+
+type GradingBatch struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Id        int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
@@ -2184,20 +2193,20 @@ type RegradeBatch struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RegradeBatch) Reset() {
-	*x = RegradeBatch{}
+func (x *GradingBatch) Reset() {
+	*x = GradingBatch{}
 	mi := &file_agg_client_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RegradeBatch) String() string {
+func (x *GradingBatch) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RegradeBatch) ProtoMessage() {}
+func (*GradingBatch) ProtoMessage() {}
 
-func (x *RegradeBatch) ProtoReflect() protoreflect.Message {
+func (x *GradingBatch) ProtoReflect() protoreflect.Message {
 	mi := &file_agg_client_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2209,96 +2218,96 @@ func (x *RegradeBatch) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RegradeBatch.ProtoReflect.Descriptor instead.
-func (*RegradeBatch) Descriptor() ([]byte, []int) {
+// Deprecated: Use GradingBatch.ProtoReflect.Descriptor instead.
+func (*GradingBatch) Descriptor() ([]byte, []int) {
 	return file_agg_client_proto_rawDescGZIP(), []int{36}
 }
 
-func (x *RegradeBatch) GetId() int64 {
+func (x *GradingBatch) GetId() int64 {
 	if x != nil {
 		return x.Id
 	}
 	return 0
 }
 
-func (x *RegradeBatch) GetCreatedAt() *timestamppb.Timestamp {
+func (x *GradingBatch) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreatedAt
 	}
 	return nil
 }
 
-func (x *RegradeBatch) GetFinishedAt() *timestamppb.Timestamp {
+func (x *GradingBatch) GetFinishedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.FinishedAt
 	}
 	return nil
 }
 
-func (x *RegradeBatch) GetStatus() string {
+func (x *GradingBatch) GetStatus() string {
 	if x != nil {
 		return x.Status
 	}
 	return ""
 }
 
-func (x *RegradeBatch) GetActorHash() string {
+func (x *GradingBatch) GetActorHash() string {
 	if x != nil {
 		return x.ActorHash
 	}
 	return ""
 }
 
-func (x *RegradeBatch) GetFilter() *BatchFilter {
+func (x *GradingBatch) GetFilter() *BatchFilter {
 	if x != nil {
 		return x.Filter
 	}
 	return nil
 }
 
-func (x *RegradeBatch) GetTotal() int32 {
+func (x *GradingBatch) GetTotal() int32 {
 	if x != nil {
 		return x.Total
 	}
 	return 0
 }
 
-func (x *RegradeBatch) GetPending() int32 {
+func (x *GradingBatch) GetPending() int32 {
 	if x != nil {
 		return x.Pending
 	}
 	return 0
 }
 
-func (x *RegradeBatch) GetRunning() int32 {
+func (x *GradingBatch) GetRunning() int32 {
 	if x != nil {
 		return x.Running
 	}
 	return 0
 }
 
-func (x *RegradeBatch) GetOk() int32 {
+func (x *GradingBatch) GetOk() int32 {
 	if x != nil {
 		return x.Ok
 	}
 	return 0
 }
 
-func (x *RegradeBatch) GetFailed() int32 {
+func (x *GradingBatch) GetFailed() int32 {
 	if x != nil {
 		return x.Failed
 	}
 	return 0
 }
 
-func (x *RegradeBatch) GetSkipped() int32 {
+func (x *GradingBatch) GetSkipped() int32 {
 	if x != nil {
 		return x.Skipped
 	}
 	return 0
 }
 
-type RegradeBatchFailure struct {
+type GradingBatchFailure struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	OrgSlug  string                 `protobuf:"bytes,1,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
 	RepoSlug string                 `protobuf:"bytes,2,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
@@ -2308,20 +2317,20 @@ type RegradeBatchFailure struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RegradeBatchFailure) Reset() {
-	*x = RegradeBatchFailure{}
+func (x *GradingBatchFailure) Reset() {
+	*x = GradingBatchFailure{}
 	mi := &file_agg_client_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RegradeBatchFailure) String() string {
+func (x *GradingBatchFailure) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RegradeBatchFailure) ProtoMessage() {}
+func (*GradingBatchFailure) ProtoMessage() {}
 
-func (x *RegradeBatchFailure) ProtoReflect() protoreflect.Message {
+func (x *GradingBatchFailure) ProtoReflect() protoreflect.Message {
 	mi := &file_agg_client_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2333,26 +2342,423 @@ func (x *RegradeBatchFailure) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RegradeBatchFailure.ProtoReflect.Descriptor instead.
-func (*RegradeBatchFailure) Descriptor() ([]byte, []int) {
+// Deprecated: Use GradingBatchFailure.ProtoReflect.Descriptor instead.
+func (*GradingBatchFailure) Descriptor() ([]byte, []int) {
 	return file_agg_client_proto_rawDescGZIP(), []int{37}
 }
 
-func (x *RegradeBatchFailure) GetOrgSlug() string {
+func (x *GradingBatchFailure) GetOrgSlug() string {
 	if x != nil {
 		return x.OrgSlug
 	}
 	return ""
 }
 
-func (x *RegradeBatchFailure) GetRepoSlug() string {
+func (x *GradingBatchFailure) GetRepoSlug() string {
 	if x != nil {
 		return x.RepoSlug
 	}
 	return ""
 }
 
-func (x *RegradeBatchFailure) GetError() string {
+func (x *GradingBatchFailure) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type GetCatalogStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCatalogStatusRequest) Reset() {
+	*x = GetCatalogStatusRequest{}
+	mi := &file_agg_client_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCatalogStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCatalogStatusRequest) ProtoMessage() {}
+
+func (x *GetCatalogStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCatalogStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetCatalogStatusRequest) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{38}
+}
+
+type GetCatalogStatusResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Repos in the catalog in use; 0 before the first successful refresh.
+	Size int32 `protobuf:"varint,1,opt,name=size,proto3" json:"size,omitempty"`
+	// When the catalog in use was stored; unset before the first successful refresh.
+	UpdatedAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	// The running refresh, or the latest one; unset when there has never been one.
+	Current *CatalogRefresh `protobuf:"bytes,3,opt,name=current,proto3" json:"current,omitempty"`
+	// The refresh that produced the catalog in use; unset before the first successful one.
+	LastCompleted *CatalogRefresh `protobuf:"bytes,4,opt,name=last_completed,json=lastCompleted,proto3" json:"last_completed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCatalogStatusResponse) Reset() {
+	*x = GetCatalogStatusResponse{}
+	mi := &file_agg_client_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCatalogStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCatalogStatusResponse) ProtoMessage() {}
+
+func (x *GetCatalogStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCatalogStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetCatalogStatusResponse) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *GetCatalogStatusResponse) GetSize() int32 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+func (x *GetCatalogStatusResponse) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *GetCatalogStatusResponse) GetCurrent() *CatalogRefresh {
+	if x != nil {
+		return x.Current
+	}
+	return nil
+}
+
+func (x *GetCatalogStatusResponse) GetLastCompleted() *CatalogRefresh {
+	if x != nil {
+		return x.LastCompleted
+	}
+	return nil
+}
+
+type RefreshCatalogRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ActorHash     string                 `protobuf:"bytes,1,opt,name=actor_hash,json=actorHash,proto3" json:"actor_hash,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RefreshCatalogRequest) Reset() {
+	*x = RefreshCatalogRequest{}
+	mi := &file_agg_client_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RefreshCatalogRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RefreshCatalogRequest) ProtoMessage() {}
+
+func (x *RefreshCatalogRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RefreshCatalogRequest.ProtoReflect.Descriptor instead.
+func (*RefreshCatalogRequest) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *RefreshCatalogRequest) GetActorHash() string {
+	if x != nil {
+		return x.ActorHash
+	}
+	return ""
+}
+
+type RefreshCatalogResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Refresh       *CatalogRefresh        `protobuf:"bytes,1,opt,name=refresh,proto3" json:"refresh,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RefreshCatalogResponse) Reset() {
+	*x = RefreshCatalogResponse{}
+	mi := &file_agg_client_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RefreshCatalogResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RefreshCatalogResponse) ProtoMessage() {}
+
+func (x *RefreshCatalogResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RefreshCatalogResponse.ProtoReflect.Descriptor instead.
+func (*RefreshCatalogResponse) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *RefreshCatalogResponse) GetRefresh() *CatalogRefresh {
+	if x != nil {
+		return x.Refresh
+	}
+	return nil
+}
+
+type CancelCatalogRefreshRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ActorHash     string                 `protobuf:"bytes,1,opt,name=actor_hash,json=actorHash,proto3" json:"actor_hash,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelCatalogRefreshRequest) Reset() {
+	*x = CancelCatalogRefreshRequest{}
+	mi := &file_agg_client_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelCatalogRefreshRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelCatalogRefreshRequest) ProtoMessage() {}
+
+func (x *CancelCatalogRefreshRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelCatalogRefreshRequest.ProtoReflect.Descriptor instead.
+func (*CancelCatalogRefreshRequest) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *CancelCatalogRefreshRequest) GetActorHash() string {
+	if x != nil {
+		return x.ActorHash
+	}
+	return ""
+}
+
+type CancelCatalogRefreshResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Refresh       *CatalogRefresh        `protobuf:"bytes,1,opt,name=refresh,proto3" json:"refresh,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelCatalogRefreshResponse) Reset() {
+	*x = CancelCatalogRefreshResponse{}
+	mi := &file_agg_client_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelCatalogRefreshResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelCatalogRefreshResponse) ProtoMessage() {}
+
+func (x *CancelCatalogRefreshResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelCatalogRefreshResponse.ProtoReflect.Descriptor instead.
+func (*CancelCatalogRefreshResponse) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *CancelCatalogRefreshResponse) GetRefresh() *CatalogRefresh {
+	if x != nil {
+		return x.Refresh
+	}
+	return nil
+}
+
+type CatalogRefresh struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	StartedAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	// Unset while the refresh runs.
+	FinishedAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	// running | completed | failed | cancelled.
+	Status string `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
+	// admin | startup (the automatic first refresh of an empty catalog).
+	Trigger   string `protobuf:"bytes,5,opt,name=trigger,proto3" json:"trigger,omitempty"`
+	ActorHash string `protobuf:"bytes,6,opt,name=actor_hash,json=actorHash,proto3" json:"actor_hash,omitempty"`
+	Pages     int32  `protobuf:"varint,7,opt,name=pages,proto3" json:"pages,omitempty"`
+	// Repos fetched so far; once completed, repos in the new catalog.
+	Repos int32 `protobuf:"varint,8,opt,name=repos,proto3" json:"repos,omitempty"`
+	// wrapper_error | too_many_pages | page_loop | store_error | interrupted | empty_listing; empty otherwise.
+	Error         string `protobuf:"bytes,9,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CatalogRefresh) Reset() {
+	*x = CatalogRefresh{}
+	mi := &file_agg_client_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CatalogRefresh) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CatalogRefresh) ProtoMessage() {}
+
+func (x *CatalogRefresh) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CatalogRefresh.ProtoReflect.Descriptor instead.
+func (*CatalogRefresh) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *CatalogRefresh) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *CatalogRefresh) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
+func (x *CatalogRefresh) GetFinishedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FinishedAt
+	}
+	return nil
+}
+
+func (x *CatalogRefresh) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *CatalogRefresh) GetTrigger() string {
+	if x != nil {
+		return x.Trigger
+	}
+	return ""
+}
+
+func (x *CatalogRefresh) GetActorHash() string {
+	if x != nil {
+		return x.ActorHash
+	}
+	return ""
+}
+
+func (x *CatalogRefresh) GetPages() int32 {
+	if x != nil {
+		return x.Pages
+	}
+	return 0
+}
+
+func (x *CatalogRefresh) GetRepos() int32 {
+	if x != nil {
+		return x.Repos
+	}
+	return 0
+}
+
+func (x *CatalogRefresh) GetError() string {
 	if x != nil {
 		return x.Error
 	}
@@ -2480,55 +2886,55 @@ const file_agg_client_proto_rawDesc = "" +
 	"\adetails\x18\t \x01(\fR\adetails\"k\n" +
 	"\x11ListAuditResponse\x120\n" +
 	"\aentries\x18\x01 \x03(\v2\x16.aggregator.AuditEntryR\aentries\x12$\n" +
-	"\x0enext_before_id\x18\x02 \x01(\x03R\fnextBeforeId\"\xba\x02\n" +
+	"\x0enext_before_id\x18\x02 \x01(\x03R\fnextBeforeId\"\xcd\x02\n" +
 	"\vBatchFilter\x12\x1c\n" +
 	"\tlanguages\x18\x01 \x03(\tR\tlanguages\x12 \n" +
 	"\tmin_score\x18\x02 \x01(\x05H\x00R\bminScore\x88\x01\x01\x12 \n" +
 	"\tmax_score\x18\x03 \x01(\x05H\x01R\bmaxScore\x88\x01\x01\x12+\n" +
 	"\x0folder_than_days\x18\x04 \x01(\x05H\x02R\rolderThanDays\x88\x01\x01\x12\x14\n" +
-	"\x05repos\x18\x05 \x03(\tR\x05repos\x12\x10\n" +
-	"\x03all\x18\x06 \x01(\bR\x03all\x12 \n" +
-	"\ttop_rated\x18\a \x01(\x05H\x03R\btopRated\x88\x01\x01\x12\x14\n" +
-	"\x05force\x18\b \x01(\bR\x05forceB\f\n" +
+	"\x05repos\x18\x05 \x03(\tR\x05repos\x12\x14\n" +
+	"\x05force\x18\b \x01(\bR\x05force\x12\x14\n" +
+	"\x05limit\x18\t \x01(\x05R\x05limit\x12!\n" +
+	"\fonly_regrade\x18\n" +
+	" \x01(\bR\vonlyRegradeB\f\n" +
 	"\n" +
 	"_min_scoreB\f\n" +
 	"\n" +
 	"_max_scoreB\x12\n" +
-	"\x10_older_than_daysB\f\n" +
-	"\n" +
-	"_top_rated\"M\n" +
-	"\x1aPreviewRegradeBatchRequest\x12/\n" +
-	"\x06filter\x18\x01 \x01(\v2\x17.aggregator.BatchFilterR\x06filter\"\xc8\x01\n" +
-	"\x1bPreviewRegradeBatchResponse\x12\x14\n" +
+	"\x10_older_than_daysJ\x04\b\x06\x10\aJ\x04\b\a\x10\bR\x03allR\ttop_rated\"M\n" +
+	"\x1aPreviewGradingBatchRequest\x12/\n" +
+	"\x06filter\x18\x01 \x01(\v2\x17.aggregator.BatchFilterR\x06filter\"\xd8\x01\n" +
+	"\x1bPreviewGradingBatchResponse\x12\x14\n" +
 	"\x05count\x18\x01 \x01(\x05R\x05count\x12\x16\n" +
-	"\x06capped\x18\x02 \x01(\bR\x06capped\x12\x16\n" +
 	"\x06sample\x18\x03 \x03(\tR\x06sample\x12\x1c\n" +
 	"\tunmatched\x18\x04 \x03(\tR\tunmatched\x12)\n" +
 	"\x10estimate_seconds\x18\x05 \x01(\x05R\x0festimateSeconds\x12\x1a\n" +
-	"\binactive\x18\x06 \x01(\x05R\binactive\"j\n" +
-	"\x18StartRegradeBatchRequest\x12/\n" +
+	"\binactive\x18\x06 \x01(\x05R\binactive\x12\x18\n" +
+	"\amatched\x18\a \x01(\x05R\amatchedJ\x04\b\x02\x10\x03R\x06capped\"j\n" +
+	"\x18StartGradingBatchRequest\x12/\n" +
 	"\x06filter\x18\x01 \x01(\v2\x17.aggregator.BatchFilterR\x06filter\x12\x1d\n" +
 	"\n" +
 	"actor_hash\x18\x02 \x01(\tR\tactorHash\"K\n" +
-	"\x19StartRegradeBatchResponse\x12.\n" +
-	"\x05batch\x18\x01 \x01(\v2\x18.aggregator.RegradeBatchR\x05batch\"n\n" +
-	"\x1aControlRegradeBatchRequest\x12\x19\n" +
+	"\x19StartGradingBatchResponse\x12.\n" +
+	"\x05batch\x18\x01 \x01(\v2\x18.aggregator.GradingBatchR\x05batch\"n\n" +
+	"\x1aControlGradingBatchRequest\x12\x19\n" +
 	"\bbatch_id\x18\x01 \x01(\x03R\abatchId\x12\x16\n" +
 	"\x06action\x18\x02 \x01(\tR\x06action\x12\x1d\n" +
 	"\n" +
 	"actor_hash\x18\x03 \x01(\tR\tactorHash\"M\n" +
-	"\x1bControlRegradeBatchResponse\x12.\n" +
-	"\x05batch\x18\x01 \x01(\v2\x18.aggregator.RegradeBatchR\x05batch\"3\n" +
-	"\x16GetRegradeBatchRequest\x12\x19\n" +
+	"\x1bControlGradingBatchResponse\x12.\n" +
+	"\x05batch\x18\x01 \x01(\v2\x18.aggregator.GradingBatchR\x05batch\"3\n" +
+	"\x16GetGradingBatchRequest\x12\x19\n" +
 	"\bbatch_id\x18\x01 \x01(\x03R\abatchId\"\x86\x01\n" +
-	"\x17GetRegradeBatchResponse\x12.\n" +
-	"\x05batch\x18\x01 \x01(\v2\x18.aggregator.RegradeBatchR\x05batch\x12;\n" +
-	"\bfailures\x18\x02 \x03(\v2\x1f.aggregator.RegradeBatchFailureR\bfailures\"1\n" +
-	"\x19ListRegradeBatchesRequest\x12\x14\n" +
-	"\x05limit\x18\x01 \x01(\x05R\x05limit\"P\n" +
-	"\x1aListRegradeBatchesResponse\x122\n" +
-	"\abatches\x18\x01 \x03(\v2\x18.aggregator.RegradeBatchR\abatches\"\x8a\x03\n" +
-	"\fRegradeBatch\x12\x0e\n" +
+	"\x17GetGradingBatchResponse\x12.\n" +
+	"\x05batch\x18\x01 \x01(\v2\x18.aggregator.GradingBatchR\x05batch\x12;\n" +
+	"\bfailures\x18\x02 \x03(\v2\x1f.aggregator.GradingBatchFailureR\bfailures\"1\n" +
+	"\x19ListGradingBatchesRequest\x12\x14\n" +
+	"\x05limit\x18\x01 \x01(\x05R\x05limit\"m\n" +
+	"\x1aListGradingBatchesResponse\x122\n" +
+	"\abatches\x18\x01 \x03(\v2\x18.aggregator.GradingBatchR\abatches\x12\x1b\n" +
+	"\tmax_limit\x18\x02 \x01(\x05R\bmaxLimit\"\x8a\x03\n" +
+	"\fGradingBatch\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x129\n" +
 	"\n" +
 	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12;\n" +
@@ -2545,10 +2951,40 @@ const file_agg_client_proto_rawDesc = "" +
 	" \x01(\x05R\x02ok\x12\x16\n" +
 	"\x06failed\x18\v \x01(\x05R\x06failed\x12\x18\n" +
 	"\askipped\x18\f \x01(\x05R\askipped\"c\n" +
-	"\x13RegradeBatchFailure\x12\x19\n" +
+	"\x13GradingBatchFailure\x12\x19\n" +
 	"\borg_slug\x18\x01 \x01(\tR\aorgSlug\x12\x1b\n" +
 	"\trepo_slug\x18\x02 \x01(\tR\brepoSlug\x12\x14\n" +
-	"\x05error\x18\x03 \x01(\tR\x05error2\xf9\t\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"\x19\n" +
+	"\x17GetCatalogStatusRequest\"\xe2\x01\n" +
+	"\x18GetCatalogStatusResponse\x12\x12\n" +
+	"\x04size\x18\x01 \x01(\x05R\x04size\x129\n" +
+	"\n" +
+	"updated_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x124\n" +
+	"\acurrent\x18\x03 \x01(\v2\x1a.aggregator.CatalogRefreshR\acurrent\x12A\n" +
+	"\x0elast_completed\x18\x04 \x01(\v2\x1a.aggregator.CatalogRefreshR\rlastCompleted\"6\n" +
+	"\x15RefreshCatalogRequest\x12\x1d\n" +
+	"\n" +
+	"actor_hash\x18\x01 \x01(\tR\tactorHash\"N\n" +
+	"\x16RefreshCatalogResponse\x124\n" +
+	"\arefresh\x18\x01 \x01(\v2\x1a.aggregator.CatalogRefreshR\arefresh\"<\n" +
+	"\x1bCancelCatalogRefreshRequest\x12\x1d\n" +
+	"\n" +
+	"actor_hash\x18\x01 \x01(\tR\tactorHash\"T\n" +
+	"\x1cCancelCatalogRefreshResponse\x124\n" +
+	"\arefresh\x18\x01 \x01(\v2\x1a.aggregator.CatalogRefreshR\arefresh\"\xab\x02\n" +
+	"\x0eCatalogRefresh\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x129\n" +
+	"\n" +
+	"started_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12;\n" +
+	"\vfinished_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"finishedAt\x12\x16\n" +
+	"\x06status\x18\x04 \x01(\tR\x06status\x12\x18\n" +
+	"\atrigger\x18\x05 \x01(\tR\atrigger\x12\x1d\n" +
+	"\n" +
+	"actor_hash\x18\x06 \x01(\tR\tactorHash\x12\x14\n" +
+	"\x05pages\x18\a \x01(\x05R\x05pages\x12\x14\n" +
+	"\x05repos\x18\b \x01(\x05R\x05repos\x12\x14\n" +
+	"\x05error\x18\t \x01(\tR\x05error2\x9c\f\n" +
 	"\n" +
 	"Aggregator\x12K\n" +
 	"\n" +
@@ -2562,11 +2998,14 @@ const file_agg_client_proto_rawDesc = "" +
 	"\x10GetRegradeStatus\x12#.aggregator.GetRegradeStatusRequest\x1a$.aggregator.GetRegradeStatusResponse\x12N\n" +
 	"\vRecordAudit\x12\x1e.aggregator.RecordAuditRequest\x1a\x1f.aggregator.RecordAuditResponse\x12H\n" +
 	"\tListAudit\x12\x1c.aggregator.ListAuditRequest\x1a\x1d.aggregator.ListAuditResponse\x12f\n" +
-	"\x13PreviewRegradeBatch\x12&.aggregator.PreviewRegradeBatchRequest\x1a'.aggregator.PreviewRegradeBatchResponse\x12`\n" +
-	"\x11StartRegradeBatch\x12$.aggregator.StartRegradeBatchRequest\x1a%.aggregator.StartRegradeBatchResponse\x12f\n" +
-	"\x13ControlRegradeBatch\x12&.aggregator.ControlRegradeBatchRequest\x1a'.aggregator.ControlRegradeBatchResponse\x12Z\n" +
-	"\x0fGetRegradeBatch\x12\".aggregator.GetRegradeBatchRequest\x1a#.aggregator.GetRegradeBatchResponse\x12c\n" +
-	"\x12ListRegradeBatches\x12%.aggregator.ListRegradeBatchesRequest\x1a&.aggregator.ListRegradeBatchesResponseB4Z2gateway-service/internal/transport/rpc/gen/agg;aggb\x06proto3"
+	"\x13PreviewGradingBatch\x12&.aggregator.PreviewGradingBatchRequest\x1a'.aggregator.PreviewGradingBatchResponse\x12`\n" +
+	"\x11StartGradingBatch\x12$.aggregator.StartGradingBatchRequest\x1a%.aggregator.StartGradingBatchResponse\x12f\n" +
+	"\x13ControlGradingBatch\x12&.aggregator.ControlGradingBatchRequest\x1a'.aggregator.ControlGradingBatchResponse\x12Z\n" +
+	"\x0fGetGradingBatch\x12\".aggregator.GetGradingBatchRequest\x1a#.aggregator.GetGradingBatchResponse\x12c\n" +
+	"\x12ListGradingBatches\x12%.aggregator.ListGradingBatchesRequest\x1a&.aggregator.ListGradingBatchesResponse\x12]\n" +
+	"\x10GetCatalogStatus\x12#.aggregator.GetCatalogStatusRequest\x1a$.aggregator.GetCatalogStatusResponse\x12W\n" +
+	"\x0eRefreshCatalog\x12!.aggregator.RefreshCatalogRequest\x1a\".aggregator.RefreshCatalogResponse\x12i\n" +
+	"\x14CancelCatalogRefresh\x12'.aggregator.CancelCatalogRefreshRequest\x1a(.aggregator.CancelCatalogRefreshResponseB4Z2gateway-service/internal/transport/rpc/gen/agg;aggb\x06proto3"
 
 var (
 	file_agg_client_proto_rawDescOnce sync.Once
@@ -2580,7 +3019,7 @@ func file_agg_client_proto_rawDescGZIP() []byte {
 	return file_agg_client_proto_rawDescData
 }
 
-var file_agg_client_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
+var file_agg_client_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
 var file_agg_client_proto_goTypes = []any{
 	(*GetRegradeStatusRequest)(nil),           // 0: aggregator.GetRegradeStatusRequest
 	(*GetRegradeStatusResponse)(nil),          // 1: aggregator.GetRegradeStatusResponse
@@ -2608,79 +3047,99 @@ var file_agg_client_proto_goTypes = []any{
 	(*AuditEntry)(nil),                        // 23: aggregator.AuditEntry
 	(*ListAuditResponse)(nil),                 // 24: aggregator.ListAuditResponse
 	(*BatchFilter)(nil),                       // 25: aggregator.BatchFilter
-	(*PreviewRegradeBatchRequest)(nil),        // 26: aggregator.PreviewRegradeBatchRequest
-	(*PreviewRegradeBatchResponse)(nil),       // 27: aggregator.PreviewRegradeBatchResponse
-	(*StartRegradeBatchRequest)(nil),          // 28: aggregator.StartRegradeBatchRequest
-	(*StartRegradeBatchResponse)(nil),         // 29: aggregator.StartRegradeBatchResponse
-	(*ControlRegradeBatchRequest)(nil),        // 30: aggregator.ControlRegradeBatchRequest
-	(*ControlRegradeBatchResponse)(nil),       // 31: aggregator.ControlRegradeBatchResponse
-	(*GetRegradeBatchRequest)(nil),            // 32: aggregator.GetRegradeBatchRequest
-	(*GetRegradeBatchResponse)(nil),           // 33: aggregator.GetRegradeBatchResponse
-	(*ListRegradeBatchesRequest)(nil),         // 34: aggregator.ListRegradeBatchesRequest
-	(*ListRegradeBatchesResponse)(nil),        // 35: aggregator.ListRegradeBatchesResponse
-	(*RegradeBatch)(nil),                      // 36: aggregator.RegradeBatch
-	(*RegradeBatchFailure)(nil),               // 37: aggregator.RegradeBatchFailure
-	(*timestamppb.Timestamp)(nil),             // 38: google.protobuf.Timestamp
+	(*PreviewGradingBatchRequest)(nil),        // 26: aggregator.PreviewGradingBatchRequest
+	(*PreviewGradingBatchResponse)(nil),       // 27: aggregator.PreviewGradingBatchResponse
+	(*StartGradingBatchRequest)(nil),          // 28: aggregator.StartGradingBatchRequest
+	(*StartGradingBatchResponse)(nil),         // 29: aggregator.StartGradingBatchResponse
+	(*ControlGradingBatchRequest)(nil),        // 30: aggregator.ControlGradingBatchRequest
+	(*ControlGradingBatchResponse)(nil),       // 31: aggregator.ControlGradingBatchResponse
+	(*GetGradingBatchRequest)(nil),            // 32: aggregator.GetGradingBatchRequest
+	(*GetGradingBatchResponse)(nil),           // 33: aggregator.GetGradingBatchResponse
+	(*ListGradingBatchesRequest)(nil),         // 34: aggregator.ListGradingBatchesRequest
+	(*ListGradingBatchesResponse)(nil),        // 35: aggregator.ListGradingBatchesResponse
+	(*GradingBatch)(nil),                      // 36: aggregator.GradingBatch
+	(*GradingBatchFailure)(nil),               // 37: aggregator.GradingBatchFailure
+	(*GetCatalogStatusRequest)(nil),           // 38: aggregator.GetCatalogStatusRequest
+	(*GetCatalogStatusResponse)(nil),          // 39: aggregator.GetCatalogStatusResponse
+	(*RefreshCatalogRequest)(nil),             // 40: aggregator.RefreshCatalogRequest
+	(*RefreshCatalogResponse)(nil),            // 41: aggregator.RefreshCatalogResponse
+	(*CancelCatalogRefreshRequest)(nil),       // 42: aggregator.CancelCatalogRefreshRequest
+	(*CancelCatalogRefreshResponse)(nil),      // 43: aggregator.CancelCatalogRefreshResponse
+	(*CatalogRefresh)(nil),                    // 44: aggregator.CatalogRefresh
+	(*timestamppb.Timestamp)(nil),             // 45: google.protobuf.Timestamp
 }
 var file_agg_client_proto_depIdxs = []int32{
-	38, // 0: aggregator.GetRegradeStatusResponse.next_run_at:type_name -> google.protobuf.Timestamp
-	38, // 1: aggregator.GetRegradeStatusResponse.started_at:type_name -> google.protobuf.Timestamp
-	38, // 2: aggregator.GetRegradeStatusResponse.last_finished_at:type_name -> google.protobuf.Timestamp
+	45, // 0: aggregator.GetRegradeStatusResponse.next_run_at:type_name -> google.protobuf.Timestamp
+	45, // 1: aggregator.GetRegradeStatusResponse.started_at:type_name -> google.protobuf.Timestamp
+	45, // 2: aggregator.GetRegradeStatusResponse.last_finished_at:type_name -> google.protobuf.Timestamp
 	13, // 3: aggregator.GetMyReposResponse.repositories:type_name -> aggregator.Repository
 	6,  // 4: aggregator.GetMyOrgsResponse.organizations:type_name -> aggregator.UserOrganization
 	13, // 5: aggregator.GetOrgReposResponse.repositories:type_name -> aggregator.Repository
 	17, // 6: aggregator.GetGradingResponse.grade:type_name -> aggregator.RepoGrade
-	38, // 7: aggregator.RequestLLMRecommendationsResponse.evaluated_at:type_name -> google.protobuf.Timestamp
+	45, // 7: aggregator.RequestLLMRecommendationsResponse.evaluated_at:type_name -> google.protobuf.Timestamp
 	16, // 8: aggregator.Repository.organization:type_name -> aggregator.Organization
 	15, // 9: aggregator.Repository.logo:type_name -> aggregator.Logo
 	14, // 10: aggregator.Repository.language:type_name -> aggregator.Language
-	38, // 11: aggregator.RepoGrade.graded_at:type_name -> google.protobuf.Timestamp
-	38, // 12: aggregator.GetAnalyticsResponse.graded_at:type_name -> google.protobuf.Timestamp
-	38, // 13: aggregator.AuditEntry.occurred_at:type_name -> google.protobuf.Timestamp
+	45, // 11: aggregator.RepoGrade.graded_at:type_name -> google.protobuf.Timestamp
+	45, // 12: aggregator.GetAnalyticsResponse.graded_at:type_name -> google.protobuf.Timestamp
+	45, // 13: aggregator.AuditEntry.occurred_at:type_name -> google.protobuf.Timestamp
 	23, // 14: aggregator.ListAuditResponse.entries:type_name -> aggregator.AuditEntry
-	25, // 15: aggregator.PreviewRegradeBatchRequest.filter:type_name -> aggregator.BatchFilter
-	25, // 16: aggregator.StartRegradeBatchRequest.filter:type_name -> aggregator.BatchFilter
-	36, // 17: aggregator.StartRegradeBatchResponse.batch:type_name -> aggregator.RegradeBatch
-	36, // 18: aggregator.ControlRegradeBatchResponse.batch:type_name -> aggregator.RegradeBatch
-	36, // 19: aggregator.GetRegradeBatchResponse.batch:type_name -> aggregator.RegradeBatch
-	37, // 20: aggregator.GetRegradeBatchResponse.failures:type_name -> aggregator.RegradeBatchFailure
-	36, // 21: aggregator.ListRegradeBatchesResponse.batches:type_name -> aggregator.RegradeBatch
-	38, // 22: aggregator.RegradeBatch.created_at:type_name -> google.protobuf.Timestamp
-	38, // 23: aggregator.RegradeBatch.finished_at:type_name -> google.protobuf.Timestamp
-	25, // 24: aggregator.RegradeBatch.filter:type_name -> aggregator.BatchFilter
-	2,  // 25: aggregator.Aggregator.GetMyRepos:input_type -> aggregator.GetMyReposRequest
-	4,  // 26: aggregator.Aggregator.GetMyOrgs:input_type -> aggregator.GetMyOrgsRequest
-	7,  // 27: aggregator.Aggregator.GetOrgRepos:input_type -> aggregator.GetOrgReposRequest
-	9,  // 28: aggregator.Aggregator.GetGrading:input_type -> aggregator.GetGradingRequest
-	11, // 29: aggregator.Aggregator.RequestLLMRecommendations:input_type -> aggregator.RequestLLMRecommendationsRequest
-	18, // 30: aggregator.Aggregator.GetAnalytics:input_type -> aggregator.GetAnalyticsRequest
-	0,  // 31: aggregator.Aggregator.GetRegradeStatus:input_type -> aggregator.GetRegradeStatusRequest
-	20, // 32: aggregator.Aggregator.RecordAudit:input_type -> aggregator.RecordAuditRequest
-	22, // 33: aggregator.Aggregator.ListAudit:input_type -> aggregator.ListAuditRequest
-	26, // 34: aggregator.Aggregator.PreviewRegradeBatch:input_type -> aggregator.PreviewRegradeBatchRequest
-	28, // 35: aggregator.Aggregator.StartRegradeBatch:input_type -> aggregator.StartRegradeBatchRequest
-	30, // 36: aggregator.Aggregator.ControlRegradeBatch:input_type -> aggregator.ControlRegradeBatchRequest
-	32, // 37: aggregator.Aggregator.GetRegradeBatch:input_type -> aggregator.GetRegradeBatchRequest
-	34, // 38: aggregator.Aggregator.ListRegradeBatches:input_type -> aggregator.ListRegradeBatchesRequest
-	3,  // 39: aggregator.Aggregator.GetMyRepos:output_type -> aggregator.GetMyReposResponse
-	5,  // 40: aggregator.Aggregator.GetMyOrgs:output_type -> aggregator.GetMyOrgsResponse
-	8,  // 41: aggregator.Aggregator.GetOrgRepos:output_type -> aggregator.GetOrgReposResponse
-	10, // 42: aggregator.Aggregator.GetGrading:output_type -> aggregator.GetGradingResponse
-	12, // 43: aggregator.Aggregator.RequestLLMRecommendations:output_type -> aggregator.RequestLLMRecommendationsResponse
-	19, // 44: aggregator.Aggregator.GetAnalytics:output_type -> aggregator.GetAnalyticsResponse
-	1,  // 45: aggregator.Aggregator.GetRegradeStatus:output_type -> aggregator.GetRegradeStatusResponse
-	21, // 46: aggregator.Aggregator.RecordAudit:output_type -> aggregator.RecordAuditResponse
-	24, // 47: aggregator.Aggregator.ListAudit:output_type -> aggregator.ListAuditResponse
-	27, // 48: aggregator.Aggregator.PreviewRegradeBatch:output_type -> aggregator.PreviewRegradeBatchResponse
-	29, // 49: aggregator.Aggregator.StartRegradeBatch:output_type -> aggregator.StartRegradeBatchResponse
-	31, // 50: aggregator.Aggregator.ControlRegradeBatch:output_type -> aggregator.ControlRegradeBatchResponse
-	33, // 51: aggregator.Aggregator.GetRegradeBatch:output_type -> aggregator.GetRegradeBatchResponse
-	35, // 52: aggregator.Aggregator.ListRegradeBatches:output_type -> aggregator.ListRegradeBatchesResponse
-	39, // [39:53] is the sub-list for method output_type
-	25, // [25:39] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	25, // 15: aggregator.PreviewGradingBatchRequest.filter:type_name -> aggregator.BatchFilter
+	25, // 16: aggregator.StartGradingBatchRequest.filter:type_name -> aggregator.BatchFilter
+	36, // 17: aggregator.StartGradingBatchResponse.batch:type_name -> aggregator.GradingBatch
+	36, // 18: aggregator.ControlGradingBatchResponse.batch:type_name -> aggregator.GradingBatch
+	36, // 19: aggregator.GetGradingBatchResponse.batch:type_name -> aggregator.GradingBatch
+	37, // 20: aggregator.GetGradingBatchResponse.failures:type_name -> aggregator.GradingBatchFailure
+	36, // 21: aggregator.ListGradingBatchesResponse.batches:type_name -> aggregator.GradingBatch
+	45, // 22: aggregator.GradingBatch.created_at:type_name -> google.protobuf.Timestamp
+	45, // 23: aggregator.GradingBatch.finished_at:type_name -> google.protobuf.Timestamp
+	25, // 24: aggregator.GradingBatch.filter:type_name -> aggregator.BatchFilter
+	45, // 25: aggregator.GetCatalogStatusResponse.updated_at:type_name -> google.protobuf.Timestamp
+	44, // 26: aggregator.GetCatalogStatusResponse.current:type_name -> aggregator.CatalogRefresh
+	44, // 27: aggregator.GetCatalogStatusResponse.last_completed:type_name -> aggregator.CatalogRefresh
+	44, // 28: aggregator.RefreshCatalogResponse.refresh:type_name -> aggregator.CatalogRefresh
+	44, // 29: aggregator.CancelCatalogRefreshResponse.refresh:type_name -> aggregator.CatalogRefresh
+	45, // 30: aggregator.CatalogRefresh.started_at:type_name -> google.protobuf.Timestamp
+	45, // 31: aggregator.CatalogRefresh.finished_at:type_name -> google.protobuf.Timestamp
+	2,  // 32: aggregator.Aggregator.GetMyRepos:input_type -> aggregator.GetMyReposRequest
+	4,  // 33: aggregator.Aggregator.GetMyOrgs:input_type -> aggregator.GetMyOrgsRequest
+	7,  // 34: aggregator.Aggregator.GetOrgRepos:input_type -> aggregator.GetOrgReposRequest
+	9,  // 35: aggregator.Aggregator.GetGrading:input_type -> aggregator.GetGradingRequest
+	11, // 36: aggregator.Aggregator.RequestLLMRecommendations:input_type -> aggregator.RequestLLMRecommendationsRequest
+	18, // 37: aggregator.Aggregator.GetAnalytics:input_type -> aggregator.GetAnalyticsRequest
+	0,  // 38: aggregator.Aggregator.GetRegradeStatus:input_type -> aggregator.GetRegradeStatusRequest
+	20, // 39: aggregator.Aggregator.RecordAudit:input_type -> aggregator.RecordAuditRequest
+	22, // 40: aggregator.Aggregator.ListAudit:input_type -> aggregator.ListAuditRequest
+	26, // 41: aggregator.Aggregator.PreviewGradingBatch:input_type -> aggregator.PreviewGradingBatchRequest
+	28, // 42: aggregator.Aggregator.StartGradingBatch:input_type -> aggregator.StartGradingBatchRequest
+	30, // 43: aggregator.Aggregator.ControlGradingBatch:input_type -> aggregator.ControlGradingBatchRequest
+	32, // 44: aggregator.Aggregator.GetGradingBatch:input_type -> aggregator.GetGradingBatchRequest
+	34, // 45: aggregator.Aggregator.ListGradingBatches:input_type -> aggregator.ListGradingBatchesRequest
+	38, // 46: aggregator.Aggregator.GetCatalogStatus:input_type -> aggregator.GetCatalogStatusRequest
+	40, // 47: aggregator.Aggregator.RefreshCatalog:input_type -> aggregator.RefreshCatalogRequest
+	42, // 48: aggregator.Aggregator.CancelCatalogRefresh:input_type -> aggregator.CancelCatalogRefreshRequest
+	3,  // 49: aggregator.Aggregator.GetMyRepos:output_type -> aggregator.GetMyReposResponse
+	5,  // 50: aggregator.Aggregator.GetMyOrgs:output_type -> aggregator.GetMyOrgsResponse
+	8,  // 51: aggregator.Aggregator.GetOrgRepos:output_type -> aggregator.GetOrgReposResponse
+	10, // 52: aggregator.Aggregator.GetGrading:output_type -> aggregator.GetGradingResponse
+	12, // 53: aggregator.Aggregator.RequestLLMRecommendations:output_type -> aggregator.RequestLLMRecommendationsResponse
+	19, // 54: aggregator.Aggregator.GetAnalytics:output_type -> aggregator.GetAnalyticsResponse
+	1,  // 55: aggregator.Aggregator.GetRegradeStatus:output_type -> aggregator.GetRegradeStatusResponse
+	21, // 56: aggregator.Aggregator.RecordAudit:output_type -> aggregator.RecordAuditResponse
+	24, // 57: aggregator.Aggregator.ListAudit:output_type -> aggregator.ListAuditResponse
+	27, // 58: aggregator.Aggregator.PreviewGradingBatch:output_type -> aggregator.PreviewGradingBatchResponse
+	29, // 59: aggregator.Aggregator.StartGradingBatch:output_type -> aggregator.StartGradingBatchResponse
+	31, // 60: aggregator.Aggregator.ControlGradingBatch:output_type -> aggregator.ControlGradingBatchResponse
+	33, // 61: aggregator.Aggregator.GetGradingBatch:output_type -> aggregator.GetGradingBatchResponse
+	35, // 62: aggregator.Aggregator.ListGradingBatches:output_type -> aggregator.ListGradingBatchesResponse
+	39, // 63: aggregator.Aggregator.GetCatalogStatus:output_type -> aggregator.GetCatalogStatusResponse
+	41, // 64: aggregator.Aggregator.RefreshCatalog:output_type -> aggregator.RefreshCatalogResponse
+	43, // 65: aggregator.Aggregator.CancelCatalogRefresh:output_type -> aggregator.CancelCatalogRefreshResponse
+	49, // [49:66] is the sub-list for method output_type
+	32, // [32:49] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_agg_client_proto_init() }
@@ -2696,7 +3155,7 @@ func file_agg_client_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agg_client_proto_rawDesc), len(file_agg_client_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   38,
+			NumMessages:   45,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

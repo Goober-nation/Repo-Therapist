@@ -304,27 +304,29 @@ export interface AuditResponse {
   next_before_id: number
 }
 
-/** The filter of a batch regrade (POST /admin/regrade/preview and /admin/regrade/batches). */
+/** The filter of a batch grading (POST /admin/grading/preview and /admin/grading/batches). */
 export interface BatchFilterBody {
   languages?: string[]
   min_score?: number
   max_score?: number
   older_than_days?: number
   repos?: string[]
-  /** The first N matching public repositories in SourceCraft rating order. */
-  top_rated?: number
-  all?: boolean
-  /** Regrade even repositories with no SourceCraft activity since their last grade. */
+  /** How many matching repositories are graded, highest SourceCraft rating first; required, at least 1. */
+  limit: number
+  /** Only repositories that already have a public grade; otherwise never-graded ones are graded too. */
+  only_regrade?: boolean
+  /** Grade even repositories with no SourceCraft activity since their last grade. */
   force?: boolean
 }
 
-/** POST /admin/regrade/preview: the dry run. */
+/** POST /admin/grading/preview: the dry run. */
 export interface BatchPreviewResponse {
+  /** Public repositories the criteria match. */
+  matched: number
+  /** How many of them the limit takes. */
   count: number
-  /** More repositories matched than one batch may hold; the batch cannot start. */
-  capped: boolean
   sample: string[]
-  /** Hand-picked repositories that are not public repositories known to the service. */
+  /** Hand-picked repositories that are not in the public repository list (reported only when the limit cut nothing). */
   unmatched: string[]
   estimate_seconds: number
   /** Estimated repositories the activity check will skip (0 with force). */
@@ -333,8 +335,8 @@ export interface BatchPreviewResponse {
 
 export type BatchStatus = "running" | "paused" | "completed" | "cancelled"
 
-/** One regrade batch with its counters. `actor` is a hash of the starting admin's Yandex ID. */
-export interface RegradeBatchResponse {
+/** One grading batch with its counters. `actor` is a hash of the starting admin's Yandex ID. */
+export interface GradingBatchResponse {
   id: number
   created_at: string
   finished_at: string | null
@@ -346,8 +348,9 @@ export interface RegradeBatchResponse {
     max_score: number | null
     older_than_days: number | null
     repos: string[] | null
-    top_rated: number | null
-    all: boolean
+    /** 0 for batches started before the limit existed. */
+    limit: number
+    only_regrade: boolean
     force: boolean
   }
   total: number
@@ -358,20 +361,50 @@ export interface RegradeBatchResponse {
   skipped: number
 }
 
-/** GET /admin/regrade/batches/{id|current}. */
-export interface RegradeBatchDetailResponse {
-  batch: RegradeBatchResponse
+/** GET /admin/grading/batches/{id|current}. */
+export interface GradingBatchDetailResponse {
+  batch: GradingBatchResponse
   failures: { repo: string; error: string }[]
 }
 
-/** GET /admin/regrade/batches/current: `batch` is null while there has never been a batch. */
+/** GET /admin/grading/batches/current: `batch` is null while there has never been a batch. */
 export interface CurrentBatchResponse {
-  batch: RegradeBatchResponse | null
+  batch: GradingBatchResponse | null
   failures: { repo: string; error: string }[]
 }
 
-export interface RegradeBatchListResponse {
-  batches: RegradeBatchResponse[]
+export interface GradingBatchListResponse {
+  batches: GradingBatchResponse[]
+  /** The stand's cap on one batch's limit (BATCH_GRADING_MAX_LIMIT); 0 means none. */
+  max_limit: number
+}
+
+export type CatalogRefreshStatus = "running" | "completed" | "failed" | "cancelled"
+
+/** One refresh of the public repository catalog. `actor` is a hash of the admin's Yandex ID; empty for "startup". */
+export interface CatalogRefreshResponse {
+  id: number
+  started_at: string
+  finished_at: string | null
+  status: CatalogRefreshStatus
+  trigger: "admin" | "startup"
+  actor: string
+  pages: number
+  /** Repositories fetched so far; once completed, repositories in the new catalog. */
+  repos: number
+  /** A fixed code for a failed refresh; empty otherwise. */
+  error: string
+}
+
+/** GET /admin/catalog: the stored list of public repositories used by the scheduled and batch gradings. */
+export interface CatalogStatusResponse {
+  /** Repositories in the catalog in use; 0 before the first successful refresh. */
+  size: number
+  updated_at: string | null
+  /** The running refresh, or the latest one; null before the first. */
+  current: CatalogRefreshResponse | null
+  /** The refresh that produced the catalog in use. */
+  last_completed: CatalogRefreshResponse | null
 }
 
 /** One curve of a graph: `points` are [unix seconds, value]. `label` is "" when the query has no grouping. */

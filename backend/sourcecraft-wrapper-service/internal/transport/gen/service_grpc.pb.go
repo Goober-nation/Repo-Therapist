@@ -28,6 +28,7 @@ const (
 	CodeHealth_ListAllPublicRepos_FullMethodName     = "/code_health.CodeHealth/ListAllPublicRepos"
 	CodeHealth_GetMyRepos_FullMethodName             = "/code_health.CodeHealth/GetMyRepos"
 	CodeHealth_ListTopRatedRepos_FullMethodName      = "/code_health.CodeHealth/ListTopRatedRepos"
+	CodeHealth_ListPublicReposPage_FullMethodName    = "/code_health.CodeHealth/ListPublicReposPage"
 	CodeHealth_GetMyOrgs_FullMethodName              = "/code_health.CodeHealth/GetMyOrgs"
 	CodeHealth_GetOrgRepos_FullMethodName            = "/code_health.CodeHealth/GetOrgRepos"
 	CodeHealth_GetPullRequests_FullMethodName        = "/code_health.CodeHealth/GetPullRequests"
@@ -50,6 +51,9 @@ type CodeHealthClient interface {
 	// ListTopRatedRepos returns one page (100) of all repositories sorted by SourceCraft rating,
 	// highest first (GET /repos?sort_by=-rating), starting at page_token.
 	ListTopRatedRepos(ctx context.Context, in *ListTopRatedReposRequest, opts ...grpc.CallOption) (*ListTopRatedReposResponse, error)
+	// ListPublicReposPage returns one page (100) of GET /repos in the platform's own order, for the
+	// Aggregator's public repo catalog refresh.
+	ListPublicReposPage(ctx context.Context, in *ListPublicReposPageRequest, opts ...grpc.CallOption) (*ListPublicReposPageResponse, error)
 	// GetMyOrgs lists the caller's organizations (GET /me/orgs) and picks a default:
 	// the personal org (slug equal to the GET /user username), else the first one.
 	GetMyOrgs(ctx context.Context, in *GetMyOrgsRequest, opts ...grpc.CallOption) (*GetMyOrgsResponse, error)
@@ -162,6 +166,16 @@ func (c *codeHealthClient) ListTopRatedRepos(ctx context.Context, in *ListTopRat
 	return out, nil
 }
 
+func (c *codeHealthClient) ListPublicReposPage(ctx context.Context, in *ListPublicReposPageRequest, opts ...grpc.CallOption) (*ListPublicReposPageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPublicReposPageResponse)
+	err := c.cc.Invoke(ctx, CodeHealth_ListPublicReposPage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *codeHealthClient) GetMyOrgs(ctx context.Context, in *GetMyOrgsRequest, opts ...grpc.CallOption) (*GetMyOrgsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetMyOrgsResponse)
@@ -227,6 +241,9 @@ type CodeHealthServer interface {
 	// ListTopRatedRepos returns one page (100) of all repositories sorted by SourceCraft rating,
 	// highest first (GET /repos?sort_by=-rating), starting at page_token.
 	ListTopRatedRepos(context.Context, *ListTopRatedReposRequest) (*ListTopRatedReposResponse, error)
+	// ListPublicReposPage returns one page (100) of GET /repos in the platform's own order, for the
+	// Aggregator's public repo catalog refresh.
+	ListPublicReposPage(context.Context, *ListPublicReposPageRequest) (*ListPublicReposPageResponse, error)
 	// GetMyOrgs lists the caller's organizations (GET /me/orgs) and picks a default:
 	// the personal org (slug equal to the GET /user username), else the first one.
 	GetMyOrgs(context.Context, *GetMyOrgsRequest) (*GetMyOrgsResponse, error)
@@ -275,6 +292,9 @@ func (UnimplementedCodeHealthServer) GetMyRepos(context.Context, *GetMyReposRequ
 }
 func (UnimplementedCodeHealthServer) ListTopRatedRepos(context.Context, *ListTopRatedReposRequest) (*ListTopRatedReposResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListTopRatedRepos not implemented")
+}
+func (UnimplementedCodeHealthServer) ListPublicReposPage(context.Context, *ListPublicReposPageRequest) (*ListPublicReposPageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListPublicReposPage not implemented")
 }
 func (UnimplementedCodeHealthServer) GetMyOrgs(context.Context, *GetMyOrgsRequest) (*GetMyOrgsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMyOrgs not implemented")
@@ -474,6 +494,24 @@ func _CodeHealth_ListTopRatedRepos_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CodeHealth_ListPublicReposPage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPublicReposPageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CodeHealthServer).ListPublicReposPage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CodeHealth_ListPublicReposPage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CodeHealthServer).ListPublicReposPage(ctx, req.(*ListPublicReposPageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CodeHealth_GetMyOrgs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetMyOrgsRequest)
 	if err := dec(in); err != nil {
@@ -606,6 +644,10 @@ var CodeHealth_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListTopRatedRepos",
 			Handler:    _CodeHealth_ListTopRatedRepos_Handler,
+		},
+		{
+			MethodName: "ListPublicReposPage",
+			Handler:    _CodeHealth_ListPublicReposPage_Handler,
 		},
 		{
 			MethodName: "GetMyOrgs",

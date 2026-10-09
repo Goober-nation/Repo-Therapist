@@ -23,95 +23,70 @@ func NewBatchRepository(db *pgxpool.Pool) *BatchRepository {
 	return &BatchRepository{db: db}
 }
 
-// SelectBatchRepos picks public repos only. Every criterion is a parameter; unset ones are NULL and
-// drop out of the WHERE. A score or age criterion on a repo that was never graded does not match,
-// except the age one, where "never graded" counts as older than any age.
-func (r *BatchRepository) SelectBatchRepos(ctx context.Context, filter domain.BatchFilter, limit int) ([]domain.BatchCandidate, bool, error) {
-	var languages, picked []string
-	if len(filter.Languages) > 0 {
-		languages = filter.Languages
-	}
+// batchCriteria is the WHERE shared by the batch selections: r is the repo table (repos or the
+// catalog), g its LEFT JOINed public grade. Unset criteria are NULL and drop out. A score criterion
+// never matches a repo without a grade; the age one always does, unless only regrades are wanted.
+const batchCriteria = `($1::text[] IS NULL OR lower(r.main_language) = ANY($1))
+	  AND ($2::int IS NULL OR g.score >= $2)
+	  AND ($3::int IS NULL OR g.score <= $3)
+	  AND ($4::int IS NULL OR g.graded_at IS NULL OR g.graded_at < now() - make_interval(days => $4))
+	  AND ($5::text[] IS NULL OR lower(r.org_slug || '/' || r.repo_slug) = ANY($5))
+	  AND (NOT $6::bool OR g.graded_at IS NOT NULL)`
 
-	if len(filter.Repos) > 0 {
-		picked = make([]string, len(filter.Repos))
-		for i, repo := range filter.Repos {
+// batchCriteriaArgs are $1..$6 of batchCriteria. Languages are already lower-cased by Normalize.
+func batchCriteriaArgs(languages []string, minScore, maxScore, olderThanDays *int, repos []string, onlyRegrade bool) []any {
+	var picked []string
+	if len(repos) > 0 {
+		picked = make([]string, len(repos))
+		for i, repo := range repos {
 			picked[i] = strings.ToLower(repo)
 		}
 	}
 
+	if len(languages) == 0 {
+		languages = nil
+	}
+
+	return []any{languages, minScore, maxScore, olderThanDays, picked, onlyRegrade}
+}
+
+// SelectBatchRepos picks known public repos only, highest SourceCraft rating first.
+func (r *BatchRepository) SelectBatchRepos(ctx context.Context, filter domain.BatchFilter) ([]domain.BatchCandidate, int, error) {
+	args := batchCriteriaArgs(filter.Languages, filter.MinScore, filter.MaxScore, filter.OlderThanDays, filter.Repos, filter.OnlyRegrade)
+
 	rows, err := r.db.Query(ctx, `
-		SELECT r.sourcecraft_uuid, r.org_slug, r.repo_slug, r.last_activity_at, g.graded_at
+		SELECT r.sourcecraft_uuid, r.org_slug, r.repo_slug, r.last_activity_at, g.graded_at, count(*) OVER ()
 		FROM repos r
 		LEFT JOIN repo_grades_public g ON g.sourcecraft_uuid = r.sourcecraft_uuid
-		WHERE r.visibility = 'public'
-		  AND ($1::text[] IS NULL OR lower(r.main_language) = ANY($1))
-		  AND ($2::int IS NULL OR g.score >= $2)
-		  AND ($3::int IS NULL OR g.score <= $3)
-		  AND ($4::int IS NULL OR g.graded_at IS NULL OR g.graded_at < now() - make_interval(days => $4))
-		  AND ($5::text[] IS NULL OR lower(r.org_slug || '/' || r.repo_slug) = ANY($5))
-		ORDER BY r.org_slug, r.repo_slug
-		LIMIT $6`,
-		languages, filter.MinScore, filter.MaxScore, filter.OlderThanDays, picked, limit+1,
+		WHERE r.visibility = 'public' AND `+batchCriteria+`
+		ORDER BY r.sourcecraft_rating DESC NULLS LAST, r.org_slug, r.repo_slug
+		LIMIT $7`,
+		append(args, filter.Limit)...,
 	)
 	if err != nil {
-		return nil, false, fmt.Errorf("select batch repos: %w", err)
+		return nil, 0, fmt.Errorf("select batch repos: %w", err)
 	}
 	defer rows.Close()
 
-	var repos []domain.BatchCandidate
+	var (
+		repos   []domain.BatchCandidate
+		matched int
+	)
 
 	for rows.Next() {
 		var c domain.BatchCandidate
-		if err := rows.Scan(&c.RepoID, &c.OrgSlug, &c.RepoSlug, &c.LastActivityAt, &c.GradedAt); err != nil {
-			return nil, false, fmt.Errorf("scan batch repo: %w", err)
+		if err := rows.Scan(&c.RepoID, &c.OrgSlug, &c.RepoSlug, &c.LastActivityAt, &c.GradedAt, &matched); err != nil {
+			return nil, 0, fmt.Errorf("scan batch repo: %w", err)
 		}
 
 		repos = append(repos, c)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, false, fmt.Errorf("iterate batch repos: %w", err)
+		return nil, 0, fmt.Errorf("iterate batch repos: %w", err)
 	}
 
-	if len(repos) > limit {
-		return repos[:limit], true, nil
-	}
-
-	return repos, false, nil
-}
-
-func (r *BatchRepository) BatchGradeInfo(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]domain.BatchGrade, error) {
-	out := make(map[uuid.UUID]domain.BatchGrade, len(ids))
-	if len(ids) == 0 {
-		return out, nil
-	}
-
-	rows, err := r.db.Query(ctx,
-		`SELECT sourcecraft_uuid, score, graded_at FROM repo_grades_public WHERE sourcecraft_uuid = ANY($1)`, ids)
-	if err != nil {
-		return nil, fmt.Errorf("batch grade info: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var (
-			id    uuid.UUID
-			score *int16
-			grade domain.BatchGrade
-		)
-		if err := rows.Scan(&id, &score, &grade.GradedAt); err != nil {
-			return nil, fmt.Errorf("scan batch grade info: %w", err)
-		}
-
-		if score != nil {
-			v := int(*score)
-			grade.Score = &v
-		}
-
-		out[id] = grade
-	}
-
-	return out, rows.Err()
+	return repos, matched, nil
 }
 
 func (r *BatchRepository) GetBatchRepo(ctx context.Context, id uuid.UUID) (domain.Repo, error) {
@@ -136,7 +111,7 @@ func (r *BatchRepository) AvgGradeSeconds(ctx context.Context) (float64, error) 
 
 	err := r.db.QueryRow(ctx, `
 		SELECT avg(extract(epoch FROM finished_at - started_at)) FROM (
-			SELECT started_at, finished_at FROM regrade_batch_items
+			SELECT started_at, finished_at FROM grading_batch_items
 			WHERE status = 'ok' AND started_at IS NOT NULL AND finished_at IS NOT NULL
 			ORDER BY finished_at DESC LIMIT 100
 		) recent`).Scan(&avg)
@@ -166,7 +141,7 @@ func (r *BatchRepository) CreateBatch(ctx context.Context, actorHash string, fil
 	var id int64
 
 	err = tx.QueryRow(ctx,
-		`INSERT INTO regrade_batches (actor_hash, filter) VALUES ($1, $2) RETURNING id`,
+		`INSERT INTO grading_batches (actor_hash, filter) VALUES ($1, $2) RETURNING id`,
 		actorHash, filterJSON,
 	).Scan(&id)
 	if err != nil {
@@ -180,7 +155,7 @@ func (r *BatchRepository) CreateBatch(ctx context.Context, actorHash string, fil
 
 	batch := &pgx.Batch{}
 	for _, repo := range repos {
-		batch.Queue(`INSERT INTO regrade_batch_items (batch_id, repo_id, org_slug, repo_slug) VALUES ($1, $2, $3, $4)`,
+		batch.Queue(`INSERT INTO grading_batch_items (batch_id, repo_id, org_slug, repo_slug) VALUES ($1, $2, $3, $4)`,
 			id, repo.RepoID, repo.OrgSlug, repo.RepoSlug)
 	}
 
@@ -212,8 +187,8 @@ const batchSelect = `
 	       count(i.*) FILTER (WHERE i.status = 'ok'),
 	       count(i.*) FILTER (WHERE i.status = 'failed'),
 	       count(i.*) FILTER (WHERE i.status = 'skipped')
-	FROM regrade_batches b
-	LEFT JOIN regrade_batch_items i ON i.batch_id = b.id`
+	FROM grading_batches b
+	LEFT JOIN grading_batch_items i ON i.batch_id = b.id`
 
 func scanBatch(row pgx.Row) (domain.Batch, error) {
 	var (
@@ -270,7 +245,7 @@ func (r *BatchRepository) ListBatches(ctx context.Context, limit int) ([]domain.
 func (r *BatchRepository) ListBatchItems(ctx context.Context, id int64, status string, limit int) ([]domain.BatchItem, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT repo_id, org_slug, repo_slug, status, error, started_at, finished_at
-		FROM regrade_batch_items
+		FROM grading_batch_items
 		WHERE batch_id = $1 AND ($2 = '' OR status = $2)
 		ORDER BY org_slug, repo_slug
 		LIMIT $3`, id, status, limit)
@@ -295,7 +270,7 @@ func (r *BatchRepository) ListBatchItems(ctx context.Context, id int64, status s
 }
 
 func (r *BatchRepository) SetBatchStatus(ctx context.Context, id int64, from []string, to string) (bool, error) {
-	tag, err := r.db.Exec(ctx, `UPDATE regrade_batches SET status = $3 WHERE id = $1 AND status = ANY($2)`, id, from, to)
+	tag, err := r.db.Exec(ctx, `UPDATE grading_batches SET status = $3 WHERE id = $1 AND status = ANY($2)`, id, from, to)
 	if err != nil {
 		return false, fmt.Errorf("set batch status: %w", err)
 	}
@@ -305,7 +280,7 @@ func (r *BatchRepository) SetBatchStatus(ctx context.Context, id int64, from []s
 
 func (r *BatchRepository) FinishBatch(ctx context.Context, id int64, status string) error {
 	_, err := r.db.Exec(ctx,
-		`UPDATE regrade_batches SET status = $2, finished_at = now() WHERE id = $1 AND status IN ('running', 'paused')`,
+		`UPDATE grading_batches SET status = $2, finished_at = now() WHERE id = $1 AND status IN ('running', 'paused')`,
 		id, status)
 	if err != nil {
 		return fmt.Errorf("finish batch: %w", err)
@@ -318,11 +293,11 @@ func (r *BatchRepository) ClaimNextBatchItem(ctx context.Context, id int64) (dom
 	var item domain.BatchItem
 
 	err := r.db.QueryRow(ctx, `
-		UPDATE regrade_batch_items SET status = 'running', started_at = now()
+		UPDATE grading_batch_items SET status = 'running', started_at = now()
 		WHERE (batch_id, repo_id) = (
-			SELECT batch_id, repo_id FROM regrade_batch_items
+			SELECT batch_id, repo_id FROM grading_batch_items
 			WHERE batch_id = $1 AND status = 'pending'
-			  AND EXISTS (SELECT 1 FROM regrade_batches WHERE id = $1 AND status = 'running')
+			  AND EXISTS (SELECT 1 FROM grading_batches WHERE id = $1 AND status = 'running')
 			ORDER BY org_slug, repo_slug
 			LIMIT 1
 			FOR UPDATE SKIP LOCKED)
@@ -341,7 +316,7 @@ func (r *BatchRepository) ClaimNextBatchItem(ctx context.Context, id int64) (dom
 
 func (r *BatchRepository) FinishBatchItem(ctx context.Context, id int64, repoID uuid.UUID, status, errCode string) error {
 	_, err := r.db.Exec(ctx,
-		`UPDATE regrade_batch_items SET status = $3, error = $4, finished_at = now() WHERE batch_id = $1 AND repo_id = $2`,
+		`UPDATE grading_batch_items SET status = $3, error = $4, finished_at = now() WHERE batch_id = $1 AND repo_id = $2`,
 		id, repoID, status, errCode)
 	if err != nil {
 		return fmt.Errorf("finish batch item: %w", err)
@@ -352,7 +327,7 @@ func (r *BatchRepository) FinishBatchItem(ctx context.Context, id int64, repoID 
 
 func (r *BatchRepository) SkipPendingItems(ctx context.Context, id int64) (int, error) {
 	tag, err := r.db.Exec(ctx,
-		`UPDATE regrade_batch_items SET status = 'skipped', finished_at = now() WHERE batch_id = $1 AND status = 'pending'`, id)
+		`UPDATE grading_batch_items SET status = 'skipped', finished_at = now() WHERE batch_id = $1 AND status = 'pending'`, id)
 	if err != nil {
 		return 0, fmt.Errorf("skip pending items: %w", err)
 	}
@@ -362,7 +337,7 @@ func (r *BatchRepository) SkipPendingItems(ctx context.Context, id int64) (int, 
 
 func (r *BatchRepository) RequeueRunningItems(ctx context.Context, id int64) error {
 	_, err := r.db.Exec(ctx,
-		`UPDATE regrade_batch_items SET status = 'pending', started_at = NULL WHERE batch_id = $1 AND status = 'running'`, id)
+		`UPDATE grading_batch_items SET status = 'pending', started_at = NULL WHERE batch_id = $1 AND status = 'running'`, id)
 	if err != nil {
 		return fmt.Errorf("requeue running items: %w", err)
 	}
@@ -372,9 +347,9 @@ func (r *BatchRepository) RequeueRunningItems(ctx context.Context, id int64) err
 
 func (r *BatchRepository) SkipOrphanedItems(ctx context.Context) error {
 	_, err := r.db.Exec(ctx, `
-		UPDATE regrade_batch_items SET status = 'skipped', finished_at = now()
+		UPDATE grading_batch_items SET status = 'skipped', finished_at = now()
 		WHERE status = 'running'
-		  AND batch_id IN (SELECT id FROM regrade_batches WHERE status IN ('cancelled', 'completed'))`)
+		  AND batch_id IN (SELECT id FROM grading_batches WHERE status IN ('cancelled', 'completed'))`)
 	if err != nil {
 		return fmt.Errorf("skip orphaned items: %w", err)
 	}

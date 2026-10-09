@@ -2,8 +2,9 @@ import { useCallback, useState } from "react"
 import type { HttpRepoHealthApi } from "../api/client"
 import type { AdminMeResponse } from "../api/contracts"
 import AuditLog from "../components/AuditLog"
+import CatalogPanel from "../components/CatalogPanel"
 import MetricsPanel from "../components/MetricsPanel"
-import RegradePanel from "../components/RegradePanel"
+import GradingPanel from "../components/GradingPanel"
 import { Button, Card, PageHeading } from "../components/Shell"
 
 /**
@@ -184,7 +185,9 @@ function AdminTools({
         )}
       </Card>
 
-      <RegradePanel api={api} onChanged={reloadAudit} />
+      <CatalogPanel api={api} onChanged={reloadAudit} />
+
+      <GradingPanel api={api} onChanged={reloadAudit} />
 
       <MetricsPanel api={api} />
 
