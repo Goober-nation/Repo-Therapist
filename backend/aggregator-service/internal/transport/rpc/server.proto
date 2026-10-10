@@ -114,6 +114,9 @@ message GetOrgReposResponse {
 message GetGradingRequest {
   string org_slug = 1;
   string repo_slug = 2;
+  // force starts a new grading even when the stored grade is current; it never bypasses the
+  // grading rate limit or a grading already in progress.
+  bool force = 3;
 }
 
 message GetGradingResponse {

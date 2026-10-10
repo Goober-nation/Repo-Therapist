@@ -110,6 +110,20 @@ async function reasonCode(response: Response): Promise<string> {
   }
 }
 
+/** Wording of a refused forced regrade: no session (401) or the per-repository cooldown (429 with a Retry-After). */
+function forceRegradeError(response: Response): ApiRequestError | undefined {
+  if (response.status === 401) {
+    return new ApiRequestError("Принудительная переоценка доступна после входа через Яндекс.", 401)
+  }
+  // The general per-IP limit answers 429 without a Retry-After; only the cooldown sends one.
+  const retryAfter = Number(response.headers.get("Retry-After"))
+  if (response.status === 429 && retryAfter > 0) {
+    const minutes = Math.max(1, Math.ceil(retryAfter / 60))
+    return new ApiRequestError(`Принудительная переоценка этого репозитория снова будет доступна через ${minutes} мин.`, 429)
+  }
+  return undefined
+}
+
 const ADMIN_DENIED_MESSAGE = "Нет доступа. Войдите через Яндекс под учётной записью администратора."
 
 /** The owner's SourceCraft PAT switches Gateway to private grading. */
@@ -136,6 +150,18 @@ export class HttpRepoHealthApi {
 
   getGrading(orgSlug: string, repoSlug: string, pat?: string): Promise<GradingResponse> {
     return this.request(`/grading/${repoPath(orgSlug, repoSlug)}`, { headers: patHeader(pat) })
+  }
+
+  /**
+   * Starts a new grading even when the stored one is current (POST /grading/.../regrade). Signed-in
+   * sessions only, once per repository per cooldown; answers like getGrading, PENDING while grading.
+   */
+  forceRegrade(orgSlug: string, repoSlug: string, pat?: string): Promise<GradingResponse> {
+    return this.request(
+      `/grading/${repoPath(orgSlug, repoSlug)}/regrade`,
+      { method: "POST", headers: { ...patHeader(pat), ...REQUEST_GUARD_HEADER } },
+      forceRegradeError,
+    )
   }
 
   getRecommendations(orgSlug: string, repoSlug: string, pat?: string): Promise<RecommendationsResponse> {

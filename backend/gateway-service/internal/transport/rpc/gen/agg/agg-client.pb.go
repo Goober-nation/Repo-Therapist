@@ -501,9 +501,12 @@ func (x *GetOrgReposResponse) GetNextPageToken() string {
 }
 
 type GetGradingRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	OrgSlug       string                 `protobuf:"bytes,1,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
-	RepoSlug      string                 `protobuf:"bytes,2,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	OrgSlug  string                 `protobuf:"bytes,1,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
+	RepoSlug string                 `protobuf:"bytes,2,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
+	// force starts a new grading even when the stored grade is current; it never bypasses the
+	// grading rate limit or a grading already in progress.
+	Force         bool `protobuf:"varint,3,opt,name=force,proto3" json:"force,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -550,6 +553,13 @@ func (x *GetGradingRequest) GetRepoSlug() string {
 		return x.RepoSlug
 	}
 	return ""
+}
+
+func (x *GetGradingRequest) GetForce() bool {
+	if x != nil {
+		return x.Force
+	}
+	return false
 }
 
 type GetGradingResponse struct {
@@ -2800,10 +2810,11 @@ const file_agg_client_proto_rawDesc = "" +
 	"page_token\x18\x02 \x01(\tR\tpageToken\"y\n" +
 	"\x13GetOrgReposResponse\x12:\n" +
 	"\frepositories\x18\x01 \x03(\v2\x16.aggregator.RepositoryR\frepositories\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"K\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"a\n" +
 	"\x11GetGradingRequest\x12\x19\n" +
 	"\borg_slug\x18\x01 \x01(\tR\aorgSlug\x12\x1b\n" +
-	"\trepo_slug\x18\x02 \x01(\tR\brepoSlug\"A\n" +
+	"\trepo_slug\x18\x02 \x01(\tR\brepoSlug\x12\x14\n" +
+	"\x05force\x18\x03 \x01(\bR\x05force\"A\n" +
 	"\x12GetGradingResponse\x12+\n" +
 	"\x05grade\x18\x01 \x01(\v2\x15.aggregator.RepoGradeR\x05grade\"Z\n" +
 	" RequestLLMRecommendationsRequest\x12\x19\n" +

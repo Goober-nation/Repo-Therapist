@@ -7,6 +7,7 @@ import {
   formatShortDate,
   getLastActivityLabel,
   healthLevel,
+  isGradeStale,
   isPrivateAnalysis,
   metricLabel,
   missingCategories,
@@ -14,6 +15,7 @@ import {
   PRIORITY_RANK,
   signed,
   splitStrengths,
+  STALE_GRADE_DAYS,
   type Tone,
 } from "../metrics"
 import type {
@@ -156,7 +158,9 @@ export function reportContent(
     title: `Repo Therapist: отчёт о здоровье ${repository.fullName}`,
     link: repository.webUrl,
     generatedAt: formatDateTime(new Date().toISOString()) ?? "",
-    gradedAt: formatDateTime(repository.gradedAt) ?? "ещё не выполнялся",
+    gradedAt:
+      (formatDateTime(repository.gradedAt) ?? "ещё не выполнялся") +
+      (isGradeStale(repository.gradedAt) ? ` (оценка устарела: старше ${STALE_GRADE_DAYS} дней)` : ""),
     isPrivate,
     mode: isPrivate ? "приватный (все 6 категорий)" : "публичный",
     score: repository.healthScore === null ? "Нет данных" : `${repository.healthScore}/100`,

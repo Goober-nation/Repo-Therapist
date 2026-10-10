@@ -202,6 +202,8 @@ export interface GatewayRankingEntry {
   likes?: number
   language?: { name?: string; color?: string }
   last_activity_at?: string
+  /** When the public grade was computed; absent when unknown. */
+  graded_at?: string
   low_confidence?: boolean | null
   confidence_reasons?: ConfidenceReasonPayload[]
   /** Null when the repo had no grade a window ago ("new"). */

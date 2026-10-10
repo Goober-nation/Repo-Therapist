@@ -2,7 +2,15 @@ import { useMemo, useState } from "react"
 import { RANKING_PAGE_SIZE, type RankingFilters, type RankingSort } from "../api/client"
 import RegradeNotice from "../components/RegradeNotice"
 import { Badge, Button, Card, LanguageLabel, PageHeading } from "../components/Shell"
-import { formatDateTime, getLastActivityLabel, HEALTHY_SCORE, healthLevel, signed } from "../metrics"
+import {
+  formatDateTime,
+  getLastActivityLabel,
+  HEALTHY_SCORE,
+  healthLevel,
+  isGradeStale,
+  signed,
+  STALE_GRADE_DAYS,
+} from "../metrics"
 import type { RegradeStatus, RepositorySummary } from "../types"
 
 export interface RankingQuery {
@@ -434,6 +442,14 @@ export default function RankingPage({
                     {repository.confidence?.low && (
                       <span className="confidence-badge" title={repository.confidence.reasons.join("\n")}>
                         <Badge tone="neutral">Мало данных</Badge>
+                      </span>
+                    )}
+                    {isGradeStale(repository.gradedAt) && (
+                      <span
+                        className="stale-badge"
+                        title={`Оценка старше ${STALE_GRADE_DAYS} дней: ${formatDateTime(repository.gradedAt)}`}
+                      >
+                        <Badge tone="warning">Устарела</Badge>
                       </span>
                     )}
                   </span>

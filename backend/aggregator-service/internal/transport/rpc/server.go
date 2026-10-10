@@ -32,6 +32,12 @@ type AggregatorService interface {
 		repoSlug string,
 	) (*domain.RepoGrade, error)
 
+	ForceGrading(
+		ctx context.Context,
+		orgSlug string,
+		repoSlug string,
+	) (*domain.RepoGrade, error)
+
 	RequestLLMRecommendations(
 		ctx context.Context,
 		orgSlug string,
@@ -161,7 +167,12 @@ func (s *Server) GetGrading(
 		)
 	}
 
-	grade, err := s.service.GetGrading(
+	getGrading := s.service.GetGrading
+	if req.GetForce() {
+		getGrading = s.service.ForceGrading
+	}
+
+	grade, err := getGrading(
 		ctx,
 		req.GetOrgSlug(),
 		req.GetRepoSlug(),

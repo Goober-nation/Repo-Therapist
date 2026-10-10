@@ -57,6 +57,8 @@ type RankingRow struct {
 	Likes           *float64
 	Language        Language
 	LastActivityAt  *time.Time
+	// GradedAt is when the public grade was computed; nil when unknown.
+	GradedAt *time.Time
 	// Confidence is the low-confidence flag of the public grade; nil when unknown (no flag row).
 	Confidence *Confidence
 

@@ -220,7 +220,9 @@ type RankingEntry struct {
 	// same filtered list. Only set when sorting by score and when the repo was graded back then.
 	PlaceChange *int32 `protobuf:"varint,12,opt,name=place_change,json=placeChange,proto3,oneof" json:"place_change,omitempty"`
 	// How many public gradings of the repo are stored in its history.
-	GradeCount    int32 `protobuf:"varint,13,opt,name=grade_count,json=gradeCount,proto3" json:"grade_count,omitempty"`
+	GradeCount int32 `protobuf:"varint,13,opt,name=grade_count,json=gradeCount,proto3" json:"grade_count,omitempty"`
+	// When the public grade was computed. Unset when unknown.
+	GradedAt      *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=graded_at,json=gradedAt,proto3" json:"graded_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -344,6 +346,13 @@ func (x *RankingEntry) GetGradeCount() int32 {
 		return x.GradeCount
 	}
 	return 0
+}
+
+func (x *RankingEntry) GetGradedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.GradedAt
+	}
+	return nil
 }
 
 type Language struct {
@@ -2200,7 +2209,7 @@ const file_service_proto_rawDesc = "" +
 	"\x13has_security_policy\x18\b \x01(\bH\x01R\x11hasSecurityPolicy\x88\x01\x01\x12\x14\n" +
 	"\x05topic\x18\t \x01(\tR\x05topicB\t\n" +
 	"\a_has_ciB\x16\n" +
-	"\x14_has_security_policy\"\xe9\x04\n" +
+	"\x14_has_security_policy\"\xa2\x05\n" +
 	"\fRankingEntry\x12\x14\n" +
 	"\x05place\x18\x01 \x01(\x05R\x05place\x12)\n" +
 	"\x10sourcecraft_uuid\x18\x02 \x01(\tR\x0fsourcecraftUuid\x12\x12\n" +
@@ -2216,7 +2225,8 @@ const file_service_proto_rawDesc = "" +
 	"\fscore_change\x18\v \x01(\x05H\x03R\vscoreChange\x88\x01\x01\x12&\n" +
 	"\fplace_change\x18\f \x01(\x05H\x04R\vplaceChange\x88\x01\x01\x12\x1f\n" +
 	"\vgrade_count\x18\r \x01(\x05R\n" +
-	"gradeCountB\x0f\n" +
+	"gradeCount\x127\n" +
+	"\tgraded_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\bgradedAtB\x0f\n" +
 	"\r_public_scoreB\b\n" +
 	"\x06_likesB\x11\n" +
 	"\x0f_low_confidenceB\x0f\n" +
@@ -2450,48 +2460,49 @@ var file_service_proto_depIdxs = []int32{
 	3,  // 1: rating.RankingEntry.language:type_name -> rating.Language
 	30, // 2: rating.RankingEntry.last_activity_at:type_name -> google.protobuf.Timestamp
 	10, // 3: rating.RankingEntry.confidence_reasons:type_name -> rating.ConfidenceReason
-	2,  // 4: rating.GetRankingResponse.entries:type_name -> rating.RankingEntry
-	8,  // 5: rating.GetPublicSummaryResponse.categories:type_name -> rating.CategoryScore
-	30, // 6: rating.GetPublicSummaryResponse.graded_at:type_name -> google.protobuf.Timestamp
-	10, // 7: rating.GetPublicSummaryResponse.confidence_reasons:type_name -> rating.ConfidenceReason
-	30, // 8: rating.HistoryPoint.graded_at:type_name -> google.protobuf.Timestamp
-	8,  // 9: rating.HistoryPoint.categories:type_name -> rating.CategoryScore
-	12, // 10: rating.GetScoreHistoryResponse.points:type_name -> rating.HistoryPoint
-	15, // 11: rating.GetPositionExplanationResponse.above:type_name -> rating.Neighbour
-	15, // 12: rating.GetPositionExplanationResponse.below:type_name -> rating.Neighbour
-	16, // 13: rating.GetPositionExplanationResponse.categories:type_name -> rating.CategoryComparison
-	30, // 14: rating.TrendPoint.week_start:type_name -> google.protobuf.Timestamp
-	19, // 15: rating.GetPlatformAnalyticsResponse.distribution:type_name -> rating.ScoreBucket
-	20, // 16: rating.GetPlatformAnalyticsResponse.levels:type_name -> rating.LevelCount
-	21, // 17: rating.GetPlatformAnalyticsResponse.languages:type_name -> rating.LanguageStat
-	22, // 18: rating.GetPlatformAnalyticsResponse.categories:type_name -> rating.CategoryAverage
-	23, // 19: rating.GetPlatformAnalyticsResponse.top_advice:type_name -> rating.AdviceStat
-	24, // 20: rating.GetPlatformAnalyticsResponse.trend:type_name -> rating.TrendPoint
-	25, // 21: rating.GetPlatformAnalyticsResponse.most_improved:type_name -> rating.ImprovedRepo
-	30, // 22: rating.GetPlatformAnalyticsResponse.generated_at:type_name -> google.protobuf.Timestamp
-	30, // 23: rating.PublicGradeEntry.last_activity_at:type_name -> google.protobuf.Timestamp
-	30, // 24: rating.PublicGradeEntry.graded_at:type_name -> google.protobuf.Timestamp
-	8,  // 25: rating.PublicGradeEntry.categories:type_name -> rating.CategoryScore
-	28, // 26: rating.ListPublicGradesResponse.entries:type_name -> rating.PublicGradeEntry
-	1,  // 27: rating.Rating.GetRanking:input_type -> rating.GetRankingRequest
-	5,  // 28: rating.Rating.GetPublicScore:input_type -> rating.GetPublicScoreRequest
-	7,  // 29: rating.Rating.GetPublicSummary:input_type -> rating.GetPublicSummaryRequest
-	11, // 30: rating.Rating.GetScoreHistory:input_type -> rating.GetScoreHistoryRequest
-	14, // 31: rating.Rating.GetPositionExplanation:input_type -> rating.GetPositionExplanationRequest
-	18, // 32: rating.Rating.GetPlatformAnalytics:input_type -> rating.GetPlatformAnalyticsRequest
-	27, // 33: rating.Rating.ListPublicGrades:input_type -> rating.ListPublicGradesRequest
-	4,  // 34: rating.Rating.GetRanking:output_type -> rating.GetRankingResponse
-	6,  // 35: rating.Rating.GetPublicScore:output_type -> rating.GetPublicScoreResponse
-	9,  // 36: rating.Rating.GetPublicSummary:output_type -> rating.GetPublicSummaryResponse
-	13, // 37: rating.Rating.GetScoreHistory:output_type -> rating.GetScoreHistoryResponse
-	17, // 38: rating.Rating.GetPositionExplanation:output_type -> rating.GetPositionExplanationResponse
-	26, // 39: rating.Rating.GetPlatformAnalytics:output_type -> rating.GetPlatformAnalyticsResponse
-	29, // 40: rating.Rating.ListPublicGrades:output_type -> rating.ListPublicGradesResponse
-	34, // [34:41] is the sub-list for method output_type
-	27, // [27:34] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	30, // 4: rating.RankingEntry.graded_at:type_name -> google.protobuf.Timestamp
+	2,  // 5: rating.GetRankingResponse.entries:type_name -> rating.RankingEntry
+	8,  // 6: rating.GetPublicSummaryResponse.categories:type_name -> rating.CategoryScore
+	30, // 7: rating.GetPublicSummaryResponse.graded_at:type_name -> google.protobuf.Timestamp
+	10, // 8: rating.GetPublicSummaryResponse.confidence_reasons:type_name -> rating.ConfidenceReason
+	30, // 9: rating.HistoryPoint.graded_at:type_name -> google.protobuf.Timestamp
+	8,  // 10: rating.HistoryPoint.categories:type_name -> rating.CategoryScore
+	12, // 11: rating.GetScoreHistoryResponse.points:type_name -> rating.HistoryPoint
+	15, // 12: rating.GetPositionExplanationResponse.above:type_name -> rating.Neighbour
+	15, // 13: rating.GetPositionExplanationResponse.below:type_name -> rating.Neighbour
+	16, // 14: rating.GetPositionExplanationResponse.categories:type_name -> rating.CategoryComparison
+	30, // 15: rating.TrendPoint.week_start:type_name -> google.protobuf.Timestamp
+	19, // 16: rating.GetPlatformAnalyticsResponse.distribution:type_name -> rating.ScoreBucket
+	20, // 17: rating.GetPlatformAnalyticsResponse.levels:type_name -> rating.LevelCount
+	21, // 18: rating.GetPlatformAnalyticsResponse.languages:type_name -> rating.LanguageStat
+	22, // 19: rating.GetPlatformAnalyticsResponse.categories:type_name -> rating.CategoryAverage
+	23, // 20: rating.GetPlatformAnalyticsResponse.top_advice:type_name -> rating.AdviceStat
+	24, // 21: rating.GetPlatformAnalyticsResponse.trend:type_name -> rating.TrendPoint
+	25, // 22: rating.GetPlatformAnalyticsResponse.most_improved:type_name -> rating.ImprovedRepo
+	30, // 23: rating.GetPlatformAnalyticsResponse.generated_at:type_name -> google.protobuf.Timestamp
+	30, // 24: rating.PublicGradeEntry.last_activity_at:type_name -> google.protobuf.Timestamp
+	30, // 25: rating.PublicGradeEntry.graded_at:type_name -> google.protobuf.Timestamp
+	8,  // 26: rating.PublicGradeEntry.categories:type_name -> rating.CategoryScore
+	28, // 27: rating.ListPublicGradesResponse.entries:type_name -> rating.PublicGradeEntry
+	1,  // 28: rating.Rating.GetRanking:input_type -> rating.GetRankingRequest
+	5,  // 29: rating.Rating.GetPublicScore:input_type -> rating.GetPublicScoreRequest
+	7,  // 30: rating.Rating.GetPublicSummary:input_type -> rating.GetPublicSummaryRequest
+	11, // 31: rating.Rating.GetScoreHistory:input_type -> rating.GetScoreHistoryRequest
+	14, // 32: rating.Rating.GetPositionExplanation:input_type -> rating.GetPositionExplanationRequest
+	18, // 33: rating.Rating.GetPlatformAnalytics:input_type -> rating.GetPlatformAnalyticsRequest
+	27, // 34: rating.Rating.ListPublicGrades:input_type -> rating.ListPublicGradesRequest
+	4,  // 35: rating.Rating.GetRanking:output_type -> rating.GetRankingResponse
+	6,  // 36: rating.Rating.GetPublicScore:output_type -> rating.GetPublicScoreResponse
+	9,  // 37: rating.Rating.GetPublicSummary:output_type -> rating.GetPublicSummaryResponse
+	13, // 38: rating.Rating.GetScoreHistory:output_type -> rating.GetScoreHistoryResponse
+	17, // 39: rating.Rating.GetPositionExplanation:output_type -> rating.GetPositionExplanationResponse
+	26, // 40: rating.Rating.GetPlatformAnalytics:output_type -> rating.GetPlatformAnalyticsResponse
+	29, // 41: rating.Rating.ListPublicGrades:output_type -> rating.ListPublicGradesResponse
+	35, // [35:42] is the sub-list for method output_type
+	28, // [28:35] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_service_proto_init() }

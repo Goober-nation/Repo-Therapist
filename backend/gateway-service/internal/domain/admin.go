@@ -59,6 +59,7 @@ type AuditFilter struct {
 // Audit actions of what a user does (docs/admin.md).
 const (
 	AuditActionGrading         = "grading.request"
+	AuditActionForceGrading    = "grading.force"
 	AuditActionRecommendations = "recommendations.request"
 )
 

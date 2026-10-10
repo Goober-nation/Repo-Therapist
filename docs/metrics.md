@@ -1,6 +1,6 @@
 # Метрики и графики работы сервиса (Prometheus)
 
-Статус: 2026-10-08. Метрики только считают то, что сервисы уже делают. Расчёт оценок и порядок рейтинга не
+Метрики только считают то, что сервисы уже делают. Расчёт оценок и порядок рейтинга не
 затрагиваются.
 
 ## Что есть, простыми словами
@@ -8,7 +8,7 @@
 - Три сервиса на Go (Gateway, Aggregator, Rating) и сервис LLM на Python отдают свои числа на отдельном порту: сколько было запросов,
   сколько оценок запущено и завершено, сколько они длились, сколько отказов по лимитам.
 - **Prometheus** раз в 15 секунд забирает эти числа и хранит их 15 дней (`PROMETHEUS_RETENTION`).
-- **Графики рисует сам сайт**, Grafana нет (решение 2026-10-08). Gateway спрашивает у Prometheus готовые
+- **Графики рисует сам сайт**, Grafana нет. Gateway спрашивает у Prometheus готовые
   числа и отдаёт их странице:
   - **в администраторской части вкладки «Доступ админа»** — блок «Работа сервиса» с десятью графиками и выбором
     периода (час, 6 часов, сутки, неделя) и блок «Расход LLM» с пятью графиками токенов и вызовов модели;
@@ -54,7 +54,7 @@ llm-summary-service :9105 ┘
 | `aggregator_grading_duration_seconds{visibility,outcome}` | Aggregator | время от запроса до результата |
 | `aggregator_grade_limiter_rejections_total` | Aggregator | оценок отклонено общим лимитом |
 | `aggregator_llm_requests_total{outcome}` | Aggregator | запросы рекомендаций: `requested`, `publish_failed`, `received_ok`, `received_error` |
-| `aggregator_grading_batch_items_total{status}`, `..._events_total{event}` | Aggregator | репозитории и события пакетной оценки (до 2026-10-09 — `aggregator_regrade_batch_*`) |
+| `aggregator_grading_batch_items_total{status}`, `..._events_total{event}` | Aggregator | репозитории и события пакетной оценки |
 | `aggregator_scheduled_regrade_*` | Aggregator | ход плановой переоценки (идёт ли, всего, обработано) |
 | `aggregator_grpc_requests_total{method,code}` и `..._duration_seconds` | Aggregator | запросы к самому Aggregator |
 | `rating_grpc_requests_total{method,code}` и `..._duration_seconds` | Rating | запросы к Rating |
@@ -121,7 +121,7 @@ docker compose up -d --build
 
 - Токены берутся из поля `usage` ответа Yandex AI Studio, то есть считаются так, как их считает провайдер. Поле
   проверено настоящим вызовом: в нём `input_tokens`, `output_tokens` и `cached_tokens` внутри `input_tokens_details`.
-- **Денег нет.** Цены нигде не заданы и не угадываются (решение 2026-10-09: «только токены»). Если цена понадобится, её
+- **Денег нет.** Цены нигде не заданы и не угадываются. Если цена понадобится, её
   умножают на эти же счётчики, ничего в сборе менять не придётся.
 - **Модель вызывается не всегда.** Рекомендации (`llm-summary-service`) идут через модель каждый раз; оценка
   документации по умолчанию считается без модели (`LLM_DOCS_MODE=algorithmic`) и появится на графиках только при

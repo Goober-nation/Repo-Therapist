@@ -22,9 +22,11 @@ type Config struct {
 	PublicAPIRateLimit RateLimitConfig
 	// ExportRateLimit is the per-IP budget of the public grades export, which reads every grade.
 	ExportRateLimit RateLimitConfig
-	Session         SessionConfig
-	Admin           AdminConfig
-	Metrics         MetricsConfig
+	// ForceRegradeCooldown is how often one user may force a regrade of one repo; 0 means no limit.
+	ForceRegradeCooldown time.Duration
+	Session              SessionConfig
+	Admin                AdminConfig
+	Metrics              MetricsConfig
 }
 
 // MetricsConfig is the monitoring side (docs/metrics.md).
@@ -247,6 +249,8 @@ func LoadConfig() *Config {
 				time.Minute,
 			),
 		},
+
+		ForceRegradeCooldown: time.Duration(getEnvIntDefault("FORCE_REGRADE_COOLDOWN_MINUTES", 60)) * time.Minute,
 
 		Admin: AdminConfig{
 			YandexIDs:       getEnvList("ADMIN_YANDEX_IDS"),

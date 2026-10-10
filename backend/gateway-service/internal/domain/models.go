@@ -67,6 +67,8 @@ type RankingEntry struct {
 	Likes           *float64
 	Language        PrimaryLanguage
 	LastActivityAt  *time.Time
+	// GradedAt is when the public grade was computed; nil when unknown.
+	GradedAt *time.Time
 	// Confidence is nil when the flag is unknown (grade stored before the flag existed).
 	Confidence *Confidence
 	// ScoreChange is the score now minus the score DynamicsDays ago, PlaceChange the places gained

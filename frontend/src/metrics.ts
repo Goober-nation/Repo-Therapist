@@ -189,6 +189,15 @@ export function formatDateTime(value?: string): string | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date.toLocaleString("ru-RU")
 }
 
+/** A grade older than this is shown as outdated (docs/grading/frontend-results.md). */
+export const STALE_GRADE_DAYS = 7
+
+/** True when the grade was computed more than STALE_GRADE_DAYS ago; false for a missing or invalid date. */
+export function isGradeStale(gradedAt?: string, now: number = Date.now()): boolean {
+  const time = gradedAt ? Date.parse(gradedAt) : Number.NaN
+  return Number.isFinite(time) && now - time > STALE_GRADE_DAYS * 24 * 60 * 60 * 1000
+}
+
 /** "4 окт." for a chart axis or a history row; undefined for a missing or invalid date. */
 export function formatShortDate(value?: string): string | undefined {
   const time = value ? new Date(value) : undefined

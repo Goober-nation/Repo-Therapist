@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -220,5 +221,29 @@ func TestScanSkipsBrokenSymlinks(t *testing.T) {
 	}
 	if export.ScannedFiles != 1 {
 		t.Errorf("ScannedFiles = %d, want 1 (clean.go only)", export.ScannedFiles)
+	}
+}
+
+// A single line longer than the scanner buffer (minified GeoJSON, notebooks with outputs) used to
+// fail the whole repo; the file is now read only up to maxScanBytes.
+func TestScanFileCutsOffHugeLines(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "huge.geojson")
+	content := "// TODO: first line\n" + strings.Repeat("x", maxLineBytes+1024) + "\n// TODO: after\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	isText, lines, err := scanFile(path)
+	if err != nil {
+		t.Fatalf("scanFile: %v", err)
+	}
+	if !isText || len(lines) == 0 || lines[0].text != "// TODO: first line" {
+		t.Fatalf("isText=%v lines=%d", isText, len(lines))
+	}
+	for _, l := range lines {
+		if len(l.text) > maxScanBytes {
+			t.Fatalf("line %d is %d bytes, want <= %d", l.number, len(l.text), maxScanBytes)
+		}
 	}
 }

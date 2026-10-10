@@ -439,6 +439,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .filter-check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--text); white-space: nowrap; cursor: pointer; }
 .filter-check input { margin: 0; }
 .confidence-badge { display: inline-flex; cursor: help; }
+.stale-badge { display: inline-flex; cursor: help; }
+.force-regrade-toggle { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-sm); white-space: nowrap; cursor: pointer; }
 .confidence-notice { display: grid; gap: 6px; margin: 4px 0; padding: 10px 12px; border: 1px solid var(--border); border-left: 3px solid var(--warning, #dfb317); border-radius: 8px; background: var(--surface-muted); font-size: var(--fs-sm); }
 .confidence-notice ul { margin: 0; padding-left: 18px; }
 .confidence-notice small { color: var(--muted); }

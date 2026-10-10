@@ -31,6 +31,10 @@ type GetMyReposDTO struct {
 type GetGradingDTO struct {
 	OrgSlug  string `json:"org_slug"`
 	RepoSlug string `json:"repo_slug"`
+	// Force starts a new grading even when the stored one is current. Only a signed-in session
+	// (SessionID) may force, once per repo per cooldown.
+	Force     bool   `json:"-"`
+	SessionID string `json:"-"`
 }
 
 type RequestLLMRecommendationsDTO struct {

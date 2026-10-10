@@ -14,23 +14,33 @@ import (
 // maxRetryAfter caps how long a server-sent Retry-After may stall a single retry.
 const maxRetryAfter = 5 * time.Second
 
+// maxRateLimitWait caps one exponential backoff step after a 429.
+const maxRateLimitWait = 30 * time.Second
+
 // Transport retries a request up to Attempts times in total. Each attempt gets its own
 // AttemptTimeout, so the owning http.Client must not set Client.Timeout (it would cap all
 // attempts together). Only 429/502/503/504 and transport errors are retried; every other status
 // is a real answer from the API and is returned as is.
+//
+// A 429 is retried up to RateLimitAttempts times (when larger than Attempts) with exponential
+// backoff from Wait (Wait, 2*Wait, 4*Wait, ... capped at maxRateLimitWait): a flat short wait
+// re-hits the limit while it is still in force.
 type Transport struct {
-	Base           http.RoundTripper
-	Attempts       int
-	Wait           time.Duration
-	AttemptTimeout time.Duration
+	Base              http.RoundTripper
+	Attempts          int
+	RateLimitAttempts int
+	Wait              time.Duration
+	AttemptTimeout    time.Duration
 }
 
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	attempts := max(t.Attempts, 1)
+	rateLimitAttempts := max(t.RateLimitAttempts, attempts)
 	// A consumed body can only be re-sent if it can be recreated.
 	if req.Body != nil && req.Body != http.NoBody && req.GetBody == nil {
-		attempts = 1
+		attempts, rateLimitAttempts = 1, 1
 	}
+	rateLimited := 0
 
 	for attempt := 1; ; attempt++ {
 		attemptReq := req
@@ -44,16 +54,24 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 
 		resp, err := t.try(attemptReq)
-		if attempt >= attempts || !retryable(resp, err) || req.Context().Err() != nil {
+		limit := attempts
+		if resp != nil && resp.StatusCode == http.StatusTooManyRequests {
+			limit = rateLimitAttempts
+		}
+		if attempt >= limit || !retryable(resp, err) || req.Context().Err() != nil {
 			return resp, err
 		}
 
 		wait := t.Wait
 		if resp != nil {
+			if resp.StatusCode == http.StatusTooManyRequests {
+				wait = backoff(t.Wait, rateLimited)
+				rateLimited++
+			}
 			if ra := retryAfter(resp); ra > wait {
 				wait = ra
 			}
-			log.Printf("retry: %s %s -> %d, attempt %d/%d", req.Method, req.URL.Path, resp.StatusCode, attempt, attempts)
+			log.Printf("retry: %s %s -> %d, attempt %d/%d, waiting %s", req.Method, req.URL.Path, resp.StatusCode, attempt, limit, wait)
 			io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
 		} else {
@@ -110,6 +128,15 @@ func retryable(resp *http.Response, err error) bool {
 		return true
 	}
 	return false
+}
+
+// backoff returns base doubled n times, capped at maxRateLimitWait.
+func backoff(base time.Duration, n int) time.Duration {
+	wait := base
+	for i := 0; i < n && wait < maxRateLimitWait; i++ {
+		wait *= 2
+	}
+	return min(wait, maxRateLimitWait)
 }
 
 // retryAfter parses a delay-seconds Retry-After header, capped at maxRetryAfter.

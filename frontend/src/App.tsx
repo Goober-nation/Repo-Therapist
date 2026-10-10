@@ -547,6 +547,7 @@ export default function App() {
                     }
                     onOpenRepository={(org, repo) => navigate({ page: "repository", org, repo, private: false })}
                     onBackToRanking={() => showPage("ranking")}
+                    canForceRegrade={profile !== null}
                     publicView={
                       canViewPublicly && repoName
                         ? {

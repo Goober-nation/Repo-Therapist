@@ -25,8 +25,10 @@ type fakeAggregator struct {
 	regrade *agg.GetRegradeStatusResponse
 	err     error
 	grade   *agg.RepoGrade
-	calls   int
-	authMD  []string
+	// gradingIn is the last GetGrading request.
+	gradingIn *agg.GetGradingRequest
+	calls     int
+	authMD    []string
 
 	myOrgs     *agg.GetMyOrgsResponse
 	orgRepos   *agg.GetOrgReposResponse
@@ -63,6 +65,7 @@ func (f *fakeAggregator) GetOrgRepos(ctx context.Context, in *agg.GetOrgReposReq
 
 func (f *fakeAggregator) GetGrading(ctx context.Context, in *agg.GetGradingRequest, opts ...grpc.CallOption) (*agg.GetGradingResponse, error) {
 	f.record(ctx)
+	f.gradingIn = in
 	if f.err != nil {
 		return nil, f.err
 	}

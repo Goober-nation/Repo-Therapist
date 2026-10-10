@@ -92,6 +92,8 @@ message RankingEntry {
   optional int32 place_change = 12;
   // How many public gradings of the repo are stored in its history.
   int32 grade_count = 13;
+  // When the public grade was computed. Unset when unknown.
+  google.protobuf.Timestamp graded_at = 14;
 }
 
 message Language {

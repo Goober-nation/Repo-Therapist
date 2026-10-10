@@ -164,7 +164,7 @@ test("a user action reads as a request with its state, and a token request says 
 test("the user-action filter names both actions and the all option sends nothing", () => {
   assert.deepEqual(
     view.USER_ACTION_FILTERS.map((option) => option.value),
-    ["", "grading.request", "recommendations.request"],
+    ["", "grading.request", "grading.force", "recommendations.request"],
   )
 })
 

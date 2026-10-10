@@ -42,3 +42,17 @@ func (e GradingLimitError) Error() string {
 func (e GradingLimitError) Unwrap() error {
 	return ErrLimitExceeded
 }
+
+// ForceRegradeCooldownError: this user forced a regrade of this repo recently and may force it again
+// after RetryAfter. It matches ErrLimitExceeded with errors.Is.
+type ForceRegradeCooldownError struct {
+	RetryAfter time.Duration
+}
+
+func (e ForceRegradeCooldownError) Error() string {
+	return "force regrade cooldown"
+}
+
+func (e ForceRegradeCooldownError) Unwrap() error {
+	return ErrLimitExceeded
+}

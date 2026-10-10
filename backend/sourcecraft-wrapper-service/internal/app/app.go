@@ -28,14 +28,16 @@ func StartApp() {
 	var client http.Client
 	timeout := intSetting("CLIENT_TIMEOUT", cfg.ClientTimeout, 5, 1)
 	retryAttempts := intSetting("HTTP_RETRY_ATTEMPTS", cfg.RetryAttempts, 3, 1)
+	rateLimitAttempts := intSetting("HTTP_RATE_LIMIT_ATTEMPTS", cfg.RateLimitAttempts, 6, 1)
 	retryWait := intSetting("HTTP_RETRY_WAIT_SECONDS", cfg.RetryWaitSeconds, 1, 0)
 	maxPages := intSetting("SOURCECRAFT_MAX_PAGES", cfg.MaxPages, 50, 1)
 	// No Client.Timeout: it would cap all retry attempts together; the transport times each one.
 	client = http.Client{
 		Transport: &retry.Transport{
-			Attempts:       retryAttempts,
-			Wait:           time.Duration(retryWait) * time.Second,
-			AttemptTimeout: time.Duration(timeout) * time.Second,
+			Attempts:          retryAttempts,
+			RateLimitAttempts: rateLimitAttempts,
+			Wait:              time.Duration(retryWait) * time.Second,
+			AttemptTimeout:    time.Duration(timeout) * time.Second,
 		},
 	}
 	srvc := service.NewSCWrapperService(client, cfg.SourceCraftURL)

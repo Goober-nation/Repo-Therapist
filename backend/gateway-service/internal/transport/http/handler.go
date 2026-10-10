@@ -169,6 +169,7 @@ func (h *Handler) Register(mux *stdhttp.ServeMux) {
 	mux.HandleFunc("GET /repos", h.GetMyRepos)
 	mux.HandleFunc("GET /orgs", h.GetMyOrgs)
 	mux.HandleFunc("GET /grading/{org}/{repo}", h.GetGrading)
+	mux.HandleFunc("POST /grading/{org}/{repo}/regrade", h.PostForceRegrade)
 	mux.HandleFunc("GET /recommendations/{org}/{repo}", h.RequestLLMRecommendations)
 	mux.HandleFunc("GET /analytics/{org}/{repo}", h.GetAnalytics)
 	mux.HandleFunc("GET /ranking", h.GetRanking)
@@ -374,6 +375,33 @@ func (h *Handler) GetGrading(
 		stdhttp.StatusOK,
 		mapGetGradingResponse(result),
 	)
+}
+
+// PostForceRegrade serves POST /grading/{org}/{repo}/regrade: starts a new grading even when the stored
+// one is current. Signed-in sessions only (401 otherwise), with the CSRF header (403 without it), once
+// per user and repo per cooldown (429 with Retry-After). Answers like GET /grading: 202 while grading.
+func (h *Handler) PostForceRegrade(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+	if !checkAdminHeader(w, r) {
+		return
+	}
+
+	orgSlug, repoSlug := strings.TrimSpace(r.PathValue("org")), strings.TrimSpace(r.PathValue("repo"))
+
+	result, err := h.service.GetGrading(
+		r.Context(),
+		clientIP(r),
+		patFromRequest(r),
+		domain.GetGradingDTO{OrgSlug: orgSlug, RepoSlug: repoSlug, Force: true, SessionID: sessionCookie(r)},
+	)
+
+	h.recordUserAction(r, domain.AuditActionForceGrading, orgSlug, repoSlug, err)
+
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	writeJSON(w, stdhttp.StatusOK, mapGetGradingResponse(result))
 }
 
 // analyticsResponse is GET /analytics: the informational analytics object as stored (bus factor,
@@ -692,6 +720,8 @@ type rankingEntryResponse struct {
 	Likes           *float64         `json:"likes,omitempty"`
 	Language        languageResponse `json:"language"`
 	LastActivityAt  *string          `json:"last_activity_at,omitempty"`
+	// GradedAt is when the public grade was computed; absent when unknown.
+	GradedAt *string `json:"graded_at,omitempty"`
 	// LowConfidence is null when the flag is unknown; the reasons are empty unless it is true.
 	LowConfidence     *bool                      `json:"low_confidence"`
 	ConfidenceReasons []confidenceReasonResponse `json:"confidence_reasons"`
@@ -863,6 +893,11 @@ func mapRankingEntryResponse(
 	result.ScoreChange, result.PlaceChange = entry.ScoreChange, entry.PlaceChange
 	result.GradeCount = entry.GradeCount
 
+	if entry.GradedAt != nil {
+		value := entry.GradedAt.Format(time.RFC3339Nano)
+		result.GradedAt = &value
+	}
+
 	return result
 }
 
@@ -941,6 +976,11 @@ func writeError(
 	var limit domain.GradingLimitError
 	if errors.As(err, &limit) {
 		w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(limit.RetryAfter.Seconds()))))
+	}
+
+	var cooldown domain.ForceRegradeCooldownError
+	if errors.As(err, &cooldown) {
+		w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(cooldown.RetryAfter.Seconds()))))
 	}
 
 	var locked domain.AdminLockedError
@@ -1045,6 +1085,9 @@ func publicErrorMessage(err error) string {
 
 	case errors.As(err, new(domain.GradingLimitError)):
 		return "grading limit reached"
+
+	case errors.As(err, new(domain.ForceRegradeCooldownError)):
+		return "force regrade cooldown"
 
 	case errors.Is(err, domain.ErrLimitExceeded):
 		return "rate limit exceeded"

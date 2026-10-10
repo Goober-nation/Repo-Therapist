@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -165,6 +166,11 @@ func matchMarker(line string) string {
 	return m
 }
 
+const (
+	maxLineBytes = 10 * 1024 * 1024
+	maxScanBytes = maxLineBytes / 2
+)
+
 type textLine struct {
 	number int
 	text   string
@@ -191,8 +197,10 @@ func scanFile(path string) (isText bool, lines []textLine, err error) {
 		return false, nil, err
 	}
 
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+	// Only the first half of the line buffer's worth of the file is read: no line within it can
+	// outgrow the buffer, so minified data or notebooks with long lines are cut off, not fatal.
+	scanner := bufio.NewScanner(io.LimitReader(f, maxScanBytes))
+	scanner.Buffer(make([]byte, 0, 64*1024), maxLineBytes)
 	lineNum := 0
 	for scanner.Scan() {
 		lineNum++

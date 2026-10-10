@@ -1,4 +1,4 @@
-# Реестр вычетов документации (`documentation-grading-v1`)
+# Реестр вычетов документации
 
 > Внутренний результат модели содержит только `grade`, восемь `subcategories` и плоский список
 > `facts`; по Kafka передаётся `repo.docs.graded`. Внутренние проверки/компоненты и числовые вычеты не
@@ -7,7 +7,7 @@
 > приёму текущего ответа Yandex. См. [контракт Kafka](kafka-contracts.md) и
 > [вывод активной модели](llm-model-output.md).
 >
-> **Примечание (проверено по коду, 2026-09-28).** По Kafka сейчас реально передаётся
+> **Примечание (проверено по коду).** По Kafka сейчас реально передаётся
 > `repo.docs.graded` с `{sourcecraft_uuid, grade, subgrades, advice, evaluated_at}`, где `advice`
 > — рекомендации на русском, построенные по этим кодам (`recommendations.py`). Все коды проверок
 > из таблиц ниже присутствуют в коде LLM-сервиса; **групповые коды из последнего раздела в коде
@@ -160,9 +160,9 @@
 | `DOC_CONFIGURATION_INCONSISTENT` | `consistency.commands` | `configuration_kind`, `documented_identifier`, `detected_identifiers` | документация плюс доказательство конфигурации | `LOW` |
 | `DOC_COMPONENT_DESCRIPTION_INCONSISTENT` | `consistency.description` | `claim_kind`, `documented_identifier`, `mismatch_kind` | утверждение плюс доказательство из репозитория | `LOW` |
 
-Внешние HTTP-ссылки в v1 не проверяются; доступность сети не должна влиять на оценку репозитория.
+Внешние HTTP-ссылки не проверяются; доступность сети не должна влиять на оценку репозитория.
 
-Остальные перечисления фактов v1 закрыты: `reference_kind` — `file`, `directory`, `script`,
+Остальные перечисления фактов закрыты: `reference_kind` — `file`, `directory`, `script`,
 `configuration` или `other`; `link_kind` — `file`, `directory` или `anchor`; `mismatch_kind` —
 `missing`, `wrong_target`, `wrong_parameter`, `wrong_value` или `other`; `configuration_kind` —
 `environment_variable`, `config_file`, `flag` или `other`; `claim_kind` — `component`,
@@ -171,7 +171,7 @@
 
 ## Групповые коды проблем
 
-> **Не реализовано** (проверено по коду 2026-09-28): ни один из кодов ниже не встречается в
+> **Не реализовано** (проверено по коду): ни один из кодов ниже не встречается в
 > `backend/llm-service/src`. Раздел описывает задуманное поведение.
 
 Код сервиса может заменить несколько связанных кодов вычетов одним кодом проблемы, сохранив все

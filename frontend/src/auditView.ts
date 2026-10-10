@@ -28,6 +28,7 @@ const ACTION_LABELS: Record<string, string> = {
   "catalog.refresh.complete": "Список репозиториев обновлён",
   "catalog.refresh.fail": "Обновление списка репозиториев не удалось",
   "grading.request": "Запрос оценки репозитория",
+  "grading.force": "Принудительная переоценка репозитория",
   "recommendations.request": "Запрос рекомендаций от модели",
 }
 
@@ -95,6 +96,7 @@ export const OUTCOME_FILTERS = [
 export const USER_ACTION_FILTERS = [
   { value: "", label: "Все действия" },
   { value: "grading.request", label: "Запросы оценки" },
+  { value: "grading.force", label: "Принудительные переоценки" },
   { value: "recommendations.request", label: "Запросы рекомендаций" },
 ]
 

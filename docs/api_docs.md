@@ -1,4 +1,4 @@
-> **Проверка актуальности (по коду, 2026-10-04).** Это ранний черновик API; реальные контракты
+> **Проверка актуальности (по коду).** Это ранний черновик API; реальные контракты
 > с тех пор изменились. Источник истины — `.proto`-файлы сервисов и
 > `backend/gateway-service/internal/transport/http/handler.go`. Расхождения:
 >
@@ -622,8 +622,9 @@ rpc GetReccomendations(GetReccomendationsRequest) returns (GetReccomendationsRes
 | `GET /repos?org={slug}&page_token=` | `PAT` (обязателен) | репозитории одной организации, видимые токену (в том числе закрытые), одной порцией того же формата, что ниже; непустой `next_page_token` передаётся обратно как `page_token` для следующей порции. Нет организации или нет доступа — `404`/`403`, интерфейс показывает одно общее сообщение |
 | `GET /repos` | `PAT` (обязателен) | без `org` — прежний список по всем организациям (`GET /me/repos`, может не уложиться в таймаут для больших организаций): `{repositories: [{sourcecraft_uuid, org_slug, repo_slug, web_url, visibility, last_activity_at, rating, language: {name, color}}], next_page_token}` |
 | `GET /grading/{org}/{repo}` | `PAT` (опционален) | `{status, grade: {sourcecraft_uuid, score, category_scores, advice, missing_data, graded_at}}` |
+| `POST /grading/{org}/{repo}/regrade` | кука `session_id` (вход через Яндекс), заголовок `X-Admin-Request: 1`, `PAT` (опционален) | принудительная переоценка: запускает новую оценку, даже если в репозитории не было активности после прошлой; ответ как у `GET /grading` (`202` и `PENDING`, пока оценка идёт; новую оценку фронтенд дожидается опросом `GET /grading`, пока не изменится `graded_at`). Одному пользователю — не чаще раза в `FORCE_REGRADE_COOLDOWN_MINUTES` минут (по умолчанию 60, `0` — без ограничения) на репозиторий: иначе `429` с `error: "force regrade cooldown"` и `Retry-After`. `401` без сессии, `403` без заголовка; общий лимит оценок (`429`, `grading limit reached`) действует как обычно, а уже идущая оценка не запускается второй раз |
 | `GET /recommendations/{org}/{repo}` | `PAT` (опционален) | `{status, raw_response: {summary, recommendations: [{priority, category, text}]}, model_used, evaluated_at}` |
-| `GET /ranking?page=&page_size=&sortby=&filter=&hide_low_confidence=&size=&ci=&security=&topic=` | — | `{entries: [{place, sourcecraft_uuid, name, web_url, public_score, likes, language, last_activity_at, low_confidence, confidence_reasons}], total_count, page, page_size}` |
+| `GET /ranking?page=&page_size=&sortby=&filter=&hide_low_confidence=&size=&ci=&security=&topic=` | — | `{entries: [{place, sourcecraft_uuid, name, web_url, public_score, likes, language, last_activity_at, graded_at, low_confidence, confidence_reasons}], total_count, page, page_size}`; `graded_at` — время публичной оценки, нет поля — неизвестно |
 | `GET /analytics/{org}/{repo}` | `PAT` (опционален) | `{status, analytics, graded_at}`: справочные показатели (фактор автобуса, карта владельцев, ревью pull request); с токеном владельца — приватные |
 | `GET /badge/{org}/{repo}.svg` | — | SVG-бейдж с сохранённой публичной оценкой (`image/svg+xml`, `Cache-Control: max-age=300`); оценку не запускает, лимит по IP не применяется; неизвестный или не оценённый репозиторий — серый `n/a` |
 | `GET /badge/{org}/{repo}/{category}.svg` | — | SVG-бейдж одной публичной категории: `activity`, `issues`, `documentation`, `code_health`; категория без данных — серый `n/a`, любой другой ID (в том числе `security` и `ci_cd`) — `404` |
@@ -635,7 +636,7 @@ rpc GetReccomendations(GetReccomendationsRequest) returns (GetReccomendationsRes
 | `POST /auth/logout` | кука `session_id` (необязательна), заголовок `X-Admin-Request: 1` | завершает сессию, снимает право, выданное по паролю, стирает куку; `200 {"signed_out": true}`, в том числе без сессии; `403` без заголовка; без кэша и без CORS |
 | `POST /admin/unlock` | кука `session_id` (нужен вход через Яндекс), заголовок `X-Admin-Request: 1` | тело `{"password"}`; верный пароль даёт права администратора до конца сессии; ответ как у `/admin/me`; `401` без сессии, `403` неверный пароль, `400` пустой или длиннее 256 байт пароль, `429` с `Retry-After` после `ADMIN_UNLOCK_MAX_ATTEMPTS` неверных; без кэша и без CORS |
 | `POST /admin/lock` | кука `session_id`, заголовок `X-Admin-Request: 1` | снимает права, полученные по паролю; ответ как у `/admin/me` |
-| `GET /admin/audit?limit=&before_id=&action=&outcome=&scope=` | кука `session_id`, только админ | страница журнала действий `{entries: [{id, at, actor_kind, actor, action, target_kind, target, outcome, details}], next_before_id}`, новые первыми; `scope=admin` — без действий пользователей, `scope=users` — только `grading.request` и `recommendations.request`; `401` без сессии, `403` не админу, `400` на неверный параметр; без кэша и без CORS; запросы, меняющие состояние, требуют заголовок `X-Admin-Request: 1` |
+| `GET /admin/audit?limit=&before_id=&action=&outcome=&scope=` | кука `session_id`, только админ | страница журнала действий `{entries: [{id, at, actor_kind, actor, action, target_kind, target, outcome, details}], next_before_id}`, новые первыми; `scope=admin` — без действий пользователей, `scope=users` — только `grading.request`, `grading.force` и `recommendations.request`; `401` без сессии, `403` не админу, `400` на неверный параметр; без кэша и без CORS; запросы, меняющие состояние, требуют заголовок `X-Admin-Request: 1` |
 | `GET /stats/series/{name}` | — | график для вкладки «Аналитика» (`gradings_per_day`, `grading_avg_seconds`), только по публичным оценкам: `{name, unit, step_seconds, generated_at, series: [{label, points: [[время, значение]]}]}`; `Cache-Control: public, max-age=60`; любое другое имя — `404`; `503` с `code` `metrics_off` или `metrics_unavailable`; подробности — [metrics.md](metrics.md) |
 | `GET /admin/metrics/{name}?range=1h\|6h\|24h\|7d` | кука `session_id`, только админ | графики работы сервиса и расхода LLM (пятнадцать имён, см. [metrics.md](metrics.md)); ответ как у `/stats/series/{name}`; без кэша и без CORS |
 | `POST /admin/grading/preview`, `POST /admin/grading/batches` | кука `session_id`, только админ, заголовок `X-Admin-Request: 1` | пробный расчёт и запуск пакетной оценки публичных репозиториев; тело `{limit, languages, min_score, max_score, older_than_days, repos, only_regrade, force}` (`limit` обязателен — сколько подошедших взять, первыми по рейтингу SourceCraft; `only_regrade` — только уже оценённые; `force` — без проверки новой активности); ошибки несут `code` (`invalid_filter`, `nothing_selected`, `limit_too_high` — `limit` больше предела стенда `BATCH_GRADING_MAX_LIMIT`, `batch_active`); без кэша и без CORS; подробности — [admin.md](admin.md) |
@@ -679,10 +680,10 @@ README. `GET /score/...`, `GET /history/...`, `GET /position/...`, `GET /stats` 
 - `categories`: публичные категории по ID в алфавитном порядке. `no_data: true` и `score: null` —
   данных нет (это не плохая оценка); `score: 0` — реальный ноль.
 - `missing_data`: категории публичной оценки без данных; `graded_at`: время оценки (RFC 3339).
-- `low_confidence` / `confidence_reasons` (2026-10-04): флаг низкой достоверности публичной оценки.
+- `low_confidence` / `confidence_reasons`: флаг низкой достоверности публичной оценки.
   `true` — оценка опирается на мало данных, `confidence_reasons` — `[{code, text}]` с заготовленными
-  общими причинами; `false` — флага нет, список пуст; `null` — неизвестно (оценка сохранена до
-  появления флага; такой репозиторий никогда не считается низкодостоверным). Флаг не меняет
+  общими причинами; `false` — флага нет, список пуст; `null` — неизвестно (флаг для оценки не
+  вычислялся; такой репозиторий никогда не считается низкодостоверным). Флаг не меняет
   `score`, `level` и `status`.
 - Кэш: `Cache-Control: public, max-age=60`.
 
@@ -695,8 +696,8 @@ README. `GET /score/...`, `GET /history/...`, `GET /position/...`, `GET /stats` 
 ```
 
 `GET /analytics/{org}/{repo}` только читает: оценку не запускает. `status`: `FINISHED` (в `analytics`
-объект версии 4 (версия 1 — без блока `reviews`, версия 2 — без `reviews.bottlenecks`, подкаталогов и файлов, версия 3 — без `issue_replies`), формат — `docs/grading/analytics.md`) или `NO_DATA` (`analytics: null`, у репозитория
-ещё нет аналитики, например он оценён до её появления). Приватный репозиторий без токена владельца —
+объект версии 4, формат — `docs/grading/analytics.md`) или `NO_DATA` (`analytics: null`, у репозитория
+ещё нет сохранённой аналитики). Приватный репозиторий без токена владельца —
 `403`, неизвестный — `404`. CORS не включён: ответ зависит от токена.
 
 `status`: `PENDING` (оценка запущена и считается), `FINISHED`, `NO_DATA`. Запрос оценки сам
@@ -706,5 +707,4 @@ README. `GET /score/...`, `GET /history/...`, `GET /position/...`, `GET /stats` 
 `category_scores` — объект по ID категории: `{id, no_data, score (0–100), metrics: [{id, no_data,
 raw_value, score (0–1)}]}`; у `documentation` дополнительно может быть `method` (`"llm"` или
 `"algorithmic"` — упрощённая оценка). `advice` — `[{category_id, metric_id, priority, text}]`,
-`priority` — `critical|high|medium|low` (`config/recommendations.yaml`); текст без метки. У оценок,
-сохранённых до 2026-10, поля нет, а текст начинается с метки `[priority]`.
+`priority` — `critical|high|medium|low` (`config/recommendations.yaml`); текст без метки.

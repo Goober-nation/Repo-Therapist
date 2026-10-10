@@ -171,6 +171,10 @@ func StartApp() {
 		cfg.ExportRateLimit.Window,
 	))
 
+	if cfg.ForceRegradeCooldown > 0 {
+		gatewayService.SetForceRegradeCooldown(redis_repository.NewCooldown(redisClient, cfg.ForceRegradeCooldown))
+	}
+
 	gatewayService.SetMetrics(appMetrics)
 	if cfg.Metrics.PrometheusURL != "" {
 		gatewayService.SetSeries(series.NewClient(cfg.Metrics.PrometheusURL, cfg.Metrics.SeriesCache, nil))

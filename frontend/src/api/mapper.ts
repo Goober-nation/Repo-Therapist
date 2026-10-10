@@ -319,6 +319,7 @@ export function repositoryFromRanking(entry: GatewayRankingEntry): RepositorySum
       analysisMode: "public",
       webUrl: entry.web_url,
       lastUpdated: entry.last_activity_at,
+      ...(entry.graded_at ? { gradedAt: entry.graded_at } : {}),
       healthScore: scoreValue(entry.public_score),
       ...(typeof entry.likes === "number" ? { likes: entry.likes } : {}),
       ...(confidenceFromPayload(entry.low_confidence, entry.confidence_reasons)

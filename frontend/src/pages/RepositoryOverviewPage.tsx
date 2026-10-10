@@ -10,8 +10,10 @@ import {
   categoryWeight,
   formatDateTime,
   getLastActivityLabel,
+  STALE_GRADE_DAYS,
   HEALTHY_SCORE,
   healthLevel,
+  isGradeStale,
   isPrivateAnalysis,
   missingCategories,
   PRIORITY_LABELS,
@@ -49,11 +51,14 @@ function RunNotice({ analysis }: { analysis: RepositoryAnalysis }) {
     )
   }
   if (!analysis.rerun) return null
-  const text = analysis.rerun.stillPending
+  const { forced, gradeChanged, stillPending } = analysis.rerun
+  const text = stillPending
     ? "Анализ ещё выполняется. Запустите проверку повторно через пару минут."
-    : analysis.rerun.gradeChanged
+    : gradeChanged
       ? "Анализ завершён, оценка обновлена."
-      : "Новых изменений с прошлого анализа нет, оценка актуальна."
+      : forced
+        ? "Переоценка не завершилась за отведённое время. Обновите страницу позже."
+        : "Новых изменений с прошлого анализа нет, оценка актуальна."
   return (
     <div className="inline-notice inline-notice--success" role="status">
       {text}
@@ -71,6 +76,7 @@ export default function RepositoryOverviewPage({
   onOpenRepository = () => {},
   onBackToRanking,
   publicView,
+  canForceRegrade = false,
 }: {
   repository: RepositorySummary
   analysis: RepositoryAnalysis
@@ -85,6 +91,8 @@ export default function RepositoryOverviewPage({
   onBackToRanking: () => void
   /** Present only for a public repository opened with the owner's token. */
   publicView?: { checked: boolean; onChange: (checked: boolean) => void }
+  /** Signed-in users may force a regrade that skips the "anything changed?" check. */
+  canForceRegrade?: boolean
 }) {
   const isPrivate = isPrivateAnalysis(repository)
   const summaryKey = `${repository.sourceCraftUuid ?? repository.id}:${isPrivate ? "private" : "public"}`
@@ -107,6 +115,9 @@ export default function RepositoryOverviewPage({
   }
   const missing = missingCategories(repository)
   const gradedAt = formatDateTime(repository.gradedAt)
+  const stale = isGradeStale(repository.gradedAt)
+  const [forceRegrade, setForceRegrade] = useState(false)
+  const forced = canForceRegrade && forceRegrade
   const modeLabel = isPrivate ? "приватный анализ (все 6 категорий)" : "публичный анализ (4 категории)"
   const actualWeights = repository.healthScore === null ? [] : scoredCategories(isPrivate, repository.categoryScores)
   const weights = actualWeights.length > 0 ? actualWeights : scoredCategories(isPrivate)
@@ -141,13 +152,31 @@ export default function RepositoryOverviewPage({
               ai={ai}
               extras={{ analytics, position: rankingInfo?.position, history: rankingInfo?.history }}
             />
+            {canForceRegrade && (
+              <label
+                className="force-regrade-toggle"
+                title="Пересчитать оценку, даже если в репозитории не было активности после прошлого анализа."
+              >
+                <input
+                  type="checkbox"
+                  checked={forceRegrade}
+                  disabled={analysis.isRunning}
+                  onChange={(event) => setForceRegrade(event.target.checked)}
+                />{" "}
+                Принудительно
+              </label>
+            )}
             <Button
               variant="primary"
-              onClick={analysis.run}
+              onClick={() => analysis.run({ force: forced })}
               disabled={analysis.isRunning}
-              title="Оценка пересчитывается, если в репозитории была активность после прошлого анализа. Иначе вернётся текущая."
+              title={
+                forced
+                  ? "Оценка будет пересчитана заново, даже если репозиторий не менялся."
+                  : "Оценка пересчитывается, если в репозитории была активность после прошлого анализа. Иначе вернётся текущая."
+              }
             >
-              {analysis.isRunning ? "Анализ идёт…" : "Запустить анализ"}
+              {analysis.isRunning ? "Анализ идёт…" : forced ? "Переоценить" : "Запустить анализ"}
             </Button>
           </>
         }
@@ -185,6 +214,11 @@ export default function RepositoryOverviewPage({
             </div>
             <div className="health-card__status">
               <Badge tone={level.tone}>{level.label}</Badge>
+              {stale && (
+                <span className="stale-badge" title={`Оценка старше ${STALE_GRADE_DAYS} дней: ${gradedAt}`}>
+                  <Badge tone="warning">Устарела</Badge>
+                </span>
+              )}
             </div>
             {repository.healthScore !== null && (
               <ScoreBar score={repository.healthScore} label={`Repo Health Score: ${repository.healthScore} из 100`} />
@@ -200,7 +234,10 @@ export default function RepositoryOverviewPage({
                 <small>Это пометка, а не штраф: оценка и место в рейтинге не изменены.</small>
               </div>
             )}
-            <p className="muted-copy">Последний анализ: {gradedAt ?? "ещё не выполнялся"}</p>
+            <p className="muted-copy">
+              Последний анализ: {gradedAt ?? "ещё не выполнялся"}
+              {stale && ` — более ${STALE_GRADE_DAYS} дней назад`}
+            </p>
           </div>
           <div className="health-card__summary">
             <h2>

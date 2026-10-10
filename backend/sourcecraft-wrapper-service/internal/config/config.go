@@ -10,18 +10,21 @@ type Config struct {
 	// network errors; CLIENT_TIMEOUT applies to each attempt separately.
 	RetryAttempts    string
 	RetryWaitSeconds string
+	// RateLimitAttempts is the attempt budget for 429s, which back off exponentially.
+	RateLimitAttempts string
 	// MaxPages caps paginated SourceCraft fetches; it limits what Activity/Issues grading sees.
 	MaxPages string
 }
 
 func LoadConfig() *Config {
 	return &Config{
-		AppPort:          getEnvDefault("APP_PORT", "8082"),
-		SourceCraftURL:   getEnvDefault("SOURCECRAFT_URL", ""),
-		ClientTimeout:    getEnvDefault("CLIENT_TIMEOUT", "5"),
-		RetryAttempts:    getEnvDefault("HTTP_RETRY_ATTEMPTS", "3"),
-		RetryWaitSeconds: getEnvDefault("HTTP_RETRY_WAIT_SECONDS", "1"),
-		MaxPages:         getEnvDefault("SOURCECRAFT_MAX_PAGES", "50"),
+		AppPort:           getEnvDefault("APP_PORT", "8082"),
+		SourceCraftURL:    getEnvDefault("SOURCECRAFT_URL", ""),
+		ClientTimeout:     getEnvDefault("CLIENT_TIMEOUT", "5"),
+		RetryAttempts:     getEnvDefault("HTTP_RETRY_ATTEMPTS", "3"),
+		RetryWaitSeconds:  getEnvDefault("HTTP_RETRY_WAIT_SECONDS", "1"),
+		RateLimitAttempts: getEnvDefault("HTTP_RATE_LIMIT_ATTEMPTS", "6"),
+		MaxPages:          getEnvDefault("SOURCECRAFT_MAX_PAGES", "50"),
 	}
 }
 

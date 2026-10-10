@@ -312,6 +312,25 @@ func (as *AggregatorService) GetGrading(
 	orgSlug string,
 	repoSlug string,
 ) (*domain.RepoGrade, error) {
+	return as.getGrading(ctx, orgSlug, repoSlug, false)
+}
+
+// ForceGrading is GetGrading that starts a new grading even when the stored grade is current, and
+// after a failed one. It still respects the grading limit and a grading already in progress.
+func (as *AggregatorService) ForceGrading(
+	ctx context.Context,
+	orgSlug string,
+	repoSlug string,
+) (*domain.RepoGrade, error) {
+	return as.getGrading(ctx, orgSlug, repoSlug, true)
+}
+
+func (as *AggregatorService) getGrading(
+	ctx context.Context,
+	orgSlug string,
+	repoSlug string,
+	force bool,
+) (*domain.RepoGrade, error) {
 	repo, private, err := as.resolveView(ctx, orgSlug, repoSlug)
 	if err != nil {
 		return nil, err
@@ -327,12 +346,13 @@ func (as *AggregatorService) GetGrading(
 	}
 
 	hasGrade := err == nil
-	if hasGrade && !as.needsRegrade(ctx, repo, private, grade) {
+	if hasGrade && !force && !as.needsRegrade(ctx, repo, private, grade) {
 		return &grade, nil
 	}
 
-	// The previous grading failed: say so once instead of silently starting another one.
-	if as.takeGradingFailure(llmKey(repo.SourcecraftUUID, viewVisibility(private))) {
+	// The previous grading failed: say so once instead of silently starting another one. A forced
+	// grading clears the failure and tries again.
+	if as.takeGradingFailure(llmKey(repo.SourcecraftUUID, viewVisibility(private))) && !force {
 		if hasGrade {
 			return &grade, nil
 		}
@@ -341,8 +361,9 @@ func (as *AggregatorService) GetGrading(
 	}
 
 	requestErr := as.requestGrading(ctx, repo, private, true)
-	// Over the grading limit, an outdated grade is still better than none.
-	if hasGrade && errors.Is(requestErr, domain.ErrGradingRateLimited) {
+	// Over the grading limit, an outdated grade is still better than none; a forced grading reports
+	// the limit, since the caller asked for a new grade.
+	if hasGrade && !force && errors.Is(requestErr, domain.ErrGradingRateLimited) {
 		return &grade, nil
 	}
 

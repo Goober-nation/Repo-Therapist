@@ -36,6 +36,8 @@ type GatewayService struct {
 	publicAPILimiter Limiter
 	// exportLimiter limits the public grades export per client IP; nil means no limit.
 	exportLimiter Limiter
+	// forceCooldown lets one user force a regrade of one repo once per cooldown; nil means no limit.
+	forceCooldown Cooldown
 
 	// Admin access: the Yandex IDs of the admins, the key of the actor hash and the limiter of
 	// recorded denials (see SetAdmin).
@@ -328,6 +330,12 @@ func (s *GatewayService) GetGrading(
 		return domain.GetGradingResponse{}, err
 	}
 
+	if request.Force {
+		if err := s.checkForceRegrade(ctx, request); err != nil {
+			return domain.GetGradingResponse{}, err
+		}
+	}
+
 	rpcCtx, cancel := context.WithTimeout(withPAT(ctx, pat), s.aggregatorTimeout)
 	defer cancel()
 
@@ -336,6 +344,7 @@ func (s *GatewayService) GetGrading(
 		&agg.GetGradingRequest{
 			OrgSlug:  request.OrgSlug,
 			RepoSlug: request.RepoSlug,
+			Force:    request.Force,
 		},
 	)
 	if err != nil {
@@ -810,6 +819,11 @@ func mapRankingEntry(
 	result.ScoreChange = entry.ScoreChange
 	result.PlaceChange = entry.PlaceChange
 	result.GradeCount = entry.GetGradeCount()
+
+	if entry.GetGradedAt() != nil {
+		gradedAt := entry.GetGradedAt().AsTime()
+		result.GradedAt = &gradedAt
+	}
 
 	if entry.Likes != nil {
 		likes := entry.GetLikes()

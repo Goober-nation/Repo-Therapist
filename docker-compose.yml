@@ -1,5 +1,6 @@
 services:
   postgres:
+    restart: unless-stopped
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?set in .env}
@@ -15,6 +16,7 @@ services:
       - pgdata:/var/lib/postgresql/data
 
   minio: # S3 storage; RustFS (MinIO-compatible) since MinIO stopped publishing images
+    restart: unless-stopped
     image: rustfs/rustfs:1.0.1-preview.11
     environment:
       RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:?set in .env}
@@ -28,6 +30,7 @@ services:
 
   # Gateway sessions and rate limiting; private grading tokens (grading:token:<job_id>).
   redis:
+    restart: unless-stopped
     image: redis:7-alpine
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set in .env}"]
     environment:
@@ -42,6 +45,7 @@ services:
       retries: 10
 
   kafka:
+    restart: unless-stopped
     image: apache/kafka:latest
     environment:
       # Single-node KRaft mode — Kafka acts as its own metadata quorum, no Zookeeper container.
@@ -122,6 +126,8 @@ services:
       PUBLIC_API_RATE_LIMIT_WINDOW: ${PUBLIC_API_RATE_LIMIT_WINDOW:-1m}
       EXPORT_RATE_LIMIT: ${EXPORT_RATE_LIMIT:-5}
       EXPORT_RATE_LIMIT_WINDOW: ${EXPORT_RATE_LIMIT_WINDOW:-1m}
+      # Forced regrade (signed-in users): once per user per repository every N minutes; 0 = no limit.
+      FORCE_REGRADE_COOLDOWN_MINUTES: ${FORCE_REGRADE_COOLDOWN_MINUTES:-60}
       ANALYTICS_CACHE_SECONDS: ${ANALYTICS_CACHE_SECONDS:-300}
       # "Доступ админа" (docs/admin.md): off until ADMIN_PASSWORD or ADMIN_YANDEX_IDS is set; AUDIT_HASH_SECRET is optional.
       ADMIN_YANDEX_IDS: ${ADMIN_YANDEX_IDS:-}
@@ -185,6 +191,7 @@ services:
         condition: service_healthy
 
   frontend:
+    restart: unless-stopped
     build:
       context: frontend
       args:

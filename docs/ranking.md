@@ -1,6 +1,6 @@
 # Рейтинг: история оценок, динамика, сравнение и объяснение места
 
-Статус: 2026-10-05 (фильтры, панель «Фильтры», таймер переоценки и правило метки «новый» добавлены в тот же день). Относится только к публичному рейтингу и публичным оценкам. Приватные оценки в
+Относится только к публичному рейтингу и публичным оценкам. Приватные оценки в
 истории не хранятся. Расчёт оценки и категорий не затрагивается: всё ниже только читает уже
 сохранённые данные (см. [grading/00-overview.md](grading/00-overview.md)).
 
@@ -142,7 +142,7 @@
 
 | Запрос | Ответ |
 |---|---|
-| `GET /ranking` | в каждой записи `score_change` и `place_change` (`null` — нет оценки недельной давности или сортировка не по Score), `grade_count` (сколько публичных оценок хранится; «новый» — не больше одной), в ответе `dynamics_days`; фильтры `size=small\|medium\|large`, `ci=true\|false`, `security=true\|false`, `topic=<текст до 64 символов>`; неверное значение — `400` |
+| `GET /ranking` | в каждой записи `graded_at` (время публичной оценки; старше 7 дней — метка «Устарела»), `score_change` и `place_change` (`null` — нет оценки недельной давности или сортировка не по Score), `grade_count` (сколько публичных оценок хранится; «новый» — не больше одной), в ответе `dynamics_days`; фильтры `size=small\|medium\|large`, `ci=true\|false`, `security=true\|false`, `topic=<текст до 64 символов>`; неверное значение — `400` |
 | `GET /history/{org}/{repo}` | `{status, points: [{graded_at, score, categories, low_confidence}]}`, от старых к новым, не больше 200 последних точек; `NO_DATA`, если истории нет |
 | `GET /regrade-status` | `{enabled, interval_seconds, next_run_at, running, started_at, last_finished_at, total, done}`; `next_run_at` — `null`, если расписание выключено; не кэшируется |
 | `GET /position/{org}/{repo}` | `{status, place, total, score, above, below, categories: [{id, score, top10_median, gap}], weakest_category}`; `NO_DATA`, если репозиторий ещё не оценён |

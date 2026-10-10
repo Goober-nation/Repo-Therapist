@@ -17,9 +17,10 @@ export interface RepositoryAnalysis {
   aiLoading: boolean
   aiError?: string
   error?: string
-  /** Result of a run the user started with the button. */
-  rerun?: { gradeChanged: boolean; stillPending: boolean }
-  run: () => void
+  /** Result of a run the user started with the button; forced when it skipped the activity check. */
+  rerun?: { gradeChanged: boolean; stillPending: boolean; forced: boolean }
+  /** Repeats grading; `force` starts a new one even when the stored grade is current (signed-in users). */
+  run: (options?: { force?: boolean }) => void
   loadAiSummary: () => void
 }
 
@@ -37,6 +38,7 @@ const NO_AI: AiReport = { recommendations: [] }
 export async function pollUntilReady<T extends { status: string }>(
   load: () => Promise<T>,
   isActive: () => boolean,
+  isReady: (response: T) => boolean = (response) => response.status !== "PENDING",
 ): Promise<T> {
   const deadline = Date.now() + POLL_TIMEOUT_MS
   const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -55,11 +57,15 @@ export async function pollUntilReady<T extends { status: string }>(
     }
   }
   let response = await attempt()
-  while (response.status === "PENDING" && Date.now() < deadline && isActive()) {
+  while (!isReady(response) && Date.now() < deadline && isActive()) {
     await wait(POLL_INTERVAL_MS)
     if (isActive()) response = await attempt()
   }
   return response
+}
+
+function gradedAtOf(grading: GradingResponse) {
+  return grading.grade?.graded_at ?? grading.graded_at
 }
 
 function errorText(error: unknown, fallback: string) {
@@ -80,7 +86,11 @@ export function useRepositoryAnalysis(
 ): RepositoryAnalysis {
   const [state, setState] = useState<State>({ isRunning: false, aiLoading: false })
   // Reruns count per repository, so a rerun of one page is never reported on another.
-  const [reruns, setReruns] = useState<{ key: string; count: number }>({ key: "", count: 0 })
+  const [reruns, setReruns] = useState<{ key: string; count: number; force: boolean }>({
+    key: "",
+    count: 0,
+    force: false,
+  })
   const onGradingRef = useRef(onGrading)
   const gradedAtRef = useRef(lastGradedAt)
   const aiRequestRef = useRef<{
@@ -98,6 +108,7 @@ export function useRepositoryAnalysis(
   const pat = target?.pat
   const key = `${org}/${repo}/${pat ? "private" : "public"}`
   const attempt = reruns.key === key ? reruns.count : 0
+  const force = reruns.key === key && reruns.force
   // Keep results from one token/session or explicit rerun from being reused for another.
   const aiRequestKey = `${key}/${attempt}/${pat ?? ""}`
 
@@ -111,7 +122,14 @@ export function useRepositoryAnalysis(
     void (async () => {
       let grading: GradingResponse
       try {
-        grading = await pollUntilReady(() => api.getGrading(org, repo, pat), isActive)
+        // A forced run starts the grading, then waits for a grade newer than the one on screen:
+        // until it lands, GET /grading keeps answering with the stored, still current grade.
+        if (force) await api.forceRegrade(org, repo, pat)
+        grading = await pollUntilReady(
+          () => api.getGrading(org, repo, pat),
+          isActive,
+          force ? (response) => response.status !== "PENDING" && gradedAtOf(response) !== gradedBefore : undefined,
+        )
       } catch (error) {
         if (active) {
           setState({
@@ -125,8 +143,7 @@ export function useRepositoryAnalysis(
       if (!active) return
       onGradingRef.current(grading)
       const stillPending = grading.status === "PENDING"
-      const gradedAt = grading.grade?.graded_at ?? grading.graded_at
-      const rerun = attempt > 0 ? { gradeChanged: gradedAt !== gradedBefore, stillPending } : undefined
+      const rerun = attempt > 0 ? { gradeChanged: gradedAtOf(grading) !== gradedBefore, stillPending, forced: force } : undefined
       if (stillPending) {
         setState((current) => ({
           ...current,
@@ -144,7 +161,7 @@ export function useRepositoryAnalysis(
       const request = aiRequestRef.current
       if (request?.key === aiRequestKey) request.active = false
     }
-  }, [api, org, repo, pat, attempt, aiRequestKey])
+  }, [api, org, repo, pat, attempt, force, aiRequestKey])
 
   const loadAiSummary = useCallback(() => {
     if (!org || !repo) return
@@ -192,7 +209,12 @@ export function useRepositoryAnalysis(
   }, [api, org, repo, pat, aiRequestKey])
 
   const run = useCallback(
-    () => setReruns((current) => ({ key, count: current.key === key ? current.count + 1 : 1 })),
+    (options?: { force?: boolean }) =>
+      setReruns((current) => ({
+        key,
+        count: current.key === key ? current.count + 1 : 1,
+        force: options?.force === true,
+      })),
     [key],
   )
   return { ...state, run, loadAiSummary }

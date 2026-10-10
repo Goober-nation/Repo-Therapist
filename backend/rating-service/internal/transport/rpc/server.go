@@ -346,6 +346,10 @@ func entryToProto(entry domain.RankingEntry) *pb.RankingEntry {
 		result.LastActivityAt = timestamppb.New(*entry.LastActivityAt)
 	}
 
+	if entry.GradedAt != nil {
+		result.GradedAt = timestamppb.New(*entry.GradedAt)
+	}
+
 	if entry.Confidence != nil {
 		result.LowConfidence = &entry.Confidence.Low
 		result.ConfidenceReasons = reasonsToProto(entry.Confidence.Reasons)

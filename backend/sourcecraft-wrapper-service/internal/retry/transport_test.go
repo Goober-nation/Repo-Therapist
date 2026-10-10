@@ -169,3 +169,56 @@ func TestPostWithBodyIsResent(t *testing.T) {
 		t.Fatalf("calls=%d, want 2", calls.Load())
 	}
 }
+
+func TestRateLimitBacksOffExponentiallyWithItsOwnBudget(t *testing.T) {
+	var calls atomic.Int32
+	var times []time.Time
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		times = append(times, time.Now())
+		if calls.Add(1) < 5 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	client := &http.Client{Transport: &Transport{Attempts: 3, RateLimitAttempts: 6, Wait: 20 * time.Millisecond, AttemptTimeout: time.Second}}
+	resp, err := client.Get(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || calls.Load() != 5 {
+		t.Fatalf("status=%d calls=%d, want 200 after 5 calls", resp.StatusCode, calls.Load())
+	}
+	for i, want := range []time.Duration{20, 40, 80, 160} {
+		if gap := times[i+1].Sub(times[i]); gap < want*time.Millisecond {
+			t.Errorf("gap %d = %s, want >= %dms", i, gap, want)
+		}
+	}
+}
+
+func TestOtherErrorsKeepTheShortBudget(t *testing.T) {
+	var calls atomic.Int32
+	srv := server(t, &calls, http.StatusServiceUnavailable)
+
+	client := &http.Client{Transport: &Transport{Attempts: 3, RateLimitAttempts: 6, Wait: time.Millisecond, AttemptTimeout: time.Second}}
+	resp, err := client.Get(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if calls.Load() != 3 {
+		t.Fatalf("calls=%d, want 3", calls.Load())
+	}
+}
+
+func TestBackoffIsCapped(t *testing.T) {
+	if got := backoff(time.Second, 10); got != maxRateLimitWait {
+		t.Fatalf("backoff = %s, want %s", got, maxRateLimitWait)
+	}
+	if got := backoff(time.Second, 2); got != 4*time.Second {
+		t.Fatalf("backoff = %s, want 4s", got)
+	}
+}
