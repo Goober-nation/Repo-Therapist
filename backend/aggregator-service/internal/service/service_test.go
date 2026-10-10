@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -79,9 +80,11 @@ func (f *fakeRepos) ReleaseRepositoryLock(ctx context.Context, id uuid.UUID) err
 
 type fakeGrades struct {
 	public, private map[uuid.UUID]domain.RepoGrade
-	upsertErr       error
-	savedPublic     []domain.RepoGrade
-	savedPrivate    []domain.RepoGrade
+	// repos is the repo metadata TopGradedPublicRepos joins with public.
+	repos        []domain.Repo
+	upsertErr    error
+	savedPublic  []domain.RepoGrade
+	savedPrivate []domain.RepoGrade
 
 	confidence       map[uuid.UUID]domain.GradeConfidence
 	confidenceDelete []uuid.UUID
@@ -203,6 +206,20 @@ func (f *fakeGrades) UpsertPublicGrade(ctx context.Context, grade domain.RepoGra
 func (f *fakeGrades) UpsertPrivateGrade(ctx context.Context, grade domain.RepoGrade) error {
 	f.savedPrivate = append(f.savedPrivate, grade)
 	return f.upsertErr
+}
+
+func (f *fakeGrades) TopGradedPublicRepos(ctx context.Context, limit int) ([]domain.Repo, error) {
+	var out []domain.Repo
+	for _, r := range f.repos {
+		if _, ok := f.public[r.SourcecraftUUID]; ok && r.Visibility == domain.VisibilityPublic {
+			out = append(out, r)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].RatingValue > out[j].RatingValue })
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
 }
 
 func (f *fakeGrades) GetPublicGradeByRepoID(ctx context.Context, repoID uuid.UUID) (domain.RepoGrade, error) {
@@ -924,25 +941,6 @@ func TestGetMyReposRequiresUserToken(t *testing.T) {
 	}
 }
 
-func TestRegradeContinuesAfterFailingRepo(t *testing.T) {
-	f := newFixture("public")
-	f.wrapper.publicRepos = []*client.Repository{
-		{Id: "not-a-uuid", Slug: "broken", Organization: &client.Organization{Slug: "org"}, Visibility: "public"},
-		{Id: testRepoID.String(), Slug: "repo", Organization: &client.Organization{Slug: "org"}, Visibility: "public"},
-	}
-
-	err := f.svc.regradePublicRepos(context.Background())
-	if err == nil {
-		t.Errorf("expected the broken repo to be reported")
-	}
-	if len(f.grading.events) != 1 || f.grading.events[0].RepoSlug != "repo" {
-		t.Errorf("events = %+v, want the valid repo still requested", f.grading.events)
-	}
-	if !reflect.DeepEqual(f.wrapper.authSeen, []string{"Bearer service-pat"}) {
-		t.Errorf("auth = %v, want the service token", f.wrapper.authSeen)
-	}
-}
-
 func TestRegradeSkipsWithoutServiceToken(t *testing.T) {
 	f := newFixture("public")
 	f.svc.Token = ""
@@ -952,23 +950,6 @@ func TestRegradeSkipsWithoutServiceToken(t *testing.T) {
 	}
 	if len(f.wrapper.authSeen) != 0 {
 		t.Errorf("wrapper should not be called without a service token")
-	}
-}
-
-func TestRegradeLimitTakesTopRated(t *testing.T) {
-	f := newFixture("public")
-	f.svc.RegradeLimit = 1
-	low := uuid.New()
-	f.wrapper.publicRepos = []*client.Repository{
-		{Id: low.String(), Slug: "low", Organization: &client.Organization{Slug: "org"}, Visibility: "public", Rating: &client.Rating{Value: 1}},
-		{Id: testRepoID.String(), Slug: "repo", Organization: &client.Organization{Slug: "org"}, Visibility: "public", Rating: &client.Rating{Value: 9}},
-	}
-
-	if err := f.svc.regradePublicRepos(context.Background()); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(f.grading.events) != 1 || f.grading.events[0].RepoSlug != "repo" {
-		t.Errorf("events = %+v, want only the top-rated repo", f.grading.events)
 	}
 }
 
@@ -1312,5 +1293,81 @@ func TestRegradeStatusReportsScheduleAndProgress(t *testing.T) {
 	status = f.svc.GetRegradeStatus(ctx)
 	if status.Running || status.StartedAt == nil || status.LastFinishedAt == nil || status.Total != status.Done {
 		t.Errorf("status = %+v, want a finished run with every repo counted", status)
+	}
+}
+
+// The scheduled run only refreshes existing grades: candidates are the top RegradeLimit graded public
+// repos by SourceCraft rating; a higher-rated repo without a grade is never picked.
+func TestScheduledRegradeSelectsTopRatedGradedRepos(t *testing.T) {
+	f := newFixture("public")
+	f.svc.RegradeLimit = 2
+
+	repo := func(slug string, rating float64, graded bool) domain.Repo {
+		r := domain.Repo{SourcecraftUUID: uuid.New(), OrgSlug: "org", RepoSlug: slug, Visibility: domain.VisibilityPublic, RatingValue: rating}
+		if graded {
+			f.grades.public[r.SourcecraftUUID] = domain.RepoGrade{SourcecraftUUID: r.SourcecraftUUID, GradedAt: gradedAt(time.Now())}
+		}
+		return r
+	}
+	f.grades.repos = []domain.Repo{repo("low", 1, true), repo("ungraded", 10, false), repo("top", 9, true), repo("mid", 5, true)}
+
+	repos, _, err := f.svc.publicReposToRegrade(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var slugs []string
+	for _, r := range repos {
+		slugs = append(slugs, r.RepoSlug)
+	}
+	if strings.Join(slugs, ",") != "top,mid" {
+		t.Errorf("candidates = %v, want the top 2 graded repos", slugs)
+	}
+	if len(f.wrapper.authSeen) != 0 {
+		t.Errorf("selection called the wrapper %d times, want none", len(f.wrapper.authSeen))
+	}
+}
+
+// A graded repo is regraded only after new SourceCraft activity: outdated analytics or facts do not
+// count, and an unanswered activity check skips the repo instead of grading it.
+func TestScheduledRegradeOnlyOnFreshActivity(t *testing.T) {
+	// The fixture's wrapper reports last activity on 2026-09-20 12:00.
+	cases := []struct {
+		name     string
+		gradedAt time.Time
+		lookup   error
+		graded   bool
+	}{
+		{"activity since the grade", time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC), nil, true},
+		{"no activity since the grade", time.Date(2026, 9, 25, 0, 0, 0, 0, time.UTC), nil, false},
+		{"unanswered check", time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC), errors.New("down"), false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture("public")
+			// No analytics or facts rows: the old run regraded such a grade even without activity.
+			f.svc.RegradeMissingAnalytics = true
+			f.wrapper.repoErr = tc.lookup
+			f.grades.public[testRepoID] = domain.RepoGrade{SourcecraftUUID: testRepoID, GradedAt: gradedAt(tc.gradedAt)}
+			f.grades.repos = []domain.Repo{{SourcecraftUUID: testRepoID, OrgSlug: "org", RepoSlug: "repo", Visibility: domain.VisibilityPublic}}
+
+			if err := f.svc.regradePublicRepos(context.Background()); err != nil {
+				t.Fatalf("regrade: %v", err)
+			}
+			if got := len(f.grading.events) == 1; got != tc.graded {
+				t.Errorf("graded = %v, want %v", got, tc.graded)
+			}
+		})
+	}
+}
+
+func TestScheduledRegradeNeverGradesWithoutGrade(t *testing.T) {
+	f := newFixture("public")
+	if err := f.svc.regradeRepo(context.Background(), domain.Repo{SourcecraftUUID: testRepoID, OrgSlug: "org", RepoSlug: "repo", Visibility: domain.VisibilityPublic}); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.grading.events) != 0 || len(f.wrapper.authSeen) != 0 {
+		t.Errorf("events = %d lookups = %d, want nothing for an ungraded repo", len(f.grading.events), len(f.wrapper.authSeen))
 	}
 }

@@ -23,6 +23,9 @@ type GradesRepository interface {
 	UpsertPublicGrade(ctx context.Context, grade RepoGrade) error
 	UpsertPrivateGrade(ctx context.Context, grade RepoGrade) error
 	GetPublicGradeByRepoID(ctx context.Context, repoID uuid.UUID) (RepoGrade, error)
+	// TopGradedPublicRepos lists public repos that already have a public grade, highest
+	// SourceCraft rating first, at most limit of them: the scheduled regrade's candidates.
+	TopGradedPublicRepos(ctx context.Context, limit int) ([]Repo, error)
 	GetPrivateGradeByRepoID(ctx context.Context, repoID uuid.UUID) (RepoGrade, error)
 	// UpsertPublicConfidence stores the low-confidence flag of a public grade;
 	// DeletePublicConfidence removes it (grade-service sent none), so a stale flag never survives.

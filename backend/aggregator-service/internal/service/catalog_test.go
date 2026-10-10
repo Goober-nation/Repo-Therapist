@@ -398,28 +398,6 @@ func TestStartCatalogRefreshesOnlyAnEmptyCatalog(t *testing.T) {
 	}
 }
 
-func TestScheduledRegradeReadsTheCatalog(t *testing.T) {
-	f, _ := catalogFixture(catalogRepoN(1, 1, "Go"), catalogRepoN(2, 5, "Go"), catalogRepoN(3, 3, "Go"))
-	f.svc.RegradeLimit = 2
-
-	repos, invalid, err := f.svc.publicReposToRegrade(context.Background())
-	if err != nil || invalid != 0 {
-		t.Fatalf("publicReposToRegrade: %v (invalid %d)", err, invalid)
-	}
-
-	var slugs []string
-	for _, repo := range repos {
-		slugs = append(slugs, repo.RepoSlug)
-	}
-
-	if strings.Join(slugs, ",") != "repo2,repo3" {
-		t.Errorf("repos = %v, want the top 2 by rating", slugs)
-	}
-	if len(f.wrapper.authSeen) != 0 {
-		t.Errorf("wrapper calls = %d, want none while the catalog is filled", len(f.wrapper.authSeen))
-	}
-}
-
 func TestBatchSelectionReadsTheCatalog(t *testing.T) {
 	f, _ := catalogFixture(catalogRepoN(1, 1, "Go"), catalogRepoN(2, 5, "Python"), catalogRepoN(3, 3, "Go"), catalogRepoN(4, 4, "Go"))
 	f.svc.BatchRepo = newMemBatches()
@@ -444,57 +422,5 @@ func TestBatchSelectionReadsTheCatalog(t *testing.T) {
 	}
 	if len(f.wrapper.authSeen) != 0 {
 		t.Errorf("wrapper calls = %d, want none while the catalog is filled", len(f.wrapper.authSeen))
-	}
-}
-
-// The catalog's activity date is as old as the catalog, so the scheduled run asks SourceCraft before
-// regrading a graded repo: no activity since the grade skips it, activity or an unanswered check grades it.
-func TestScheduledRegradeChecksFreshActivity(t *testing.T) {
-	// The fixture's wrapper reports last activity on 2026-09-20 12:00.
-	stale := catalogRepoN(0, 1, "Go")
-	stale.SourcecraftUUID, stale.OrgSlug, stale.RepoSlug = testRepoID, "org", "repo"
-	stale.LastActivityAt = gradedAt(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
-
-	cases := []struct {
-		name     string
-		gradedAt time.Time
-		lookup   error
-		graded   bool
-	}{
-		{"activity since the grade", time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC), nil, true},
-		{"no activity since the grade", time.Date(2026, 9, 25, 0, 0, 0, 0, time.UTC), nil, false},
-		{"unanswered check", time.Date(2026, 9, 25, 0, 0, 0, 0, time.UTC), errors.New("down"), true},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			f, _ := catalogFixture(stale)
-			f.svc.RegradeMissingAnalytics = false
-			f.wrapper.repoErr = tc.lookup
-			f.grades.public[testRepoID] = domain.RepoGrade{SourcecraftUUID: testRepoID, GradedAt: gradedAt(tc.gradedAt)}
-
-			if err := f.svc.regradePublicRepos(context.Background()); err != nil {
-				t.Fatalf("regrade: %v", err)
-			}
-
-			if got := len(f.grading.events) == 1; got != tc.graded {
-				t.Errorf("graded = %v, want %v", got, tc.graded)
-			}
-			if len(f.wrapper.authSeen) != 1 {
-				t.Errorf("lookups = %d, want one fresh activity check", len(f.wrapper.authSeen))
-			}
-		})
-	}
-}
-
-func TestScheduledRegradeGradesNeverGradedWithoutLookup(t *testing.T) {
-	f, _ := catalogFixture(catalogRepoN(1, 1, "Go"))
-
-	if err := f.svc.regradePublicRepos(context.Background()); err != nil {
-		t.Fatalf("regrade: %v", err)
-	}
-
-	if len(f.grading.events) != 1 || len(f.wrapper.authSeen) != 0 {
-		t.Errorf("events = %d, lookups = %d, want a grading without a lookup", len(f.grading.events), len(f.wrapper.authSeen))
 	}
 }

@@ -127,7 +127,6 @@ func StartApp() {
 		log.Println(warning)
 	}
 	aggregatorService.RegradeLimit = cfg.Grading.RegradeLimit
-	aggregatorService.RegradeListTimeout = cfg.Grading.RegradeListTimeout
 	aggregatorService.RegradeMissingAnalytics = cfg.Grading.RegradeMissingAnalytics
 	aggregatorService.GradeLimiter = service.NewGradeLimiter(cfg.Grading.RequestLimit, cfg.Grading.RequestWindow)
 	if cfg.Grading.LLMRequestTTL > 0 {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -427,6 +428,36 @@ func (r *GradesRepository) GetPublicAnalytics(ctx context.Context, repoID uuid.U
 
 func (r *GradesRepository) GetPrivateAnalytics(ctx context.Context, repoID uuid.UUID) (domain.RepoAnalytics, error) {
 	return r.getAnalytics(ctx, false, repoID)
+}
+
+func (r *GradesRepository) TopGradedPublicRepos(ctx context.Context, limit int) ([]domain.Repo, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT r.sourcecraft_uuid, r.org_slug, r.repo_slug, r.visibility, r.last_activity_at,
+		       coalesce(r.main_language, ''), coalesce(r.language_color, ''),
+		       coalesce(r.sourcecraft_rating, 0), coalesce(r.web_url, '')
+		FROM repos r
+		JOIN repo_grades_public g USING (sourcecraft_uuid)
+		WHERE r.visibility = 'public' AND g.graded_at IS NOT NULL
+		ORDER BY r.sourcecraft_rating DESC NULLS LAST, r.org_slug, r.repo_slug
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("top graded public repos: %w", err)
+	}
+	defer rows.Close()
+
+	var repos []domain.Repo
+
+	for rows.Next() {
+		var repo domain.Repo
+		if err := rows.Scan(&repo.SourcecraftUUID, &repo.OrgSlug, &repo.RepoSlug, &repo.Visibility,
+			&repo.LastActivityAt, &repo.Language.Name, &repo.Language.Color, &repo.RatingValue, &repo.WebURL); err != nil {
+			return nil, fmt.Errorf("scan graded public repo: %w", err)
+		}
+
+		repos = append(repos, repo)
+	}
+
+	return repos, rows.Err()
 }
 
 func (r *GradesRepository) GetPublicGradeByRepoID(ctx context.Context, repoID uuid.UUID) (domain.RepoGrade, error) {
