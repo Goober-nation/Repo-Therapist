@@ -176,3 +176,32 @@ func TestTokenReleaserDeletesOnce(t *testing.T) {
 		t.Fatalf("deleted = %v, want exactly one delete of job", tokens.deleted)
 	}
 }
+
+// A request left uncommitted by a crash comes back hours later; relaying it would clone the repo
+// for a job nobody waits for, so it is dropped. Fresh and timeless requests still go through.
+func TestRelayGradingRequestDropsStaleRequests(t *testing.T) {
+	t.Setenv("GRADE_REQUEST_MAX_AGE", "")
+	tokens := &fakeTokens{tokens: map[string]string{}}
+
+	for _, tc := range []struct {
+		name        string
+		requestedAt time.Time
+		want        bool
+	}{
+		{"stale", time.Now().Add(-10 * time.Hour), false},
+		{"fresh", time.Now().Add(-time.Minute), true},
+		{"no time", time.Time{}, true},
+	} {
+		value, _ := json.Marshal(contracts.GradingRequestedEvent{JobID: "j-" + tc.name, OrgSlug: "o", RepoSlug: "r", Visibility: "public", RequestedAt: tc.requestedAt})
+		_, ok, err := relayGradingRequest(context.Background(), newJobStore(), tokens, value)
+		if err != nil || ok != tc.want {
+			t.Errorf("%s: ok=%v err=%v, want ok=%v", tc.name, ok, err, tc.want)
+		}
+	}
+
+	t.Setenv("GRADE_REQUEST_MAX_AGE", "0")
+	value, _ := json.Marshal(contracts.GradingRequestedEvent{JobID: "j-off", OrgSlug: "o", RepoSlug: "r", Visibility: "public", RequestedAt: time.Now().Add(-10 * time.Hour)})
+	if _, ok, _ := relayGradingRequest(context.Background(), newJobStore(), tokens, value); !ok {
+		t.Error("GRADE_REQUEST_MAX_AGE=0 must turn the check off")
+	}
+}

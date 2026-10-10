@@ -25,3 +25,28 @@ func CloneTimeout() time.Duration {
 	}
 	return d
 }
+
+// DefaultGradeRequestMaxAge matches the aggregator's GRADING_LOCK_TIMEOUT: by then the aggregator
+// has freed the repo lock and stopped waiting, so cloning for the request is wasted work.
+const DefaultGradeRequestMaxAge = 20 * time.Minute
+
+// GradeRequestMaxAge returns GRADE_REQUEST_MAX_AGE (a Go duration) or DefaultGradeRequestMaxAge;
+// "0" turns the age check off.
+func GradeRequestMaxAge() time.Duration {
+	v := os.Getenv("GRADE_REQUEST_MAX_AGE")
+	if v == "" {
+		return DefaultGradeRequestMaxAge
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d < 0 {
+		log.Printf("ignoring invalid GRADE_REQUEST_MAX_AGE=%q, using %s", v, DefaultGradeRequestMaxAge)
+		return DefaultGradeRequestMaxAge
+	}
+	return d
+}
+
+// StaleRequest reports whether a request made at requestedAt is older than maxAge at now. A request
+// without a time (e.g. a hand-made one) and a zero maxAge never count as stale.
+func StaleRequest(requestedAt, now time.Time, maxAge time.Duration) bool {
+	return maxAge > 0 && !requestedAt.IsZero() && now.Sub(requestedAt) > maxAge
+}

@@ -48,12 +48,20 @@ func RunListen() error {
 	producer := kafkaclient.NewProducer(brokers, contracts.TopicRepoReady)
 	defer producer.Close()
 
+	maxAge := service.GradeRequestMaxAge()
 	log.Printf("repository-service listening on %s, publishing to %s", contracts.TopicGradeRequested, contracts.TopicRepoReady)
 	return consumer.Run(ctx, func(ctx context.Context, value []byte) error {
 		var req contracts.GradeRequested
 		if err := json.Unmarshal(value, &req); err != nil {
 			log.Printf("skipping unparseable %s message: %v", contracts.TopicGradeRequested, err)
 			return nil // don't kill the whole consumer loop over one bad message
+		}
+		// A request left uncommitted by a crash is redelivered however old it is; the aggregator
+		// stopped waiting for it long ago, and a late answer would release a newer job's repo lock.
+		if service.StaleRequest(req.RequestedAt, time.Now(), maxAge) {
+			log.Printf("dropping stale grade request for %s/%s (job %s, requested %s ago)",
+				req.OrgSlug, req.RepoSlug, req.JobID, time.Since(req.RequestedAt).Round(time.Second))
+			return nil
 		}
 
 		log.Printf("received grade request for %s/%s", req.OrgSlug, req.RepoSlug)

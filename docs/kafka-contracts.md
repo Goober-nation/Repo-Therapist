@@ -46,6 +46,13 @@ LLM-сервис по-прежнему принимает старые `LLM_SUMM
 }
 ```
 
+**Устаревшие запросы.** Grade service (на `grading.requests`) и Repository service (на
+`repo.grade.requested`) пропускают запрос, если `requested_at` старше `GRADE_REQUEST_MAX_AGE`
+(по умолчанию 20m, как `GRADING_LOCK_TIMEOUT`; `0` выключает проверку). Ответ на пропущенный запрос
+не отправляется. Так после сбоя сервера не обрабатываются запросы, оставшиеся незафиксированными в
+Kafka: Aggregator к этому времени уже перестал их ждать и освободил блокировку репозитория, а
+поздний ответ освободил бы блокировку нового задания. Запрос без `requested_at` не пропускается.
+
 Собственные топики Aggregator в том виде, как их читает/пишет Grade service:
 
 - `grading.requests`: `{job_id, org_slug, repo_slug, visibility, requested_at}`. `job_id` —

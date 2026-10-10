@@ -114,6 +114,13 @@ func relayGradingRequest(ctx context.Context, jobs *jobStore, tokens tokenstore.
 		log.Printf("dropping grading request for %s/%s: no job_id", req.OrgSlug, req.RepoSlug)
 		return out, false, nil
 	}
+	// A request left uncommitted by a crash is redelivered however old it is; the aggregator
+	// stopped waiting for it long ago, and a late answer would release a newer job's repo lock.
+	if staleRequest(req.RequestedAt, time.Now(), gradeRequestMaxAge()) {
+		log.Printf("dropping stale grading request for %s/%s (job %s, requested %s ago)",
+			req.OrgSlug, req.RepoSlug, req.JobID, time.Since(req.RequestedAt).Round(time.Second))
+		return out, false, nil
+	}
 
 	token, err := tokens.GetToken(ctx, req.JobID)
 	if err != nil {
@@ -350,4 +357,29 @@ func requestDocs(ctx context.Context, producer *kafkaclient.Producer, docs docsS
 		return nil, time.Time{}
 	}
 	return ch, time.Now().Add(docs.timeout)
+}
+
+// defaultGradeRequestMaxAge matches the aggregator's GRADING_LOCK_TIMEOUT: by then the aggregator
+// has freed the repo lock and stopped waiting for the job.
+const defaultGradeRequestMaxAge = 20 * time.Minute
+
+// gradeRequestMaxAge returns GRADE_REQUEST_MAX_AGE (a Go duration) or the default; "0" turns the
+// age check off.
+func gradeRequestMaxAge() time.Duration {
+	v := os.Getenv("GRADE_REQUEST_MAX_AGE")
+	if v == "" {
+		return defaultGradeRequestMaxAge
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d < 0 {
+		log.Printf("ignoring invalid GRADE_REQUEST_MAX_AGE=%q, using %s", v, defaultGradeRequestMaxAge)
+		return defaultGradeRequestMaxAge
+	}
+	return d
+}
+
+// staleRequest reports whether a request made at requestedAt is older than maxAge at now. A request
+// without a time and a zero maxAge never count as stale.
+func staleRequest(requestedAt, now time.Time, maxAge time.Duration) bool {
+	return maxAge > 0 && !requestedAt.IsZero() && now.Sub(requestedAt) > maxAge
 }
