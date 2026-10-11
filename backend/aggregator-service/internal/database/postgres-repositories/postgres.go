@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,7 +18,7 @@ type RepoRepository struct {
 	db *pgxpool.Pool
 	// LockTimeout lets AcquireRepositoryLock take over a lock left busy longer than this, e.g.
 	// by a grading whose service died without reporting back; 0 never takes one over.
-	LockTimeout time.Duration
+	LockTimeout atomic.Int64 // nanoseconds; set at startup and on config changes
 }
 
 func NewRepoRepository(db *pgxpool.Pool) *RepoRepository {
@@ -741,7 +742,7 @@ func (r *RepoRepository) AcquireRepositoryLock(ctx context.Context, id uuid.UUID
 		  )
 		`,
 		id,
-		r.LockTimeout.Seconds(),
+		time.Duration(r.LockTimeout.Load()).Seconds(),
 	)
 	if err != nil {
 		return false, mapRepositoryError(err)

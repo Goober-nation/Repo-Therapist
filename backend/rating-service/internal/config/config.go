@@ -2,7 +2,7 @@ package config
 
 import (
 	"fmt"
-	"os"
+	"repo-therapist/runtimeconfig"
 	"strconv"
 )
 
@@ -101,7 +101,7 @@ func LoadConfig() *Config {
 }
 
 func getEnvDefault(key string, def string) string {
-	value := os.Getenv(key)
+	value := runtimeconfig.Getenv(key)
 	if value == "" {
 		return def
 	}

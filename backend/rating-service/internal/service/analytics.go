@@ -41,11 +41,18 @@ type CacheRecorder interface {
 func (s *RatingService) SetCacheRecorder(r CacheRecorder) { s.cacheRecorder = r }
 
 func (s *RatingService) SetAnalytics(repo domain.AnalyticsRepository, cacheTTL time.Duration) {
+	s.analytics = repo
+	s.SetAnalyticsTTL(cacheTTL)
+}
+
+// SetAnalyticsTTL changes how long platform analytics are cached; below 1 means the default. An
+// answer already cached keeps its expiry.
+func (s *RatingService) SetAnalyticsTTL(cacheTTL time.Duration) {
 	if cacheTTL < 1 {
 		cacheTTL = DefaultAnalyticsCacheTTL
 	}
-
-	s.analytics = repo
+	s.liveMu.Lock()
+	defer s.liveMu.Unlock()
 	s.analyticsTTL = cacheTTL
 }
 
@@ -55,6 +62,10 @@ func (s *RatingService) GetPlatformAnalytics(ctx context.Context) (domain.Platfo
 	if s.analytics == nil {
 		return domain.PlatformAnalytics{}, fmt.Errorf("%w: analytics are not configured", domain.ErrInvalidArgument)
 	}
+
+	s.liveMu.RLock()
+	dynamicsDays, ttl := s.dynamicsDays, s.analyticsTTL
+	s.liveMu.RUnlock()
 
 	s.cache.mu.Lock()
 	defer s.cache.mu.Unlock()
@@ -76,14 +87,14 @@ func (s *RatingService) GetPlatformAnalytics(ctx context.Context) (domain.Platfo
 		TopLanguages:     topLanguages,
 		TopAdvice:        topAdvice,
 		TrendWeeks:       trendWeeks,
-		ImprovedDays:     s.dynamicsDays,
+		ImprovedDays:     dynamicsDays,
 		ImprovedLimit:    improvedLimit,
 	})
 	if err != nil {
 		return domain.PlatformAnalytics{}, err
 	}
 
-	s.cache.value, s.cache.expires = value, time.Now().Add(s.analyticsTTL)
+	s.cache.value, s.cache.expires = value, time.Now().Add(ttl)
 
 	return value, nil
 }

@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"repo-therapist/runtimeconfig"
 	"syscall"
 	"time"
 
@@ -17,14 +18,10 @@ import (
 	"rating-service/internal/transport/rpc"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 )
 
 func StartApp() {
-	if err := godotenv.Load(); err != nil {
-		log.Printf(".env not found, using environment variables")
-	}
 
 	cfg := config.LoadConfig()
 
@@ -51,6 +48,14 @@ func StartApp() {
 	ratingService := service.NewRatingService(rankingRepo, cfg.DynamicsDays)
 	ratingService.SetSizeBuckets(cfg.SizeSmallLOC, cfg.SizeLargeLOC)
 	ratingService.SetAnalytics(rankingRepo, time.Duration(cfg.AnalyticsCacheSeconds)*time.Second)
+	ratingService.SetSearch(rankingRepo)
+	// Non-static settings follow config/app.yaml reloads and admin overrides.
+	runtimeconfig.OnChange(func() {
+		live := config.LoadConfig()
+		ratingService.SetDynamicsDays(live.DynamicsDays)
+		ratingService.SetSizeBuckets(live.SizeSmallLOC, live.SizeLargeLOC)
+		ratingService.SetAnalyticsTTL(time.Duration(live.AnalyticsCacheSeconds) * time.Second)
+	})
 
 	appMetrics := metrics.New()
 	appMetrics.Serve(ctx, cfg.MetricsAddress)

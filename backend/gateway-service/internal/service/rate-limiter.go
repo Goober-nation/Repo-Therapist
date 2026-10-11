@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -12,10 +13,12 @@ type Limiter interface {
 	Allow(ctx context.Context, key string) (bool, error)
 }
 
+// RedisLimiter allows limit requests per key per window. Limit and window are atomics so
+// SetLimits can change them while requests are served (config reloads, admin overrides).
 type RedisLimiter struct {
 	client *redis.Client
-	limit  int
-	window time.Duration
+	limit  atomic.Int64
+	window atomic.Int64 // nanoseconds
 }
 
 func NewRedisLimiter(
@@ -23,11 +26,16 @@ func NewRedisLimiter(
 	limit int,
 	window time.Duration,
 ) *RedisLimiter {
-	return &RedisLimiter{
-		client: client,
-		limit:  limit,
-		window: window,
-	}
+	rl := &RedisLimiter{client: client}
+	rl.SetLimits(limit, window)
+
+	return rl
+}
+
+// SetLimits changes the limit and window; a key's current window keeps its expiry.
+func (rl *RedisLimiter) SetLimits(limit int, window time.Duration) {
+	rl.limit.Store(int64(limit))
+	rl.window.Store(int64(window))
 }
 
 var rateLimitScript = redis.NewScript(`
@@ -48,11 +56,12 @@ func (rl *RedisLimiter) Allow(
 	ctx context.Context,
 	key string,
 ) (bool, error) {
-	if rl.limit <= 0 {
+	limit, window := rl.limit.Load(), time.Duration(rl.window.Load())
+	if limit <= 0 {
 		return false, fmt.Errorf("rate limit must be greater than zero")
 	}
 
-	if rl.window <= 0 {
+	if window <= 0 {
 		return false, fmt.Errorf("rate limit window must be greater than zero")
 	}
 
@@ -60,8 +69,8 @@ func (rl *RedisLimiter) Allow(
 		ctx,
 		rl.client,
 		[]string{key},
-		rl.window.Milliseconds(),
-		rl.limit,
+		window.Milliseconds(),
+		limit,
 	).Int()
 	if err != nil {
 		return false, fmt.Errorf("check rate limit: %w", err)

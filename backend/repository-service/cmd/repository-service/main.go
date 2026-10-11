@@ -12,19 +12,30 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"repo-therapist/repository-service/internal/contracts"
+	"repo-therapist/runtimeconfig"
+	"repo-therapist/runtimeconfig/kafkasync"
 
 	"repo-therapist/repository-service/internal/service"
 	"repo-therapist/repository-service/internal/transport"
 )
 
 func main() {
+	// Settings (config/app.yaml + env + admin overrides) must load before anything reads them.
+	store, err := runtimeconfig.Start(context.Background(), "repository")
+	if err != nil {
+		log.Fatalf("config: %v", err)
+	}
+	// Admin overrides (config.updated) are read up to date before the service starts work.
+	kafkasync.Run(context.Background(), store, "repository")
+	contracts.LoadTopics()
 	org := flag.String("org", "", "SourceCraft org slug (one-shot mode)")
 	repo := flag.String("repo", "", "SourceCraft repo slug (one-shot mode)")
 	listen := flag.Bool("listen", false, "run as a Kafka consumer instead of one-shot mode")
 	flag.Parse()
 
 	for _, key := range []string{"S3_ACCESS_KEY", "S3_SECRET_KEY"} {
-		if os.Getenv(key) == "" {
+		if runtimeconfig.Getenv(key) == "" {
 			log.Fatalf("repository-service: %s is required", key)
 		}
 	}

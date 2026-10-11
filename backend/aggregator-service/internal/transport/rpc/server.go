@@ -65,6 +65,10 @@ type AggregatorService interface {
 	CatalogStatus(ctx context.Context) (domain.CatalogStatus, error)
 	RefreshCatalog(ctx context.Context, actorHash string) (domain.CatalogRefresh, error)
 	CancelCatalogRefresh(ctx context.Context, actorHash string) (domain.CatalogRefresh, error)
+
+	ListSettings(ctx context.Context) (domain.SettingsPage, error)
+	SetSetting(ctx context.Context, key, value, actorHash string) (domain.SettingView, error)
+	ResetSetting(ctx context.Context, key, actorHash string) (domain.SettingView, error)
 }
 
 type Server struct {
@@ -419,6 +423,11 @@ const (
 	// Reasons of a refused catalog request.
 	CatalogReasonActive     = "refresh_active"
 	CatalogReasonNotRunning = "refresh_not_running"
+
+	// Reasons of a refused settings request.
+	SettingReasonUnknown   = "setting_unknown"
+	SettingReasonInvalid   = "setting_invalid"
+	SettingReasonEnvLocked = "setting_env_locked"
 )
 
 func mapError(err error) error {
@@ -507,6 +516,16 @@ func mapError(err error) error {
 
 	case errors.Is(err, domain.ErrBatchNotFound):
 		return status.Error(codes.NotFound, BatchReasonNotFound)
+
+	case errors.Is(err, domain.ErrSettingUnknown):
+		return status.Error(codes.NotFound, SettingReasonUnknown)
+
+	case errors.Is(err, domain.ErrSettingInvalid):
+		return status.Error(codes.InvalidArgument, SettingReasonInvalid)
+
+	case errors.Is(err, domain.ErrSettingEnvLocked):
+		// Not FailedPrecondition: the Gateway reads that code as a pending grading.
+		return status.Error(codes.Aborted, SettingReasonEnvLocked)
 
 	case errors.Is(err, domain.ErrCatalogRefreshActive):
 		return status.Error(codes.AlreadyExists, CatalogReasonActive)
@@ -785,4 +804,64 @@ func (s *Server) CancelCatalogRefresh(
 	}
 
 	return &server.CancelCatalogRefreshResponse{Refresh: catalogRefreshToProto(&refresh)}, nil
+}
+
+// ListSettings lists the admin-editable settings.
+func (s *Server) ListSettings(ctx context.Context, _ *server.ListSettingsRequest) (*server.ListSettingsResponse, error) {
+	page, err := s.service.ListSettings(ctx)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &server.ListSettingsResponse{}
+	for _, v := range page.Settings {
+		response.Settings = append(response.Settings, settingToProto(v))
+	}
+
+	for _, p := range page.Processes {
+		process := &server.ConfigProcess{Name: p.Name, Sections: p.Sections, RestartPending: p.RestartPending}
+		if !p.ReportedAt.IsZero() {
+			process.ReportedAt = timestamppb.New(p.ReportedAt)
+		}
+
+		response.Processes = append(response.Processes, process)
+	}
+
+	return response, nil
+}
+
+// SetSetting stores an admin override.
+func (s *Server) SetSetting(ctx context.Context, req *server.SetSettingRequest) (*server.SetSettingResponse, error) {
+	v, err := s.service.SetSetting(ctx, req.GetKey(), req.GetValue(), req.GetActorHash())
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return &server.SetSettingResponse{Setting: settingToProto(v)}, nil
+}
+
+// ResetSetting drops an admin override.
+func (s *Server) ResetSetting(ctx context.Context, req *server.ResetSettingRequest) (*server.ResetSettingResponse, error) {
+	v, err := s.service.ResetSetting(ctx, req.GetKey(), req.GetActorHash())
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return &server.ResetSettingResponse{Setting: settingToProto(v)}, nil
+}
+
+func settingToProto(v domain.SettingView) *server.Setting {
+	out := &server.Setting{
+		Key: v.Key, Group: v.Group, Title: v.Title, Type: v.Type, Min: v.Min, Max: v.Max, Values: v.Values,
+		FileValue: v.FileValue, FileSet: v.FileSet, EnvLockedBy: v.EnvLockedBy,
+	}
+
+	if v.Override != nil {
+		out.Overridden = true
+		out.OverrideValue = v.Override.Value
+		out.UpdatedBy = v.Override.UpdatedBy
+		out.UpdatedAt = timestamppb.New(v.Override.UpdatedAt)
+	}
+
+	return out
 }

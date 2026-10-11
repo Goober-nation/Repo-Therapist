@@ -219,7 +219,7 @@ func (s *GatewayService) recordDenied(ctx context.Context, clientIP, actorKind, 
 
 // RecordAudit reports one event to the Aggregator, the only writer of the audit log.
 func (s *GatewayService) RecordAudit(ctx context.Context, event domain.AuditEvent) error {
-	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorTimeout)
+	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorRPCTimeout())
 	defer cancel()
 
 	_, err := s.aggregatorClient.RecordAudit(rpcCtx, &agg.RecordAuditRequest{
@@ -240,7 +240,7 @@ func (s *GatewayService) RecordAudit(ctx context.Context, event domain.AuditEven
 
 // ListAudit returns one page of the audit log, newest first.
 func (s *GatewayService) ListAudit(ctx context.Context, filter domain.AuditFilter) (domain.AuditPage, error) {
-	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorTimeout)
+	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorRPCTimeout())
 	defer cancel()
 
 	resp, err := s.aggregatorClient.ListAudit(rpcCtx, &agg.ListAuditRequest{

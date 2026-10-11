@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { categoryLabel } from "../metrics"
+import { usePublicConfig } from "../publicConfig"
 import { Button, Card, SectionHeading } from "./Shell"
 
 /** Categories graded in the public mode, which the category badges can show. */
@@ -139,8 +140,9 @@ export default function BadgeSnippet({
   repo: string
 }) {
   // Absent outside the browser (server-side rendering in tests).
+  const { config } = usePublicConfig()
   const origin = publicOrigin(
-    import.meta.env.VITE_PUBLIC_URL,
+    config.publicUrl,
     typeof window === "undefined" ? "" : window.location.origin,
   )
   const path = repoPath(org, repo)

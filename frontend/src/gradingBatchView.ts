@@ -143,6 +143,9 @@ const REASON_MESSAGES: Record<string, string> = {
   batch_not_found: "Пакет не найден.",
   refresh_active: "Список репозиториев уже обновляется. Дождитесь окончания или остановите обновление.",
   refresh_not_running: "Обновление списка уже закончилось.",
+  setting_unknown: "Эту настройку нельзя менять из панели.",
+  setting_invalid: "Значение не подходит: проверьте тип и допустимые границы.",
+  setting_env_locked: "Настройка задана в переменных окружения сервиса: окружение всегда главнее, изменение не применится.",
 }
 
 /** Russian wording of a refused batch request, or undefined to keep the generic message. */

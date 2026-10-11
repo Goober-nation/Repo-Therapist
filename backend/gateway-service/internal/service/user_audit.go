@@ -19,6 +19,8 @@ var repoSlugPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
 // SetUserAudit turns on the audit of user actions. dedup lets one actor's identical action on one
 // target through once per its window, so a page that polls cannot fill the log; nil turns it off.
 func (s *GatewayService) SetUserAudit(dedup Limiter) {
+	s.liveMu.Lock()
+	defer s.liveMu.Unlock()
 	s.userAuditDedup = dedup
 }
 
@@ -30,7 +32,10 @@ func (s *GatewayService) SetUserAudit(dedup Limiter) {
 // answer about a public repo; a refusal (the repo exists but is private) is hashed as well. The actor is the keyed hash of the Yandex ID, or anonymous. Nothing else of
 // the request (IP, query string, token) is stored.
 func (s *GatewayService) RecordUserAction(ctx context.Context, action domain.UserAction) {
-	if s.userAuditDedup == nil || len(s.auditSecret) == 0 {
+	s.liveMu.RLock()
+	dedup := s.userAuditDedup
+	s.liveMu.RUnlock()
+	if dedup == nil || len(s.auditSecret) == 0 {
 		return
 	}
 
@@ -79,7 +84,7 @@ func (s *GatewayService) RecordUserAction(ctx context.Context, action domain.Use
 
 	key := fmt.Sprintf("audit:user_action:%s:%s:%s:%s:%s", action.Action, actorKey, target, outcome, details["state"]+details["reason"])
 
-	allowed, err := s.userAuditDedup.Allow(ctx, key)
+	allowed, err := dedup.Allow(ctx, key)
 	if err != nil || !allowed {
 		return
 	}

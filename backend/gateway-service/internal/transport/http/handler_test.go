@@ -19,6 +19,14 @@ import (
 type fakeService struct {
 	err error
 
+	search     domain.CatalogSearchDTO
+	suggestFor string
+	reposOut   domain.CatalogReposPage
+
+	// settingSet records the last SetSetting call: actor, key, value.
+	settingSet   [3]string
+	publicConfig domain.PublicConfig
+
 	userActions []domain.UserAction
 
 	pat      string
@@ -433,3 +441,21 @@ func TestClientIPTrustsRealIPOnlyFromProxy(t *testing.T) {
 		}
 	}
 }
+
+func (f *fakeService) ListSettings(context.Context) (domain.SettingsPage, error) {
+	return domain.SettingsPage{Settings: []domain.Setting{
+		{Key: "gateway.rate_limit", Type: "int", FileValue: "60", FileSet: true},
+		{Key: "llm.llm_docs_mode", Type: "enum", Overridden: true, OverrideValue: "auto", EnvLockedBy: []string{"llm-service"}},
+	}}, f.err
+}
+
+func (f *fakeService) SetSetting(_ context.Context, actorHash, key, value string) (domain.Setting, error) {
+	f.settingSet = [3]string{actorHash, key, value}
+	return domain.Setting{Key: key, Overridden: true, OverrideValue: value}, f.err
+}
+
+func (f *fakeService) ResetSetting(_ context.Context, _ string, key string) (domain.Setting, error) {
+	return domain.Setting{Key: key, FileValue: "60", FileSet: true}, f.err
+}
+
+func (f *fakeService) PublicConfig() domain.PublicConfig { return f.publicConfig }

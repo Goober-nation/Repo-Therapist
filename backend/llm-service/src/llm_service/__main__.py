@@ -2,12 +2,11 @@
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
 
-from . import metrics
+from . import metrics, runtime_config
 from .context import build_model_context, select_context_paths
 from .discovery import readme_links
 from .grading import required_file_paths
@@ -68,14 +67,21 @@ def main(argv=None) -> int:
     if args.dry_run and (args.listen or args.listen_summary or args.summary_file):
         parser.error("--dry-run applies only to documentation grading of --repo")
     try:
+        # Settings (config/app.yaml + env + admin overrides) load before anything reads them;
+        # the long-running workers also follow file reloads.
+        store = runtime_config.init(watch=args.listen or args.listen_summary)
+        if args.listen or args.listen_summary:
+            # Admin overrides (config.updated) are read up to date before the worker starts.
+            from . import config_sync
+            config_sync.start(store, "llm-service" if args.listen else "llm-summary-service")
         if args.listen:
             from .kafka_worker import main as run_kafka_worker
-            metrics.start_server(metrics.port_from_env(os.environ))
+            metrics.start_server(metrics.port_from_env(runtime_config))
             run_kafka_worker()
             return 0
         if args.listen_summary:
             from .kafka_worker import summary_main
-            metrics.start_server(metrics.port_from_env(os.environ))
+            metrics.start_server(metrics.port_from_env(runtime_config))
             summary_main()
             return 0
         if args.summary_file:

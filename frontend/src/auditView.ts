@@ -27,6 +27,8 @@ const ACTION_LABELS: Record<string, string> = {
   "catalog.refresh.cancel": "Остановка обновления списка репозиториев",
   "catalog.refresh.complete": "Список репозиториев обновлён",
   "catalog.refresh.fail": "Обновление списка репозиториев не удалось",
+  "settings.set": "Изменение настройки",
+  "settings.reset": "Сброс настройки к значению из app.yaml",
   "grading.request": "Запрос оценки репозитория",
   "grading.force": "Принудительная переоценка репозитория",
   "recommendations.request": "Запрос рекомендаций от модели",
@@ -43,6 +45,7 @@ const TARGET_LABELS: Record<string, string> = {
   batch: "Пакет",
   route: "Маршрут",
   catalog: "Обновление списка",
+  setting: "Настройка",
 }
 
 const REASON_LABELS: Record<string, string> = {
@@ -61,6 +64,8 @@ const REASON_LABELS: Record<string, string> = {
   page_loop: "SourceCraft зациклил страницы",
   store_error: "сбой базы данных",
   empty_listing: "SourceCraft вернул пустой список",
+  invalid: "значение не подходит",
+  env_locked: "задано в окружении",
 }
 
 const STATE_LABELS: Record<string, string> = {
@@ -123,6 +128,13 @@ export function accessNote(details: Record<string, unknown> | null | undefined):
   return details?.access === "token" ? "по токену, репозиторий скрыт хешем" : ""
 }
 
+/** A settings change as "old → new"; a missing value reads as the code default. Empty for other entries. */
+export function settingChangeNote(details: Record<string, unknown> | null | undefined): string {
+  if (!details || !Object.hasOwn(details, "new")) return ""
+  const show = (value: unknown) => (typeof value === "string" ? value : "по умолчанию")
+  return Object.hasOwn(details, "old") ? `${show(details.old)} → ${show(details.new)}` : show(details.new)
+}
+
 export function auditRow(entry: AuditEntryResponse): AuditRow {
   const target = entry.target ? `${TARGET_LABELS[entry.target_kind] ?? entry.target_kind}: ${entry.target}` : ""
   return {
@@ -133,7 +145,7 @@ export function auditRow(entry: AuditEntryResponse): AuditRow {
     action: actionLabel(entry.action),
     target,
     outcome: OUTCOME_LABELS[entry.outcome] ?? { label: entry.outcome, tone: "neutral" },
-    note: [reasonLabel(entry.details), accessNote(entry.details)].filter(Boolean).join(" · "),
+    note: [settingChangeNote(entry.details), reasonLabel(entry.details), accessNote(entry.details)].filter(Boolean).join(" · "),
   }
 }
 

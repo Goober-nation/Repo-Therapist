@@ -82,8 +82,8 @@ func (as *AggregatorService) ListAudit(ctx context.Context, filter domain.AuditF
 
 // StartAuditRetention deletes audit entries older than retentionDays now and then every hour, until
 // ctx ends. A non-positive retentionDays keeps the log forever.
-func (as *AggregatorService) StartAuditRetention(ctx context.Context, retentionDays int) {
-	if as.AuditRepo == nil || retentionDays <= 0 {
+func (as *AggregatorService) StartAuditRetention(ctx context.Context) {
+	if as.AuditRepo == nil {
 		return
 	}
 
@@ -92,7 +92,10 @@ func (as *AggregatorService) StartAuditRetention(ctx context.Context, retentionD
 		defer ticker.Stop()
 
 		for {
-			as.purgeAudit(ctx, retentionDays)
+			// Read each round: AUDIT_RETENTION_DAYS can change at runtime; 0 keeps everything.
+			if days := as.auditRetentionDays(); days > 0 {
+				as.purgeAudit(ctx, days)
+			}
 
 			select {
 			case <-ctx.Done():

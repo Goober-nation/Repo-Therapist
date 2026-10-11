@@ -7,6 +7,7 @@ import (
 	"repo-therapist/security-wrapper-service/internal/domain"
 	"repo-therapist/security-wrapper-service/internal/sarif"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc/metadata"
@@ -27,13 +28,23 @@ type SecurityService interface {
 }
 
 type Wrapper struct {
-	client       appsecClient
-	pollInterval time.Duration
-	pollTimeout  time.Duration
+	client appsecClient
+	// pollInterval and pollTimeout are nanoseconds; atomics so SetPolling can change them while
+	// reports are polled (config reloads).
+	pollInterval atomic.Int64
+	pollTimeout  atomic.Int64
 }
 
 func NewWrapper(client appsecClient, pollInterval, pollTimeout time.Duration) *Wrapper {
-	return &Wrapper{client: client, pollInterval: pollInterval, pollTimeout: pollTimeout}
+	w := &Wrapper{client: client}
+	w.SetPolling(pollInterval, pollTimeout)
+	return w
+}
+
+// SetPolling changes the report polling interval and timeout; a poll in progress keeps its deadline.
+func (w *Wrapper) SetPolling(interval, timeout time.Duration) {
+	w.pollInterval.Store(int64(interval))
+	w.pollTimeout.Store(int64(timeout))
 }
 
 // GetAppsecResult is the whole v1 flow: latest scan -> per-severity OPEN counts -> generate/poll/
@@ -98,7 +109,7 @@ func (w *Wrapper) fetchAndParseReport(ctx context.Context, token, gitRepo string
 		return nil, err
 	}
 
-	deadline := time.Now().Add(w.pollTimeout)
+	deadline := time.Now().Add(time.Duration(w.pollTimeout.Load()))
 	for {
 		done, failed, err := w.client.PollOperation(ctx, token, gitRepo, operationUUID)
 		if err != nil {
@@ -117,7 +128,7 @@ func (w *Wrapper) fetchAndParseReport(ctx context.Context, token, gitRepo string
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		case <-time.After(w.pollInterval):
+		case <-time.After(time.Duration(w.pollInterval.Load())):
 		}
 	}
 

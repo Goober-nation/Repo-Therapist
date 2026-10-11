@@ -2,7 +2,7 @@ package service
 
 import (
 	"log"
-	"os"
+	"repo-therapist/runtimeconfig"
 	"time"
 )
 
@@ -14,7 +14,7 @@ const DefaultCloneTimeout = 10 * time.Minute
 // CloneTimeout returns CLONE_TIMEOUT (a Go duration, e.g. "15m") or DefaultCloneTimeout when it
 // is unset or invalid.
 func CloneTimeout() time.Duration {
-	v := os.Getenv("CLONE_TIMEOUT")
+	v := runtimeconfig.Getenv("CLONE_TIMEOUT")
 	if v == "" {
 		return DefaultCloneTimeout
 	}
@@ -33,7 +33,7 @@ const DefaultGradeRequestMaxAge = 20 * time.Minute
 // GradeRequestMaxAge returns GRADE_REQUEST_MAX_AGE (a Go duration) or DefaultGradeRequestMaxAge;
 // "0" turns the age check off.
 func GradeRequestMaxAge() time.Duration {
-	v := os.Getenv("GRADE_REQUEST_MAX_AGE")
+	v := runtimeconfig.Getenv("GRADE_REQUEST_MAX_AGE")
 	if v == "" {
 		return DefaultGradeRequestMaxAge
 	}

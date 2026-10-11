@@ -6,6 +6,7 @@ import {
   profileFromYandexResult,
   type YandexProfile,
 } from "../api/yandexAuth"
+import { usePublicConfig } from "../publicConfig"
 
 export default function YandexSignIn({
   theme,
@@ -18,8 +19,10 @@ export default function YandexSignIn({
   const [attempt, setAttempt] = useState(0)
   const [status, setStatus] =
     useState<"loading" | "ready" | "verifying" | "error">("loading")
-  const clientId = (import.meta.env.VITE_YANDEX_CLIENT_ID ?? "").trim()
-  const devBypass = import.meta.env.VITE_DEV_AUTH_BYPASS === "true"
+  // Runtime settings from GET /api/config; until they arrive the button shows as loading.
+  const { config, loaded } = usePublicConfig()
+  const clientId = config.yandexClientId
+  const devBypass = config.devAuthBypass
   const [devError, setDevError] = useState(false)
 
   useEffect(() => {
@@ -108,7 +111,7 @@ export default function YandexSignIn({
           <button className="auth-button" type="button" disabled>
             Войти через Яндекс ID
           </button>
-          <small role="status">Вход через Яндекс пока не настроен.</small>
+          <small role="status">{loaded ? "Вход через Яндекс пока не настроен." : "Загружаем настройки входа…"}</small>
         </>
       ) : (
         <>

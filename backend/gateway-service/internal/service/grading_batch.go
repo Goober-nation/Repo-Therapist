@@ -15,6 +15,7 @@ var batchReasons = map[string]struct{}{
 	"nothing_selected": {}, "invalid_filter": {}, "limit_too_high": {},
 	"batch_active": {}, "bad_state": {}, "batch_not_found": {},
 	"refresh_active": {}, "refresh_not_running": {},
+	"setting_unknown": {}, "setting_invalid": {}, "setting_env_locked": {},
 }
 
 // batchError is rpcError plus the Aggregator's reason word, when it sent a known one.
@@ -94,7 +95,7 @@ func batchFromProto(b *agg.GradingBatch) domain.GradingBatch {
 
 // PreviewGradingBatch is the dry run: what the filter would regrade, without starting anything.
 func (s *GatewayService) PreviewGradingBatch(ctx context.Context, filter domain.BatchFilter) (domain.BatchPreview, error) {
-	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorTimeout)
+	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorRPCTimeout())
 	defer cancel()
 
 	resp, err := s.aggregatorClient.PreviewGradingBatch(rpcCtx, &agg.PreviewGradingBatchRequest{Filter: filterToProto(filter)})
@@ -114,7 +115,7 @@ func (s *GatewayService) PreviewGradingBatch(ctx context.Context, filter domain.
 
 // StartGradingBatch starts a batch for the filter under the admin's actor hash.
 func (s *GatewayService) StartGradingBatch(ctx context.Context, actorHash string, filter domain.BatchFilter) (domain.GradingBatch, error) {
-	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorTimeout)
+	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorRPCTimeout())
 	defer cancel()
 
 	resp, err := s.aggregatorClient.StartGradingBatch(rpcCtx, &agg.StartGradingBatchRequest{
@@ -135,7 +136,7 @@ func (s *GatewayService) ControlGradingBatch(ctx context.Context, actorHash stri
 		return domain.GradingBatch{}, fmt.Errorf("%w: unknown batch action", domain.ErrInvalidRequest)
 	}
 
-	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorTimeout)
+	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorRPCTimeout())
 	defer cancel()
 
 	resp, err := s.aggregatorClient.ControlGradingBatch(rpcCtx, &agg.ControlGradingBatchRequest{
@@ -150,7 +151,7 @@ func (s *GatewayService) ControlGradingBatch(ctx context.Context, actorHash stri
 
 // GetGradingBatch returns a batch and its failed repos; id 0 means the active batch, or the latest.
 func (s *GatewayService) GetGradingBatch(ctx context.Context, id int64) (domain.GradingBatchDetail, error) {
-	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorTimeout)
+	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorRPCTimeout())
 	defer cancel()
 
 	resp, err := s.aggregatorClient.GetGradingBatch(rpcCtx, &agg.GetGradingBatchRequest{BatchId: id})
@@ -171,7 +172,7 @@ func (s *GatewayService) GetGradingBatch(ctx context.Context, id int64) (domain.
 
 // ListGradingBatches returns the most recent batches, newest first, and the stand's limit cap.
 func (s *GatewayService) ListGradingBatches(ctx context.Context, limit int32) (domain.GradingBatchList, error) {
-	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorTimeout)
+	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorRPCTimeout())
 	defer cancel()
 
 	resp, err := s.aggregatorClient.ListGradingBatches(rpcCtx, &agg.ListGradingBatchesRequest{Limit: limit})

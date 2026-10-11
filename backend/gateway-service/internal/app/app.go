@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"log"
+	"repo-therapist/runtimeconfig"
 
 	"net/http"
 	"os"
@@ -21,17 +22,12 @@ import (
 	"gateway-service/internal/transport/rpc/gen/rank"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 func StartApp() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Printf(".env not found, using environment variables")
-	}
 
 	cfg := config.LoadConfig()
 
@@ -134,9 +130,9 @@ func StartApp() {
 		cfg.Rating.Address,
 	)
 
-	yandexHTTPClient := &http.Client{
-		Timeout: cfg.Yandex.Timeout,
-	}
+	// No client-wide Timeout: every Yandex call carries a context deadline of YANDEX_TIMEOUT, read
+	// per call so config changes apply without a restart.
+	yandexHTTPClient := &http.Client{}
 
 	var yandexClient httptransport.YandexIDClient = httptransport.NewClient(
 		yandexHTTPClient, cfg.Yandex.UserInfoURL)
@@ -159,45 +155,67 @@ func StartApp() {
 		cfg.Yandex.Timeout,
 	)
 
-	gatewayService.SetPublicAPILimiter(service.NewRedisLimiter(
-		redisClient,
-		cfg.PublicAPIRateLimit.Limit,
-		cfg.PublicAPIRateLimit.Window,
-	))
+	publicAPILimiter := service.NewRedisLimiter(redisClient, cfg.PublicAPIRateLimit.Limit, cfg.PublicAPIRateLimit.Window)
+	gatewayService.SetPublicAPILimiter(publicAPILimiter)
 
-	gatewayService.SetExportLimiter(service.NewRedisLimiter(
-		redisClient,
-		cfg.ExportRateLimit.Limit,
-		cfg.ExportRateLimit.Window,
-	))
-
-	if cfg.ForceRegradeCooldown > 0 {
-		gatewayService.SetForceRegradeCooldown(redis_repository.NewCooldown(redisClient, cfg.ForceRegradeCooldown))
-	}
+	exportLimiter := service.NewRedisLimiter(redisClient, cfg.ExportRateLimit.Limit, cfg.ExportRateLimit.Window)
+	gatewayService.SetExportLimiter(exportLimiter)
 
 	gatewayService.SetMetrics(appMetrics)
-	if cfg.Metrics.PrometheusURL != "" {
-		gatewayService.SetSeries(series.NewClient(cfg.Metrics.PrometheusURL, cfg.Metrics.SeriesCache, nil))
-		log.Printf("graphs read metrics from %s", cfg.Metrics.PrometheusURL)
-	} else {
-		log.Println("graphs are off: set PROMETHEUS_URL to turn them on")
-	}
+
+	deniedLogLimiter := service.NewRedisLimiter(redisClient, cfg.Admin.DeniedLog.Limit, cfg.Admin.DeniedLog.Window)
 	gatewayService.SetAdmin(
 		cfg.Admin.YandexIDs,
 		cfg.Admin.HashSecret(),
-		service.NewRedisLimiter(redisClient, cfg.Admin.DeniedLog.Limit, cfg.Admin.DeniedLog.Window),
+		deniedLogLimiter,
 	)
 
-	if cfg.Admin.UserAuditWindow > 0 {
-		gatewayService.SetUserAudit(service.NewRedisLimiter(redisClient, 1, cfg.Admin.UserAuditWindow))
-	}
-
+	attemptGuard := redis_repository.NewAttemptGuard(redisClient, cfg.Admin.UnlockMaxAttempts, cfg.Admin.UnlockLock)
 	gatewayService.SetAdminUnlock(
 		cfg.Admin.Password,
 		redis_repository.NewAdminGrantStore(redisClient),
-		redis_repository.NewAttemptGuard(redisClient, cfg.Admin.UnlockMaxAttempts, cfg.Admin.UnlockLock),
+		attemptGuard,
 		cfg.Session.TTL,
 	)
+
+	// Non-static settings (config/app.yaml outside `static:`) are re-read on every reload and admin
+	// override. Rate-limit counters live in Redis, so changing a limit keeps them.
+	var seriesKey string
+	applyLive := func() {
+		live := config.LoadConfig()
+		rateLimiter.SetLimits(live.RateLimit.Limit, live.RateLimit.Window)
+		publicAPILimiter.SetLimits(live.PublicAPIRateLimit.Limit, live.PublicAPIRateLimit.Window)
+		exportLimiter.SetLimits(live.ExportRateLimit.Limit, live.ExportRateLimit.Window)
+		deniedLogLimiter.SetLimits(live.Admin.DeniedLog.Limit, live.Admin.DeniedLog.Window)
+		attemptGuard.SetLimits(live.Admin.UnlockMaxAttempts, live.Admin.UnlockLock)
+		gatewayService.SetTimeouts(live.Aggregator.Timeout, live.Rating.Timeout, live.Yandex.Timeout)
+
+		if live.ForceRegradeCooldown > 0 {
+			gatewayService.SetForceRegradeCooldown(redis_repository.NewCooldown(redisClient, live.ForceRegradeCooldown))
+		} else {
+			gatewayService.SetForceRegradeCooldown(nil)
+		}
+
+		if live.Admin.UserAuditWindow > 0 {
+			gatewayService.SetUserAudit(service.NewRedisLimiter(redisClient, 1, live.Admin.UserAuditWindow))
+		} else {
+			gatewayService.SetUserAudit(nil)
+		}
+
+		// A new series client only when its settings change, so its cache survives other reloads.
+		if key := live.Metrics.PrometheusURL + "|" + live.Metrics.SeriesCache.String(); key != seriesKey {
+			seriesKey = key
+			if live.Metrics.PrometheusURL != "" {
+				gatewayService.SetSeries(series.NewClient(live.Metrics.PrometheusURL, live.Metrics.SeriesCache, nil))
+				log.Printf("graphs read metrics from %s", live.Metrics.PrometheusURL)
+			} else {
+				gatewayService.SetSeries(nil)
+				log.Println("graphs are off: set PROMETHEUS_URL to turn them on")
+			}
+		}
+	}
+	applyLive()
+	runtimeconfig.OnChange(applyLive)
 
 	if gatewayService.UnlockAvailable() {
 		log.Printf("admin password unlock is on: %d wrong tries lock for %s", cfg.Admin.UnlockMaxAttempts, cfg.Admin.UnlockLock)
@@ -217,6 +235,7 @@ func StartApp() {
 		gatewayService,
 	)
 	handler.SetInsecureCookies(cfg.Yandex.DevBypassUserID != "")
+	gatewayService.SetDevAuthBypass(cfg.Yandex.DevBypassUserID != "")
 
 	router := http.NewServeMux()
 

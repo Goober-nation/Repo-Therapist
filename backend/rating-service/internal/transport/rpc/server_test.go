@@ -15,6 +15,11 @@ import (
 )
 
 type fakeService struct {
+	suggestions domain.Suggestions
+	reposPage   domain.CatalogReposPage
+	orgsPage    domain.CatalogOrgsPage
+	searchReq   []any
+
 	page  domain.RankingPage
 	err   error
 	req   *domain.RankingRequest

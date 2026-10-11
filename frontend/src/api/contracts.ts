@@ -424,3 +424,86 @@ export interface SeriesResponse {
   generated_at: string
   series: SeriesLineResponse[]
 }
+
+/** Where a setting's running value comes from: environment > admin override > app.yaml > code default. */
+export type SettingSource = "env" | "override" | "file" | "default"
+
+/** One admin-editable key of config/app.yaml (GET /admin/settings). */
+export interface SettingResponse {
+  key: string
+  group: string
+  title: string
+  type: "int" | "float" | "duration" | "bool" | "string" | "enum"
+  min?: string
+  max?: string
+  values?: string[]
+  /** The app.yaml value; null when the file leaves the key to the code default. */
+  file_value: string | null
+  /** The admin override; null when there is none. */
+  override: string | null
+  updated_at: string | null
+  updated_by?: string
+  /** Processes whose environment sets the key: the environment always wins, no override applies. */
+  env_locked_by: string[]
+  effective_from: SettingSource
+}
+
+/** A running process and its static (restart-only) keys changed since it started. */
+export interface ConfigProcessResponse {
+  name: string
+  sections: string[]
+  restart_pending: string[]
+  reported_at: string | null
+}
+
+export interface SettingsResponse {
+  settings: SettingResponse[]
+  processes: ConfigProcessResponse[]
+}
+
+/** GET /config: the SPA's runtime settings (the `frontend` section of app.yaml). */
+export interface PublicConfigResponse {
+  public_url: string
+  yandex_client_id: string
+  dev_auth_bypass: boolean
+  poll_timeout_ms: number
+}
+
+/** A public repository of the catalog matched by a search (GET /search/*). */
+export interface CatalogRepoResponse {
+  sourcecraft_uuid: string
+  org_slug: string
+  repo_slug: string
+  description: string
+  web_url: string
+  language: { name: string; color: string }
+  likes: number
+  last_activity_at: string | null
+  /** null while the repository has not been graded. */
+  public_score: number | null
+}
+
+export interface CatalogOrgResponse {
+  slug: string
+  repo_count: number
+}
+
+/** GET /search/suggest: the top 3 repositories and the top organization. */
+export interface SearchSuggestResponse {
+  repos: CatalogRepoResponse[]
+  orgs: CatalogOrgResponse[]
+}
+
+export interface SearchReposResponse {
+  repos: CatalogRepoResponse[]
+  total_count: number
+  page: number
+  page_size: number
+}
+
+export interface SearchOrgsResponse {
+  orgs: CatalogOrgResponse[]
+  total_count: number
+  page: number
+  page_size: number
+}

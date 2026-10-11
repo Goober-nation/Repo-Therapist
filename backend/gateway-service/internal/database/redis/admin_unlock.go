@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -55,13 +56,23 @@ func (s *AdminGrantStore) Revoke(ctx context.Context, sessionID string) (bool, e
 // AttemptGuard counts wrong admin passwords in Redis. A key's failures are counted over one lock
 // period; reaching the limit locks the key for that period.
 type AttemptGuard struct {
-	client      *redis.Client
-	maxAttempts int
-	lockFor     time.Duration
+	client *redis.Client
+	// Atomics so SetLimits can change them at runtime (config reloads, admin overrides).
+	maxAttempts atomic.Int64
+	lockFor     atomic.Int64 // nanoseconds
 }
 
 func NewAttemptGuard(client *redis.Client, maxAttempts int, lockFor time.Duration) *AttemptGuard {
-	return &AttemptGuard{client: client, maxAttempts: maxAttempts, lockFor: lockFor}
+	g := &AttemptGuard{client: client}
+	g.SetLimits(maxAttempts, lockFor)
+
+	return g
+}
+
+// SetLimits changes the attempt budget and lock period; locks already set keep their expiry.
+func (g *AttemptGuard) SetLimits(maxAttempts int, lockFor time.Duration) {
+	g.maxAttempts.Store(int64(maxAttempts))
+	g.lockFor.Store(int64(lockFor))
 }
 
 func failKey(key string) string { return "admin_unlock:fail:" + key }
@@ -104,7 +115,7 @@ func (g *AttemptGuard) RecordFailure(ctx context.Context, keys ...string) (bool,
 	locked := false
 
 	for _, key := range keys {
-		result, err := failureScript.Run(ctx, g.client, []string{failKey(key), lockKey(key)}, g.maxAttempts, g.lockFor.Milliseconds()).Int()
+		result, err := failureScript.Run(ctx, g.client, []string{failKey(key), lockKey(key)}, g.maxAttempts.Load(), time.Duration(g.lockFor.Load()).Milliseconds()).Int()
 		if err != nil {
 			return locked, fmt.Errorf("record admin unlock failure: %w", err)
 		}

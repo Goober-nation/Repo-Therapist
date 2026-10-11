@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"os"
+	"repo-therapist/runtimeconfig"
 	"strings"
 	"time"
 
@@ -307,8 +307,8 @@ func readPulls(ctx context.Context, s3Client *storage.Client, prefix, repoID str
 func newS3Client(ctx context.Context) (*storage.Client, error) {
 	return storage.NewClient(ctx, storage.Config{
 		Endpoint:  EnvOrDefault("S3_ENDPOINT", "localhost:9000"),
-		AccessKey: os.Getenv("S3_ACCESS_KEY"),
-		SecretKey: os.Getenv("S3_SECRET_KEY"),
+		AccessKey: runtimeconfig.Getenv("S3_ACCESS_KEY"),
+		SecretKey: runtimeconfig.Getenv("S3_SECRET_KEY"),
 		Bucket:    EnvOrDefault("S3_BUCKET", "repo-content"),
 		UseSSL:    false,
 	})
@@ -438,7 +438,7 @@ func toContractRecommendations(recs []scoring.Recommendation) []contracts.Recomm
 func gradeSecurity(ctx context.Context, repoID, token string) scoring.CategoryResult {
 	pat := token
 	if pat == "" {
-		pat = os.Getenv("SOURCECRAFT_PAT")
+		pat = runtimeconfig.Getenv("SOURCECRAFT_PAT")
 	}
 	if pat == "" {
 		log.Printf("no request token and SOURCECRAFT_PAT not set: Security category will be no-data for %s", repoID)
@@ -471,7 +471,7 @@ func PrintResult(out *GradeOutput) {
 }
 
 func EnvOrDefault(key, def string) string {
-	if v := os.Getenv(key); v != "" {
+	if v := runtimeconfig.Getenv(key); v != "" {
 		return v
 	}
 	return def

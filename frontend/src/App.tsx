@@ -28,8 +28,10 @@ import RankingPage, { DEFAULT_RANKING_QUERY, rankingFilters, type RankingQuery }
 import RepositoryOverviewPage from "./pages/RepositoryOverviewPage"
 import RulesPage from "./pages/RulesPage"
 import { gradingToken } from "./metrics"
+import CatalogSearch from "./components/CatalogSearch"
+import SearchPage from "./pages/SearchPage"
 import { loadPat, patExpiresIn, savePat } from "./patStorage"
-import { parseRepositoryLink, useRoute } from "./route"
+import { useRoute, type RepoRef } from "./route"
 import type { Confidence, PageId, PositionExplanation, RepoAnalytics, RepositorySummary, ScorePoint } from "./types"
 import { useRepositoryAnalysis } from "./useRepositoryAnalysis"
 
@@ -76,7 +78,10 @@ function errorText(error: unknown, fallback: string) {
 export default function App() {
   const [route, navigate] = useRoute()
   const [theme, setTheme] = useState(readTheme)
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  // Open by default where it sits beside the content; on phones it would push the page down.
+  const [isSidebarOpen, setIsSidebarOpen] = useState(
+    () => typeof window === "undefined" || window.matchMedia("(min-width: 781px)").matches,
+  )
   const [profile, setProfile] = useState<YandexProfile | null>(loadSavedProfile)
   // Saved in localStorage for one hour (see patStorage), then dropped.
   const [pat, setPat] = useState<string | undefined>(loadPat)
@@ -402,13 +407,19 @@ export default function App() {
     }
   }
 
-  const openRepositoryLink = (link: string) => {
-    const parsed = parseRepositoryLink(link)
-    if (parsed) navigate({ page: "repository", ...parsed, private: false })
-    return parsed !== null
-  }
+  const openPublicRepository = (ref: RepoRef) => navigate({ page: "repository", ...ref, private: false })
 
-  const showPage = (page: Exclude<PageId, "overview">) => navigate({ page })
+  const searchBar = (
+    <CatalogSearch
+      api={api}
+      onSearch={(text) => navigate({ page: "search", q: text })}
+      onOpenRepository={openPublicRepository}
+      onOpenOrganization={(slug) => navigate({ page: "search", q: "", org: slug })}
+    />
+  )
+
+  const showPage = (page: Exclude<PageId, "overview">) =>
+    navigate(page === "search" ? { page, q: "" } : { page })
 
   const toggleCompare = (item: RepositorySummary) =>
     setCompareSelection((current) =>
@@ -443,7 +454,6 @@ export default function App() {
         onPageChange={showPage}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((open) => !open)}
-        onOpenRepositoryLink={openRepositoryLink}
         yandexProfile={profile}
         onYandexSignIn={handleSignIn}
         onSignOut={handleSignOut}
@@ -468,8 +478,12 @@ export default function App() {
                 onClearCompare={() => setCompareSelection([])}
                 onQueryChange={setRankingQuery}
                 onRetry={() => setRankingAttempt((value) => value + 1)}
+                searchBar={searchBar}
                 onSelectRepository={(item) => openRepository(item, false)}
               />
+            )}
+            {route.page === "search" && (
+              <SearchPage api={api} route={route} onNavigate={navigate} onOpenRepository={openPublicRepository} />
             )}
             {route.page === "analytics" && (
               <AnalyticsPage

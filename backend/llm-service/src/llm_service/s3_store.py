@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
+
+from . import runtime_config
 
 
 @dataclass(frozen=True)
@@ -18,14 +19,14 @@ class S3Config:
 
     @classmethod
     def from_env(cls) -> S3Config:
-        ssl = os.environ.get("S3_USE_SSL", "false").lower()
+        ssl = runtime_config.get("S3_USE_SSL", "false").lower()
         if ssl not in {"true", "false"}:
             raise ValueError("S3_USE_SSL must be true or false")
         return cls(
-            endpoint=os.environ.get("S3_ENDPOINT", "localhost:9000"),
-            bucket=os.environ.get("S3_BUCKET", "repo-content"),
-            access_key=os.environ.get("S3_ACCESS_KEY", ""),
-            secret_key=os.environ.get("S3_SECRET_KEY", ""),
+            endpoint=runtime_config.get("S3_ENDPOINT", "localhost:9000"),
+            bucket=runtime_config.get("S3_BUCKET", "repo-content"),
+            access_key=runtime_config.get("S3_ACCESS_KEY", ""),
+            secret_key=runtime_config.get("S3_SECRET_KEY", ""),
             use_ssl=ssl == "true",
             connect_timeout=_seconds_env("S3_CONNECT_TIMEOUT", cls.connect_timeout),
             read_timeout=_seconds_env("S3_READ_TIMEOUT", cls.read_timeout),
@@ -40,7 +41,7 @@ class S3Config:
 
 
 def _seconds_env(key: str, default: float) -> float:
-    value = os.environ.get(key, "").strip()
+    value = runtime_config.get(key, "").strip()
     if not value:
         return default
     try:

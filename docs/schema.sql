@@ -215,6 +215,13 @@ CREATE INDEX ON public_repo_catalog (sourcecraft_rating DESC);
 CREATE INDEX ON public_repo_catalog (lower(main_language));
 CREATE INDEX ON public_repo_catalog (lower(org_slug || '/' || repo_slug));
 
+-- Name search (GET /search/*): substring and fuzzy matching of repo and org names.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX public_repo_catalog_name_trgm ON public_repo_catalog
+  USING GIN (lower(org_slug || '/' || repo_slug) gin_trgm_ops);
+CREATE INDEX public_repo_catalog_org_trgm ON public_repo_catalog
+  USING GIN (lower(org_slug) gin_trgm_ops);
+
 -- Same shape, no constraints beyond the columns: pages may repeat a repo while the listing shifts.
 CREATE UNLOGGED TABLE public_repo_catalog_staging (
   sourcecraft_uuid   UUID NOT NULL,
@@ -250,3 +257,12 @@ CREATE TABLE catalog_refreshes (
 -- At most one refresh running at a time.
 CREATE UNIQUE INDEX catalog_refreshes_one_running ON catalog_refreshes ((true))
   WHERE status = 'running';
+
+-- Admin overrides of config/app.yaml (docs/config.md). Only the Aggregator writes here and republishes
+-- every row to the compacted Kafka topic config.updated; a row exists only while a key is overridden.
+CREATE TABLE settings_override (
+  key        TEXT PRIMARY KEY,           -- app.yaml path, e.g. gateway.rate_limit
+  value      TEXT NOT NULL,
+  updated_by TEXT NOT NULL DEFAULT '',   -- audit actor hash of the admin, never a raw Yandex ID
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

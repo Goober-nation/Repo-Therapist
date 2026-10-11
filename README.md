@@ -51,7 +51,7 @@
 SourceCraft.
 
 ```bash
-cp .env.example .env        # заполните SOURCECRAFT_PAT, S3_*, POSTGRES_*
+cp .env.example .env        # только секреты: SOURCECRAFT_PAT, S3_*, POSTGRES_*, REDIS_PASSWORD
 docker compose up -d        # Postgres, S3 (RustFS), Redis, Kafka, миграции, сервисы, фронтенд
 ```
 
@@ -62,7 +62,9 @@ docker compose up -d        # Postgres, S3 (RustFS), Redis, Kafka, миграц�
 - Redis (`8052`) и Kafka (`8053`) опубликованы только на `127.0.0.1` — для сервисов, запущенных на
   хосте, и отладки; Redis требует пароль `REDIS_PASSWORD` из `.env`.
 
-Все настройки описаны в комментариях в [.env.example](.env.example).
+Настройки, кроме секретов, — в [config/app.yaml](config/app.yaml): сервисы перечитывают его на лету, а
+часть ключей администратор меняет во вкладке «Доступ админа». Переменная окружения всегда главнее файла
+и панели. Подробно — [docs/config.md](docs/config.md).
 Ручное сквозное тестирование: [docs/testing.md](docs/testing.md).
 
 ```bash

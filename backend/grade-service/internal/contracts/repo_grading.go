@@ -6,7 +6,7 @@ package contracts
 
 import (
 	"encoding/json"
-	"os"
+	"repo-therapist/runtimeconfig"
 	"strings"
 	"time"
 )
@@ -14,17 +14,17 @@ import (
 // Topic names default to the documented contract and can be overridden per environment; the env
 // names are shared with the other services (docs/kafka-contracts.md, "Topic env vars").
 var (
-	TopicGradeRequested = TopicEnv("KAFKA_REPO_GRADE_REQUESTED_TOPIC", "repo.grade.requested")
-	TopicRepoReady      = TopicEnv("KAFKA_REPO_READY_TOPIC", "repo.ready")
+	TopicGradeRequested string
+	TopicRepoReady      string
 
 	// Grade <-> LLM Documentation exchange (docs/kafka-contracts.md, "active Grade ↔ LLM contract").
-	TopicDocsGradeRequested = TopicEnv("KAFKA_DOCS_GRADE_REQUESTED_TOPIC", "repo.docs.grade.requested")
-	TopicDocsGraded         = TopicEnv("KAFKA_DOCS_GRADED_TOPIC", "repo.docs.graded")
+	TopicDocsGradeRequested string
+	TopicDocsGraded         string
 )
 
 // TopicEnv returns the trimmed value of env var key, or def when it is unset or blank.
 func TopicEnv(key, def string) string {
-	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+	if v := strings.TrimSpace(runtimeconfig.Getenv(key)); v != "" {
 		return v
 	}
 	return def
@@ -34,7 +34,7 @@ func TopicEnv(key, def string) string {
 // neither service can join a consumer group before its topic exists. Includes the Aggregator's
 // two topics too (grade-service is the only service that touches those, but provisions them here
 // alongside its own internal ones for the same reason).
-var AllTopics = []string{TopicGradeRequested, TopicRepoReady, TopicGradingRequests, TopicGradingResults, TopicDocsGradeRequested, TopicDocsGraded}
+var AllTopics []string
 
 // GradeRequested is published to ask Repository service to clone+upload a repo. Consumed by
 // Repository service, produced by grade-service relaying grading.requests.
@@ -72,8 +72,8 @@ type RepoReady struct {
 // from the two topics above, which are Repository<->Grade service's own internal handoff.
 // Grade service is the only service that talks to these two; Repository service is unaffected.
 var (
-	TopicGradingRequests = TopicEnv("KAFKA_GRADING_REQUESTS_TOPIC", "grading.requests")
-	TopicGradingResults  = TopicEnv("KAFKA_GRADING_RESULTS_TOPIC", "grading.results")
+	TopicGradingRequests string
+	TopicGradingResults  string
 )
 
 // Grading visibilities. A job is graded as exactly one of these: private when the request
@@ -194,4 +194,18 @@ type DocsGraded struct {
 	Method          *string        `json:"method"`
 	Error           string         `json:"error"`
 	EvaluatedAt     time.Time      `json:"evaluated_at"`
+}
+
+func init() { LoadTopics() }
+
+// LoadTopics reads the topic names. It runs at package init (tools, tests) and again from main
+// after runtimeconfig.Start, so names set in config/app.yaml apply; the names are restart-only.
+func LoadTopics() {
+	TopicGradeRequested = TopicEnv("KAFKA_REPO_GRADE_REQUESTED_TOPIC", "repo.grade.requested")
+	TopicRepoReady = TopicEnv("KAFKA_REPO_READY_TOPIC", "repo.ready")
+	TopicDocsGradeRequested = TopicEnv("KAFKA_DOCS_GRADE_REQUESTED_TOPIC", "repo.docs.grade.requested")
+	TopicDocsGraded = TopicEnv("KAFKA_DOCS_GRADED_TOPIC", "repo.docs.graded")
+	TopicGradingRequests = TopicEnv("KAFKA_GRADING_REQUESTS_TOPIC", "grading.requests")
+	TopicGradingResults = TopicEnv("KAFKA_GRADING_RESULTS_TOPIC", "grading.results")
+	AllTopics = []string{TopicGradeRequested, TopicRepoReady, TopicGradingRequests, TopicGradingResults, TopicDocsGradeRequested, TopicDocsGraded}
 }

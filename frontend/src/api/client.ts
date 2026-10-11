@@ -8,6 +8,9 @@ import type {
   BatchPreviewResponse,
   CatalogRefreshResponse,
   CatalogStatusResponse,
+  PublicConfigResponse,
+  SettingResponse,
+  SettingsResponse,
   CurrentBatchResponse,
   GatewayRankingResponse,
   GradingResponse,
@@ -21,6 +24,9 @@ import type {
   GradingBatchListResponse,
   GradingBatchResponse,
   RegradeStatusResponse,
+  SearchOrgsResponse,
+  SearchReposResponse,
+  SearchSuggestResponse,
   SeriesResponse,
   StatsResponse,
 } from "./contracts"
@@ -62,6 +68,9 @@ export interface HttpRepoHealthApiOptions {
 
 /** Largest page rating-service accepts. */
 export const RANKING_PAGE_SIZE = 100
+
+/** Entries per page of search results. */
+export const SEARCH_PAGE_SIZE = 20
 
 export type RankingSort = "score" | "likes" | "last_activity"
 
@@ -185,6 +194,25 @@ export class HttpRepoHealthApi {
     const topic = filters.topic?.trim()
     if (topic) query.set("topic", topic)
     return this.request(`/ranking?${query}`)
+  }
+
+  /** The top 3 public repositories and the top organization whose names match text. */
+  suggest(text: string): Promise<SearchSuggestResponse> {
+    return this.request(`/search/suggest?${new URLSearchParams({ q: text })}`)
+  }
+
+  /** One page of the public repositories matching text; org keeps only that organization's. */
+  searchRepos(text: string, org = "", page = 1): Promise<SearchReposResponse> {
+    const query = new URLSearchParams({ page: String(page), page_size: String(SEARCH_PAGE_SIZE) })
+    if (text) query.set("q", text)
+    if (org) query.set("org", org)
+    return this.request(`/search/repos?${query}`)
+  }
+
+  /** One page of the organizations matching text. */
+  searchOrgs(text: string, page = 1): Promise<SearchOrgsResponse> {
+    const query = new URLSearchParams({ q: text, page: String(page), page_size: String(SEARCH_PAGE_SIZE) })
+    return this.request(`/search/orgs?${query}`)
   }
 
   /** The stored public grade with its low-confidence flag; read-only, never starts a grading. */
@@ -328,6 +356,30 @@ export class HttpRepoHealthApi {
   /** Stops the running catalog refresh; the catalog in use is untouched. */
   cancelCatalogRefresh(): Promise<CatalogRefreshResponse> {
     return this.batchRequest("/admin/catalog/refresh/cancel", { method: "POST", headers: REQUEST_GUARD_HEADER })
+  }
+
+  /** The admin-editable settings of config/app.yaml and the processes that reported; admins only. */
+  getSettings(): Promise<SettingsResponse> {
+    return this.batchRequest("/admin/settings")
+  }
+
+  /** Stores an admin override of one setting; the Aggregator validates it and audits old and new values. */
+  setSetting(key: string, value: string): Promise<SettingResponse> {
+    return this.batchRequest(`/admin/settings/${encodeURIComponent(key)}`, {
+      method: "PUT",
+      headers: { ...REQUEST_GUARD_HEADER, "Content-Type": "application/json" },
+      body: JSON.stringify({ value }),
+    })
+  }
+
+  /** Drops the override so the app.yaml value applies again. */
+  resetSetting(key: string): Promise<SettingResponse> {
+    return this.batchRequest(`/admin/settings/${encodeURIComponent(key)}`, { method: "DELETE", headers: REQUEST_GUARD_HEADER })
+  }
+
+  /** The SPA's runtime settings; public. */
+  getPublicConfig(): Promise<PublicConfigResponse> {
+    return this.request("/config")
   }
 
   /** Batch routes answer with Russian wording: admin denial, or the Gateway's reason word. */

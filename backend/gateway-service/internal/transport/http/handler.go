@@ -29,6 +29,13 @@ const (
 )
 
 type GatewayService interface {
+	SearchService
+
+	ListSettings(ctx context.Context) (domain.SettingsPage, error)
+	SetSetting(ctx context.Context, actorHash, key, value string) (domain.Setting, error)
+	ResetSetting(ctx context.Context, actorHash, key string) (domain.Setting, error)
+	PublicConfig() domain.PublicConfig
+
 	GetMyRepos(
 		ctx context.Context,
 		clientIP string,
@@ -173,6 +180,9 @@ func (h *Handler) Register(mux *stdhttp.ServeMux) {
 	mux.HandleFunc("GET /recommendations/{org}/{repo}", h.RequestLLMRecommendations)
 	mux.HandleFunc("GET /analytics/{org}/{repo}", h.GetAnalytics)
 	mux.HandleFunc("GET /ranking", h.GetRanking)
+	mux.HandleFunc("GET /search/suggest", h.GetSearchSuggest)
+	mux.HandleFunc("GET /search/repos", h.GetSearchRepos)
+	mux.HandleFunc("GET /search/orgs", h.GetSearchOrgs)
 	mux.HandleFunc("GET /badge/{org}/{repo}", h.GetBadge)
 	mux.HandleFunc("GET /badge/{org}/{repo}/{category}", h.GetCategoryBadge)
 	mux.HandleFunc("GET /widget/{org}/{repo}", h.GetWidget)
@@ -193,6 +203,10 @@ func (h *Handler) Register(mux *stdhttp.ServeMux) {
 	mux.HandleFunc("GET /admin/catalog", h.requireAdmin(h.GetCatalog))
 	mux.HandleFunc("POST /admin/catalog/refresh", h.requireAdmin(h.PostCatalogRefresh))
 	mux.HandleFunc("POST /admin/catalog/refresh/cancel", h.requireAdmin(h.PostCatalogCancel))
+	mux.HandleFunc("GET /admin/settings", h.requireAdmin(h.GetSettings))
+	mux.HandleFunc("PUT /admin/settings/{key}", h.requireAdmin(h.PutSetting))
+	mux.HandleFunc("DELETE /admin/settings/{key}", h.requireAdmin(h.DeleteSetting))
+	mux.HandleFunc("GET /config", h.GetConfig)
 	mux.HandleFunc("GET /stats", h.GetStats)
 	mux.HandleFunc("GET /export/grades.csv", h.ExportGradesCSV)
 	mux.HandleFunc("GET /export/grades.json", h.ExportGradesJSON)

@@ -18,6 +18,8 @@ type Cooldown interface {
 
 // SetForceRegradeCooldown sets how often one user may force a regrade of one repo; nil means no limit.
 func (s *GatewayService) SetForceRegradeCooldown(cooldown Cooldown) {
+	s.liveMu.Lock()
+	defer s.liveMu.Unlock()
 	s.forceCooldown = cooldown
 }
 
@@ -33,13 +35,16 @@ func (s *GatewayService) checkForceRegrade(ctx context.Context, request domain.G
 		return fmt.Errorf("check force regrade session: %w", err)
 	}
 
-	if s.forceCooldown == nil {
+	s.liveMu.RLock()
+	cooldown := s.forceCooldown
+	s.liveMu.RUnlock()
+	if cooldown == nil {
 		return nil
 	}
 
 	key := "force_regrade:" + user.ID.String() + ":" + strings.ToLower(request.OrgSlug+"/"+request.RepoSlug)
 
-	retryAfter, err := s.forceCooldown.Acquire(ctx, key)
+	retryAfter, err := cooldown.Acquire(ctx, key)
 	if err != nil {
 		return fmt.Errorf("%w: force regrade cooldown: %v", domain.ErrUnavailable, err)
 	}

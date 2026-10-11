@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"repo-therapist/runtimeconfig"
 
 	"os/signal"
 	"sync"
@@ -192,7 +193,7 @@ func runRepoReadyGrader(ctx context.Context, brokers []string, cfg *config.Confi
 		if docsCh != nil {
 			reply = docs.waiters.wait(ctx, ready.JobID, docsCh, docsDeadline)
 			if reply == nil {
-				log.Printf("no %s reply for %s/%s within %s: Documentation will be no-data", contracts.TopicDocsGraded, ready.OrgSlug, ready.RepoSlug, docs.timeout)
+				log.Printf("no %s reply for %s/%s within %s: Documentation will be no-data", contracts.TopicDocsGraded, ready.OrgSlug, ready.RepoSlug, docs.timeout())
 			} else if reply.Error != "" {
 				log.Printf("LLM documentation evaluation for %s/%s failed with %s: Documentation will be no-data", ready.OrgSlug, ready.RepoSlug, reply.Error)
 			}
@@ -320,13 +321,20 @@ func detachedOnShutdown(ctx context.Context) (context.Context, context.CancelFun
 	return context.WithTimeout(context.WithoutCancel(ctx), shutdownPublishTimeout)
 }
 
-// docsSettings controls the Documentation round trip to the LLM service. enabled is false when
-// the documentation category is not_calculated or LLM_ENABLED=false; Documentation is then
-// no-data without asking.
+// docsSettings controls the Documentation round trip to the LLM service. Documentation is
+// no-data without asking when its category is not_calculated or LLM_ENABLED=false. LLM_ENABLED and
+// LLM_TIMEOUT are read per grading, so config/app.yaml and admin-panel changes apply live.
 type docsSettings struct {
-	enabled bool
-	timeout time.Duration
-	waiters *docsWaiters
+	categoryEnabled bool
+	waiters         *docsWaiters
+}
+
+func (d docsSettings) enabled() bool {
+	return d.categoryEnabled && runtimeconfig.Getenv("LLM_ENABLED") != "false"
+}
+
+func (d docsSettings) timeout() time.Duration {
+	return app.DurationEnv("LLM_TIMEOUT", defaultLLMTimeout)
 }
 
 // defaultLLMTimeout bounds how long a grading waits for repo.docs.graded; the LLM service has no
@@ -335,18 +343,21 @@ const defaultLLMTimeout = 70 * time.Second
 
 func newDocsSettings(cfg *config.Config) docsSettings {
 	docCfg, ok := cfg.Categories["documentation"]
-	enabled := ok && docCfg.Status == config.StatusCalculated && os.Getenv("LLM_ENABLED") != "false"
-	timeout := app.DurationEnv("LLM_TIMEOUT", defaultLLMTimeout)
-	if enabled && timeout >= app.GradeTimeout() {
-		log.Printf("LLM_TIMEOUT (%s) is not below GRADE_TIMEOUT (%s): the grade limit may expire before the Documentation reply", timeout, app.GradeTimeout())
+	docs := docsSettings{categoryEnabled: ok && docCfg.Status == config.StatusCalculated, waiters: newDocsWaiters()}
+	warn := func() {
+		if timeout := docs.timeout(); docs.enabled() && timeout >= app.GradeTimeout() {
+			log.Printf("LLM_TIMEOUT (%s) is not below GRADE_TIMEOUT (%s): the grade limit may expire before the Documentation reply", timeout, app.GradeTimeout())
+		}
 	}
-	return docsSettings{enabled: enabled, timeout: timeout, waiters: newDocsWaiters()}
+	warn()
+	runtimeconfig.OnChange(warn)
+	return docs
 }
 
 // requestDocs publishes repo.docs.grade.requested and returns the channel its reply arrives on
 // plus the wait deadline, or a nil channel when docs grading is off or the publish failed.
 func requestDocs(ctx context.Context, producer *kafkaclient.Producer, docs docsSettings, ready contracts.RepoReady) (chan contracts.DocsGraded, time.Time) {
-	if !docs.enabled {
+	if !docs.enabled() {
 		return nil, time.Time{}
 	}
 	ch := docs.waiters.register(ready.JobID)
@@ -356,7 +367,7 @@ func requestDocs(ctx context.Context, producer *kafkaclient.Producer, docs docsS
 		log.Printf("publishing %s for %s/%s failed: %v (Documentation will be no-data)", contracts.TopicDocsGradeRequested, ready.OrgSlug, ready.RepoSlug, err)
 		return nil, time.Time{}
 	}
-	return ch, time.Now().Add(docs.timeout)
+	return ch, time.Now().Add(docs.timeout())
 }
 
 // defaultGradeRequestMaxAge matches the aggregator's GRADING_LOCK_TIMEOUT: by then the aggregator
@@ -366,7 +377,7 @@ const defaultGradeRequestMaxAge = 20 * time.Minute
 // gradeRequestMaxAge returns GRADE_REQUEST_MAX_AGE (a Go duration) or the default; "0" turns the
 // age check off.
 func gradeRequestMaxAge() time.Duration {
-	v := os.Getenv("GRADE_REQUEST_MAX_AGE")
+	v := runtimeconfig.Getenv("GRADE_REQUEST_MAX_AGE")
 	if v == "" {
 		return defaultGradeRequestMaxAge
 	}

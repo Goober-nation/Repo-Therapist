@@ -21,7 +21,7 @@ func (s *GatewayService) GetMyOrgs(
 		return domain.GetMyOrgsDTO{}, domain.ErrUnauthenticated
 	}
 
-	rpcCtx, cancel := context.WithTimeout(withPAT(ctx, pat), s.aggregatorTimeout)
+	rpcCtx, cancel := context.WithTimeout(withPAT(ctx, pat), s.aggregatorRPCTimeout())
 	defer cancel()
 
 	resp, err := s.aggregatorClient.GetMyOrgs(rpcCtx, &agg.GetMyOrgsRequest{})
@@ -63,7 +63,7 @@ func (s *GatewayService) GetOrgRepos(
 		return domain.GetMyReposDTO{}, domain.ErrInvalidRequest
 	}
 
-	rpcCtx, cancel := context.WithTimeout(withPAT(ctx, pat), s.aggregatorTimeout)
+	rpcCtx, cancel := context.WithTimeout(withPAT(ctx, pat), s.aggregatorRPCTimeout())
 	defer cancel()
 
 	resp, err := s.aggregatorClient.GetOrgRepos(rpcCtx, &agg.GetOrgReposRequest{

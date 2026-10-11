@@ -22,12 +22,16 @@ func NewGradeLimiter(limit int, window time.Duration) *GradeLimiter {
 // Reserve takes a slot at now. When the window is full it returns false and how long until the
 // oldest start leaves the window.
 func (l *GradeLimiter) Reserve(now time.Time) (bool, time.Duration) {
-	if l == nil || l.limit <= 0 {
+	if l == nil {
 		return true, 0
 	}
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
+	if l.limit <= 0 {
+		return true, 0
+	}
 
 	cutoff := now.Add(-l.window)
 	kept := l.starts[:0]
@@ -49,7 +53,7 @@ func (l *GradeLimiter) Reserve(now time.Time) (bool, time.Duration) {
 
 // Cancel returns the slot taken at start, for a grading that was never published.
 func (l *GradeLimiter) Cancel(start time.Time) {
-	if l == nil || l.limit <= 0 {
+	if l == nil {
 		return
 	}
 
@@ -62,4 +66,18 @@ func (l *GradeLimiter) Cancel(start time.Time) {
 			return
 		}
 	}
+}
+
+// SetLimits changes the limit and window at runtime (config reloads, admin overrides). Starts
+// already counted stay counted; a lower limit applies from the next Reserve.
+func (l *GradeLimiter) SetLimits(limit int, window time.Duration) {
+	if l == nil {
+		return
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.limit = limit
+	l.window = window
 }

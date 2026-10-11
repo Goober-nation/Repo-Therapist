@@ -5,7 +5,7 @@
 package contracts
 
 import (
-	"os"
+	"repo-therapist/runtimeconfig"
 	"strings"
 	"time"
 )
@@ -13,13 +13,13 @@ import (
 // Topic names default to the documented contract and can be overridden per environment; the env
 // names are shared with grade-service (docs/kafka-contracts.md, "Topic env vars").
 var (
-	TopicGradeRequested = TopicEnv("KAFKA_REPO_GRADE_REQUESTED_TOPIC", "repo.grade.requested")
-	TopicRepoReady      = TopicEnv("KAFKA_REPO_READY_TOPIC", "repo.ready")
+	TopicGradeRequested string
+	TopicRepoReady      string
 )
 
 // TopicEnv returns the trimmed value of env var key, or def when it is unset or blank.
 func TopicEnv(key, def string) string {
-	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+	if v := strings.TrimSpace(runtimeconfig.Getenv(key)); v != "" {
 		return v
 	}
 	return def
@@ -27,7 +27,7 @@ func TopicEnv(key, def string) string {
 
 // AllTopics is every topic this exchange uses — pass to kafka.EnsureTopics at service startup so
 // neither service can join a consumer group before its topic exists.
-var AllTopics = []string{TopicGradeRequested, TopicRepoReady}
+var AllTopics []string
 
 // GradeRequested is published to ask Repository service to clone+upload a repo. Consumed by
 // Repository service, produced by grade-service relaying grading.requests.
@@ -59,4 +59,14 @@ type RepoReady struct {
 	S3Prefix        string `json:"s3_prefix,omitempty"`
 	Status          string `json:"status"` // StatusReady | StatusFailed
 	Error           string `json:"error,omitempty"`
+}
+
+func init() { LoadTopics() }
+
+// LoadTopics reads the topic names. It runs at package init (tools, tests) and again from main
+// after runtimeconfig.Start, so names set in config/app.yaml apply; the names are restart-only.
+func LoadTopics() {
+	TopicGradeRequested = TopicEnv("KAFKA_REPO_GRADE_REQUESTED_TOPIC", "repo.grade.requested")
+	TopicRepoReady = TopicEnv("KAFKA_REPO_READY_TOPIC", "repo.ready")
+	AllTopics = []string{TopicGradeRequested, TopicRepoReady}
 }

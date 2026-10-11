@@ -15,7 +15,7 @@ func (as *AggregatorService) GetMyOrgs(ctx context.Context) (domain.MyOrganizati
 		return domain.MyOrganizations{}, domain.ErrUnauthenticated
 	}
 
-	cont, cancel := context.WithTimeout(withToken(ctx, token), as.RPCTimeout)
+	cont, cancel := context.WithTimeout(withToken(ctx, token), as.rpcTimeout())
 	defer cancel()
 
 	response, err := as.clientRPC.GetMyOrgs(cont, &client.GetMyOrgsRequest{})
@@ -49,7 +49,7 @@ func (as *AggregatorService) GetOrgRepos(
 		return domain.MyRepositoriesResponse{}, domain.ErrUnauthenticated
 	}
 
-	cont, cancel := context.WithTimeout(withToken(ctx, token), as.RPCTimeout)
+	cont, cancel := context.WithTimeout(withToken(ctx, token), as.rpcTimeout())
 	defer cancel()
 
 	response, err := as.clientRPC.GetOrgRepos(cont, &client.GetOrgReposRequest{

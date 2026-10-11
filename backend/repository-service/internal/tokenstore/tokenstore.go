@@ -6,7 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
+	"repo-therapist/runtimeconfig"
 	"strconv"
 
 	"github.com/redis/go-redis/v9"
@@ -30,12 +30,12 @@ type Redis struct {
 // NewFromEnv connects with the env names gateway-service uses: REDIS_ADDRESS, REDIS_PASSWORD,
 // REDIS_DB.
 func NewFromEnv() *Redis {
-	db, _ := strconv.Atoi(os.Getenv("REDIS_DB"))
-	addr := os.Getenv("REDIS_ADDRESS")
+	db, _ := strconv.Atoi(runtimeconfig.Getenv("REDIS_DB"))
+	addr := runtimeconfig.Getenv("REDIS_ADDRESS")
 	if addr == "" {
 		addr = "localhost:6379"
 	}
-	return &Redis{client: redis.NewClient(&redis.Options{Addr: addr, Password: os.Getenv("REDIS_PASSWORD"), DB: db})}
+	return &Redis{client: redis.NewClient(&redis.Options{Addr: addr, Password: runtimeconfig.Getenv("REDIS_PASSWORD"), DB: db})}
 }
 
 func (r *Redis) Ping(ctx context.Context) error { return r.client.Ping(ctx).Err() }

@@ -45,8 +45,8 @@ func (as *AggregatorService) batchConcurrency() int {
 }
 
 func (as *AggregatorService) batchItemTimeout() time.Duration {
-	if as.BatchItemTimeout > 0 {
-		return as.BatchItemTimeout
+	if timeout := as.liveBatchItemTimeout(); timeout > 0 {
+		return timeout
 	}
 
 	return DefaultBatchItemTimeout
@@ -89,8 +89,8 @@ func (as *AggregatorService) selectForBatch(ctx context.Context, filter domain.B
 		return filter, batchSelection{}, err
 	}
 
-	if as.BatchMaxLimit > 0 && filter.Limit > as.BatchMaxLimit {
-		return filter, batchSelection{}, fmt.Errorf("%w (%d)", domain.ErrBatchLimitTooHigh, as.BatchMaxLimit)
+	if maxLimit := as.batchMaxLimit(); maxLimit > 0 && filter.Limit > maxLimit {
+		return filter, batchSelection{}, fmt.Errorf("%w (%d)", domain.ErrBatchLimitTooHigh, maxLimit)
 	}
 
 	if as.catalogInUse(ctx) {
@@ -350,7 +350,7 @@ func (as *AggregatorService) BatchStatus(ctx context.Context, id int64) (domain.
 }
 
 // MaxBatchLimit is the stand's cap on one batch's limit; 0 means none.
-func (as *AggregatorService) MaxBatchLimit() int { return as.BatchMaxLimit }
+func (as *AggregatorService) MaxBatchLimit() int { return as.batchMaxLimit() }
 
 // ListBatches returns the most recent batches, newest first.
 func (as *AggregatorService) ListBatches(ctx context.Context, limit int) ([]domain.Batch, error) {
@@ -583,7 +583,16 @@ func (as *AggregatorService) gradeBatchItem(ctx context.Context, repoID uuid.UUI
 
 	startedAt := as.now()
 
-	if err := as.requestGrading(withTrigger(ctx, "batch"), repo, false, false); !errors.Is(err, domain.GradingPending) {
+	// Waits while users' gradings are in flight or the background slots are full.
+	release, err := as.backgroundTurn(ctx)
+	if err != nil {
+		return domain.BatchItemFailed, domain.BatchErrorTimeout
+	}
+
+	err = as.requestGrading(withTrigger(ctx, "batch"), repo, false, false)
+	release()
+
+	if !errors.Is(err, domain.GradingPending) {
 		log.Printf("grading batch: request %s/%s: %v", repo.OrgSlug, repo.RepoSlug, err)
 
 		return domain.BatchItemFailed, domain.BatchErrorRequest
@@ -612,6 +621,9 @@ func (as *AggregatorService) gradeBatchItem(ctx context.Context, repoID uuid.UUI
 
 		break
 	}
+
+	// A free lock ends the grading even when its result was lost (lock timeout).
+	as.landFlight(repo.SourcecraftUUID)
 
 	if as.takeGradingFailure(key) {
 		return domain.BatchItemFailed, domain.BatchErrorGrading

@@ -64,6 +64,16 @@ service Aggregator {
   // CancelCatalogRefresh stops the running refresh; the catalog in use is untouched. ABORTED
   // (refresh_not_running) when none runs.
   rpc CancelCatalogRefresh(CancelCatalogRefreshRequest) returns (CancelCatalogRefreshResponse);
+  // ListSettings lists the admin-editable keys of config/app.yaml (docs/config.md) with their
+  // app.yaml value, admin override and the processes whose environment sets them. Read-only.
+  rpc ListSettings(ListSettingsRequest) returns (ListSettingsResponse);
+  // SetSetting stores an admin override and publishes it to config.updated. NOT_FOUND
+  // (setting_unknown) for a key that is not admin-editable, INVALID_ARGUMENT (setting_invalid) for a
+  // value outside its type or bounds, ABORTED (setting_env_locked) when the environment
+  // of a process that uses the key sets it. Recorded in the audit log under actor_hash.
+  rpc SetSetting(SetSettingRequest) returns (SetSettingResponse);
+  // ResetSetting drops the override so the app.yaml value applies again. Recorded in the audit log.
+  rpc ResetSetting(ResetSettingRequest) returns (ResetSettingResponse);
 }
 
 message GetRegradeStatusRequest {}
@@ -389,4 +399,60 @@ message CatalogRefresh {
   int32 repos = 8;
   // wrapper_error | too_many_pages | page_loop | store_error | interrupted | empty_listing; empty otherwise.
   string error = 9;
+}
+
+message ListSettingsRequest {}
+
+message ListSettingsResponse {
+  repeated Setting settings = 1;
+  // The processes that reported their configuration on config.status.
+  repeated ConfigProcess processes = 2;
+}
+
+message Setting {
+  // app.yaml path, e.g. gateway.rate_limit.
+  string key = 1;
+  string group = 2;
+  string title = 3;
+  // int, float, duration, bool, string or enum.
+  string type = 4;
+  string min = 5;
+  string max = 6;
+  repeated string values = 7;
+  // The app.yaml value; file_set is false when the file leaves the key to the code default.
+  string file_value = 8;
+  bool file_set = 9;
+  string override_value = 10;
+  bool overridden = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  string updated_by = 13;
+  // Processes whose environment sets the key; the environment always wins, so no override applies.
+  repeated string env_locked_by = 14;
+}
+
+message ConfigProcess {
+  string name = 1;
+  repeated string sections = 2;
+  // Static (restart-only) keys changed in app.yaml since the process started.
+  repeated string restart_pending = 3;
+  google.protobuf.Timestamp reported_at = 4;
+}
+
+message SetSettingRequest {
+  string key = 1;
+  string value = 2;
+  string actor_hash = 3;
+}
+
+message SetSettingResponse {
+  Setting setting = 1;
+}
+
+message ResetSettingRequest {
+  string key = 1;
+  string actor_hash = 2;
+}
+
+message ResetSettingResponse {
+  Setting setting = 1;
 }

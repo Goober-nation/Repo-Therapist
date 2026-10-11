@@ -10,6 +10,7 @@ import (
 	"gateway-service/internal/transport/rpc/gen/rank"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,6 +22,10 @@ import (
 type GatewayService struct {
 	aggregatorClient agg.AggregatorClient
 	ratingClient     rank.RatingClient
+
+	// liveMu guards the fields config reloads and admin overrides change at runtime: the three
+	// timeouts, forceCooldown, userAuditDedup and series (see live.go).
+	liveMu sync.RWMutex
 
 	aggregatorTimeout time.Duration
 	ratingTimeout     time.Duration
@@ -54,6 +59,8 @@ type GatewayService struct {
 	adminGrants   domain.AdminGrantStore
 	attemptGuard  domain.AttemptGuard
 	grantTTL      time.Duration
+	// devAuthBypass is true while DEV_AUTH_BYPASS_USER_ID is set (SetDevAuthBypass).
+	devAuthBypass bool
 }
 
 func NewGatewayService(
@@ -187,7 +194,7 @@ func (s *GatewayService) GetMyRepos(
 		return domain.GetMyReposDTO{}, domain.ErrUnauthenticated
 	}
 
-	rpcCtx, cancel := context.WithTimeout(withPAT(ctx, pat), s.aggregatorTimeout)
+	rpcCtx, cancel := context.WithTimeout(withPAT(ctx, pat), s.aggregatorRPCTimeout())
 	defer cancel()
 
 	resp, err := s.aggregatorClient.GetMyRepos(
@@ -279,7 +286,7 @@ func (s *GatewayService) RequestLLMRecommendations(
 		return domain.RequestLLMRecommendationsResponse{}, err
 	}
 
-	rpcCtx, cancel := context.WithTimeout(withPAT(ctx, pat), s.aggregatorTimeout)
+	rpcCtx, cancel := context.WithTimeout(withPAT(ctx, pat), s.aggregatorRPCTimeout())
 	defer cancel()
 
 	resp, err := s.aggregatorClient.RequestLLMRecommendations(
@@ -336,7 +343,7 @@ func (s *GatewayService) GetGrading(
 		}
 	}
 
-	rpcCtx, cancel := context.WithTimeout(withPAT(ctx, pat), s.aggregatorTimeout)
+	rpcCtx, cancel := context.WithTimeout(withPAT(ctx, pat), s.aggregatorRPCTimeout())
 	defer cancel()
 
 	resp, err := s.aggregatorClient.GetGrading(
@@ -378,7 +385,7 @@ func (s *GatewayService) GetAnalytics(
 		return domain.RepoAnalytics{}, err
 	}
 
-	rpcCtx, cancel := context.WithTimeout(withPAT(ctx, pat), s.aggregatorTimeout)
+	rpcCtx, cancel := context.WithTimeout(withPAT(ctx, pat), s.aggregatorRPCTimeout())
 	defer cancel()
 
 	resp, err := s.aggregatorClient.GetAnalytics(
@@ -453,7 +460,7 @@ func (s *GatewayService) GetRanking(
 
 	rpcCtx, cancel := context.WithTimeout(
 		ctx,
-		s.ratingTimeout,
+		s.ratingRPCTimeout(),
 	)
 	defer cancel()
 
@@ -487,7 +494,7 @@ func (s *GatewayService) GetPublicScore(
 	orgSlug string,
 	repoSlug string,
 ) (*int32, error) {
-	rpcCtx, cancel := context.WithTimeout(ctx, s.ratingTimeout)
+	rpcCtx, cancel := context.WithTimeout(ctx, s.ratingRPCTimeout())
 	defer cancel()
 
 	resp, err := s.ratingClient.GetPublicScore(
@@ -509,7 +516,7 @@ func (s *GatewayService) GetPublicSummary(
 	orgSlug string,
 	repoSlug string,
 ) (domain.PublicSummary, error) {
-	rpcCtx, cancel := context.WithTimeout(ctx, s.ratingTimeout)
+	rpcCtx, cancel := context.WithTimeout(ctx, s.ratingRPCTimeout())
 	defer cancel()
 
 	resp, err := s.ratingClient.GetPublicSummary(
@@ -567,7 +574,7 @@ func (s *GatewayService) GetScoreHistory(
 		return nil, err
 	}
 
-	rpcCtx, cancel := context.WithTimeout(ctx, s.ratingTimeout)
+	rpcCtx, cancel := context.WithTimeout(ctx, s.ratingRPCTimeout())
 	defer cancel()
 
 	resp, err := s.ratingClient.GetScoreHistory(
@@ -604,7 +611,7 @@ func (s *GatewayService) GetRegradeStatus(ctx context.Context, clientIP string) 
 		return domain.RegradeStatus{}, err
 	}
 
-	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorTimeout)
+	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorRPCTimeout())
 	defer cancel()
 
 	resp, err := s.aggregatorClient.GetRegradeStatus(rpcCtx, &agg.GetRegradeStatusRequest{})
@@ -650,7 +657,7 @@ func (s *GatewayService) GetPositionExplanation(
 		return domain.PositionExplanation{}, err
 	}
 
-	rpcCtx, cancel := context.WithTimeout(ctx, s.ratingTimeout)
+	rpcCtx, cancel := context.WithTimeout(ctx, s.ratingRPCTimeout())
 	defer cancel()
 
 	resp, err := s.ratingClient.GetPositionExplanation(
@@ -862,7 +869,7 @@ func (s *GatewayService) LoginWithYandex(
 		)
 	}
 
-	yandexCtx, cancel := context.WithTimeout(ctx, s.yandexTimeout)
+	yandexCtx, cancel := context.WithTimeout(ctx, s.yandexRPCTimeout())
 	defer cancel()
 
 	yandexUser, err := s.yandexClient.GetUser(
@@ -930,3 +937,7 @@ func (s *GatewayService) LoginWithYandex(
 		SessionID: sessionID,
 	}, nil
 }
+
+// SetDevAuthBypass records that the Yandex sign-in is bypassed (testing stands), so the public
+// config may offer the dev sign-in button.
+func (s *GatewayService) SetDevAuthBypass(on bool) { s.devAuthBypass = on }

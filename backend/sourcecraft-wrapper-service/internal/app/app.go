@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"repo-therapist/runtimeconfig"
 	"sourcecraft-wrapper-service/internal/config"
 	"sourcecraft-wrapper-service/internal/retry"
 	"sourcecraft-wrapper-service/internal/service"
@@ -16,32 +17,23 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 )
 
 func StartApp() {
-	if err := godotenv.Load(); err != nil {
-		log.Printf("no .env file loaded: %v", err)
-	}
 	cfg := config.LoadConfig()
-	var client http.Client
-	timeout := intSetting("CLIENT_TIMEOUT", cfg.ClientTimeout, 5, 1)
-	retryAttempts := intSetting("HTTP_RETRY_ATTEMPTS", cfg.RetryAttempts, 3, 1)
-	rateLimitAttempts := intSetting("HTTP_RATE_LIMIT_ATTEMPTS", cfg.RateLimitAttempts, 6, 1)
-	retryWait := intSetting("HTTP_RETRY_WAIT_SECONDS", cfg.RetryWaitSeconds, 1, 0)
-	maxPages := intSetting("SOURCECRAFT_MAX_PAGES", cfg.MaxPages, 50, 1)
 	// No Client.Timeout: it would cap all retry attempts together; the transport times each one.
-	client = http.Client{
-		Transport: &retry.Transport{
-			Attempts:          retryAttempts,
-			RateLimitAttempts: rateLimitAttempts,
-			Wait:              time.Duration(retryWait) * time.Second,
-			AttemptTimeout:    time.Duration(timeout) * time.Second,
-		},
-	}
+	transport := newSwapTransport(retryTransport(cfg))
+	client := http.Client{Transport: transport}
 	srvc := service.NewSCWrapperService(client, cfg.SourceCraftURL)
-	srvc.MaxPages = maxPages
+	srvc.SetMaxPages(intSetting("SOURCECRAFT_MAX_PAGES", cfg.MaxPages, 50, 1))
+	// Retries, timeouts and the page cap follow config/app.yaml reloads; APP_PORT and
+	// SOURCECRAFT_URL need a restart.
+	runtimeconfig.OnChange(func() {
+		live := config.LoadConfig()
+		transport.set(retryTransport(live))
+		srvc.SetMaxPages(intSetting("SOURCECRAFT_MAX_PAGES", live.MaxPages, 50, 1))
+	})
 	lis, err := net.Listen("tcp", ":"+cfg.AppPort)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
@@ -87,6 +79,15 @@ func StartApp() {
 
 // intSetting parses a numeric setting; an invalid or too small value falls back to def with a log
 // line instead of stopping the service (the container's entrypoint stops every service when one exits).
+func retryTransport(cfg *config.Config) *retry.Transport {
+	return &retry.Transport{
+		Attempts:          intSetting("HTTP_RETRY_ATTEMPTS", cfg.RetryAttempts, 3, 1),
+		RateLimitAttempts: intSetting("HTTP_RATE_LIMIT_ATTEMPTS", cfg.RateLimitAttempts, 6, 1),
+		Wait:              time.Duration(intSetting("HTTP_RETRY_WAIT_SECONDS", cfg.RetryWaitSeconds, 1, 0)) * time.Second,
+		AttemptTimeout:    time.Duration(intSetting("CLIENT_TIMEOUT", cfg.ClientTimeout, 5, 1)) * time.Second,
+	}
+}
+
 func intSetting(name, value string, def, min int) int {
 	n, err := strconv.Atoi(value)
 	if err != nil || n < min {

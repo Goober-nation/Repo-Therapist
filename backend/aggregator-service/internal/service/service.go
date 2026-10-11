@@ -56,6 +56,8 @@ type AggregatorService struct {
 	BatchPoll        time.Duration
 	// BatchMaxLimit caps the limit of one batch (config BATCH_GRADING_MAX_LIMIT); 0 means no cap.
 	BatchMaxLimit int
+	// Settings is the admin settings page (config/app.yaml overrides); nil leaves it off.
+	Settings *Settings
 	// CatalogRepo stores the public repo catalog; nil leaves it off and the live listings in use.
 	CatalogRepo domain.CatalogRepository
 	// CatalogMaxPages bounds one catalog refresh; 0 means DefaultCatalogMaxPages.
@@ -85,6 +87,8 @@ type AggregatorService struct {
 	// TokenTTL bounds how long a stored PAT lives; keep it equal to the repo lock timeout.
 	// 0 falls back to DefaultGradingTokenTTL.
 	TokenTTL time.Duration
+	// AuditRetentionDays deletes audit entries older than this many days; 0 keeps them forever.
+	AuditRetentionDays int
 
 	llmMu       sync.Mutex
 	llmRequests map[string]llmRequest
@@ -92,6 +96,10 @@ type AggregatorService struct {
 	failureMu       sync.Mutex
 	gradingFailures map[string]time.Time
 	now             func() time.Time
+
+	// liveMu guards the fields config reloads and admin overrides change while the service runs
+	// (UpdateLive); read them through the accessors in live.go.
+	liveMu sync.RWMutex
 
 	regradeMu    sync.Mutex
 	regradeState regradeState
@@ -104,6 +112,9 @@ type AggregatorService struct {
 
 	// gradingStarts remembers when each repo's grading was requested, to time it at the result.
 	gradingStarts sync.Map
+
+	// inflight tracks published gradings so background ones yield to user ones (priority.go).
+	inflight flights
 }
 
 // regradeState is what the public regrade reports about itself; guarded by regradeMu.
@@ -391,7 +402,7 @@ func (as *AggregatorService) needsRegrade(ctx context.Context, repo domain.Repo,
 		return true
 	}
 
-	if !as.RegradeMissingAnalytics {
+	if !as.regradeMissingAnalytics() {
 		return false
 	}
 
@@ -453,7 +464,7 @@ func (as *AggregatorService) resolveView(ctx context.Context, orgSlug, repoSlug 
 
 // resolveRepo fetches the repo's current metadata from the wrapper and stores it in repos.
 func (as *AggregatorService) resolveRepo(ctx context.Context, orgSlug, repoSlug string) (domain.Repo, error) {
-	cont, cancel := context.WithTimeout(as.wrapperContext(ctx), as.RPCTimeout)
+	cont, cancel := context.WithTimeout(as.wrapperContext(ctx), as.rpcTimeout())
 	defer cancel()
 
 	response, err := as.clientRPC.GetRepositoryBySlugs(
@@ -621,8 +632,11 @@ func (as *AggregatorService) requestGrading(ctx context.Context, repo domain.Rep
 
 	as.gradingStarts.Store(repo.SourcecraftUUID, as.now())
 
+	trigger := gradingTrigger(ctx, userInitiated)
+	as.trackFlight(repo.SourcecraftUUID, isBackgroundTrigger(trigger))
+
 	if as.Metrics != nil {
-		as.Metrics.GradingRequested(visibilityLabel(private), gradingTrigger(ctx, userInitiated))
+		as.Metrics.GradingRequested(visibilityLabel(private), trigger)
 	}
 
 	return domain.GradingPending
@@ -636,7 +650,7 @@ func (as *AggregatorService) storeGradingToken(ctx context.Context, jobID, token
 	if as.TokenStore == nil {
 		return errors.New("no grading token store configured")
 	}
-	ttl := as.TokenTTL
+	ttl := as.tokenTTL()
 	if ttl <= 0 {
 		ttl = DefaultGradingTokenTTL
 	}
@@ -652,7 +666,7 @@ func (as *AggregatorService) GetMyRepos(
 		return domain.MyRepositoriesResponse{}, domain.ErrUnauthenticated
 	}
 
-	cont, cancel := context.WithTimeout(withToken(ctx, token), as.RPCTimeout)
+	cont, cancel := context.WithTimeout(withToken(ctx, token), as.rpcTimeout())
 	defer cancel()
 
 	response, err := as.clientRPC.GetMyRepos(
@@ -694,9 +708,9 @@ func (as *AggregatorService) StartPublicGrading(ctx context.Context, interval ti
 	as.regradeState.enabled = true
 	as.regradeState.interval = interval
 	as.regradeState.nextRunAt = as.currentTime().Add(interval)
-	as.regradeMu.Unlock()
-
+	// Under regradeMu: SetRegradeInterval resets this ticker from config changes.
 	as.ticker = time.NewTicker(interval)
+	as.regradeMu.Unlock()
 
 	go func() {
 		defer as.ticker.Stop()
@@ -712,7 +726,7 @@ func (as *AggregatorService) StartPublicGrading(ctx context.Context, interval ti
 
 			case tick := <-as.ticker.C:
 				as.regradeMu.Lock()
-				as.regradeState.nextRunAt = tick.Add(interval)
+				as.regradeState.nextRunAt = tick.Add(as.regradeState.interval)
 				as.regradeMu.Unlock()
 
 				as.runPublicRegrade(ctx)
@@ -789,6 +803,7 @@ func (as *AggregatorService) SaveGradingResult(ctx context.Context,
 	}()
 
 	started, timed := as.gradingStarts.LoadAndDelete(grade.SourcecraftUUID)
+	as.landFlight(grade.SourcecraftUUID)
 
 	var elapsed time.Duration
 
@@ -1022,7 +1037,7 @@ func (as *AggregatorService) regradePublicRepos(ctx context.Context) error {
 // with 0). The scheduled run only refreshes existing grades: a repo never graded is not in the list.
 // invalid is kept for the caller's count and is always 0.
 func (as *AggregatorService) publicReposToRegrade(ctx context.Context) (repos []domain.Repo, invalid int, err error) {
-	limit := as.RegradeLimit
+	limit := as.regradeLimit()
 	if limit <= 0 {
 		limit = math.MaxInt32
 	}
@@ -1064,6 +1079,13 @@ func (as *AggregatorService) regradeRepo(ctx context.Context, repo domain.Repo) 
 	if fresh.Visibility != domain.VisibilityPublic || !active {
 		return nil
 	}
+
+	// Waits while users' gradings are in flight or the background slots are full.
+	release, err := as.backgroundTurn(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
 
 	if err := as.requestGrading(ctx, fresh, false, false); !errors.Is(err, domain.GradingPending) {
 		return err
@@ -1238,7 +1260,7 @@ func (as *AggregatorService) markLLMRequested(key string) bool {
 	defer as.llmMu.Unlock()
 
 	now := as.now()
-	if request, ok := as.llmRequests[key]; ok && request.failure == "" && now.Sub(request.requestedAt) < as.LLMRequestTTL {
+	if request, ok := as.llmRequests[key]; ok && request.failure == "" && now.Sub(request.requestedAt) < as.llmRequestTTL() {
 		return false
 	}
 
@@ -1357,7 +1379,7 @@ func (as *AggregatorService) hasPrivateAccess(ctx context.Context, repo domain.R
 		return false
 	}
 
-	cont, cancel := context.WithTimeout(withToken(ctx, token), as.RPCTimeout)
+	cont, cancel := context.WithTimeout(withToken(ctx, token), as.rpcTimeout())
 	defer cancel()
 
 	response, err := as.clientRPC.GetMyRepos(

@@ -24,7 +24,7 @@ func (s *GatewayService) GetPlatformStats(ctx context.Context, clientIP string) 
 		return domain.PlatformStats{}, err
 	}
 
-	rpcCtx, cancel := context.WithTimeout(ctx, s.ratingTimeout)
+	rpcCtx, cancel := context.WithTimeout(ctx, s.ratingRPCTimeout())
 	defer cancel()
 
 	resp, err := s.ratingClient.GetPlatformAnalytics(rpcCtx, &rank.GetPlatformAnalyticsRequest{})
@@ -114,7 +114,7 @@ func (s *GatewayService) ExportPublicGrades(ctx context.Context, clientIP string
 	}
 
 	for page := int32(1); ; page++ {
-		rpcCtx, cancel := context.WithTimeout(ctx, s.ratingTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, s.ratingRPCTimeout())
 		resp, err := s.ratingClient.ListPublicGrades(rpcCtx, &rank.ListPublicGradesRequest{Page: page, PageSize: exportPageSize})
 		cancel()
 

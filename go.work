@@ -1,11 +1,12 @@
 go 1.27.1
 
 use (
-	./backend/grade-service
-	./backend/repository-service
-	./backend/security-wrapper-service
-	./backend/sourcecraft-wrapper-service
 	./backend/aggregator-service
 	./backend/gateway-service
+	./backend/grade-service
 	./backend/rating-service
+	./backend/repository-service
+	./backend/runtimeconfig
+	./backend/security-wrapper-service
+	./backend/sourcecraft-wrapper-service
 )

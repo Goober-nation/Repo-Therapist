@@ -33,7 +33,7 @@ func catalogRefreshFromProto(r *agg.CatalogRefresh) *domain.CatalogRefresh {
 
 // GetCatalogStatus returns the public repo catalog's size, age and refreshes.
 func (s *GatewayService) GetCatalogStatus(ctx context.Context) (domain.CatalogStatus, error) {
-	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorTimeout)
+	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorRPCTimeout())
 	defer cancel()
 
 	resp, err := s.aggregatorClient.GetCatalogStatus(rpcCtx, &agg.GetCatalogStatusRequest{})
@@ -57,7 +57,7 @@ func (s *GatewayService) GetCatalogStatus(ctx context.Context) (domain.CatalogSt
 
 // RefreshCatalog starts a catalog refresh under the admin's actor hash.
 func (s *GatewayService) RefreshCatalog(ctx context.Context, actorHash string) (domain.CatalogRefresh, error) {
-	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorTimeout)
+	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorRPCTimeout())
 	defer cancel()
 
 	resp, err := s.aggregatorClient.RefreshCatalog(rpcCtx, &agg.RefreshCatalogRequest{ActorHash: actorHash})
@@ -70,7 +70,7 @@ func (s *GatewayService) RefreshCatalog(ctx context.Context, actorHash string) (
 
 // CancelCatalogRefresh stops the running catalog refresh.
 func (s *GatewayService) CancelCatalogRefresh(ctx context.Context, actorHash string) (domain.CatalogRefresh, error) {
-	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorTimeout)
+	rpcCtx, cancel := context.WithTimeout(ctx, s.aggregatorRPCTimeout())
 	defer cancel()
 
 	resp, err := s.aggregatorClient.CancelCatalogRefresh(rpcCtx, &agg.CancelCatalogRefreshRequest{ActorHash: actorHash})

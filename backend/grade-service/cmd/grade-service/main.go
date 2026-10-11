@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"repo-therapist/runtimeconfig"
+	"repo-therapist/runtimeconfig/kafkasync"
 
 	"repo-therapist/grade-service/internal/app"
 	"repo-therapist/grade-service/internal/config"
@@ -22,13 +24,21 @@ import (
 )
 
 func main() {
+	// Settings (config/app.yaml + env + admin overrides) must load before anything reads them.
+	store, startErr := runtimeconfig.Start(context.Background(), "grade")
+	if startErr != nil {
+		log.Fatalf("config: %v", startErr)
+	}
+	// Admin overrides (config.updated) are read up to date before the service starts work.
+	kafkasync.Run(context.Background(), store, "grade")
+	contracts.LoadTopics()
 	repoID := flag.String("repo-id", "", "SourceCraft repo UUID (one-shot mode)")
 	configPath := flag.String("config", "config/grading.yaml", "path to grading policy config")
 	listen := flag.Bool("listen", false, "consume repo.ready from Kafka instead of one-shot mode")
 	flag.Parse()
 
 	for _, key := range []string{"S3_ACCESS_KEY", "S3_SECRET_KEY"} {
-		if os.Getenv(key) == "" {
+		if runtimeconfig.Getenv(key) == "" {
 			log.Fatalf("grade-service: %s is required", key)
 		}
 	}

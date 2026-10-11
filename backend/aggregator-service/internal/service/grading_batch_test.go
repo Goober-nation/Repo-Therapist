@@ -783,6 +783,9 @@ func TestPauseStopsNewGradingsAndResumeContinues(t *testing.T) {
 		t.Fatalf("batch = %+v", done)
 	}
 
+	// completeBatch records the audit entry right after the status, so it can lag behind it.
+	waitFor(t, "completion audit", func() bool { return len(audit.events()) == 4 })
+
 	var actions []string
 	for _, e := range audit.events() {
 		actions = append(actions, e.Action)

@@ -4,6 +4,7 @@ import (
 	"aggregator-service/internal/config"
 	postgres_repositories "aggregator-service/internal/database/postgres-repositories"
 	redis_repositories "aggregator-service/internal/database/redis"
+	"aggregator-service/internal/domain"
 	"aggregator-service/internal/metrics"
 	"aggregator-service/internal/service"
 	"aggregator-service/internal/transport/kafka"
@@ -15,21 +16,18 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"repo-therapist/runtimeconfig"
+	"repo-therapist/runtimeconfig/kafkasync"
 	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
 	goredis "github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 func StartApp() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Printf(".env not found, using environment variables")
-	}
 
 	cfg := config.LoadConfig()
 
@@ -52,7 +50,6 @@ func StartApp() {
 
 	log.Println("postgres connected")
 	reposRepo := postgres_repositories.NewRepoRepository(db)
-	reposRepo.LockTimeout = cfg.Grading.LockTimeout
 	gradesRepo := postgres_repositories.NewGradesRepository(db)
 	llmRepo := postgres_repositories.NewLLMRepository(db)
 	auditRepo := postgres_repositories.NewAuditRepository(db)
@@ -73,6 +70,15 @@ func StartApp() {
 	log.Println("redis connected")
 
 	ensureTopics(ctx, cfg)
+
+	// Admin overrides (docs/config.md): read config.updated up to date before anything uses the
+	// settings, follow config.status for the env locks other processes report.
+	configStore := runtimeconfig.Default()
+	configSync := kafkasync.New(configStore, cfg.Kafka.Brokers, "aggregator")
+	configSync.Start(ctx)
+	configStatuses := kafkasync.ReadStatuses(ctx, cfg.Kafka.Brokers)
+	settingsPublisher := kafkasync.NewPublisher(cfg.Kafka.Brokers)
+	defer settingsPublisher.Close()
 
 	gradingPublisher := kafka.NewGradingPublisher(
 		cfg.Kafka.Brokers,
@@ -117,20 +123,54 @@ func StartApp() {
 	aggregatorService.AuditRepo = auditRepo
 	aggregatorService.BatchRepo = batchRepo
 	aggregatorService.CatalogRepo = catalogRepo
-	aggregatorService.CatalogMaxPages = cfg.Batch.CatalogMaxPages
 	aggregatorService.BatchConcurrency = cfg.Batch.Concurrency
-	aggregatorService.BatchItemTimeout = cfg.Batch.ItemTimeout
-	aggregatorService.BatchMaxLimit = cfg.Batch.MaxLimit
 	aggregatorService.TokenStore = redis_repositories.NewTokenStore(redisClient)
-	aggregatorService.TokenTTL = cfg.Grading.LockTimeout
-	if warning := config.LockTimeoutWarning(cfg.Grading.LockTimeout); warning != "" {
-		log.Println(warning)
-	}
-	aggregatorService.RegradeLimit = cfg.Grading.RegradeLimit
-	aggregatorService.RegradeMissingAnalytics = cfg.Grading.RegradeMissingAnalytics
 	aggregatorService.GradeLimiter = service.NewGradeLimiter(cfg.Grading.RequestLimit, cfg.Grading.RequestWindow)
-	if cfg.Grading.LLMRequestTTL > 0 {
-		aggregatorService.LLMRequestTTL = cfg.Grading.LLMRequestTTL
+	// Non-static settings (config/app.yaml outside `static:`) are re-read on every reload and admin
+	// override; static ones above (addresses, topics, BatchConcurrency) need a restart.
+	applyLive := func() {
+		live := config.LoadConfig()
+		reposRepo.LockTimeout.Store(int64(live.Grading.LockTimeout))
+		aggregatorService.UpdateLive(func(as *service.AggregatorService) {
+			as.RPCTimeout = live.GRPC.Timeout
+			as.CatalogMaxPages = live.Batch.CatalogMaxPages
+			as.BatchItemTimeout = live.Batch.ItemTimeout
+			as.BatchMaxLimit = live.Batch.MaxLimit
+			as.TokenTTL = live.Grading.LockTimeout
+			as.RegradeLimit = live.Grading.RegradeLimit
+			as.RegradeMissingAnalytics = live.Grading.RegradeMissingAnalytics
+			as.LLMRequestTTL = service.DefaultLLMRequestTTL
+			if live.Grading.LLMRequestTTL > 0 {
+				as.LLMRequestTTL = live.Grading.LLMRequestTTL
+			}
+			as.AuditRetentionDays = live.Audit.RetentionDays
+		})
+		aggregatorService.GradeLimiter.SetLimits(live.Grading.RequestLimit, live.Grading.RequestWindow)
+		aggregatorService.SetRegradeInterval(live.Grading.RegradeInterval)
+		if warning := config.LockTimeoutWarning(live.Grading.LockTimeout); warning != "" {
+			log.Println(warning)
+		}
+	}
+	applyLive()
+	runtimeconfig.OnChange(applyLive)
+
+	aggregatorService.Settings = &service.Settings{
+		Repo:      postgres_repositories.NewSettingsRepository(db),
+		Publisher: settingsPublisher,
+		File:      configStore.File,
+		Processes: func() []domain.ConfigProcess {
+			statuses := map[string]service.ProcessStatus{}
+			for name, st := range configStatuses.Statuses() {
+				statuses[name] = service.ProcessStatus{Sections: st.Sections, EnvLocked: st.EnvLocked,
+					RestartPending: st.RestartPending, ReportedAt: st.ReportedAt}
+			}
+
+			return service.ProcessesFromStatuses(statuses)
+		},
+		OwnEnvLocked: func(key string) bool { return configStore.Owns(key) && configStore.EnvLocked(key) },
+	}
+	if err := aggregatorService.ReconcileSettings(ctx, configSync.Seen()); err != nil {
+		log.Printf("config: reconciling admin overrides with Kafka: %v", err)
 	}
 
 	gradeConsumer := kafka.NewGradeConsumer(
@@ -173,7 +213,7 @@ func StartApp() {
 
 	log.Printf("grpc server listening on %s", cfg.GRPC.Address)
 
-	aggregatorService.StartAuditRetention(ctx, cfg.Audit.RetentionDays)
+	aggregatorService.StartAuditRetention(ctx)
 	aggregatorService.ResumeBatch(ctx)
 	aggregatorService.StartCatalog(ctx)
 

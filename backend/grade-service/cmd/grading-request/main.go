@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"repo-therapist/runtimeconfig"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,6 +32,10 @@ import (
 )
 
 func main() {
+	if _, err := runtimeconfig.Init(runtimeconfig.Path(), "grade"); err != nil {
+		log.Fatalf("config: %v", err)
+	}
+	contracts.LoadTopics()
 	org := flag.String("org", "", "org slug")
 	repo := flag.String("repo", "", "repo slug")
 	visibility := flag.String("visibility", "public", "public (no token) or private (SOURCECRAFT_PAT stored in Redis as the user token)")
@@ -45,7 +50,7 @@ func main() {
 	}
 	var token string
 	if *visibility == "private" {
-		token = os.Getenv("SOURCECRAFT_PAT")
+		token = runtimeconfig.Getenv("SOURCECRAFT_PAT")
 		if token == "" {
 			log.Fatal("grading-request: --visibility=private needs SOURCECRAFT_PAT set")
 		}

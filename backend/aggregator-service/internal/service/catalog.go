@@ -26,8 +26,8 @@ type catalogRunner struct {
 }
 
 func (as *AggregatorService) catalogMaxPages() int {
-	if as.CatalogMaxPages > 0 {
-		return as.CatalogMaxPages
+	if pages := as.liveCatalogMaxPages(); pages > 0 {
+		return pages
 	}
 
 	return DefaultCatalogMaxPages
@@ -233,7 +233,7 @@ func (as *AggregatorService) fetchCatalog(ctx context.Context, id int64) (string
 			return domain.CatalogErrorTooManyPages, fmt.Errorf("listing goes past %d pages", as.catalogMaxPages())
 		}
 
-		cont, cancel := context.WithTimeout(withToken(ctx, as.Token), as.RPCTimeout)
+		cont, cancel := context.WithTimeout(withToken(ctx, as.Token), as.rpcTimeout())
 		response, err := as.clientRPC.ListPublicReposPage(cont, &client.ListPublicReposPageRequest{PageToken: pageToken})
 		cancel()
 

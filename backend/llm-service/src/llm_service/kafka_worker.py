@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -16,7 +15,7 @@ from .grade_wire import (REQUEST_TOPIC, RESULT_TOPIC, parse_grade_request,
 from .model_response import InvalidModelResponse
 from .s3_store import S3Config, S3Store, _seconds_env
 from .snapshot import SnapshotError
-from . import summary_wire
+from . import runtime_config, summary_wire
 from .summary import NoGradeData, generate_summary
 from .summary_wire import (build_summary_failure, build_summary_result, parse_summary_request,
                            request_correlation_if_valid)
@@ -46,13 +45,10 @@ def request_age(request: dict) -> float:
 
 
 def _env_first(*keys: str, default: str) -> str:
-    """First nonblank value among env vars keys; the KAFKA_* names shared with the
-    Go services come first, the older LLM_SUMMARY_* names are kept as fallbacks."""
-    for key in keys:
-        value = os.environ.get(key, "").strip()
-        if value:
-            return value
-    return default
+    """First nonblank value among keys; the KAFKA_* names shared with the Go services
+    come first, the older LLM_SUMMARY_* names are kept as fallbacks. An old name set in
+    the environment still beats a new name in config/app.yaml (runtime_config.get_first)."""
+    return runtime_config.get_first(*keys, default=default)
 
 
 @dataclass(frozen=True)
@@ -64,8 +60,8 @@ class KafkaConfig:
 
     @classmethod
     def from_env(cls) -> KafkaConfig:
-        return cls(os.environ.get("KAFKA_BROKERS", "localhost:9092"),
-                   os.environ.get("LLM_KAFKA_GROUP_ID", "llm-service-documentation-v1"),
+        return cls(runtime_config.get("KAFKA_BROKERS", "localhost:9092"),
+                   runtime_config.get("LLM_KAFKA_GROUP_ID", "llm-service-documentation-v1"),
                    _env_first("KAFKA_DOCS_GRADE_REQUESTED_TOPIC", default=cls.request_topic),
                    _env_first("KAFKA_DOCS_GRADED_TOPIC", default=cls.result_topic))
 
@@ -84,7 +80,7 @@ class SummaryKafkaConfig:
 
     @classmethod
     def from_env(cls) -> SummaryKafkaConfig:
-        env = os.environ.get
+        env = runtime_config.get
         return cls(env("KAFKA_BROKERS", cls.brokers),
                    env("LLM_SUMMARY_KAFKA_GROUP_ID", cls.group_id),
                    _env_first("KAFKA_LLM_REQUESTS_TOPIC", "LLM_SUMMARY_REQUEST_TOPIC",
@@ -128,7 +124,7 @@ def _failure(exc: Exception) -> tuple[str, bool, str]:
 
 def documentation_mode() -> str:
     """LLM_DOCS_MODE: auto (default), llm or algorithmic; typos fail at startup."""
-    mode = os.environ.get("LLM_DOCS_MODE", "auto").strip().lower()
+    mode = runtime_config.get("LLM_DOCS_MODE", "auto").strip().lower()
     if mode not in DOCUMENTATION_MODES:
         raise ValueError("LLM_DOCS_MODE must be auto, llm or algorithmic")
     return mode
@@ -306,24 +302,62 @@ def run_summary_worker(config: SummaryKafkaConfig, model, *, consumer=None,
            consumer=consumer, producer=producer)
 
 
+class LiveDocumentation:
+    """LLM_DOCS_MODE, the Yandex model and LLM_DOCS_REQUEST_MAX_AGE_SECONDS for each
+    request, so config/app.yaml reloads and admin overrides apply without a restart. The
+    model is rebuilt only when the mode or its settings change."""
+
+    def __init__(self):
+        self._key = None
+        self._model = None
+        self.current()  # invalid startup settings fail here, before consuming
+
+    def current(self) -> tuple[str, object, float]:
+        mode = documentation_mode()
+        max_age = request_max_age_from_env()
+        key = (mode, runtime_config.get("YANDEX_AI_MODEL", "aliceai-llm"),
+               runtime_config.get("YANDEX_FOLDER_ID", ""))
+        if key != self._key:
+            self._model = documentation_model(mode)
+            self._key = key
+            LOG.info("Documentation mode: %s", mode)
+        return mode, self._model, max_age
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
-    mode = documentation_mode()
-    max_age = request_max_age_from_env()
+    live = LiveDocumentation()
     store = S3Store(S3Config.from_env())
-    model = documentation_model(mode)
-    LOG.info("Documentation mode: %s", mode)
+
+    def handle(raw):
+        mode, model, max_age = live.current()
+        return process_documentation_request(raw, store, model, mode, max_age)
+
     try:
-        run_worker(KafkaConfig.from_env(), store, model, mode=mode, max_age=max_age)
+        config = KafkaConfig.from_env()
+        _serve(config, config.request_topic, config.result_topic, handle)
     except KeyboardInterrupt:
         pass
 
 
 def summary_main() -> None:
     logging.basicConfig(level=logging.INFO)
-    model = YandexModel(YandexModelConfig.from_env())
+    models = {}
+
+    def current_model():
+        # Rebuilt only when YANDEX_AI_MODEL or YANDEX_FOLDER_ID change (config reloads).
+        config = YandexModelConfig.from_env()
+        key = (config.model, config.folder_id)
+        if key not in models:
+            models.clear()
+            models[key] = YandexModel(config)
+        return models[key]
+
+    current_model()  # invalid startup settings fail here, before consuming
+    config = SummaryKafkaConfig.from_env()
     try:
-        run_summary_worker(SummaryKafkaConfig.from_env(), model)
+        _serve(config, config.request_topic, config.result_topic,
+               lambda raw: process_summary_request(raw, current_model()))
     except KeyboardInterrupt:
         pass
 

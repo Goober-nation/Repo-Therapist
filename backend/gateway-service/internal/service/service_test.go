@@ -228,3 +228,15 @@ func TestRecommendationsPendingPassesThrough(t *testing.T) {
 		t.Errorf("err = %v, want ErrPending", err)
 	}
 }
+
+func (f *fakeAggregator) ListSettings(ctx context.Context, in *agg.ListSettingsRequest, opts ...grpc.CallOption) (*agg.ListSettingsResponse, error) {
+	return &agg.ListSettingsResponse{}, f.err
+}
+
+func (f *fakeAggregator) SetSetting(ctx context.Context, in *agg.SetSettingRequest, opts ...grpc.CallOption) (*agg.SetSettingResponse, error) {
+	return &agg.SetSettingResponse{Setting: &agg.Setting{Key: in.GetKey(), Overridden: true, OverrideValue: in.GetValue()}}, f.err
+}
+
+func (f *fakeAggregator) ResetSetting(ctx context.Context, in *agg.ResetSettingRequest, opts ...grpc.CallOption) (*agg.ResetSettingResponse, error) {
+	return &agg.ResetSettingResponse{Setting: &agg.Setting{Key: in.GetKey()}}, f.err
+}

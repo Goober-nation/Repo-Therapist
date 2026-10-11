@@ -33,3 +33,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
 	gopkg.in/ini.v1 v1.67.3 // indirect
 )
+
+require repo-therapist/runtimeconfig v0.0.0
+
+replace repo-therapist/runtimeconfig => ../runtimeconfig

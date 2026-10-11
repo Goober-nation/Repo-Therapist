@@ -315,20 +315,41 @@ function BatchSummary({ batch }: { batch: GradingBatchResponse }) {
   )
 }
 
+const FAILURES_PAGE_SIZE = 20
+
 function Failures({ failures }: { failures: GradingBatchDetailResponse["failures"] }) {
+  const [page, setPage] = useState(1)
+  const pageCount = Math.max(1, Math.ceil(failures.length / FAILURES_PAGE_SIZE))
+  // A refresh can shrink the list: stay on the last page that still exists.
+  const current = Math.min(page, pageCount)
+  const shown = failures.slice((current - 1) * FAILURES_PAGE_SIZE, current * FAILURES_PAGE_SIZE)
+
   if (failures.length === 0) return null
 
   return (
     <div className="regrade-failures">
       <strong>С ошибкой ({failures.length})</strong>
       <ul>
-        {failures.map((failure) => (
+        {shown.map((failure) => (
           <li key={failure.repo}>
             <span>{failure.repo}</span>
             <small className="muted">{itemErrorLabel(failure.error)}</small>
           </li>
         ))}
       </ul>
+      {pageCount > 1 && (
+        <nav className="audit-pager" aria-label="Страницы списка ошибок">
+          <Button onClick={() => setPage(current - 1)} disabled={current <= 1}>
+            Назад
+          </Button>
+          <span className="muted" aria-current="page">
+            Страница {current} из {pageCount}
+          </span>
+          <Button onClick={() => setPage(current + 1)} disabled={current >= pageCount}>
+            Дальше
+          </Button>
+        </nav>
+      )}
     </div>
   )
 }

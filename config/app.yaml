@@ -1,0 +1,233 @@
+# Service settings (everything except secrets) — docs/config.md.
+#
+# Precedence, highest first: environment > admin override (admin panel) > this file > code default.
+# The environment always wins: any key set there (even to an empty value) ignores this file and the
+# admin panel for the whole life of the process. Secrets live only in .env.
+#
+# A key maps to the environment variable of the same name in upper case (rate_limit -> RATE_LIMIT).
+# Each process reads `shared` plus its own section (gateway also reads `frontend`). Keys under a
+# section's `static:` are read once at startup: changing them here needs a restart (logged). All
+# other keys are re-read within ~2s of saving this file or on SIGHUP; an invalid file is rejected and
+# the last good config stays in force. A key with no value documents the setting and leaves the code
+# default in charge.
+#
+# Values below are the host-run setup (ports published by docker-compose). In Docker,
+# docker-compose and docker/go-entrypoint.sh set the addresses through the environment, which wins.
+
+shared:
+  # Repository-service limit per repo: clone + export + upload. Aggregator checks
+  # GRADING_LOCK_TIMEOUT > CLONE_TIMEOUT + GRADE_TIMEOUT.
+  clone_timeout: 10m
+  # Grade-service limit per repo; the LLM wait (grade.llm_timeout) runs inside it.
+  grade_timeout: 4m
+  static:
+    kafka_brokers: localhost:8053
+    s3_endpoint: localhost:8054
+    s3_bucket: repo-content
+    # Must match the s3_endpoint scheme (llm-service).
+    s3_use_ssl: false
+    # Host-run against docker-compose: localhost:8052 (Redis), localhost:8051 + the POSTGRES_DB name
+    # (Postgres). Empty = code defaults (localhost:6379, localhost:5432/postgres).
+    redis_address:
+    redis_db:
+    db_host:
+    db_port:
+    db_name:
+    db_ssl_mode:
+    # Optional Kafka topic renames (docs/kafka-contracts.md, "Topic env vars"); empty = contract name.
+    kafka_repo_grade_requested_topic:
+    kafka_repo_ready_topic:
+    kafka_docs_grade_requested_topic:
+    kafka_docs_graded_topic:
+    kafka_grading_requests_topic:
+    kafka_grading_results_topic:
+    kafka_llm_requests_topic:
+    kafka_llm_recommendations_topic:
+
+aggregator:
+  # Public regrade: period, top N public repos by SourceCraft rating (0 = all).
+  grading_regrade_interval: 72h
+  grading_regrade_limit: 20
+  grading_regrade_list_timeout:
+  # Suppresses duplicate LLM recommendation requests per repo view.
+  llm_request_ttl: 2m
+  analytics_regrade_missing: true
+  # New gradings started by users per window, service-wide (0 = off).
+  grading_request_limit: 10
+  grading_request_window: 10m
+  # Frees a repo lock busy longer than this; keep above clone_timeout + grade_timeout.
+  grading_lock_timeout: 20m
+  batch_grading_item_timeout: 15m
+  # Max repos an admin may request in one batch (0 = no cap).
+  batch_grading_max_limit: 0
+  # Public repo catalog refresh, pages of 100.
+  catalog_max_pages: 2000
+  # Audit entries older than this are deleted (0 = keep forever).
+  audit_retention_days: 30
+  grpc_timeout: 10s
+  static:
+    grpc_address: ":8083"
+    metrics_address:
+    wrapper_grpc_address: localhost:8082
+    batch_grading_concurrency: 3
+    grading_regrade_on_start: false
+    kafka_grading_consumer_group: aggregator-grading
+    kafka_llm_consumer_group: aggregator-llm
+
+gateway:
+  # Requests per client IP per window.
+  rate_limit: 60
+  rate_limit_window: 1m
+  # Public JSON score API (GET /score/...); badges and the widget are not limited.
+  public_api_rate_limit: 300
+  public_api_rate_limit_window: 1m
+  export_rate_limit: 5
+  export_rate_limit_window: 1m
+  # Forced regrade: once per user per repo every N minutes (0 = no limit).
+  force_regrade_cooldown_minutes: 60
+  aggregator_grpc_timeout: 10s
+  rating_grpc_timeout: 10s
+  yandex_timeout: 5s
+  admin_unlock_max_attempts: 5
+  admin_unlock_lock: 15m
+  admin_denied_log_limit: 5
+  admin_denied_log_window: 10m
+  user_audit_window: 5m
+  # Admin and Analytics graphs read Prometheus; empty turns them off.
+  prometheus_url:
+  series_cache_seconds: 60
+  static:
+    http_address: ":8080"
+    http_read_header_timeout: 5s
+    http_read_timeout: 15s
+    http_write_timeout: 30s
+    http_idle_timeout: 60s
+    aggregator_grpc_address: localhost:8083
+    rating_grpc_address: localhost:8086
+    yandex_user_info_url: https://login.yandex.ru/info?format=json
+    session_ttl: 24h
+    session_key_prefix: "session:"
+    metrics_address:
+
+# Served by gateway at GET /api/config; the SPA reads it on load.
+frontend:
+  # Origin used in badge links; empty = the page origin.
+  vite_public_url: http://localhost:8081
+  # Public Yandex OAuth client ID for the sign-in button.
+  vite_yandex_client_id: 02911c23943a4bfd86ea3ce72f0dc9b4
+  # Testing stands only: dev sign-in button (gateway needs DEV_AUTH_BYPASS_USER_ID in .env).
+  vite_dev_auth_bypass: true
+  # How long the SPA waits for a grading; raise together with the grading timeouts.
+  poll_timeout_ms: 900000
+
+rating:
+  ranking_dynamics_days: 7
+  # Size groups by lines of code; large must exceed small.
+  ranking_size_small_loc: 2000
+  ranking_size_large_loc: 20000
+  analytics_cache_seconds: 300
+  static:
+    grpc_address: ":8086"
+    metrics_address:
+
+repository:
+  # How far back commit history is cloned; affects Activity grading.
+  git_history_days: 365
+  # Free /dev/shm needed to clone in RAM; otherwise disk.
+  clone_shm_min_free_bytes: 157286400
+  clone_tmp_dir:
+  # Requests older than this are skipped (0 = off).
+  grade_request_max_age: 20m
+  pr_sample_limit: 20
+  issue_reply_sample_limit: 25
+  static:
+    sc_wrapper_addr: localhost:8082
+
+grade:
+  # How long a user token waits for repo.ready.
+  grade_job_ttl: 30m
+  # Wait for repo.docs.graded; keep below grade_timeout.
+  llm_timeout: 70s
+  # false skips the LLM Documentation request.
+  llm_enabled: true
+  grade_request_max_age: 20m
+  # Keep a repo's S3 export after grading (debugging).
+  s3_keep_repo_data: false
+  static:
+    security_wrapper_addr: localhost:8085
+    sc_wrapper_addr: localhost:8082
+    recommendations_path: config/recommendations.yaml
+
+security_wrapper:
+  # Seconds per AppSec call attempt.
+  client_timeout: 5
+  report_poll_interval_seconds: 2
+  report_poll_timeout_seconds: 60
+  http_retry_attempts: 3
+  http_retry_wait_seconds: 1
+  static:
+    app_port: 8085
+    appsec_url: https://appsec.sourcecraft.tech
+
+sourcecraft_wrapper:
+  # Seconds per SourceCraft call attempt.
+  client_timeout: 5
+  http_retry_attempts: 3
+  http_retry_wait_seconds: 1
+  http_rate_limit_attempts: 6
+  # Page cap (100/page) for issues etc.; affects Activity/Issues grading.
+  sourcecraft_max_pages: 50
+  static:
+    app_port: 8082
+    sourcecraft_url: https://api.sourcecraft.tech
+
+# llm-service and llm-summary-service (one codebase).
+llm:
+  # auto (model when credentials are set), llm or algorithmic. Affects the Documentation grade.
+  llm_docs_mode: algorithmic
+  # Older documentation requests are skipped without a model call (seconds).
+  llm_docs_request_max_age_seconds: 70
+  # MEDIUM/LOW recommendation priority boundary (0-100).
+  llm_priority_threshold: 75
+  yandex_ai_model: aliceai-llm
+  # Folder of YANDEX_AI_API_KEY (.env); kept with the key in .env.
+  yandex_folder_id:
+  static:
+    # S3 timeouts, seconds.
+    s3_connect_timeout: 5
+    s3_read_timeout: 15
+    # Advice catalog; empty = backend/llm-service/config/advice.yaml.
+    llm_advice_path:
+    llm_metrics_port:
+    llm_kafka_group_id: llm-service-documentation-v1
+    llm_summary_kafka_group_id: llm-service-recommendations-v1
+
+# Keys the admin panel may override (never static ones). Every value is checked against these bounds
+# by the aggregator before it is stored and again by each service before it is applied.
+admin_editable:
+  # Rate limits
+  - {key: gateway.rate_limit, type: int, min: "1", max: "100000", group: rate_limits, title: "Запросов с IP за окно"}
+  - {key: gateway.rate_limit_window, type: duration, min: 1s, max: 24h, group: rate_limits, title: "Окно общего лимита"}
+  - {key: gateway.public_api_rate_limit, type: int, min: "1", max: "100000", group: rate_limits, title: "Публичный API: запросов с IP за окно"}
+  - {key: gateway.public_api_rate_limit_window, type: duration, min: 1s, max: 24h, group: rate_limits, title: "Публичный API: окно"}
+  - {key: gateway.export_rate_limit, type: int, min: "1", max: "10000", group: rate_limits, title: "Выгрузка оценок: запросов с IP за окно"}
+  - {key: gateway.export_rate_limit_window, type: duration, min: 1s, max: 24h, group: rate_limits, title: "Выгрузка оценок: окно"}
+  - {key: gateway.force_regrade_cooldown_minutes, type: int, min: "0", max: "10080", group: rate_limits, title: "Пауза между принудительными переоценками, мин (0 — без паузы)"}
+  - {key: aggregator.grading_request_limit, type: int, min: "0", max: "100000", group: rate_limits, title: "Новых оценок за окно на весь сервис (0 — без лимита)"}
+  - {key: aggregator.grading_request_window, type: duration, min: 1s, max: 24h, group: rate_limits, title: "Окно лимита новых оценок"}
+  # Grading and regrade
+  - {key: aggregator.grading_regrade_interval, type: duration, min: 1h, max: 2160h, group: grading, title: "Период плановой переоценки"}
+  - {key: aggregator.grading_regrade_limit, type: int, min: "0", max: "100000", group: grading, title: "Переоценивать топ-N публичных репозиториев (0 — все)"}
+  - {key: aggregator.grading_lock_timeout, type: duration, min: 1m, max: 24h, group: grading, title: "Снятие зависшей блокировки репозитория"}
+  - {key: aggregator.batch_grading_item_timeout, type: duration, min: 1m, max: 24h, group: grading, title: "Пакетная оценка: лимит на один репозиторий"}
+  - {key: aggregator.batch_grading_max_limit, type: int, min: "0", max: "100000", group: grading, title: "Пакетная оценка: максимум репозиториев (0 — без ограничения)"}
+  - {key: shared.clone_timeout, type: duration, min: 30s, max: 2h, group: grading, title: "Лимит клонирования репозитория"}
+  - {key: shared.grade_timeout, type: duration, min: 30s, max: 2h, group: grading, title: "Лимит расчёта оценки"}
+  - {key: grade.grade_job_ttl, type: duration, min: 1m, max: 24h, group: grading, title: "Хранение токена задачи до готовности репозитория"}
+  # LLM
+  - {key: grade.llm_enabled, type: bool, group: llm, title: "Запрашивать оценку документации у LLM-сервиса"}
+  - {key: grade.llm_timeout, type: duration, min: 5s, max: 30m, group: llm, title: "Ожидание оценки документации"}
+  - {key: aggregator.llm_request_ttl, type: duration, min: 10s, max: 24h, group: llm, title: "Подавление повторных запросов рекомендаций"}
+  - {key: llm.llm_docs_mode, type: enum, values: [auto, llm, algorithmic], group: llm, title: "Режим оценки документации (влияет на оценку)"}
+  - {key: llm.llm_docs_request_max_age_seconds, type: int, min: "5", max: "3600", group: llm, title: "Максимальный возраст запроса на оценку документации, с"}
+  - {key: llm.llm_priority_threshold, type: int, min: "0", max: "100", group: llm, title: "Граница приоритета рекомендаций MEDIUM/LOW (влияет на рекомендации)"}

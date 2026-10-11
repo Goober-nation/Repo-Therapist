@@ -26,6 +26,9 @@ const (
 	Rating_GetPositionExplanation_FullMethodName = "/rating.Rating/GetPositionExplanation"
 	Rating_GetPlatformAnalytics_FullMethodName   = "/rating.Rating/GetPlatformAnalytics"
 	Rating_ListPublicGrades_FullMethodName       = "/rating.Rating/ListPublicGrades"
+	Rating_SuggestCatalog_FullMethodName         = "/rating.Rating/SuggestCatalog"
+	Rating_SearchCatalogRepos_FullMethodName     = "/rating.Rating/SearchCatalogRepos"
+	Rating_SearchCatalogOrgs_FullMethodName      = "/rating.Rating/SearchCatalogOrgs"
 )
 
 // RatingClient is the client API for Rating service.
@@ -56,6 +59,15 @@ type RatingClient interface {
 	// ListPublicGrades returns one page of the public grades, ordered by org and repo slug, for the
 	// public export. Public grades only; read-only.
 	ListPublicGrades(ctx context.Context, in *ListPublicGradesRequest, opts ...grpc.CallOption) (*ListPublicGradesResponse, error)
+	// SuggestCatalog returns the best few public repositories (3) and organizations (1) of the
+	// catalog whose names match the query, for the search field. Read-only.
+	SuggestCatalog(ctx context.Context, in *SuggestCatalogRequest, opts ...grpc.CallOption) (*SuggestCatalogResponse, error)
+	// SearchCatalogRepos returns one page of the catalog repositories whose names match the query,
+	// best match first; org keeps only that organization's repositories. Read-only.
+	SearchCatalogRepos(ctx context.Context, in *SearchCatalogReposRequest, opts ...grpc.CallOption) (*SearchCatalogReposResponse, error)
+	// SearchCatalogOrgs returns one page of the catalog organizations whose names match the query,
+	// best match first. Read-only.
+	SearchCatalogOrgs(ctx context.Context, in *SearchCatalogOrgsRequest, opts ...grpc.CallOption) (*SearchCatalogOrgsResponse, error)
 }
 
 type ratingClient struct {
@@ -136,6 +148,36 @@ func (c *ratingClient) ListPublicGrades(ctx context.Context, in *ListPublicGrade
 	return out, nil
 }
 
+func (c *ratingClient) SuggestCatalog(ctx context.Context, in *SuggestCatalogRequest, opts ...grpc.CallOption) (*SuggestCatalogResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SuggestCatalogResponse)
+	err := c.cc.Invoke(ctx, Rating_SuggestCatalog_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ratingClient) SearchCatalogRepos(ctx context.Context, in *SearchCatalogReposRequest, opts ...grpc.CallOption) (*SearchCatalogReposResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchCatalogReposResponse)
+	err := c.cc.Invoke(ctx, Rating_SearchCatalogRepos_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ratingClient) SearchCatalogOrgs(ctx context.Context, in *SearchCatalogOrgsRequest, opts ...grpc.CallOption) (*SearchCatalogOrgsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchCatalogOrgsResponse)
+	err := c.cc.Invoke(ctx, Rating_SearchCatalogOrgs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RatingServer is the server API for Rating service.
 // All implementations must embed UnimplementedRatingServer
 // for forward compatibility.
@@ -164,6 +206,15 @@ type RatingServer interface {
 	// ListPublicGrades returns one page of the public grades, ordered by org and repo slug, for the
 	// public export. Public grades only; read-only.
 	ListPublicGrades(context.Context, *ListPublicGradesRequest) (*ListPublicGradesResponse, error)
+	// SuggestCatalog returns the best few public repositories (3) and organizations (1) of the
+	// catalog whose names match the query, for the search field. Read-only.
+	SuggestCatalog(context.Context, *SuggestCatalogRequest) (*SuggestCatalogResponse, error)
+	// SearchCatalogRepos returns one page of the catalog repositories whose names match the query,
+	// best match first; org keeps only that organization's repositories. Read-only.
+	SearchCatalogRepos(context.Context, *SearchCatalogReposRequest) (*SearchCatalogReposResponse, error)
+	// SearchCatalogOrgs returns one page of the catalog organizations whose names match the query,
+	// best match first. Read-only.
+	SearchCatalogOrgs(context.Context, *SearchCatalogOrgsRequest) (*SearchCatalogOrgsResponse, error)
 	mustEmbedUnimplementedRatingServer()
 }
 
@@ -194,6 +245,15 @@ func (UnimplementedRatingServer) GetPlatformAnalytics(context.Context, *GetPlatf
 }
 func (UnimplementedRatingServer) ListPublicGrades(context.Context, *ListPublicGradesRequest) (*ListPublicGradesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListPublicGrades not implemented")
+}
+func (UnimplementedRatingServer) SuggestCatalog(context.Context, *SuggestCatalogRequest) (*SuggestCatalogResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SuggestCatalog not implemented")
+}
+func (UnimplementedRatingServer) SearchCatalogRepos(context.Context, *SearchCatalogReposRequest) (*SearchCatalogReposResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchCatalogRepos not implemented")
+}
+func (UnimplementedRatingServer) SearchCatalogOrgs(context.Context, *SearchCatalogOrgsRequest) (*SearchCatalogOrgsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchCatalogOrgs not implemented")
 }
 func (UnimplementedRatingServer) mustEmbedUnimplementedRatingServer() {}
 func (UnimplementedRatingServer) testEmbeddedByValue()                {}
@@ -342,6 +402,60 @@ func _Rating_ListPublicGrades_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Rating_SuggestCatalog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SuggestCatalogRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RatingServer).SuggestCatalog(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Rating_SuggestCatalog_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RatingServer).SuggestCatalog(ctx, req.(*SuggestCatalogRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Rating_SearchCatalogRepos_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchCatalogReposRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RatingServer).SearchCatalogRepos(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Rating_SearchCatalogRepos_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RatingServer).SearchCatalogRepos(ctx, req.(*SearchCatalogReposRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Rating_SearchCatalogOrgs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchCatalogOrgsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RatingServer).SearchCatalogOrgs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Rating_SearchCatalogOrgs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RatingServer).SearchCatalogOrgs(ctx, req.(*SearchCatalogOrgsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Rating_ServiceDesc is the grpc.ServiceDesc for Rating service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -376,6 +490,18 @@ var Rating_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListPublicGrades",
 			Handler:    _Rating_ListPublicGrades_Handler,
+		},
+		{
+			MethodName: "SuggestCatalog",
+			Handler:    _Rating_SuggestCatalog_Handler,
+		},
+		{
+			MethodName: "SearchCatalogRepos",
+			Handler:    _Rating_SearchCatalogRepos_Handler,
+		},
+		{
+			MethodName: "SearchCatalogOrgs",
+			Handler:    _Rating_SearchCatalogOrgs_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

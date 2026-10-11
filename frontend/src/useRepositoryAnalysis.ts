@@ -2,13 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { ApiRequestError, GradingLimitError, type HttpRepoHealthApi } from "./api/client"
 import type { GradingResponse } from "./api/contracts"
 import { aiReportFromResponse } from "./api/mapper"
+import { publicConfig } from "./publicConfig"
 import type { AiReport } from "./types"
 
 /** Gateway allows RATE_LIMIT (60 in docker-compose) requests per client per minute. */
 const POLL_INTERVAL_MS = 10_000
 const RATE_LIMITED_WAIT_MS = 30_000
-/** Covers the backend defaults CLONE_TIMEOUT=10m + GRADE_TIMEOUT=4m; raise with them. */
-const POLL_TIMEOUT_MS = 15 * 60_000
 
 export interface RepositoryAnalysis {
   isRunning: boolean
@@ -40,7 +39,8 @@ export async function pollUntilReady<T extends { status: string }>(
   isActive: () => boolean,
   isReady: (response: T) => boolean = (response) => response.status !== "PENDING",
 ): Promise<T> {
-  const deadline = Date.now() + POLL_TIMEOUT_MS
+  // frontend.poll_timeout_ms of app.yaml (GET /api/config); covers CLONE_TIMEOUT + GRADE_TIMEOUT.
+  const deadline = Date.now() + publicConfig().pollTimeoutMs
   const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
   // A 429 means "slow down", not "failed": wait and ask again until the deadline. The grading
   // limit is the exception: its wait is minutes long, so the user is told instead.

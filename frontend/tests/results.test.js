@@ -1760,7 +1760,7 @@ test("the README snippets are a dropdown that starts collapsed and loads nothing
   assert.doesNotMatch(html, /badge-snippet__item|<img|api\/badge|api\/widget|api\/score/)
 })
 
-test("badge links use VITE_PUBLIC_URL's origin and fall back to the page origin", async () => {
+test("badge links use the configured public URL's origin and fall back to the page origin", async () => {
   const { publicOrigin } = await vite.ssrLoadModule("/src/components/BadgeSnippet.tsx")
   const page = "http://localhost:5173"
 

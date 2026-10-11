@@ -1,4 +1,3 @@
-import { useState } from "react"
 import type { YandexProfile } from "../api/yandexAuth"
 import type { PageId } from "../types"
 import YandexSignIn from "./YandexSignIn"
@@ -6,6 +5,7 @@ import YandexSignIn from "./YandexSignIn"
 const pageTitles: Record<PageId, string> = {
   overview: "Анализ репозитория",
   ranking: "Рейтинг SourceCraft",
+  search: "Поиск",
   analytics: "Аналитика",
   access: "Доступ админа",
   my: "Мои репозитории",
@@ -20,7 +20,6 @@ export default function TopBar({
   onPageChange,
   isSidebarOpen,
   onToggleSidebar,
-  onOpenRepositoryLink,
   yandexProfile,
   onYandexSignIn,
   onSignOut,
@@ -32,14 +31,10 @@ export default function TopBar({
   onPageChange: (page: Exclude<PageId, "overview">) => void
   isSidebarOpen: boolean
   onToggleSidebar: () => void
-  onOpenRepositoryLink: (link: string) => boolean
   yandexProfile: YandexProfile | null
   onYandexSignIn: (profile: YandexProfile) => void
   onSignOut: () => void
 }) {
-  const [repositoryLink, setRepositoryLink] = useState("")
-  const [isLinkInvalid, setIsLinkInvalid] = useState(false)
-
   const nextThemeLabel =
     theme === "light"
       ? "Тёмная тема"
@@ -121,36 +116,6 @@ export default function TopBar({
         </strong>
       </div>
       <div className="topbar__actions">
-        <form
-          className="topbar-repository-search"
-          onSubmit={(event) => {
-            event.preventDefault()
-            const opened = onOpenRepositoryLink(repositoryLink)
-            setIsLinkInvalid(!opened)
-            if (opened) setRepositoryLink("")
-          }}
-        >
-          <input
-            aria-label="Ссылка на открытый репозиторий SourceCraft"
-            placeholder="https://sourcecraft.dev/org/repo"
-            inputMode="url"
-            value={repositoryLink}
-            aria-invalid={isLinkInvalid}
-            aria-describedby={isLinkInvalid ? "repository-link-error" : undefined}
-            onChange={(event) => {
-              setRepositoryLink(event.target.value)
-              setIsLinkInvalid(false)
-            }}
-          />
-          <button type="submit" className="topbar-repository-search__submit">
-            Открыть
-          </button>
-          {isLinkInvalid && (
-            <small id="repository-link-error" className="topbar-repository-search__error" role="alert">
-              Нужна ссылка вида https://sourcecraft.dev/организация/репозиторий
-            </small>
-          )}
-        </form>
         <button
           className="theme-toggle"
           type="button"

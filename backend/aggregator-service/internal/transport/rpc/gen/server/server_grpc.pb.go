@@ -36,6 +36,9 @@ const (
 	Aggregator_GetCatalogStatus_FullMethodName          = "/aggregator.Aggregator/GetCatalogStatus"
 	Aggregator_RefreshCatalog_FullMethodName            = "/aggregator.Aggregator/RefreshCatalog"
 	Aggregator_CancelCatalogRefresh_FullMethodName      = "/aggregator.Aggregator/CancelCatalogRefresh"
+	Aggregator_ListSettings_FullMethodName              = "/aggregator.Aggregator/ListSettings"
+	Aggregator_SetSetting_FullMethodName                = "/aggregator.Aggregator/SetSetting"
+	Aggregator_ResetSetting_FullMethodName              = "/aggregator.Aggregator/ResetSetting"
 )
 
 // AggregatorClient is the client API for Aggregator service.
@@ -87,6 +90,16 @@ type AggregatorClient interface {
 	// CancelCatalogRefresh stops the running refresh; the catalog in use is untouched. ABORTED
 	// (refresh_not_running) when none runs.
 	CancelCatalogRefresh(ctx context.Context, in *CancelCatalogRefreshRequest, opts ...grpc.CallOption) (*CancelCatalogRefreshResponse, error)
+	// ListSettings lists the admin-editable keys of config/app.yaml (docs/config.md) with their
+	// app.yaml value, admin override and the processes whose environment sets them. Read-only.
+	ListSettings(ctx context.Context, in *ListSettingsRequest, opts ...grpc.CallOption) (*ListSettingsResponse, error)
+	// SetSetting stores an admin override and publishes it to config.updated. NOT_FOUND
+	// (setting_unknown) for a key that is not admin-editable, INVALID_ARGUMENT (setting_invalid) for a
+	// value outside its type or bounds, ABORTED (setting_env_locked) when the environment
+	// of a process that uses the key sets it. Recorded in the audit log under actor_hash.
+	SetSetting(ctx context.Context, in *SetSettingRequest, opts ...grpc.CallOption) (*SetSettingResponse, error)
+	// ResetSetting drops the override so the app.yaml value applies again. Recorded in the audit log.
+	ResetSetting(ctx context.Context, in *ResetSettingRequest, opts ...grpc.CallOption) (*ResetSettingResponse, error)
 }
 
 type aggregatorClient struct {
@@ -267,6 +280,36 @@ func (c *aggregatorClient) CancelCatalogRefresh(ctx context.Context, in *CancelC
 	return out, nil
 }
 
+func (c *aggregatorClient) ListSettings(ctx context.Context, in *ListSettingsRequest, opts ...grpc.CallOption) (*ListSettingsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSettingsResponse)
+	err := c.cc.Invoke(ctx, Aggregator_ListSettings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aggregatorClient) SetSetting(ctx context.Context, in *SetSettingRequest, opts ...grpc.CallOption) (*SetSettingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetSettingResponse)
+	err := c.cc.Invoke(ctx, Aggregator_SetSetting_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aggregatorClient) ResetSetting(ctx context.Context, in *ResetSettingRequest, opts ...grpc.CallOption) (*ResetSettingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResetSettingResponse)
+	err := c.cc.Invoke(ctx, Aggregator_ResetSetting_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AggregatorServer is the server API for Aggregator service.
 // All implementations must embed UnimplementedAggregatorServer
 // for forward compatibility.
@@ -316,6 +359,16 @@ type AggregatorServer interface {
 	// CancelCatalogRefresh stops the running refresh; the catalog in use is untouched. ABORTED
 	// (refresh_not_running) when none runs.
 	CancelCatalogRefresh(context.Context, *CancelCatalogRefreshRequest) (*CancelCatalogRefreshResponse, error)
+	// ListSettings lists the admin-editable keys of config/app.yaml (docs/config.md) with their
+	// app.yaml value, admin override and the processes whose environment sets them. Read-only.
+	ListSettings(context.Context, *ListSettingsRequest) (*ListSettingsResponse, error)
+	// SetSetting stores an admin override and publishes it to config.updated. NOT_FOUND
+	// (setting_unknown) for a key that is not admin-editable, INVALID_ARGUMENT (setting_invalid) for a
+	// value outside its type or bounds, ABORTED (setting_env_locked) when the environment
+	// of a process that uses the key sets it. Recorded in the audit log under actor_hash.
+	SetSetting(context.Context, *SetSettingRequest) (*SetSettingResponse, error)
+	// ResetSetting drops the override so the app.yaml value applies again. Recorded in the audit log.
+	ResetSetting(context.Context, *ResetSettingRequest) (*ResetSettingResponse, error)
 	mustEmbedUnimplementedAggregatorServer()
 }
 
@@ -376,6 +429,15 @@ func (UnimplementedAggregatorServer) RefreshCatalog(context.Context, *RefreshCat
 }
 func (UnimplementedAggregatorServer) CancelCatalogRefresh(context.Context, *CancelCatalogRefreshRequest) (*CancelCatalogRefreshResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CancelCatalogRefresh not implemented")
+}
+func (UnimplementedAggregatorServer) ListSettings(context.Context, *ListSettingsRequest) (*ListSettingsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSettings not implemented")
+}
+func (UnimplementedAggregatorServer) SetSetting(context.Context, *SetSettingRequest) (*SetSettingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetSetting not implemented")
+}
+func (UnimplementedAggregatorServer) ResetSetting(context.Context, *ResetSettingRequest) (*ResetSettingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResetSetting not implemented")
 }
 func (UnimplementedAggregatorServer) mustEmbedUnimplementedAggregatorServer() {}
 func (UnimplementedAggregatorServer) testEmbeddedByValue()                    {}
@@ -704,6 +766,60 @@ func _Aggregator_CancelCatalogRefresh_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Aggregator_ListSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSettingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregatorServer).ListSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Aggregator_ListSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregatorServer).ListSettings(ctx, req.(*ListSettingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Aggregator_SetSetting_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetSettingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregatorServer).SetSetting(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Aggregator_SetSetting_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregatorServer).SetSetting(ctx, req.(*SetSettingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Aggregator_ResetSetting_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResetSettingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregatorServer).ResetSetting(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Aggregator_ResetSetting_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregatorServer).ResetSetting(ctx, req.(*ResetSettingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Aggregator_ServiceDesc is the grpc.ServiceDesc for Aggregator service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -778,6 +894,18 @@ var Aggregator_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CancelCatalogRefresh",
 			Handler:    _Aggregator_CancelCatalogRefresh_Handler,
+		},
+		{
+			MethodName: "ListSettings",
+			Handler:    _Aggregator_ListSettings_Handler,
+		},
+		{
+			MethodName: "SetSetting",
+			Handler:    _Aggregator_SetSetting_Handler,
+		},
+		{
+			MethodName: "ResetSetting",
+			Handler:    _Aggregator_ResetSetting_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

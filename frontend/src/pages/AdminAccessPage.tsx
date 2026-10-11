@@ -5,6 +5,7 @@ import AuditLog from "../components/AuditLog"
 import CatalogPanel from "../components/CatalogPanel"
 import MetricsPanel from "../components/MetricsPanel"
 import GradingPanel from "../components/GradingPanel"
+import SettingsPanel from "../components/SettingsPanel"
 import { Button, Card, PageHeading } from "../components/Shell"
 
 /**
@@ -188,6 +189,8 @@ function AdminTools({
       <CatalogPanel api={api} onChanged={reloadAudit} />
 
       <GradingPanel api={api} onChanged={reloadAudit} />
+
+      <SettingsPanel api={api} onChanged={reloadAudit} />
 
       <MetricsPanel api={api} />
 

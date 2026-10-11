@@ -31,6 +31,15 @@ service Rating {
   // ListPublicGrades returns one page of the public grades, ordered by org and repo slug, for the
   // public export. Public grades only; read-only.
   rpc ListPublicGrades(ListPublicGradesRequest) returns (ListPublicGradesResponse);
+  // SuggestCatalog returns the best few public repositories (3) and organizations (1) of the
+  // catalog whose names match the query, for the search field. Read-only.
+  rpc SuggestCatalog(SuggestCatalogRequest) returns (SuggestCatalogResponse);
+  // SearchCatalogRepos returns one page of the catalog repositories whose names match the query,
+  // best match first; org keeps only that organization's repositories. Read-only.
+  rpc SearchCatalogRepos(SearchCatalogReposRequest) returns (SearchCatalogReposResponse);
+  // SearchCatalogOrgs returns one page of the catalog organizations whose names match the query,
+  // best match first. Read-only.
+  rpc SearchCatalogOrgs(SearchCatalogOrgsRequest) returns (SearchCatalogOrgsResponse);
 }
 
 enum SortBy {
@@ -316,6 +325,72 @@ message PublicGradeEntry {
 message ListPublicGradesResponse {
   repeated PublicGradeEntry entries = 1;
   // Number of graded public repos across all pages.
+  int32 total_count = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message CatalogRepo {
+  string sourcecraft_uuid = 1;
+  string org_slug = 2;
+  string repo_slug = 3;
+  // Empty when unknown.
+  string description = 4;
+  // Empty when unknown.
+  string web_url = 5;
+  // Always set; name and color are empty strings when unknown.
+  Language language = 6;
+  // SourceCraft rating value.
+  double likes = 7;
+  // Unset when unknown.
+  google.protobuf.Timestamp last_activity_at = 8;
+  // Unset when the repo has not been graded yet.
+  optional int32 public_score = 9;
+}
+
+message CatalogOrg {
+  string slug = 1;
+  // Public repositories of the organization in the catalog.
+  int32 repo_count = 2;
+}
+
+message SuggestCatalogRequest {
+  string query = 1;
+}
+
+message SuggestCatalogResponse {
+  repeated CatalogRepo repos = 1;
+  repeated CatalogOrg orgs = 2;
+}
+
+message SearchCatalogReposRequest {
+  // Matched case-insensitively against "org/repo"; may be empty when org is set.
+  string query = 1;
+  // Only this organization's repositories (exact, case-insensitive); empty means any.
+  string org = 2;
+  // 1-based page number; 0 means the first page.
+  int32 page = 3;
+  // Entries per page; 0 means the default (20), max 100.
+  int32 page_size = 4;
+}
+
+message SearchCatalogReposResponse {
+  repeated CatalogRepo repos = 1;
+  int32 total_count = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message SearchCatalogOrgsRequest {
+  string query = 1;
+  // 1-based page number; 0 means the first page.
+  int32 page = 2;
+  // Entries per page; 0 means the default (20), max 100.
+  int32 page_size = 3;
+}
+
+message SearchCatalogOrgsResponse {
+  repeated CatalogOrg orgs = 1;
   int32 total_count = 2;
   int32 page = 3;
   int32 page_size = 4;

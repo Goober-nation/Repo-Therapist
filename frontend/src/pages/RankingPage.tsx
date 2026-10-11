@@ -1,12 +1,12 @@
-import { useMemo, useState } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import { RANKING_PAGE_SIZE, type RankingFilters, type RankingSort } from "../api/client"
 import RegradeNotice from "../components/RegradeNotice"
 import { Badge, Button, Card, LanguageLabel, PageHeading } from "../components/Shell"
 import {
   formatDateTime,
   getLastActivityLabel,
-  HEALTHY_SCORE,
-  healthLevel,
+  RANKING_HEALTHY_SCORE,
+  rankingLevel,
   isGradeStale,
   signed,
   STALE_GRADE_DAYS,
@@ -82,6 +82,7 @@ export default function RankingPage({
   onClearCompare = () => {},
   onQueryChange = () => {},
   onRetry = () => {},
+  searchBar,
 }: {
   repositories: RepositorySummary[]
   onSelectRepository: (repository: RepositorySummary) => void
@@ -103,8 +104,9 @@ export default function RankingPage({
   onClearCompare?: () => void
   onQueryChange?: (query: RankingQuery) => void
   onRetry?: () => void
+  /** The catalog search field, shown below the stats. */
+  searchBar?: ReactNode
 }) {
-  const [searchQuery, setSearchQuery] = useState("")
   // The topic is applied on Enter or when the field loses focus, not on every keystroke.
   const [topicDraft, setTopicDraft] = useState(query.topic ?? "")
   const [minimumHealth, setMinimumHealth] = useState(0)
@@ -112,17 +114,11 @@ export default function RankingPage({
   const [infoOpen, setInfoOpen] = useState(false)
   const pageCount = Math.max(1, Math.ceil(total / RANKING_PAGE_SIZE))
 
-  // Search and the minimum score narrow the loaded page only; the catalog is paged on the server.
-  const visibleRepositories = useMemo(() => {
-    const text = searchQuery.trim().toLocaleLowerCase()
-    return repositories.filter(
-      (repository) =>
-        (!text ||
-          repository.fullName.toLocaleLowerCase().includes(text) ||
-          repository.language.toLocaleLowerCase().includes(text)) &&
-        (minimumHealth === 0 || (repository.healthScore ?? -1) >= minimumHealth),
-    )
-  }, [minimumHealth, repositories, searchQuery])
+  // The minimum score narrows the loaded page only; the catalog is paged on the server.
+  const visibleRepositories = useMemo(
+    () => repositories.filter((repository) => minimumHealth === 0 || (repository.healthScore ?? -1) >= minimumHealth),
+    [minimumHealth, repositories],
+  )
 
   const scores = repositories.flatMap((repository) =>
     repository.healthScore === null ? [] : [repository.healthScore],
@@ -140,7 +136,6 @@ export default function RankingPage({
   }
 
   const resetFilters = () => {
-    setSearchQuery("")
     setMinimumHealth(0)
     setTopicDraft("")
     if (hasActiveFilters(query)) {
@@ -177,21 +172,10 @@ export default function RankingPage({
         </div>
       )}
 
+      {searchBar}
+
       <Card className="ranking-card">
         <div className="ranking-toolbar">
-          <label className="search-field">
-            <span className="visually-hidden">Поиск репозиториев</span>
-            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <circle cx="7" cy="7" r="4.5" />
-              <path d="m10.5 10.5 3 3" />
-            </svg>
-            <input
-              type="search"
-              placeholder="Поиск на этой странице"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-            />
-          </label>
           <label className="filter-field filter-field--sort">
             <span>Сортировка</span>
             <select value={query.sort} onChange={(event) => change({ sort: event.target.value as RankingSort })}>
@@ -257,7 +241,7 @@ export default function RankingPage({
               <select value={minimumHealth} onChange={(event) => setMinimumHealth(Number(event.target.value))}>
                 <option value={0}>Любой</option>
                 <option value={60}>От 60</option>
-                <option value={HEALTHY_SCORE}>От {HEALTHY_SCORE}</option>
+                <option value={RANKING_HEALTHY_SCORE}>От {RANKING_HEALTHY_SCORE}</option>
                 <option value={90}>От 90</option>
               </select>
             </label>
@@ -365,7 +349,7 @@ export default function RankingPage({
               </span>
             </div>
             {!isLoading && !error && visibleRepositories.map((repository, index) => {
-              const level = healthLevel(repository.healthScore)
+              const level = rankingLevel(repository.healthScore)
               return (
                 <div
                   className={`ranking-row ranking-row--interactive ${
@@ -510,7 +494,7 @@ export default function RankingPage({
         ) : visibleRepositories.length === 0 ? (
           <div className="empty-state">
             <strong>На этой странице ничего не найдено</strong>
-            <p>Поиск и фильтр по Score работают в пределах загруженной страницы.</p>
+            <p>Фильтр по Score работает в пределах загруженной страницы.</p>
             <Button variant="quiet" onClick={resetFilters}>
               Сбросить фильтры
             </Button>

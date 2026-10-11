@@ -8,13 +8,13 @@ DOC_SECTION_<ID> for a section fallback, or DOC_ALGORITHMIC_NOTICE for the notic
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import yaml
 
 from .deductions import RULES
 from .grading import GROUPS
+from . import runtime_config
 
 # Docker and the documented commands run from backend/llm-service; the source-tree
 # path covers imports from any other working directory.
@@ -47,7 +47,7 @@ def _text(value, where):
 
 
 def advice_path() -> Path:
-    configured = os.environ.get("LLM_ADVICE_PATH", "").strip()
+    configured = runtime_config.get("LLM_ADVICE_PATH", "").strip()
     if configured:
         return Path(configured)
     return next((path for path in _DEFAULT_PATHS if path.is_file()), _DEFAULT_PATHS[0])

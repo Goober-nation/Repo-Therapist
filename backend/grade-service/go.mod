@@ -36,3 +36,7 @@ require (
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/ini.v1 v1.67.3 // indirect
 )
+
+require repo-therapist/runtimeconfig v0.0.0
+
+replace repo-therapist/runtimeconfig => ../runtimeconfig

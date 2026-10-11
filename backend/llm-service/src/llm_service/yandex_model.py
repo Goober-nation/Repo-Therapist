@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import ssl
 from dataclasses import dataclass, field
 from http.client import HTTPException
@@ -19,6 +18,7 @@ from .formatted_response import parse_formatted_response
 from .documentation_result import documentation_payload
 from .snapshot import Snapshot
 from . import metrics
+from . import runtime_config
 
 API_URL = "https://ai.api.cloud.yandex.net/v1/responses"
 # Approximate UTF-8 guardrails, below the model context windows with room for output.
@@ -130,9 +130,9 @@ class YandexModelConfig:
     @classmethod
     def from_env(cls) -> YandexModelConfig:
         return cls(
-            api_key=os.environ.get("YANDEX_AI_API_KEY", ""),
-            folder_id=os.environ.get("YANDEX_FOLDER_ID", ""),
-            model=os.environ.get("YANDEX_AI_MODEL", "aliceai-llm"),
+            api_key=runtime_config.get("YANDEX_AI_API_KEY", ""),
+            folder_id=runtime_config.get("YANDEX_FOLDER_ID", ""),
+            model=runtime_config.get("YANDEX_AI_MODEL", "aliceai-llm"),
         )
 
 

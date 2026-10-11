@@ -2193,6 +2193,539 @@ func (x *ListPublicGradesResponse) GetPageSize() int32 {
 	return 0
 }
 
+type CatalogRepo struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SourcecraftUuid string                 `protobuf:"bytes,1,opt,name=sourcecraft_uuid,json=sourcecraftUuid,proto3" json:"sourcecraft_uuid,omitempty"`
+	OrgSlug         string                 `protobuf:"bytes,2,opt,name=org_slug,json=orgSlug,proto3" json:"org_slug,omitempty"`
+	RepoSlug        string                 `protobuf:"bytes,3,opt,name=repo_slug,json=repoSlug,proto3" json:"repo_slug,omitempty"`
+	// Empty when unknown.
+	Description string `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	// Empty when unknown.
+	WebUrl string `protobuf:"bytes,5,opt,name=web_url,json=webUrl,proto3" json:"web_url,omitempty"`
+	// Always set; name and color are empty strings when unknown.
+	Language *Language `protobuf:"bytes,6,opt,name=language,proto3" json:"language,omitempty"`
+	// SourceCraft rating value.
+	Likes float64 `protobuf:"fixed64,7,opt,name=likes,proto3" json:"likes,omitempty"`
+	// Unset when unknown.
+	LastActivityAt *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=last_activity_at,json=lastActivityAt,proto3" json:"last_activity_at,omitempty"`
+	// Unset when the repo has not been graded yet.
+	PublicScore   *int32 `protobuf:"varint,9,opt,name=public_score,json=publicScore,proto3,oneof" json:"public_score,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CatalogRepo) Reset() {
+	*x = CatalogRepo{}
+	mi := &file_rate_client_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CatalogRepo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CatalogRepo) ProtoMessage() {}
+
+func (x *CatalogRepo) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CatalogRepo.ProtoReflect.Descriptor instead.
+func (*CatalogRepo) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *CatalogRepo) GetSourcecraftUuid() string {
+	if x != nil {
+		return x.SourcecraftUuid
+	}
+	return ""
+}
+
+func (x *CatalogRepo) GetOrgSlug() string {
+	if x != nil {
+		return x.OrgSlug
+	}
+	return ""
+}
+
+func (x *CatalogRepo) GetRepoSlug() string {
+	if x != nil {
+		return x.RepoSlug
+	}
+	return ""
+}
+
+func (x *CatalogRepo) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *CatalogRepo) GetWebUrl() string {
+	if x != nil {
+		return x.WebUrl
+	}
+	return ""
+}
+
+func (x *CatalogRepo) GetLanguage() *Language {
+	if x != nil {
+		return x.Language
+	}
+	return nil
+}
+
+func (x *CatalogRepo) GetLikes() float64 {
+	if x != nil {
+		return x.Likes
+	}
+	return 0
+}
+
+func (x *CatalogRepo) GetLastActivityAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastActivityAt
+	}
+	return nil
+}
+
+func (x *CatalogRepo) GetPublicScore() int32 {
+	if x != nil && x.PublicScore != nil {
+		return *x.PublicScore
+	}
+	return 0
+}
+
+type CatalogOrg struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Slug  string                 `protobuf:"bytes,1,opt,name=slug,proto3" json:"slug,omitempty"`
+	// Public repositories of the organization in the catalog.
+	RepoCount     int32 `protobuf:"varint,2,opt,name=repo_count,json=repoCount,proto3" json:"repo_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CatalogOrg) Reset() {
+	*x = CatalogOrg{}
+	mi := &file_rate_client_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CatalogOrg) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CatalogOrg) ProtoMessage() {}
+
+func (x *CatalogOrg) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CatalogOrg.ProtoReflect.Descriptor instead.
+func (*CatalogOrg) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *CatalogOrg) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
+func (x *CatalogOrg) GetRepoCount() int32 {
+	if x != nil {
+		return x.RepoCount
+	}
+	return 0
+}
+
+type SuggestCatalogRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Query         string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SuggestCatalogRequest) Reset() {
+	*x = SuggestCatalogRequest{}
+	mi := &file_rate_client_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuggestCatalogRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuggestCatalogRequest) ProtoMessage() {}
+
+func (x *SuggestCatalogRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuggestCatalogRequest.ProtoReflect.Descriptor instead.
+func (*SuggestCatalogRequest) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *SuggestCatalogRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+type SuggestCatalogResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Repos         []*CatalogRepo         `protobuf:"bytes,1,rep,name=repos,proto3" json:"repos,omitempty"`
+	Orgs          []*CatalogOrg          `protobuf:"bytes,2,rep,name=orgs,proto3" json:"orgs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SuggestCatalogResponse) Reset() {
+	*x = SuggestCatalogResponse{}
+	mi := &file_rate_client_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuggestCatalogResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuggestCatalogResponse) ProtoMessage() {}
+
+func (x *SuggestCatalogResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuggestCatalogResponse.ProtoReflect.Descriptor instead.
+func (*SuggestCatalogResponse) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *SuggestCatalogResponse) GetRepos() []*CatalogRepo {
+	if x != nil {
+		return x.Repos
+	}
+	return nil
+}
+
+func (x *SuggestCatalogResponse) GetOrgs() []*CatalogOrg {
+	if x != nil {
+		return x.Orgs
+	}
+	return nil
+}
+
+type SearchCatalogReposRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Matched case-insensitively against "org/repo"; may be empty when org is set.
+	Query string `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
+	// Only this organization's repositories (exact, case-insensitive); empty means any.
+	Org string `protobuf:"bytes,2,opt,name=org,proto3" json:"org,omitempty"`
+	// 1-based page number; 0 means the first page.
+	Page int32 `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
+	// Entries per page; 0 means the default (20), max 100.
+	PageSize      int32 `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchCatalogReposRequest) Reset() {
+	*x = SearchCatalogReposRequest{}
+	mi := &file_rate_client_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchCatalogReposRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchCatalogReposRequest) ProtoMessage() {}
+
+func (x *SearchCatalogReposRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchCatalogReposRequest.ProtoReflect.Descriptor instead.
+func (*SearchCatalogReposRequest) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *SearchCatalogReposRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *SearchCatalogReposRequest) GetOrg() string {
+	if x != nil {
+		return x.Org
+	}
+	return ""
+}
+
+func (x *SearchCatalogReposRequest) GetPage() int32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *SearchCatalogReposRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+type SearchCatalogReposResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Repos         []*CatalogRepo         `protobuf:"bytes,1,rep,name=repos,proto3" json:"repos,omitempty"`
+	TotalCount    int32                  `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
+	Page          int32                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize      int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchCatalogReposResponse) Reset() {
+	*x = SearchCatalogReposResponse{}
+	mi := &file_rate_client_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchCatalogReposResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchCatalogReposResponse) ProtoMessage() {}
+
+func (x *SearchCatalogReposResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchCatalogReposResponse.ProtoReflect.Descriptor instead.
+func (*SearchCatalogReposResponse) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *SearchCatalogReposResponse) GetRepos() []*CatalogRepo {
+	if x != nil {
+		return x.Repos
+	}
+	return nil
+}
+
+func (x *SearchCatalogReposResponse) GetTotalCount() int32 {
+	if x != nil {
+		return x.TotalCount
+	}
+	return 0
+}
+
+func (x *SearchCatalogReposResponse) GetPage() int32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *SearchCatalogReposResponse) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+type SearchCatalogOrgsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Query string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
+	// 1-based page number; 0 means the first page.
+	Page int32 `protobuf:"varint,2,opt,name=page,proto3" json:"page,omitempty"`
+	// Entries per page; 0 means the default (20), max 100.
+	PageSize      int32 `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchCatalogOrgsRequest) Reset() {
+	*x = SearchCatalogOrgsRequest{}
+	mi := &file_rate_client_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchCatalogOrgsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchCatalogOrgsRequest) ProtoMessage() {}
+
+func (x *SearchCatalogOrgsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchCatalogOrgsRequest.ProtoReflect.Descriptor instead.
+func (*SearchCatalogOrgsRequest) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *SearchCatalogOrgsRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *SearchCatalogOrgsRequest) GetPage() int32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *SearchCatalogOrgsRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+type SearchCatalogOrgsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Orgs          []*CatalogOrg          `protobuf:"bytes,1,rep,name=orgs,proto3" json:"orgs,omitempty"`
+	TotalCount    int32                  `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
+	Page          int32                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize      int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchCatalogOrgsResponse) Reset() {
+	*x = SearchCatalogOrgsResponse{}
+	mi := &file_rate_client_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchCatalogOrgsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchCatalogOrgsResponse) ProtoMessage() {}
+
+func (x *SearchCatalogOrgsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rate_client_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchCatalogOrgsResponse.ProtoReflect.Descriptor instead.
+func (*SearchCatalogOrgsResponse) Descriptor() ([]byte, []int) {
+	return file_rate_client_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *SearchCatalogOrgsResponse) GetOrgs() []*CatalogOrg {
+	if x != nil {
+		return x.Orgs
+	}
+	return nil
+}
+
+func (x *SearchCatalogOrgsResponse) GetTotalCount() int32 {
+	if x != nil {
+		return x.TotalCount
+	}
+	return 0
+}
+
+func (x *SearchCatalogOrgsResponse) GetPage() int32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *SearchCatalogOrgsResponse) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
 var File_rate_client_proto protoreflect.FileDescriptor
 
 const file_rate_client_proto_rawDesc = "" +
@@ -2393,11 +2926,53 @@ const file_rate_client_proto_rawDesc = "" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
 	"totalCount\x12\x12\n" +
 	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"\xee\x02\n" +
+	"\vCatalogRepo\x12)\n" +
+	"\x10sourcecraft_uuid\x18\x01 \x01(\tR\x0fsourcecraftUuid\x12\x19\n" +
+	"\borg_slug\x18\x02 \x01(\tR\aorgSlug\x12\x1b\n" +
+	"\trepo_slug\x18\x03 \x01(\tR\brepoSlug\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x17\n" +
+	"\aweb_url\x18\x05 \x01(\tR\x06webUrl\x12,\n" +
+	"\blanguage\x18\x06 \x01(\v2\x10.rating.LanguageR\blanguage\x12\x14\n" +
+	"\x05likes\x18\a \x01(\x01R\x05likes\x12D\n" +
+	"\x10last_activity_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x0elastActivityAt\x12&\n" +
+	"\fpublic_score\x18\t \x01(\x05H\x00R\vpublicScore\x88\x01\x01B\x0f\n" +
+	"\r_public_score\"?\n" +
+	"\n" +
+	"CatalogOrg\x12\x12\n" +
+	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x1d\n" +
+	"\n" +
+	"repo_count\x18\x02 \x01(\x05R\trepoCount\"-\n" +
+	"\x15SuggestCatalogRequest\x12\x14\n" +
+	"\x05query\x18\x01 \x01(\tR\x05query\"k\n" +
+	"\x16SuggestCatalogResponse\x12)\n" +
+	"\x05repos\x18\x01 \x03(\v2\x13.rating.CatalogRepoR\x05repos\x12&\n" +
+	"\x04orgs\x18\x02 \x03(\v2\x12.rating.CatalogOrgR\x04orgs\"t\n" +
+	"\x19SearchCatalogReposRequest\x12\x14\n" +
+	"\x05query\x18\x01 \x01(\tR\x05query\x12\x10\n" +
+	"\x03org\x18\x02 \x01(\tR\x03org\x12\x12\n" +
+	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"\x99\x01\n" +
+	"\x1aSearchCatalogReposResponse\x12)\n" +
+	"\x05repos\x18\x01 \x03(\v2\x13.rating.CatalogRepoR\x05repos\x12\x1f\n" +
+	"\vtotal_count\x18\x02 \x01(\x05R\n" +
+	"totalCount\x12\x12\n" +
+	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"a\n" +
+	"\x18SearchCatalogOrgsRequest\x12\x14\n" +
+	"\x05query\x18\x01 \x01(\tR\x05query\x12\x12\n" +
+	"\x04page\x18\x02 \x01(\x05R\x04page\x12\x1b\n" +
+	"\tpage_size\x18\x03 \x01(\x05R\bpageSize\"\x95\x01\n" +
+	"\x19SearchCatalogOrgsResponse\x12&\n" +
+	"\x04orgs\x18\x01 \x03(\v2\x12.rating.CatalogOrgR\x04orgs\x12\x1f\n" +
+	"\vtotal_count\x18\x02 \x01(\x05R\n" +
+	"totalCount\x12\x12\n" +
+	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x04 \x01(\x05R\bpageSize*I\n" +
 	"\x06SortBy\x12\x11\n" +
 	"\rSORT_BY_SCORE\x10\x00\x12\x19\n" +
 	"\x15SORT_BY_LAST_ACTIVITY\x10\x01\x12\x11\n" +
-	"\rSORT_BY_LIKES\x10\x022\xec\x04\n" +
+	"\rSORT_BY_LIKES\x10\x022\xf4\x06\n" +
 	"\x06Rating\x12C\n" +
 	"\n" +
 	"GetRanking\x12\x19.rating.GetRankingRequest\x1a\x1a.rating.GetRankingResponse\x12O\n" +
@@ -2406,7 +2981,10 @@ const file_rate_client_proto_rawDesc = "" +
 	"\x0fGetScoreHistory\x12\x1e.rating.GetScoreHistoryRequest\x1a\x1f.rating.GetScoreHistoryResponse\x12g\n" +
 	"\x16GetPositionExplanation\x12%.rating.GetPositionExplanationRequest\x1a&.rating.GetPositionExplanationResponse\x12a\n" +
 	"\x14GetPlatformAnalytics\x12#.rating.GetPlatformAnalyticsRequest\x1a$.rating.GetPlatformAnalyticsResponse\x12U\n" +
-	"\x10ListPublicGrades\x12\x1f.rating.ListPublicGradesRequest\x1a .rating.ListPublicGradesResponseB6Z4gateway-service/internal/transport/rpc/gen/rank;rankb\x06proto3"
+	"\x10ListPublicGrades\x12\x1f.rating.ListPublicGradesRequest\x1a .rating.ListPublicGradesResponse\x12O\n" +
+	"\x0eSuggestCatalog\x12\x1d.rating.SuggestCatalogRequest\x1a\x1e.rating.SuggestCatalogResponse\x12[\n" +
+	"\x12SearchCatalogRepos\x12!.rating.SearchCatalogReposRequest\x1a\".rating.SearchCatalogReposResponse\x12X\n" +
+	"\x11SearchCatalogOrgs\x12 .rating.SearchCatalogOrgsRequest\x1a!.rating.SearchCatalogOrgsResponseB6Z4gateway-service/internal/transport/rpc/gen/rank;rankb\x06proto3"
 
 var (
 	file_rate_client_proto_rawDescOnce sync.Once
@@ -2421,7 +2999,7 @@ func file_rate_client_proto_rawDescGZIP() []byte {
 }
 
 var file_rate_client_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_rate_client_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
+var file_rate_client_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_rate_client_proto_goTypes = []any{
 	(SortBy)(0),                            // 0: rating.SortBy
 	(*GetRankingRequest)(nil),              // 1: rating.GetRankingRequest
@@ -2453,25 +3031,33 @@ var file_rate_client_proto_goTypes = []any{
 	(*ListPublicGradesRequest)(nil),        // 27: rating.ListPublicGradesRequest
 	(*PublicGradeEntry)(nil),               // 28: rating.PublicGradeEntry
 	(*ListPublicGradesResponse)(nil),       // 29: rating.ListPublicGradesResponse
-	(*timestamppb.Timestamp)(nil),          // 30: google.protobuf.Timestamp
+	(*CatalogRepo)(nil),                    // 30: rating.CatalogRepo
+	(*CatalogOrg)(nil),                     // 31: rating.CatalogOrg
+	(*SuggestCatalogRequest)(nil),          // 32: rating.SuggestCatalogRequest
+	(*SuggestCatalogResponse)(nil),         // 33: rating.SuggestCatalogResponse
+	(*SearchCatalogReposRequest)(nil),      // 34: rating.SearchCatalogReposRequest
+	(*SearchCatalogReposResponse)(nil),     // 35: rating.SearchCatalogReposResponse
+	(*SearchCatalogOrgsRequest)(nil),       // 36: rating.SearchCatalogOrgsRequest
+	(*SearchCatalogOrgsResponse)(nil),      // 37: rating.SearchCatalogOrgsResponse
+	(*timestamppb.Timestamp)(nil),          // 38: google.protobuf.Timestamp
 }
 var file_rate_client_proto_depIdxs = []int32{
 	0,  // 0: rating.GetRankingRequest.sort_by:type_name -> rating.SortBy
 	3,  // 1: rating.RankingEntry.language:type_name -> rating.Language
-	30, // 2: rating.RankingEntry.last_activity_at:type_name -> google.protobuf.Timestamp
+	38, // 2: rating.RankingEntry.last_activity_at:type_name -> google.protobuf.Timestamp
 	10, // 3: rating.RankingEntry.confidence_reasons:type_name -> rating.ConfidenceReason
-	30, // 4: rating.RankingEntry.graded_at:type_name -> google.protobuf.Timestamp
+	38, // 4: rating.RankingEntry.graded_at:type_name -> google.protobuf.Timestamp
 	2,  // 5: rating.GetRankingResponse.entries:type_name -> rating.RankingEntry
 	8,  // 6: rating.GetPublicSummaryResponse.categories:type_name -> rating.CategoryScore
-	30, // 7: rating.GetPublicSummaryResponse.graded_at:type_name -> google.protobuf.Timestamp
+	38, // 7: rating.GetPublicSummaryResponse.graded_at:type_name -> google.protobuf.Timestamp
 	10, // 8: rating.GetPublicSummaryResponse.confidence_reasons:type_name -> rating.ConfidenceReason
-	30, // 9: rating.HistoryPoint.graded_at:type_name -> google.protobuf.Timestamp
+	38, // 9: rating.HistoryPoint.graded_at:type_name -> google.protobuf.Timestamp
 	8,  // 10: rating.HistoryPoint.categories:type_name -> rating.CategoryScore
 	12, // 11: rating.GetScoreHistoryResponse.points:type_name -> rating.HistoryPoint
 	15, // 12: rating.GetPositionExplanationResponse.above:type_name -> rating.Neighbour
 	15, // 13: rating.GetPositionExplanationResponse.below:type_name -> rating.Neighbour
 	16, // 14: rating.GetPositionExplanationResponse.categories:type_name -> rating.CategoryComparison
-	30, // 15: rating.TrendPoint.week_start:type_name -> google.protobuf.Timestamp
+	38, // 15: rating.TrendPoint.week_start:type_name -> google.protobuf.Timestamp
 	19, // 16: rating.GetPlatformAnalyticsResponse.distribution:type_name -> rating.ScoreBucket
 	20, // 17: rating.GetPlatformAnalyticsResponse.levels:type_name -> rating.LevelCount
 	21, // 18: rating.GetPlatformAnalyticsResponse.languages:type_name -> rating.LanguageStat
@@ -2479,30 +3065,42 @@ var file_rate_client_proto_depIdxs = []int32{
 	23, // 20: rating.GetPlatformAnalyticsResponse.top_advice:type_name -> rating.AdviceStat
 	24, // 21: rating.GetPlatformAnalyticsResponse.trend:type_name -> rating.TrendPoint
 	25, // 22: rating.GetPlatformAnalyticsResponse.most_improved:type_name -> rating.ImprovedRepo
-	30, // 23: rating.GetPlatformAnalyticsResponse.generated_at:type_name -> google.protobuf.Timestamp
-	30, // 24: rating.PublicGradeEntry.last_activity_at:type_name -> google.protobuf.Timestamp
-	30, // 25: rating.PublicGradeEntry.graded_at:type_name -> google.protobuf.Timestamp
+	38, // 23: rating.GetPlatformAnalyticsResponse.generated_at:type_name -> google.protobuf.Timestamp
+	38, // 24: rating.PublicGradeEntry.last_activity_at:type_name -> google.protobuf.Timestamp
+	38, // 25: rating.PublicGradeEntry.graded_at:type_name -> google.protobuf.Timestamp
 	8,  // 26: rating.PublicGradeEntry.categories:type_name -> rating.CategoryScore
 	28, // 27: rating.ListPublicGradesResponse.entries:type_name -> rating.PublicGradeEntry
-	1,  // 28: rating.Rating.GetRanking:input_type -> rating.GetRankingRequest
-	5,  // 29: rating.Rating.GetPublicScore:input_type -> rating.GetPublicScoreRequest
-	7,  // 30: rating.Rating.GetPublicSummary:input_type -> rating.GetPublicSummaryRequest
-	11, // 31: rating.Rating.GetScoreHistory:input_type -> rating.GetScoreHistoryRequest
-	14, // 32: rating.Rating.GetPositionExplanation:input_type -> rating.GetPositionExplanationRequest
-	18, // 33: rating.Rating.GetPlatformAnalytics:input_type -> rating.GetPlatformAnalyticsRequest
-	27, // 34: rating.Rating.ListPublicGrades:input_type -> rating.ListPublicGradesRequest
-	4,  // 35: rating.Rating.GetRanking:output_type -> rating.GetRankingResponse
-	6,  // 36: rating.Rating.GetPublicScore:output_type -> rating.GetPublicScoreResponse
-	9,  // 37: rating.Rating.GetPublicSummary:output_type -> rating.GetPublicSummaryResponse
-	13, // 38: rating.Rating.GetScoreHistory:output_type -> rating.GetScoreHistoryResponse
-	17, // 39: rating.Rating.GetPositionExplanation:output_type -> rating.GetPositionExplanationResponse
-	26, // 40: rating.Rating.GetPlatformAnalytics:output_type -> rating.GetPlatformAnalyticsResponse
-	29, // 41: rating.Rating.ListPublicGrades:output_type -> rating.ListPublicGradesResponse
-	35, // [35:42] is the sub-list for method output_type
-	28, // [28:35] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	3,  // 28: rating.CatalogRepo.language:type_name -> rating.Language
+	38, // 29: rating.CatalogRepo.last_activity_at:type_name -> google.protobuf.Timestamp
+	30, // 30: rating.SuggestCatalogResponse.repos:type_name -> rating.CatalogRepo
+	31, // 31: rating.SuggestCatalogResponse.orgs:type_name -> rating.CatalogOrg
+	30, // 32: rating.SearchCatalogReposResponse.repos:type_name -> rating.CatalogRepo
+	31, // 33: rating.SearchCatalogOrgsResponse.orgs:type_name -> rating.CatalogOrg
+	1,  // 34: rating.Rating.GetRanking:input_type -> rating.GetRankingRequest
+	5,  // 35: rating.Rating.GetPublicScore:input_type -> rating.GetPublicScoreRequest
+	7,  // 36: rating.Rating.GetPublicSummary:input_type -> rating.GetPublicSummaryRequest
+	11, // 37: rating.Rating.GetScoreHistory:input_type -> rating.GetScoreHistoryRequest
+	14, // 38: rating.Rating.GetPositionExplanation:input_type -> rating.GetPositionExplanationRequest
+	18, // 39: rating.Rating.GetPlatformAnalytics:input_type -> rating.GetPlatformAnalyticsRequest
+	27, // 40: rating.Rating.ListPublicGrades:input_type -> rating.ListPublicGradesRequest
+	32, // 41: rating.Rating.SuggestCatalog:input_type -> rating.SuggestCatalogRequest
+	34, // 42: rating.Rating.SearchCatalogRepos:input_type -> rating.SearchCatalogReposRequest
+	36, // 43: rating.Rating.SearchCatalogOrgs:input_type -> rating.SearchCatalogOrgsRequest
+	4,  // 44: rating.Rating.GetRanking:output_type -> rating.GetRankingResponse
+	6,  // 45: rating.Rating.GetPublicScore:output_type -> rating.GetPublicScoreResponse
+	9,  // 46: rating.Rating.GetPublicSummary:output_type -> rating.GetPublicSummaryResponse
+	13, // 47: rating.Rating.GetScoreHistory:output_type -> rating.GetScoreHistoryResponse
+	17, // 48: rating.Rating.GetPositionExplanation:output_type -> rating.GetPositionExplanationResponse
+	26, // 49: rating.Rating.GetPlatformAnalytics:output_type -> rating.GetPlatformAnalyticsResponse
+	29, // 50: rating.Rating.ListPublicGrades:output_type -> rating.ListPublicGradesResponse
+	33, // 51: rating.Rating.SuggestCatalog:output_type -> rating.SuggestCatalogResponse
+	35, // 52: rating.Rating.SearchCatalogRepos:output_type -> rating.SearchCatalogReposResponse
+	37, // 53: rating.Rating.SearchCatalogOrgs:output_type -> rating.SearchCatalogOrgsResponse
+	44, // [44:54] is the sub-list for method output_type
+	34, // [34:44] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_rate_client_proto_init() }
@@ -2519,13 +3117,14 @@ func file_rate_client_proto_init() {
 	file_rate_client_proto_msgTypes[15].OneofWrappers = []any{}
 	file_rate_client_proto_msgTypes[16].OneofWrappers = []any{}
 	file_rate_client_proto_msgTypes[27].OneofWrappers = []any{}
+	file_rate_client_proto_msgTypes[29].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rate_client_proto_rawDesc), len(file_rate_client_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   29,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

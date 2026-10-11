@@ -113,6 +113,18 @@ Linter (e.g. `golangci-lint`), DB migration tooling, and exact local run command
 S3 endpoint, Kafka broker) are not yet decided — confirm with the user rather than assuming a
 default, per "Interview the User During Planning" below.
 
+## Runtime configuration (user decision, 2026-10-11)
+
+Non-secret settings live in `config/app.yaml` (sectioned per service, each with a `static:`
+subsection for restart-only keys); secrets stay in `.env`. Precedence, always: environment >
+admin-panel override (DB `settings_override` -> compacted Kafka `config.updated`) > app.yaml > code
+default. **Env wins 100%:** never write to the process environment from the loaders
+(`backend/runtimeconfig`, `llm_service/runtime_config.py`), load `.env` before the snapshot, never add
+`${VAR:-default}` entries for app.yaml keys to docker-compose (they would env-lock the key), and an
+empty env value still counts as set. New settings: add the key to app.yaml (env name = upper-cased
+key), read it through `runtimeconfig.Getenv` / `runtime_config.get` at the point of use (or mark it
+`static:`), and only list it in `admin_editable` with type and bounds. Docs: `docs/config.md`.
+
 ---
 
 ## Definition of Done
@@ -267,6 +279,7 @@ last known working state.
 | `agents_memory/MEMORY.md` | Durable cross-session facts, read every session (also gitignored) |
 | `agents_memory/topics/` | Deep domain-specific research, read on-demand |
 | `docs/schema.sql` | Current DB schema |
+| `config/app.yaml` | All non-secret settings (hot-reloaded; `docs/config.md`) |
 | `docs/kafka-contracts.md` | Kafka message shapes (team decision, currently a stub) |
 | `8. Yandex Cloud.pdf` | Original hackathon case brief |
 | `SCS_API_1.0.0_draft (2).pdf` | AppSec API org-provided reference |

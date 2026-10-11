@@ -20,11 +20,13 @@ type jobStore struct {
 	mu   sync.Mutex
 	jobs map[string]job
 	now  func() time.Time
-	ttl  time.Duration // how long a job is remembered if repo.ready never arrives
+	// ttl is how long a job is remembered if repo.ready never arrives; read per call so a
+	// GRADE_JOB_TTL change in config/app.yaml or the admin panel applies without a restart.
+	ttl func() time.Duration
 }
 
 func newJobStore() *jobStore {
-	return &jobStore{jobs: map[string]job{}, now: time.Now, ttl: app.JobTTL()}
+	return &jobStore{jobs: map[string]job{}, now: time.Now, ttl: app.JobTTL}
 }
 
 func (s *jobStore) put(jobID, visibility string) {
@@ -32,7 +34,7 @@ func (s *jobStore) put(jobID, visibility string) {
 	defer s.mu.Unlock()
 	now := s.now()
 	for k, j := range s.jobs {
-		if now.Sub(j.createdAt) > s.ttl {
+		if now.Sub(j.createdAt) > s.ttl() {
 			delete(s.jobs, k)
 		}
 	}
@@ -45,7 +47,7 @@ func (s *jobStore) take(jobID string) (j job, ok bool) {
 	defer s.mu.Unlock()
 	j, ok = s.jobs[jobID]
 	delete(s.jobs, jobID)
-	if !ok || s.now().Sub(j.createdAt) > s.ttl {
+	if !ok || s.now().Sub(j.createdAt) > s.ttl() {
 		return job{}, false
 	}
 	return j, true

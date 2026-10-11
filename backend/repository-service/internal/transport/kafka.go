@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"repo-therapist/runtimeconfig"
 	"syscall"
 	"time"
 
@@ -48,7 +49,6 @@ func RunListen() error {
 	producer := kafkaclient.NewProducer(brokers, contracts.TopicRepoReady)
 	defer producer.Close()
 
-	maxAge := service.GradeRequestMaxAge()
 	log.Printf("repository-service listening on %s, publishing to %s", contracts.TopicGradeRequested, contracts.TopicRepoReady)
 	return consumer.Run(ctx, func(ctx context.Context, value []byte) error {
 		var req contracts.GradeRequested
@@ -58,7 +58,7 @@ func RunListen() error {
 		}
 		// A request left uncommitted by a crash is redelivered however old it is; the aggregator
 		// stopped waiting for it long ago, and a late answer would release a newer job's repo lock.
-		if service.StaleRequest(req.RequestedAt, time.Now(), maxAge) {
+		if service.StaleRequest(req.RequestedAt, time.Now(), service.GradeRequestMaxAge()) {
 			log.Printf("dropping stale grade request for %s/%s (job %s, requested %s ago)",
 				req.OrgSlug, req.RepoSlug, req.JobID, time.Since(req.RequestedAt).Round(time.Second))
 			return nil
@@ -133,7 +133,7 @@ func detachedOnShutdown(ctx context.Context) (context.Context, context.CancelFun
 }
 
 func envOrDefault(key, def string) string {
-	if v := os.Getenv(key); v != "" {
+	if v := runtimeconfig.Getenv(key); v != "" {
 		return v
 	}
 	return def

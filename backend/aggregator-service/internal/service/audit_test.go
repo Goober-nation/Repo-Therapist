@@ -152,11 +152,43 @@ func TestStartAuditRetentionDisabledDoesNothing(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	s.StartAuditRetention(ctx, 0)
+	s.StartAuditRetention(ctx) // AuditRetentionDays is 0
 	time.Sleep(20 * time.Millisecond)
 
 	if !repo.cutoff.IsZero() {
 		t.Error("a non-positive retention must keep the log and never purge")
+	}
+}
+
+// purgeSignalRepo reports each purge on a channel, so the test reads it without a data race.
+type purgeSignalRepo struct {
+	fakeAuditRepo
+	purged chan time.Time
+}
+
+func (r *purgeSignalRepo) DeleteAuditBefore(_ context.Context, cutoff time.Time) (int64, error) {
+	r.purged <- cutoff
+	return 0, nil
+}
+
+func TestAuditRetentionIsReadLive(t *testing.T) {
+	repo := &purgeSignalRepo{purged: make(chan time.Time, 1)}
+	s := auditService(&fakeAuditRepo{})
+	s.AuditRepo = repo
+	s.UpdateLive(func(as *AggregatorService) { as.AuditRetentionDays = 30 })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s.StartAuditRetention(ctx)
+
+	select {
+	case cutoff := <-repo.purged:
+		if want := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC); !cutoff.Equal(want) {
+			t.Errorf("cutoff = %v, want %v", cutoff, want)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("a retention set through UpdateLive must purge")
 	}
 }
 

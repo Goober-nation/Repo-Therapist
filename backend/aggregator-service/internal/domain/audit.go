@@ -45,7 +45,7 @@ var (
 
 	auditActors   = map[string]bool{AuditActorAdmin: true, AuditActorUser: true, AuditActorAnonymous: true, AuditActorSystem: true}
 	auditOutcomes = map[string]bool{AuditOutcomeOK: true, AuditOutcomeDenied: true, AuditOutcomeError: true}
-	auditTargets  = map[string]bool{AuditTargetNone: true, AuditTargetRepo: true, AuditTargetBatch: true, AuditTargetRoute: true, AuditTargetCatalog: true}
+	auditTargets  = map[string]bool{AuditTargetNone: true, AuditTargetRepo: true, AuditTargetBatch: true, AuditTargetRoute: true, AuditTargetCatalog: true, AuditTargetSetting: true}
 )
 
 // AuditEvent is what a caller reports. The ActorHash is computed by the caller from the Yandex ID,

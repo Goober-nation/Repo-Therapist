@@ -8,6 +8,7 @@ import (
 	url2 "net/url"
 	"sourcecraft-wrapper-service/internal/domain"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc/metadata"
@@ -39,6 +40,8 @@ type SCWrapper struct {
 	apiURL string
 	// MaxPages caps every paginated fetch (commits, runs, issues, milestones).
 	MaxPages int
+	// livePages, when set by SetMaxPages, replaces MaxPages at runtime (config reloads).
+	livePages atomic.Int64
 	// OrgReposBatch and OrgReposBudget bound one GetOrgRepos call (0 means the default).
 	OrgReposBatch  int
 	OrgReposBudget time.Duration
@@ -212,7 +215,7 @@ func (scw *SCWrapper) GetIssues(ctx context.Context, repoID string) (domain.Issu
 
 	var all domain.Issues
 	pageToken := ""
-	for page := 0; page < scw.MaxPages; page++ {
+	for page := 0; page < scw.maxPages(); page++ {
 		var resp domain.Issues
 		next, err := scw.getPage(ctx, token, basePath, pageToken, &resp, func() string { return resp.NextPageToken })
 		if err != nil {
@@ -236,7 +239,7 @@ func (scw *SCWrapper) GetMilestones(ctx context.Context, repoID string) (domain.
 
 	var all domain.Milestones
 	pageToken := ""
-	for page := 0; page < scw.MaxPages; page++ {
+	for page := 0; page < scw.maxPages(); page++ {
 		var resp domain.Milestones
 		next, err := scw.getPage(ctx, token, basePath, pageToken, &resp, func() string { return resp.NextPageToken })
 		if err != nil {
@@ -334,7 +337,7 @@ func (scw *SCWrapper) ListAllPublicRepos(
 	var repositories []domain.Repository
 	pageToken := ""
 
-	for page := 0; page < scw.MaxPages; page++ {
+	for page := 0; page < scw.maxPages(); page++ {
 		url := fmt.Sprintf("%s/repos?page_size=100", scw.apiURL)
 
 		if pageToken != "" {
@@ -442,7 +445,7 @@ func (scw *SCWrapper) GetMyRepos(ctx context.Context) (domain.MyRepositoriesResp
 	var all domain.MyRepositoriesResponse
 	pageToken := ""
 
-	for page := 0; page < scw.MaxPages; page++ {
+	for page := 0; page < scw.maxPages(); page++ {
 		var rr domain.MyRepositoriesResponse
 
 		next, err := scw.getPage(
@@ -469,4 +472,18 @@ func (scw *SCWrapper) GetMyRepos(ctx context.Context) (domain.MyRepositoriesResp
 	}
 
 	return all, nil
+}
+
+// SetMaxPages changes the page cap while the service runs; n below 1 is ignored.
+func (scw *SCWrapper) SetMaxPages(n int) {
+	if n >= 1 {
+		scw.livePages.Store(int64(n))
+	}
+}
+
+func (scw *SCWrapper) maxPages() int {
+	if n := scw.livePages.Load(); n > 0 {
+		return int(n)
+	}
+	return scw.MaxPages
 }

@@ -63,13 +63,13 @@ func TestJobStoreExpiry(t *testing.T) {
 	s.now = func() time.Time { return now }
 	s.put("old", contracts.VisibilityPrivate)
 
-	now = now.Add(s.ttl + time.Minute)
+	now = now.Add(s.ttl() + time.Minute)
 	if _, ok := s.take("old"); ok {
 		t.Error("expired job was returned")
 	}
 
 	s.put("a", contracts.VisibilityPrivate)
-	now = now.Add(s.ttl + time.Minute)
+	now = now.Add(s.ttl() + time.Minute)
 	s.put("c", contracts.VisibilityPrivate)
 	if _, exists := s.jobs["a"]; exists {
 		t.Error("put should sweep expired jobs")

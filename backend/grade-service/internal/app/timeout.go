@@ -2,7 +2,7 @@ package app
 
 import (
 	"log"
-	"os"
+	"repo-therapist/runtimeconfig"
 	"strconv"
 	"time"
 )
@@ -29,7 +29,7 @@ func JobTTL() time.Duration {
 // DurationEnv returns env var key parsed as a positive Go duration, or def when it is unset or
 // invalid (an invalid value is logged).
 func DurationEnv(key string, def time.Duration) time.Duration {
-	v := os.Getenv(key)
+	v := runtimeconfig.Getenv(key)
 	if v == "" {
 		return def
 	}
@@ -44,7 +44,7 @@ func DurationEnv(key string, def time.Duration) time.Duration {
 // KeepRepoData reports whether S3_KEEP_REPO_DATA asks to keep a repo's S3 export after its
 // grading result is published (for debugging). Default false: the export is deleted.
 func KeepRepoData() bool {
-	v := os.Getenv("S3_KEEP_REPO_DATA")
+	v := runtimeconfig.Getenv("S3_KEEP_REPO_DATA")
 	if v == "" {
 		return false
 	}

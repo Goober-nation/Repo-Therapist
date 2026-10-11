@@ -9,6 +9,8 @@
   документации.
 - Aggregator ↔ LLM service — **описано ниже как плоские сообщения `llm.recommendations.*`** для
   сводки по репозиторию и приоритизированных рекомендаций.
+- Aggregator → все сервисы — настройки из панели администратора: топики `config.updated` /
+  `config.status`, **описаны ниже** и в [config.md](config.md).
 - Grade service ↔ Security wrapper — не через Kafka: Grade service вызывает обёртку напрямую по
   gRPC (`GetAppsecResult`), см. `grading/security.md`.
 
@@ -30,7 +32,41 @@
 | `llm.recommendations.received` | `KAFKA_LLM_RECOMMENDATIONS_TOPIC` | aggregator, llm |
 
 LLM-сервис по-прежнему принимает старые `LLM_SUMMARY_REQUEST_TOPIC`/`LLM_SUMMARY_RESULT_TOPIC`
-как запасные; если заданы обе, побеждает переменная `KAFKA_*`.
+как запасные; если заданы обе, побеждает переменная `KAFKA_*`. Старое имя, заданное в окружении,
+главнее нового имени в `config/app.yaml`.
+
+Имена топиков можно задать и в `config/app.yaml` (`shared.static.kafka_*_topic`); они читаются только
+при запуске. Топики настроек `config.updated` / `config.status` не переименовываются.
+
+## Настройки: `config.updated` и `config.status`
+
+Оба топика — с одной партицией и `cleanup.policy=compact` (Kafka хранит последнее сообщение по каждому
+ключу). Их создаёт с этими параметрами первый запустившийся сервис; уже существующим топикам политика
+выставляется заново.
+
+**`config.updated`** — пишет только Aggregator, читают все сервисы с настройками из панели (aggregator,
+gateway, grade, repository, llm-service, llm-summary-service). Ключ сообщения — путь в app.yaml
+(`gateway.rate_limit`), значение:
+
+```json
+{"key": "gateway.rate_limit", "value": "90", "updated_at": "2026-10-11T12:00:00Z"}
+```
+
+Сброс к значению из файла — сообщение с тем же ключом и пустым значением (tombstone). Читатели не
+используют группу потребителей: каждый процесс читает топик целиком с первого смещения, при запуске —
+до конца (не дольше 15 секунд), затем следит за новыми сообщениями. Значение, не подходящее по типу и
+границам `admin_editable`, и ключ, заданный в окружении процесса, процесс не применяет.
+
+**`config.status`** — пишет каждый процесс при запуске и после каждого изменения своих настроек, читает
+Aggregator. Ключ — имя процесса (`gateway`, `grade`, `llm-service`, ...), значение:
+
+```json
+{"service": "gateway", "sections": ["shared", "gateway", "frontend"],
+ "env_locked": ["gateway.rate_limit"], "restart_pending": [], "reported_at": "2026-10-11T12:00:00Z"}
+```
+
+`env_locked` — ключи, заданные в окружении процесса (без значений); Aggregator отклоняет изменение
+такого ключа. `restart_pending` — `static:`-ключи, изменённые в файле после запуска.
 
 ## `repo.grade.requested`
 

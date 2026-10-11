@@ -2,7 +2,7 @@ package config
 
 import (
 	"fmt"
-	"os"
+	"repo-therapist/runtimeconfig"
 	"strconv"
 	"time"
 )
@@ -259,7 +259,7 @@ func LoadConfig() *Config {
 }
 
 func getEnvDefault(key string, def string) string {
-	value := os.Getenv(key)
+	value := runtimeconfig.Getenv(key)
 	if value == "" {
 		return def
 	}
@@ -268,7 +268,7 @@ func getEnvDefault(key string, def string) string {
 }
 
 func getEnvBool(key string, def bool) bool {
-	value, err := strconv.ParseBool(os.Getenv(key))
+	value, err := strconv.ParseBool(runtimeconfig.Getenv(key))
 	if err != nil {
 		return def
 	}
@@ -277,7 +277,7 @@ func getEnvBool(key string, def bool) bool {
 }
 
 func getEnvInt(key string, def int) int {
-	value, err := strconv.Atoi(os.Getenv(key))
+	value, err := strconv.Atoi(runtimeconfig.Getenv(key))
 	if err != nil || value < 0 {
 		return def
 	}
@@ -286,7 +286,7 @@ func getEnvInt(key string, def int) int {
 }
 
 func getEnvList(key string, def []string) []string {
-	value := os.Getenv(key)
+	value := runtimeconfig.Getenv(key)
 	if value == "" {
 		return def
 	}
@@ -307,7 +307,7 @@ func getEnvList(key string, def []string) []string {
 }
 
 func getEnvDuration(key string, def time.Duration) time.Duration {
-	value := os.Getenv(key)
+	value := runtimeconfig.Getenv(key)
 	if value == "" {
 		return def
 	}

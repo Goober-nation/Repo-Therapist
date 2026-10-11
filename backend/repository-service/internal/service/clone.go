@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"repo-therapist/runtimeconfig"
 	"strconv"
 	"strings"
 	"time"
@@ -111,8 +112,8 @@ func CloneAndUpload(ctx context.Context, org, repo, jobID, token string) (res *R
 
 	s3Client, err := storage.NewClient(ctx, storage.Config{
 		Endpoint:  envOrDefault("S3_ENDPOINT", "localhost:9000"),
-		AccessKey: os.Getenv("S3_ACCESS_KEY"),
-		SecretKey: os.Getenv("S3_SECRET_KEY"),
+		AccessKey: runtimeconfig.Getenv("S3_ACCESS_KEY"),
+		SecretKey: runtimeconfig.Getenv("S3_SECRET_KEY"),
 		Bucket:    envOrDefault("S3_BUCKET", "repo-content"),
 		UseSSL:    false,
 	})
@@ -255,7 +256,7 @@ func resolvePAT(token string) (string, error) {
 	if token != "" {
 		return token, nil
 	}
-	if pat := os.Getenv("SOURCECRAFT_PAT"); pat != "" {
+	if pat := runtimeconfig.Getenv("SOURCECRAFT_PAT"); pat != "" {
 		return pat, nil
 	}
 	return "", fmt.Errorf("no request token and SOURCECRAFT_PAT environment variable is not set")
@@ -402,7 +403,7 @@ func cloneInto(base string, clone func(dir string) error) (string, error) {
 // predict, and it naturally protects against concurrent clones starving each other of the same
 // shared RAM, which a static per-repo threshold wouldn't catch.
 func cloneTempBase() string {
-	if dir := os.Getenv("CLONE_TMP_DIR"); dir != "" {
+	if dir := runtimeconfig.Getenv("CLONE_TMP_DIR"); dir != "" {
 		return dir
 	}
 
@@ -413,7 +414,7 @@ func cloneTempBase() string {
 	}
 
 	minFree := int64(defaultMinShmFreeBytes)
-	if v := os.Getenv("CLONE_SHM_MIN_FREE_BYTES"); v != "" {
+	if v := runtimeconfig.Getenv("CLONE_SHM_MIN_FREE_BYTES"); v != "" {
 		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n >= 0 {
 			minFree = n
 		} else {
@@ -457,7 +458,7 @@ func redactURL(args []string) []string {
 // prSampleLimit returns PR_SAMPLE_LIMIT (0 switches the pull request sample off); an invalid or
 // negative value falls back to prdata.DefaultSampleLimit.
 func prSampleLimit() int {
-	v := os.Getenv("PR_SAMPLE_LIMIT")
+	v := runtimeconfig.Getenv("PR_SAMPLE_LIMIT")
 	if v == "" {
 		return prdata.DefaultSampleLimit
 	}
@@ -470,7 +471,7 @@ func prSampleLimit() int {
 }
 
 func envOrDefault(key, def string) string {
-	if v := os.Getenv(key); v != "" {
+	if v := runtimeconfig.Getenv(key); v != "" {
 		return v
 	}
 	return def
@@ -479,7 +480,7 @@ func envOrDefault(key, def string) string {
 // issueReplySampleLimit returns ISSUE_REPLY_SAMPLE_LIMIT (0 switches the issue reply sample off); an
 // invalid or negative value falls back to issuedata.DefaultSampleLimit.
 func issueReplySampleLimit() int {
-	v := os.Getenv("ISSUE_REPLY_SAMPLE_LIMIT")
+	v := runtimeconfig.Getenv("ISSUE_REPLY_SAMPLE_LIMIT")
 	if v == "" {
 		return issuedata.DefaultSampleLimit
 	}

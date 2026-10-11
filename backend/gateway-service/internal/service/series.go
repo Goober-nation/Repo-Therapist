@@ -15,7 +15,11 @@ type SeriesSource interface {
 }
 
 // SetSeries turns the graphs on; nil leaves them off (every graph request is then "metrics_off").
-func (s *GatewayService) SetSeries(source SeriesSource) { s.series = source }
+func (s *GatewayService) SetSeries(source SeriesSource) {
+	s.liveMu.Lock()
+	defer s.liveMu.Unlock()
+	s.series = source
+}
 
 // PublicSeries answers a graph of the Analytics tab: only series built from public gradings, behind the
 // public API's per-IP limit.
@@ -33,11 +37,14 @@ func (s *GatewayService) AdminSeries(ctx context.Context, name, rangeName string
 }
 
 func (s *GatewayService) querySeries(ctx context.Context, name string, public bool, rangeName string) (series.Result, error) {
-	if s.series == nil {
+	s.liveMu.RLock()
+	source := s.series
+	s.liveMu.RUnlock()
+	if source == nil {
 		return series.Result{}, domain.ReasonError{Reason: "metrics_off", Err: fmt.Errorf("graphs: %w", domain.ErrUnavailable)}
 	}
 
-	result, err := s.series.Query(ctx, name, public, rangeName)
+	result, err := source.Query(ctx, name, public, rangeName)
 
 	switch {
 	case err == nil:

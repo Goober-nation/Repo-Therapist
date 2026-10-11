@@ -1,7 +1,22 @@
 package main
 
-import "repo-therapist/security-wrapper-service/internal/app"
+import (
+	"context"
+	"github.com/joho/godotenv"
+	"log"
+
+	"repo-therapist/runtimeconfig"
+	"repo-therapist/security-wrapper-service/internal/app"
+)
 
 func main() {
+	// .env before the config snapshot: its values are part of the environment layer, which always wins.
+	if err := godotenv.Load(); err != nil {
+		log.Printf(".env not loaded (%v), using the process environment", err)
+	}
+	// Settings (config/app.yaml + env + admin overrides) must load before anything reads them.
+	if _, err := runtimeconfig.Start(context.Background(), "security_wrapper"); err != nil {
+		log.Fatalf("config: %v", err)
+	}
 	app.StartApp()
 }

@@ -17,6 +17,23 @@ export function healthLevel(score: number | null): { label: string; tone: Tone }
   return LEVELS.find((level) => score >= level.min) ?? LEVELS[LEVELS.length - 1]
 }
 
+/** Score at which a repository counts as healthy in the ranking (RANKING_LEVELS). */
+export const RANKING_HEALTHY_SCORE = 70
+
+// The ranking's own bands; badges, analytics and the repository page still use LEVELS.
+const RANKING_LEVELS: { min: number; label: string; tone: Tone }[] = [
+  { min: 80, label: "Отличное состояние", tone: "good" },
+  { min: RANKING_HEALTHY_SCORE, label: "Здоровый", tone: "good" },
+  { min: 40, label: "Требует внимания", tone: "warning" },
+  { min: 0, label: "Под риском", tone: "critical" },
+]
+
+/** healthLevel with the ranking's bands. */
+export function rankingLevel(score: number | null): { label: string; tone: Tone } {
+  if (score === null) return { label: "Нет данных", tone: "neutral" }
+  return RANKING_LEVELS.find((level) => score >= level.min) ?? RANKING_LEVELS[RANKING_LEVELS.length - 1]
+}
+
 /** Mirrors config/grading.yaml. Keep in sync when weights change. */
 const CATEGORIES: Record<string, { label: string; weight: number; privateOnly?: boolean }> = {
   activity: { label: "Activity", weight: 20 },

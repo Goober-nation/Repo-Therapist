@@ -2775,6 +2775,516 @@ func (x *CatalogRefresh) GetError() string {
 	return ""
 }
 
+type ListSettingsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSettingsRequest) Reset() {
+	*x = ListSettingsRequest{}
+	mi := &file_agg_client_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSettingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSettingsRequest) ProtoMessage() {}
+
+func (x *ListSettingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSettingsRequest.ProtoReflect.Descriptor instead.
+func (*ListSettingsRequest) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{45}
+}
+
+type ListSettingsResponse struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Settings []*Setting             `protobuf:"bytes,1,rep,name=settings,proto3" json:"settings,omitempty"`
+	// The processes that reported their configuration on config.status.
+	Processes     []*ConfigProcess `protobuf:"bytes,2,rep,name=processes,proto3" json:"processes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSettingsResponse) Reset() {
+	*x = ListSettingsResponse{}
+	mi := &file_agg_client_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSettingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSettingsResponse) ProtoMessage() {}
+
+func (x *ListSettingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSettingsResponse.ProtoReflect.Descriptor instead.
+func (*ListSettingsResponse) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *ListSettingsResponse) GetSettings() []*Setting {
+	if x != nil {
+		return x.Settings
+	}
+	return nil
+}
+
+func (x *ListSettingsResponse) GetProcesses() []*ConfigProcess {
+	if x != nil {
+		return x.Processes
+	}
+	return nil
+}
+
+type Setting struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// app.yaml path, e.g. gateway.rate_limit.
+	Key   string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Group string `protobuf:"bytes,2,opt,name=group,proto3" json:"group,omitempty"`
+	Title string `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	// int, float, duration, bool, string or enum.
+	Type   string   `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	Min    string   `protobuf:"bytes,5,opt,name=min,proto3" json:"min,omitempty"`
+	Max    string   `protobuf:"bytes,6,opt,name=max,proto3" json:"max,omitempty"`
+	Values []string `protobuf:"bytes,7,rep,name=values,proto3" json:"values,omitempty"`
+	// The app.yaml value; file_set is false when the file leaves the key to the code default.
+	FileValue     string                 `protobuf:"bytes,8,opt,name=file_value,json=fileValue,proto3" json:"file_value,omitempty"`
+	FileSet       bool                   `protobuf:"varint,9,opt,name=file_set,json=fileSet,proto3" json:"file_set,omitempty"`
+	OverrideValue string                 `protobuf:"bytes,10,opt,name=override_value,json=overrideValue,proto3" json:"override_value,omitempty"`
+	Overridden    bool                   `protobuf:"varint,11,opt,name=overridden,proto3" json:"overridden,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	UpdatedBy     string                 `protobuf:"bytes,13,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
+	// Processes whose environment sets the key; the environment always wins, so no override applies.
+	EnvLockedBy   []string `protobuf:"bytes,14,rep,name=env_locked_by,json=envLockedBy,proto3" json:"env_locked_by,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Setting) Reset() {
+	*x = Setting{}
+	mi := &file_agg_client_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Setting) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Setting) ProtoMessage() {}
+
+func (x *Setting) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Setting.ProtoReflect.Descriptor instead.
+func (*Setting) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *Setting) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *Setting) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+func (x *Setting) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *Setting) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *Setting) GetMin() string {
+	if x != nil {
+		return x.Min
+	}
+	return ""
+}
+
+func (x *Setting) GetMax() string {
+	if x != nil {
+		return x.Max
+	}
+	return ""
+}
+
+func (x *Setting) GetValues() []string {
+	if x != nil {
+		return x.Values
+	}
+	return nil
+}
+
+func (x *Setting) GetFileValue() string {
+	if x != nil {
+		return x.FileValue
+	}
+	return ""
+}
+
+func (x *Setting) GetFileSet() bool {
+	if x != nil {
+		return x.FileSet
+	}
+	return false
+}
+
+func (x *Setting) GetOverrideValue() string {
+	if x != nil {
+		return x.OverrideValue
+	}
+	return ""
+}
+
+func (x *Setting) GetOverridden() bool {
+	if x != nil {
+		return x.Overridden
+	}
+	return false
+}
+
+func (x *Setting) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *Setting) GetUpdatedBy() string {
+	if x != nil {
+		return x.UpdatedBy
+	}
+	return ""
+}
+
+func (x *Setting) GetEnvLockedBy() []string {
+	if x != nil {
+		return x.EnvLockedBy
+	}
+	return nil
+}
+
+type ConfigProcess struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Name     string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Sections []string               `protobuf:"bytes,2,rep,name=sections,proto3" json:"sections,omitempty"`
+	// Static (restart-only) keys changed in app.yaml since the process started.
+	RestartPending []string               `protobuf:"bytes,3,rep,name=restart_pending,json=restartPending,proto3" json:"restart_pending,omitempty"`
+	ReportedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=reported_at,json=reportedAt,proto3" json:"reported_at,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ConfigProcess) Reset() {
+	*x = ConfigProcess{}
+	mi := &file_agg_client_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfigProcess) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfigProcess) ProtoMessage() {}
+
+func (x *ConfigProcess) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfigProcess.ProtoReflect.Descriptor instead.
+func (*ConfigProcess) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *ConfigProcess) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ConfigProcess) GetSections() []string {
+	if x != nil {
+		return x.Sections
+	}
+	return nil
+}
+
+func (x *ConfigProcess) GetRestartPending() []string {
+	if x != nil {
+		return x.RestartPending
+	}
+	return nil
+}
+
+func (x *ConfigProcess) GetReportedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ReportedAt
+	}
+	return nil
+}
+
+type SetSettingRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	ActorHash     string                 `protobuf:"bytes,3,opt,name=actor_hash,json=actorHash,proto3" json:"actor_hash,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetSettingRequest) Reset() {
+	*x = SetSettingRequest{}
+	mi := &file_agg_client_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetSettingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetSettingRequest) ProtoMessage() {}
+
+func (x *SetSettingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetSettingRequest.ProtoReflect.Descriptor instead.
+func (*SetSettingRequest) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *SetSettingRequest) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *SetSettingRequest) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+func (x *SetSettingRequest) GetActorHash() string {
+	if x != nil {
+		return x.ActorHash
+	}
+	return ""
+}
+
+type SetSettingResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Setting       *Setting               `protobuf:"bytes,1,opt,name=setting,proto3" json:"setting,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetSettingResponse) Reset() {
+	*x = SetSettingResponse{}
+	mi := &file_agg_client_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetSettingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetSettingResponse) ProtoMessage() {}
+
+func (x *SetSettingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetSettingResponse.ProtoReflect.Descriptor instead.
+func (*SetSettingResponse) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *SetSettingResponse) GetSetting() *Setting {
+	if x != nil {
+		return x.Setting
+	}
+	return nil
+}
+
+type ResetSettingRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	ActorHash     string                 `protobuf:"bytes,2,opt,name=actor_hash,json=actorHash,proto3" json:"actor_hash,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResetSettingRequest) Reset() {
+	*x = ResetSettingRequest{}
+	mi := &file_agg_client_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResetSettingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResetSettingRequest) ProtoMessage() {}
+
+func (x *ResetSettingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResetSettingRequest.ProtoReflect.Descriptor instead.
+func (*ResetSettingRequest) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *ResetSettingRequest) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *ResetSettingRequest) GetActorHash() string {
+	if x != nil {
+		return x.ActorHash
+	}
+	return ""
+}
+
+type ResetSettingResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Setting       *Setting               `protobuf:"bytes,1,opt,name=setting,proto3" json:"setting,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResetSettingResponse) Reset() {
+	*x = ResetSettingResponse{}
+	mi := &file_agg_client_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResetSettingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResetSettingResponse) ProtoMessage() {}
+
+func (x *ResetSettingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agg_client_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResetSettingResponse.ProtoReflect.Descriptor instead.
+func (*ResetSettingResponse) Descriptor() ([]byte, []int) {
+	return file_agg_client_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *ResetSettingResponse) GetSetting() *Setting {
+	if x != nil {
+		return x.Setting
+	}
+	return nil
+}
+
 var File_agg_client_proto protoreflect.FileDescriptor
 
 const file_agg_client_proto_rawDesc = "" +
@@ -2995,7 +3505,51 @@ const file_agg_client_proto_rawDesc = "" +
 	"actor_hash\x18\x06 \x01(\tR\tactorHash\x12\x14\n" +
 	"\x05pages\x18\a \x01(\x05R\x05pages\x12\x14\n" +
 	"\x05repos\x18\b \x01(\x05R\x05repos\x12\x14\n" +
-	"\x05error\x18\t \x01(\tR\x05error2\x9c\f\n" +
+	"\x05error\x18\t \x01(\tR\x05error\"\x15\n" +
+	"\x13ListSettingsRequest\"\x80\x01\n" +
+	"\x14ListSettingsResponse\x12/\n" +
+	"\bsettings\x18\x01 \x03(\v2\x13.aggregator.SettingR\bsettings\x127\n" +
+	"\tprocesses\x18\x02 \x03(\v2\x19.aggregator.ConfigProcessR\tprocesses\"\x96\x03\n" +
+	"\aSetting\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05group\x18\x02 \x01(\tR\x05group\x12\x14\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12\x12\n" +
+	"\x04type\x18\x04 \x01(\tR\x04type\x12\x10\n" +
+	"\x03min\x18\x05 \x01(\tR\x03min\x12\x10\n" +
+	"\x03max\x18\x06 \x01(\tR\x03max\x12\x16\n" +
+	"\x06values\x18\a \x03(\tR\x06values\x12\x1d\n" +
+	"\n" +
+	"file_value\x18\b \x01(\tR\tfileValue\x12\x19\n" +
+	"\bfile_set\x18\t \x01(\bR\afileSet\x12%\n" +
+	"\x0eoverride_value\x18\n" +
+	" \x01(\tR\roverrideValue\x12\x1e\n" +
+	"\n" +
+	"overridden\x18\v \x01(\bR\n" +
+	"overridden\x129\n" +
+	"\n" +
+	"updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_by\x18\r \x01(\tR\tupdatedBy\x12\"\n" +
+	"\renv_locked_by\x18\x0e \x03(\tR\venvLockedBy\"\xa5\x01\n" +
+	"\rConfigProcess\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
+	"\bsections\x18\x02 \x03(\tR\bsections\x12'\n" +
+	"\x0frestart_pending\x18\x03 \x03(\tR\x0erestartPending\x12;\n" +
+	"\vreported_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"reportedAt\"Z\n" +
+	"\x11SetSettingRequest\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\x12\x1d\n" +
+	"\n" +
+	"actor_hash\x18\x03 \x01(\tR\tactorHash\"C\n" +
+	"\x12SetSettingResponse\x12-\n" +
+	"\asetting\x18\x01 \x01(\v2\x13.aggregator.SettingR\asetting\"F\n" +
+	"\x13ResetSettingRequest\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x1d\n" +
+	"\n" +
+	"actor_hash\x18\x02 \x01(\tR\tactorHash\"E\n" +
+	"\x14ResetSettingResponse\x12-\n" +
+	"\asetting\x18\x01 \x01(\v2\x13.aggregator.SettingR\asetting2\x8f\x0e\n" +
 	"\n" +
 	"Aggregator\x12K\n" +
 	"\n" +
@@ -3016,7 +3570,11 @@ const file_agg_client_proto_rawDesc = "" +
 	"\x12ListGradingBatches\x12%.aggregator.ListGradingBatchesRequest\x1a&.aggregator.ListGradingBatchesResponse\x12]\n" +
 	"\x10GetCatalogStatus\x12#.aggregator.GetCatalogStatusRequest\x1a$.aggregator.GetCatalogStatusResponse\x12W\n" +
 	"\x0eRefreshCatalog\x12!.aggregator.RefreshCatalogRequest\x1a\".aggregator.RefreshCatalogResponse\x12i\n" +
-	"\x14CancelCatalogRefresh\x12'.aggregator.CancelCatalogRefreshRequest\x1a(.aggregator.CancelCatalogRefreshResponseB4Z2gateway-service/internal/transport/rpc/gen/agg;aggb\x06proto3"
+	"\x14CancelCatalogRefresh\x12'.aggregator.CancelCatalogRefreshRequest\x1a(.aggregator.CancelCatalogRefreshResponse\x12Q\n" +
+	"\fListSettings\x12\x1f.aggregator.ListSettingsRequest\x1a .aggregator.ListSettingsResponse\x12K\n" +
+	"\n" +
+	"SetSetting\x12\x1d.aggregator.SetSettingRequest\x1a\x1e.aggregator.SetSettingResponse\x12Q\n" +
+	"\fResetSetting\x12\x1f.aggregator.ResetSettingRequest\x1a .aggregator.ResetSettingResponseB4Z2gateway-service/internal/transport/rpc/gen/agg;aggb\x06proto3"
 
 var (
 	file_agg_client_proto_rawDescOnce sync.Once
@@ -3030,7 +3588,7 @@ func file_agg_client_proto_rawDescGZIP() []byte {
 	return file_agg_client_proto_rawDescData
 }
 
-var file_agg_client_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
+var file_agg_client_proto_msgTypes = make([]protoimpl.MessageInfo, 53)
 var file_agg_client_proto_goTypes = []any{
 	(*GetRegradeStatusRequest)(nil),           // 0: aggregator.GetRegradeStatusRequest
 	(*GetRegradeStatusResponse)(nil),          // 1: aggregator.GetRegradeStatusResponse
@@ -3077,23 +3635,31 @@ var file_agg_client_proto_goTypes = []any{
 	(*CancelCatalogRefreshRequest)(nil),       // 42: aggregator.CancelCatalogRefreshRequest
 	(*CancelCatalogRefreshResponse)(nil),      // 43: aggregator.CancelCatalogRefreshResponse
 	(*CatalogRefresh)(nil),                    // 44: aggregator.CatalogRefresh
-	(*timestamppb.Timestamp)(nil),             // 45: google.protobuf.Timestamp
+	(*ListSettingsRequest)(nil),               // 45: aggregator.ListSettingsRequest
+	(*ListSettingsResponse)(nil),              // 46: aggregator.ListSettingsResponse
+	(*Setting)(nil),                           // 47: aggregator.Setting
+	(*ConfigProcess)(nil),                     // 48: aggregator.ConfigProcess
+	(*SetSettingRequest)(nil),                 // 49: aggregator.SetSettingRequest
+	(*SetSettingResponse)(nil),                // 50: aggregator.SetSettingResponse
+	(*ResetSettingRequest)(nil),               // 51: aggregator.ResetSettingRequest
+	(*ResetSettingResponse)(nil),              // 52: aggregator.ResetSettingResponse
+	(*timestamppb.Timestamp)(nil),             // 53: google.protobuf.Timestamp
 }
 var file_agg_client_proto_depIdxs = []int32{
-	45, // 0: aggregator.GetRegradeStatusResponse.next_run_at:type_name -> google.protobuf.Timestamp
-	45, // 1: aggregator.GetRegradeStatusResponse.started_at:type_name -> google.protobuf.Timestamp
-	45, // 2: aggregator.GetRegradeStatusResponse.last_finished_at:type_name -> google.protobuf.Timestamp
+	53, // 0: aggregator.GetRegradeStatusResponse.next_run_at:type_name -> google.protobuf.Timestamp
+	53, // 1: aggregator.GetRegradeStatusResponse.started_at:type_name -> google.protobuf.Timestamp
+	53, // 2: aggregator.GetRegradeStatusResponse.last_finished_at:type_name -> google.protobuf.Timestamp
 	13, // 3: aggregator.GetMyReposResponse.repositories:type_name -> aggregator.Repository
 	6,  // 4: aggregator.GetMyOrgsResponse.organizations:type_name -> aggregator.UserOrganization
 	13, // 5: aggregator.GetOrgReposResponse.repositories:type_name -> aggregator.Repository
 	17, // 6: aggregator.GetGradingResponse.grade:type_name -> aggregator.RepoGrade
-	45, // 7: aggregator.RequestLLMRecommendationsResponse.evaluated_at:type_name -> google.protobuf.Timestamp
+	53, // 7: aggregator.RequestLLMRecommendationsResponse.evaluated_at:type_name -> google.protobuf.Timestamp
 	16, // 8: aggregator.Repository.organization:type_name -> aggregator.Organization
 	15, // 9: aggregator.Repository.logo:type_name -> aggregator.Logo
 	14, // 10: aggregator.Repository.language:type_name -> aggregator.Language
-	45, // 11: aggregator.RepoGrade.graded_at:type_name -> google.protobuf.Timestamp
-	45, // 12: aggregator.GetAnalyticsResponse.graded_at:type_name -> google.protobuf.Timestamp
-	45, // 13: aggregator.AuditEntry.occurred_at:type_name -> google.protobuf.Timestamp
+	53, // 11: aggregator.RepoGrade.graded_at:type_name -> google.protobuf.Timestamp
+	53, // 12: aggregator.GetAnalyticsResponse.graded_at:type_name -> google.protobuf.Timestamp
+	53, // 13: aggregator.AuditEntry.occurred_at:type_name -> google.protobuf.Timestamp
 	23, // 14: aggregator.ListAuditResponse.entries:type_name -> aggregator.AuditEntry
 	25, // 15: aggregator.PreviewGradingBatchRequest.filter:type_name -> aggregator.BatchFilter
 	25, // 16: aggregator.StartGradingBatchRequest.filter:type_name -> aggregator.BatchFilter
@@ -3102,55 +3668,67 @@ var file_agg_client_proto_depIdxs = []int32{
 	36, // 19: aggregator.GetGradingBatchResponse.batch:type_name -> aggregator.GradingBatch
 	37, // 20: aggregator.GetGradingBatchResponse.failures:type_name -> aggregator.GradingBatchFailure
 	36, // 21: aggregator.ListGradingBatchesResponse.batches:type_name -> aggregator.GradingBatch
-	45, // 22: aggregator.GradingBatch.created_at:type_name -> google.protobuf.Timestamp
-	45, // 23: aggregator.GradingBatch.finished_at:type_name -> google.protobuf.Timestamp
+	53, // 22: aggregator.GradingBatch.created_at:type_name -> google.protobuf.Timestamp
+	53, // 23: aggregator.GradingBatch.finished_at:type_name -> google.protobuf.Timestamp
 	25, // 24: aggregator.GradingBatch.filter:type_name -> aggregator.BatchFilter
-	45, // 25: aggregator.GetCatalogStatusResponse.updated_at:type_name -> google.protobuf.Timestamp
+	53, // 25: aggregator.GetCatalogStatusResponse.updated_at:type_name -> google.protobuf.Timestamp
 	44, // 26: aggregator.GetCatalogStatusResponse.current:type_name -> aggregator.CatalogRefresh
 	44, // 27: aggregator.GetCatalogStatusResponse.last_completed:type_name -> aggregator.CatalogRefresh
 	44, // 28: aggregator.RefreshCatalogResponse.refresh:type_name -> aggregator.CatalogRefresh
 	44, // 29: aggregator.CancelCatalogRefreshResponse.refresh:type_name -> aggregator.CatalogRefresh
-	45, // 30: aggregator.CatalogRefresh.started_at:type_name -> google.protobuf.Timestamp
-	45, // 31: aggregator.CatalogRefresh.finished_at:type_name -> google.protobuf.Timestamp
-	2,  // 32: aggregator.Aggregator.GetMyRepos:input_type -> aggregator.GetMyReposRequest
-	4,  // 33: aggregator.Aggregator.GetMyOrgs:input_type -> aggregator.GetMyOrgsRequest
-	7,  // 34: aggregator.Aggregator.GetOrgRepos:input_type -> aggregator.GetOrgReposRequest
-	9,  // 35: aggregator.Aggregator.GetGrading:input_type -> aggregator.GetGradingRequest
-	11, // 36: aggregator.Aggregator.RequestLLMRecommendations:input_type -> aggregator.RequestLLMRecommendationsRequest
-	18, // 37: aggregator.Aggregator.GetAnalytics:input_type -> aggregator.GetAnalyticsRequest
-	0,  // 38: aggregator.Aggregator.GetRegradeStatus:input_type -> aggregator.GetRegradeStatusRequest
-	20, // 39: aggregator.Aggregator.RecordAudit:input_type -> aggregator.RecordAuditRequest
-	22, // 40: aggregator.Aggregator.ListAudit:input_type -> aggregator.ListAuditRequest
-	26, // 41: aggregator.Aggregator.PreviewGradingBatch:input_type -> aggregator.PreviewGradingBatchRequest
-	28, // 42: aggregator.Aggregator.StartGradingBatch:input_type -> aggregator.StartGradingBatchRequest
-	30, // 43: aggregator.Aggregator.ControlGradingBatch:input_type -> aggregator.ControlGradingBatchRequest
-	32, // 44: aggregator.Aggregator.GetGradingBatch:input_type -> aggregator.GetGradingBatchRequest
-	34, // 45: aggregator.Aggregator.ListGradingBatches:input_type -> aggregator.ListGradingBatchesRequest
-	38, // 46: aggregator.Aggregator.GetCatalogStatus:input_type -> aggregator.GetCatalogStatusRequest
-	40, // 47: aggregator.Aggregator.RefreshCatalog:input_type -> aggregator.RefreshCatalogRequest
-	42, // 48: aggregator.Aggregator.CancelCatalogRefresh:input_type -> aggregator.CancelCatalogRefreshRequest
-	3,  // 49: aggregator.Aggregator.GetMyRepos:output_type -> aggregator.GetMyReposResponse
-	5,  // 50: aggregator.Aggregator.GetMyOrgs:output_type -> aggregator.GetMyOrgsResponse
-	8,  // 51: aggregator.Aggregator.GetOrgRepos:output_type -> aggregator.GetOrgReposResponse
-	10, // 52: aggregator.Aggregator.GetGrading:output_type -> aggregator.GetGradingResponse
-	12, // 53: aggregator.Aggregator.RequestLLMRecommendations:output_type -> aggregator.RequestLLMRecommendationsResponse
-	19, // 54: aggregator.Aggregator.GetAnalytics:output_type -> aggregator.GetAnalyticsResponse
-	1,  // 55: aggregator.Aggregator.GetRegradeStatus:output_type -> aggregator.GetRegradeStatusResponse
-	21, // 56: aggregator.Aggregator.RecordAudit:output_type -> aggregator.RecordAuditResponse
-	24, // 57: aggregator.Aggregator.ListAudit:output_type -> aggregator.ListAuditResponse
-	27, // 58: aggregator.Aggregator.PreviewGradingBatch:output_type -> aggregator.PreviewGradingBatchResponse
-	29, // 59: aggregator.Aggregator.StartGradingBatch:output_type -> aggregator.StartGradingBatchResponse
-	31, // 60: aggregator.Aggregator.ControlGradingBatch:output_type -> aggregator.ControlGradingBatchResponse
-	33, // 61: aggregator.Aggregator.GetGradingBatch:output_type -> aggregator.GetGradingBatchResponse
-	35, // 62: aggregator.Aggregator.ListGradingBatches:output_type -> aggregator.ListGradingBatchesResponse
-	39, // 63: aggregator.Aggregator.GetCatalogStatus:output_type -> aggregator.GetCatalogStatusResponse
-	41, // 64: aggregator.Aggregator.RefreshCatalog:output_type -> aggregator.RefreshCatalogResponse
-	43, // 65: aggregator.Aggregator.CancelCatalogRefresh:output_type -> aggregator.CancelCatalogRefreshResponse
-	49, // [49:66] is the sub-list for method output_type
-	32, // [32:49] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	53, // 30: aggregator.CatalogRefresh.started_at:type_name -> google.protobuf.Timestamp
+	53, // 31: aggregator.CatalogRefresh.finished_at:type_name -> google.protobuf.Timestamp
+	47, // 32: aggregator.ListSettingsResponse.settings:type_name -> aggregator.Setting
+	48, // 33: aggregator.ListSettingsResponse.processes:type_name -> aggregator.ConfigProcess
+	53, // 34: aggregator.Setting.updated_at:type_name -> google.protobuf.Timestamp
+	53, // 35: aggregator.ConfigProcess.reported_at:type_name -> google.protobuf.Timestamp
+	47, // 36: aggregator.SetSettingResponse.setting:type_name -> aggregator.Setting
+	47, // 37: aggregator.ResetSettingResponse.setting:type_name -> aggregator.Setting
+	2,  // 38: aggregator.Aggregator.GetMyRepos:input_type -> aggregator.GetMyReposRequest
+	4,  // 39: aggregator.Aggregator.GetMyOrgs:input_type -> aggregator.GetMyOrgsRequest
+	7,  // 40: aggregator.Aggregator.GetOrgRepos:input_type -> aggregator.GetOrgReposRequest
+	9,  // 41: aggregator.Aggregator.GetGrading:input_type -> aggregator.GetGradingRequest
+	11, // 42: aggregator.Aggregator.RequestLLMRecommendations:input_type -> aggregator.RequestLLMRecommendationsRequest
+	18, // 43: aggregator.Aggregator.GetAnalytics:input_type -> aggregator.GetAnalyticsRequest
+	0,  // 44: aggregator.Aggregator.GetRegradeStatus:input_type -> aggregator.GetRegradeStatusRequest
+	20, // 45: aggregator.Aggregator.RecordAudit:input_type -> aggregator.RecordAuditRequest
+	22, // 46: aggregator.Aggregator.ListAudit:input_type -> aggregator.ListAuditRequest
+	26, // 47: aggregator.Aggregator.PreviewGradingBatch:input_type -> aggregator.PreviewGradingBatchRequest
+	28, // 48: aggregator.Aggregator.StartGradingBatch:input_type -> aggregator.StartGradingBatchRequest
+	30, // 49: aggregator.Aggregator.ControlGradingBatch:input_type -> aggregator.ControlGradingBatchRequest
+	32, // 50: aggregator.Aggregator.GetGradingBatch:input_type -> aggregator.GetGradingBatchRequest
+	34, // 51: aggregator.Aggregator.ListGradingBatches:input_type -> aggregator.ListGradingBatchesRequest
+	38, // 52: aggregator.Aggregator.GetCatalogStatus:input_type -> aggregator.GetCatalogStatusRequest
+	40, // 53: aggregator.Aggregator.RefreshCatalog:input_type -> aggregator.RefreshCatalogRequest
+	42, // 54: aggregator.Aggregator.CancelCatalogRefresh:input_type -> aggregator.CancelCatalogRefreshRequest
+	45, // 55: aggregator.Aggregator.ListSettings:input_type -> aggregator.ListSettingsRequest
+	49, // 56: aggregator.Aggregator.SetSetting:input_type -> aggregator.SetSettingRequest
+	51, // 57: aggregator.Aggregator.ResetSetting:input_type -> aggregator.ResetSettingRequest
+	3,  // 58: aggregator.Aggregator.GetMyRepos:output_type -> aggregator.GetMyReposResponse
+	5,  // 59: aggregator.Aggregator.GetMyOrgs:output_type -> aggregator.GetMyOrgsResponse
+	8,  // 60: aggregator.Aggregator.GetOrgRepos:output_type -> aggregator.GetOrgReposResponse
+	10, // 61: aggregator.Aggregator.GetGrading:output_type -> aggregator.GetGradingResponse
+	12, // 62: aggregator.Aggregator.RequestLLMRecommendations:output_type -> aggregator.RequestLLMRecommendationsResponse
+	19, // 63: aggregator.Aggregator.GetAnalytics:output_type -> aggregator.GetAnalyticsResponse
+	1,  // 64: aggregator.Aggregator.GetRegradeStatus:output_type -> aggregator.GetRegradeStatusResponse
+	21, // 65: aggregator.Aggregator.RecordAudit:output_type -> aggregator.RecordAuditResponse
+	24, // 66: aggregator.Aggregator.ListAudit:output_type -> aggregator.ListAuditResponse
+	27, // 67: aggregator.Aggregator.PreviewGradingBatch:output_type -> aggregator.PreviewGradingBatchResponse
+	29, // 68: aggregator.Aggregator.StartGradingBatch:output_type -> aggregator.StartGradingBatchResponse
+	31, // 69: aggregator.Aggregator.ControlGradingBatch:output_type -> aggregator.ControlGradingBatchResponse
+	33, // 70: aggregator.Aggregator.GetGradingBatch:output_type -> aggregator.GetGradingBatchResponse
+	35, // 71: aggregator.Aggregator.ListGradingBatches:output_type -> aggregator.ListGradingBatchesResponse
+	39, // 72: aggregator.Aggregator.GetCatalogStatus:output_type -> aggregator.GetCatalogStatusResponse
+	41, // 73: aggregator.Aggregator.RefreshCatalog:output_type -> aggregator.RefreshCatalogResponse
+	43, // 74: aggregator.Aggregator.CancelCatalogRefresh:output_type -> aggregator.CancelCatalogRefreshResponse
+	46, // 75: aggregator.Aggregator.ListSettings:output_type -> aggregator.ListSettingsResponse
+	50, // 76: aggregator.Aggregator.SetSetting:output_type -> aggregator.SetSettingResponse
+	52, // 77: aggregator.Aggregator.ResetSetting:output_type -> aggregator.ResetSettingResponse
+	58, // [58:78] is the sub-list for method output_type
+	38, // [38:58] is the sub-list for method input_type
+	38, // [38:38] is the sub-list for extension type_name
+	38, // [38:38] is the sub-list for extension extendee
+	0,  // [0:38] is the sub-list for field type_name
 }
 
 func init() { file_agg_client_proto_init() }
@@ -3166,7 +3744,7 @@ func file_agg_client_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agg_client_proto_rawDesc), len(file_agg_client_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   45,
+			NumMessages:   53,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

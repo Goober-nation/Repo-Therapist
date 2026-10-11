@@ -119,34 +119,13 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?set in .env}
       AGGREGATOR_GRPC_ADDRESS: localhost:8083
       RATING_GRPC_ADDRESS: localhost:8086
-      # Gateway requests per client IP per minute (code default 10 is too low for the SPA's polling).
-      RATE_LIMIT: ${RATE_LIMIT:-60}
-      # Public JSON score API (GET /score/...): its own per-IP budget; badges and the widget are not limited.
-      PUBLIC_API_RATE_LIMIT: ${PUBLIC_API_RATE_LIMIT:-300}
-      PUBLIC_API_RATE_LIMIT_WINDOW: ${PUBLIC_API_RATE_LIMIT_WINDOW:-1m}
-      EXPORT_RATE_LIMIT: ${EXPORT_RATE_LIMIT:-5}
-      EXPORT_RATE_LIMIT_WINDOW: ${EXPORT_RATE_LIMIT_WINDOW:-1m}
-      # Forced regrade (signed-in users): once per user per repository every N minutes; 0 = no limit.
-      FORCE_REGRADE_COOLDOWN_MINUTES: ${FORCE_REGRADE_COOLDOWN_MINUTES:-60}
-      ANALYTICS_CACHE_SECONDS: ${ANALYTICS_CACHE_SECONDS:-300}
-      # "Доступ админа" (docs/admin.md): off until ADMIN_PASSWORD or ADMIN_YANDEX_IDS is set; AUDIT_HASH_SECRET is optional.
-      ADMIN_YANDEX_IDS: ${ADMIN_YANDEX_IDS:-}
-      # Testing stands only: any token signs in as this Yandex ID, session cookie not Secure. Empty = off.
-      DEV_AUTH_BYPASS_USER_ID: ${DEV_AUTH_BYPASS_USER_ID:-}
-      AUDIT_HASH_SECRET: ${AUDIT_HASH_SECRET:-}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      ADMIN_UNLOCK_MAX_ATTEMPTS: ${ADMIN_UNLOCK_MAX_ATTEMPTS:-5}
-      ADMIN_UNLOCK_LOCK: ${ADMIN_UNLOCK_LOCK:-15m}
-      ADMIN_DENIED_LOG_LIMIT: ${ADMIN_DENIED_LOG_LIMIT:-5}
-      ADMIN_DENIED_LOG_WINDOW: ${ADMIN_DENIED_LOG_WINDOW:-10m}
-      USER_AUDIT_WINDOW: ${USER_AUDIT_WINDOW:-5m}
-      AUDIT_RETENTION_DAYS: ${AUDIT_RETENTION_DAYS:-30}
-      BATCH_GRADING_CONCURRENCY: ${BATCH_GRADING_CONCURRENCY:-3}
-      BATCH_GRADING_ITEM_TIMEOUT: ${BATCH_GRADING_ITEM_TIMEOUT:-15m}
-      BATCH_GRADING_MAX_LIMIT: ${BATCH_GRADING_MAX_LIMIT:-0}
       # Monitoring (docs/metrics.md): the graphs of the admin and Analytics tabs read Prometheus; empty turns them off.
       PROMETHEUS_URL: ${PROMETHEUS_URL:-http://prometheus:9090}
-      SERIES_CACHE_SECONDS: ${SERIES_CACHE_SECONDS:-60}
+      # Everything else that is not a secret lives in config/app.yaml (docs/config.md), mounted below:
+      # edits apply without a rebuild. A key set here or in .env wins over app.yaml and the admin panel.
+    volumes:
+      # Directory mount, not a file mount: editors replace files by rename, which a file mount misses.
+      - ./config:/app/config:ro
     # Clones go to /dev/shm first; repository-service retries on disk if a repo outgrows it.
     shm_size: 400m
     restart: unless-stopped
@@ -166,11 +145,12 @@ services:
     environment:
       KAFKA_BROKERS: kafka:29092
       S3_ENDPOINT: minio:9000
-      # Documentation is graded without the model for now (presence of sections only);
-      # set LLM_DOCS_MODE=auto in .env to bring the model back.
-      LLM_DOCS_MODE: ${LLM_DOCS_MODE:-algorithmic}
       # Model calls and tokens for Prometheus (docs/metrics.md); the port is internal, never published.
       LLM_METRICS_PORT: "9104"
+      # LLM_DOCS_MODE and the other settings: config/app.yaml (docs/config.md), mounted below.
+      APP_CONFIG: /app/app-config/app.yaml
+    volumes:
+      - ./config:/app/app-config:ro
     restart: unless-stopped
     depends_on:
       kafka:
@@ -184,6 +164,9 @@ services:
     environment:
       KAFKA_BROKERS: kafka:29092
       LLM_METRICS_PORT: "9105"
+      APP_CONFIG: /app/app-config/app.yaml
+    volumes:
+      - ./config:/app/app-config:ro
     command: ["python", "-m", "llm_service", "--listen-summary"]
     restart: unless-stopped
     depends_on:
@@ -192,12 +175,9 @@ services:
 
   frontend:
     restart: unless-stopped
+    # Runtime settings (Yandex client ID, public URL, dev sign-in) come from GET /api/config, not the build.
     build:
       context: frontend
-      args:
-        VITE_YANDEX_CLIENT_ID: ${VITE_YANDEX_CLIENT_ID:-}
-        VITE_PUBLIC_URL: ${VITE_PUBLIC_URL:-}
-        VITE_DEV_AUTH_BYPASS: ${VITE_DEV_AUTH_BYPASS:-}
     ports:
       - "8081:80"
     depends_on:

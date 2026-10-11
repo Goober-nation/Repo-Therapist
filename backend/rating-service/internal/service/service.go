@@ -7,6 +7,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -34,7 +35,10 @@ const (
 )
 
 type RatingService struct {
-	repo         domain.RankingRepository
+	repo domain.RankingRepository
+	// liveMu guards dynamicsDays, the size buckets and analyticsTTL, which config reloads and
+	// admin overrides change while the service runs.
+	liveMu       sync.RWMutex
 	dynamicsDays int
 	sizeSmallLOC int
 	sizeLargeLOC int
@@ -44,6 +48,9 @@ type RatingService struct {
 	analyticsTTL  time.Duration
 	cacheRecorder CacheRecorder
 	cache         analyticsCache
+
+	// search serves the catalog search; nil until SetSearch.
+	search domain.SearchRepository
 }
 
 // NewRatingService builds the service; dynamicsDays is the window of the score and place change
@@ -64,13 +71,34 @@ func NewRatingService(repo domain.RankingRepository, dynamicsDays int) *RatingSe
 // SetSizeBuckets sets the limits (lines of code) between the small, medium and large size filters;
 // a non-positive or inverted pair keeps the defaults.
 func (s *RatingService) SetSizeBuckets(small, large int) {
+	s.liveMu.Lock()
+	defer s.liveMu.Unlock()
 	if small > 0 && large > small {
 		s.sizeSmallLOC, s.sizeLargeLOC = small, large
 	}
 }
 
+// SetDynamicsDays changes the score and place change window; a value below 1 means
+// DefaultDynamicsDays.
+func (s *RatingService) SetDynamicsDays(days int) {
+	if days < 1 {
+		days = DefaultDynamicsDays
+	}
+	s.liveMu.Lock()
+	defer s.liveMu.Unlock()
+	s.dynamicsDays = days
+}
+
+// liveSettings returns the runtime-tunable settings in one consistent read.
+func (s *RatingService) liveSettings() (dynamicsDays, sizeSmallLOC, sizeLargeLOC int) {
+	s.liveMu.RLock()
+	defer s.liveMu.RUnlock()
+	return s.dynamicsDays, s.sizeSmallLOC, s.sizeLargeLOC
+}
+
 func (s *RatingService) GetRanking(ctx context.Context, req domain.RankingRequest) (domain.RankingPage, error) {
-	query, page, err := buildQuery(req, s.dynamicsDays, s.sizeSmallLOC, s.sizeLargeLOC)
+	dynamicsDays, sizeSmallLOC, sizeLargeLOC := s.liveSettings()
+	query, page, err := buildQuery(req, dynamicsDays, sizeSmallLOC, sizeLargeLOC)
 	if err != nil {
 		return domain.RankingPage{}, err
 	}
@@ -86,7 +114,7 @@ func (s *RatingService) GetRanking(ctx context.Context, req domain.RankingReques
 		Page:       page,
 		PageSize:   query.Limit,
 
-		DynamicsDays: s.dynamicsDays,
+		DynamicsDays: dynamicsDays,
 	}
 
 	// Past the last page — nothing to list.

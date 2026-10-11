@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"os"
+	"repo-therapist/runtimeconfig"
 	"strconv"
 	"strings"
 	"time"
@@ -260,7 +260,7 @@ func LoadConfig() *Config {
 				Window: getEnvDuration("ADMIN_DENIED_LOG_WINDOW", 10*time.Minute),
 			},
 			UserAuditWindow:   getEnvDuration("USER_AUDIT_WINDOW", 5*time.Minute),
-			Password:          os.Getenv("ADMIN_PASSWORD"),
+			Password:          runtimeconfig.Getenv("ADMIN_PASSWORD"),
 			UnlockMaxAttempts: getEnvIntDefault("ADMIN_UNLOCK_MAX_ATTEMPTS", 5),
 			UnlockLock:        getEnvDuration("ADMIN_UNLOCK_LOCK", 15*time.Minute),
 		},
@@ -288,7 +288,7 @@ func getEnvDefault(
 	key string,
 	def string,
 ) string {
-	value := os.Getenv(key)
+	value := runtimeconfig.Getenv(key)
 	if value == "" {
 		return def
 	}
@@ -319,7 +319,7 @@ func (a AdminConfig) HashSecret() string {
 func getEnvList(key string) []string {
 	var items []string
 
-	for _, item := range strings.Split(os.Getenv(key), ",") {
+	for _, item := range strings.Split(runtimeconfig.Getenv(key), ",") {
 		if item = strings.TrimSpace(item); item != "" {
 			items = append(items, item)
 		}
@@ -332,7 +332,7 @@ func getEnvIntDefault(
 	key string,
 	def int,
 ) int {
-	value := os.Getenv(key)
+	value := runtimeconfig.Getenv(key)
 	if value == "" {
 		return def
 	}
@@ -349,7 +349,7 @@ func getEnvDuration(
 	key string,
 	def time.Duration,
 ) time.Duration {
-	value := os.Getenv(key)
+	value := runtimeconfig.Getenv(key)
 	if value == "" {
 		return def
 	}

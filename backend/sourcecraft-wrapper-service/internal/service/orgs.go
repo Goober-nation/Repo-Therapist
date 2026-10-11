@@ -44,7 +44,7 @@ func (scw *SCWrapper) GetMyOrgs(ctx context.Context) (domain.MyOrganizations, er
 
 	var orgs []domain.UserOrganization
 	pageToken := ""
-	for page := 0; page < scw.MaxPages; page++ {
+	for page := 0; page < scw.maxPages(); page++ {
 		var resp struct {
 			Organizations []domain.UserOrganization `json:"organizations"`
 			NextPageToken string                    `json:"next_page_token"`
@@ -114,7 +114,7 @@ func (scw *SCWrapper) GetOrgRepos(
 	path := "/orgs/" + url2.PathEscape(orgSlug) + "/repos"
 
 	var result domain.MyRepositoriesResponse
-	for page := 0; page < scw.MaxPages; page++ {
+	for page := 0; page < scw.maxPages(); page++ {
 		pageCtx, cancel := ctx, context.CancelFunc(func() {})
 		if page > 0 {
 			// The first page is bounded only by the caller; later ones must fit the budget.

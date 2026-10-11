@@ -22,6 +22,9 @@ type RatingService interface {
 	GetPositionExplanation(ctx context.Context, orgSlug, repoSlug string) (domain.PositionExplanation, error)
 	GetPlatformAnalytics(ctx context.Context) (domain.PlatformAnalytics, error)
 	ListPublicGrades(ctx context.Context, page, pageSize int) (domain.PublicGradesPage, error)
+	SuggestCatalog(ctx context.Context, query string) (domain.Suggestions, error)
+	SearchCatalogRepos(ctx context.Context, query, org string, page, pageSize int) (domain.CatalogReposPage, error)
+	SearchCatalogOrgs(ctx context.Context, query string, page, pageSize int) (domain.CatalogOrgsPage, error)
 }
 
 type Server struct {
