@@ -5,18 +5,18 @@
 
 # One text per deduction code; codes sharing a text are listed together.
 # priority (critical|high|medium|low) is sent with each advice item. Documentation never uses
-# critical: high = the reader cannot understand or start the project (no README, purpose, run
-# steps, license; a command that does not match the project); medium = a main section is missing
-# or a setting/reference is wrong; low = a detail of an existing section.
+# critical: high = there is no README to start from at all; medium = a main section is missing or
+# unclear (purpose, run steps, capabilities, build, tests) or a command/setting/reference is wrong;
+# low = a detail of an existing section, LICENSE, CONTRIBUTING, CODEOWNERS.
 recommendations:
   - codes: [DOC_PURPOSE_MISSING, DOC_PURPOSE_UNCLEAR]
-    priority: high
+    priority: medium
     text: Уточните, какую задачу решает проект, для чего его используют и какой результат он даёт.
   - codes: [DOC_CAPABILITIES_MISSING, DOC_CAPABILITIES_INCOMPLETE]
     priority: medium
     text: Перечислите основные возможности проекта и кратко опишите их назначение.
   - codes: [DOC_LOCAL_RUN_MISSING, DOC_LOCAL_RUN_COMMANDS_INCOMPLETE]
-    priority: high
+    priority: medium
     text: Опишите последовательность команд от подготовки окружения до первого запуска.
   - codes: [DOC_LOCAL_RUN_PREREQUISITES_INCOMPLETE]
     priority: medium
@@ -67,7 +67,7 @@ recommendations:
     priority: medium
     text: Проверьте указанный путь или якорь и обновите ссылку на существующий объект.
   - codes: [DOC_COMMAND_INCONSISTENT, DOC_SCRIPT_NOT_FOUND]
-    priority: high
+    priority: medium
     text: Сверьте команду с доступными скриптами проекта и исправьте её в инструкции.
   - codes: [DOC_CONFIGURATION_INCONSISTENT]
     priority: medium
@@ -79,7 +79,7 @@ recommendations:
     priority: high
     text: Добавьте в README описание проекта и ссылки на основные инструкции.
   - codes: [DOC_LICENSE_MISSING, DOC_LICENSE_EMPTY]
-    priority: high
+    priority: low
     text: Укажите выбранные владельцем проекта условия использования в LICENSE.
   - codes: [DOC_CONTRIBUTING_MISSING, DOC_CONTRIBUTING_EMPTY]
     priority: low

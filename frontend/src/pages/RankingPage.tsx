@@ -240,9 +240,9 @@ export default function RankingPage({
               <span>Score (на странице)</span>
               <select value={minimumHealth} onChange={(event) => setMinimumHealth(Number(event.target.value))}>
                 <option value={0}>Любой</option>
-                <option value={60}>От 60</option>
+                <option value={40}>От 40</option>
                 <option value={RANKING_HEALTHY_SCORE}>От {RANKING_HEALTHY_SCORE}</option>
-                <option value={90}>От 90</option>
+                <option value={80}>От 80</option>
               </select>
             </label>
             <label className="filter-field">

@@ -33,11 +33,23 @@ type fakeRepos struct {
 	updated   []domain.Repo
 	existing  map[uuid.UUID]bool
 	createErr error
+	// createErrFor fails CreateRepository for one repo only.
+	createErrFor map[uuid.UUID]error
+	// slugHolder holds its org/repo name under its own ID: creating another ID with that name fails
+	// as a unique violation until the holder is purged.
+	slugHolder *domain.Repo
+	purged     []uuid.UUID
 }
 
 func (f *fakeRepos) CreateRepository(ctx context.Context, repo domain.Repo) (uuid.UUID, error) {
 	if f.createErr != nil {
 		return uuid.Nil, f.createErr
+	}
+	if err := f.createErrFor[repo.SourcecraftUUID]; err != nil {
+		return uuid.Nil, err
+	}
+	if h := f.slugHolder; h != nil && h.OrgSlug == repo.OrgSlug && h.RepoSlug == repo.RepoSlug && h.SourcecraftUUID != repo.SourcecraftUUID {
+		return uuid.Nil, domain.ErrRepositoryExists
 	}
 	f.created = append(f.created, repo)
 	f.existing[repo.SourcecraftUUID] = true
@@ -57,7 +69,19 @@ func (f *fakeRepos) GetRepositoryByID(ctx context.Context, repoID uuid.UUID) (do
 	return domain.Repo{}, domain.ErrRepositoryNotFound
 }
 func (f *fakeRepos) GetRepositoryBySlugs(ctx context.Context, orgSlug, repoSlug string) (domain.Repo, error) {
+	if h := f.slugHolder; h != nil && h.OrgSlug == orgSlug && h.RepoSlug == repoSlug {
+		return *h, nil
+	}
 	return domain.Repo{}, domain.ErrRepositoryNotFound
+}
+
+func (f *fakeRepos) PurgeRepository(ctx context.Context, repoID uuid.UUID) error {
+	f.purged = append(f.purged, repoID)
+	if f.slugHolder != nil && f.slugHolder.SourcecraftUUID == repoID {
+		f.slugHolder = nil
+	}
+	delete(f.existing, repoID)
+	return nil
 }
 func (f *fakeRepos) GetRepositoryLock(ctx context.Context, id uuid.UUID) (domain.RepoLock, error) {
 	return domain.RepoLock{}, nil
@@ -1369,5 +1393,25 @@ func TestScheduledRegradeNeverGradesWithoutGrade(t *testing.T) {
 	}
 	if len(f.grading.events) != 0 || len(f.wrapper.authSeen) != 0 {
 		t.Errorf("events = %d lookups = %d, want nothing for an ungraded repo", len(f.grading.events), len(f.wrapper.authSeen))
+	}
+}
+
+// A repo deleted in SourceCraft and recreated under the same name arrives with a new ID while the old
+// row still holds the name: the old repo is purged with its data and the new one is saved.
+func TestUpsertRepoReplacesRecreatedRepo(t *testing.T) {
+	f := newFixture("public")
+	oldID, newID := uuid.New(), uuid.New()
+	f.repos.slugHolder = &domain.Repo{SourcecraftUUID: oldID, OrgSlug: "org", RepoSlug: "reused", Visibility: domain.VisibilityPublic}
+	f.repos.existing[oldID] = true
+
+	repo := domain.Repo{SourcecraftUUID: newID, OrgSlug: "org", RepoSlug: "reused", Visibility: domain.VisibilityPublic}
+	if err := f.svc.upsertRepo(context.Background(), repo); err != nil {
+		t.Fatalf("upsertRepo: %v", err)
+	}
+	if !reflect.DeepEqual(f.repos.purged, []uuid.UUID{oldID}) {
+		t.Errorf("purged = %v, want the old repo", f.repos.purged)
+	}
+	if !f.repos.existing[newID] {
+		t.Error("the recreated repo was not saved")
 	}
 }

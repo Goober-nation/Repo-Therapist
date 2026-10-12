@@ -12,6 +12,9 @@ type RepoRepository interface {
 	CreateRepository(ctx context.Context, repo Repo) (uuid.UUID, error)
 	UpdateRepository(ctx context.Context, repo Repo) (uuid.UUID, error)
 	DeleteRepository(ctx context.Context, repoID uuid.UUID) error
+	// PurgeRepository deletes a repo together with every row that references it (grades, history,
+	// analytics, facts, LLM responses, confidence, lock, batch items), in one transaction.
+	PurgeRepository(ctx context.Context, repoID uuid.UUID) error
 	GetRepositoryByID(ctx context.Context, repoID uuid.UUID) (Repo, error)
 	GetRepositoryBySlugs(ctx context.Context, orgSlug, repoSlug string) (Repo, error)
 	GetRepositoryLock(ctx context.Context, id uuid.UUID) (RepoLock, error)

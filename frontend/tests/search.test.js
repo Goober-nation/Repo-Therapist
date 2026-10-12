@@ -109,5 +109,5 @@ test("the ranking's levels: excellent from 80, healthy from 70, attention from 4
   assert.equal(label(40), "Требует внимания")
   assert.equal(label(39), "Под риском")
   assert.equal(label(null), "Нет данных")
-  assert.equal(healthLevel(80).label, "Здоровый", "the other pages keep their bands")
+  assert.deepEqual(healthLevel(80), rankingLevel(80), "every page uses the ranking's bands")
 })

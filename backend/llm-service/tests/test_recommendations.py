@@ -107,7 +107,7 @@ class RecommendationTests(unittest.TestCase):
     def test_deterministic_missing_file_has_specific_recommendation(self):
         item = render_advice({'subcategory': 'required_files', 'code': 'DOC_LICENSE_MISSING',
                               'facts': {}, 'evidence': []})
-        self.assertEqual(item['priority'], 'high')
+        self.assertEqual(item['priority'], 'low')
         text = item['text']
         self.assertNotIn('Файл LICENSE не найден', text)
         self.assertIn('выбранные владельцем проекта условия', text)

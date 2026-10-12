@@ -294,6 +294,7 @@ func (r worldRepos) UpdateRepository(context.Context, domain.Repo) (uuid.UUID, e
 	return uuid.Nil, nil
 }
 func (r worldRepos) DeleteRepository(context.Context, uuid.UUID) error { return nil }
+func (r worldRepos) PurgeRepository(context.Context, uuid.UUID) error  { return nil }
 func (r worldRepos) GetRepositoryBySlugs(context.Context, string, string) (domain.Repo, error) {
 	return domain.Repo{}, domain.ErrRepositoryNotFound
 }

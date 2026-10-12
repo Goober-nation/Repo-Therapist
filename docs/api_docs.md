@@ -689,7 +689,7 @@ README. `GET /score/...`, `GET /history/...`, `GET /position/...`, `GET /stats` 
 - `status`: `FINISHED` — есть публичная оценка; `NO_DATA` — репозиторий публичный, но ещё не
   оценён (`score: null`, `categories: []`, `graded_at: null`). Неизвестный или не публичный
   репозиторий — `404`; приватная оценка здесь никогда не отдаётся.
-- `level`: `excellent` (от 90), `healthy` (от 75), `attention` (от 60), `at_risk` (ниже 60),
+- `level`: `excellent` (от 80), `healthy` (от 70), `attention` (от 40), `at_risk` (ниже 40),
   `no_data`. Границы совпадают с цветами бейджей и уровнями во фронтенде.
 - `categories`: публичные категории по ID в алфавитном порядке. `no_data: true` и `score: null` —
   данных нет (это не плохая оценка); `score: 0` — реальный ноль.

@@ -156,7 +156,7 @@ func TestExportCSV(t *testing.T) {
 	}
 
 	first := rows[1]
-	if first[0] != "acme" || first[3] != "82" || first[4] != "healthy" || first[6] != "4.5" || first[9] != "false" {
+	if first[0] != "acme" || first[3] != "82" || first[4] != "excellent" || first[6] != "4.5" || first[9] != "false" {
 		t.Errorf("first = %v", first)
 	}
 
@@ -200,7 +200,7 @@ func TestExportJSON(t *testing.T) {
 		t.Fatalf("body = %+v", body)
 	}
 
-	if body.Grades[0].Level != "healthy" || body.Grades[2].Org != "zed" || body.Grades[2].Level != "excellent" {
+	if body.Grades[0].Level != "excellent" || body.Grades[2].Org != "zed" || body.Grades[2].Level != "excellent" {
 		t.Errorf("grades = %+v", body.Grades)
 	}
 

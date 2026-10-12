@@ -19,11 +19,11 @@ const (
 // badgeColors mirrors the frontend health levels (frontend/src/metrics.ts).
 func badgeColor(score int32) string {
 	switch {
-	case score >= 90:
+	case score >= 80:
 		return "#2e9e4f"
-	case score >= 75:
+	case score >= 70:
 		return "#58b368"
-	case score >= 60:
+	case score >= 40:
 		return "#dfb317"
 	default:
 		return "#e05d44"

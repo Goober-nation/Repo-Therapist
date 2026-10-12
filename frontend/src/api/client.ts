@@ -67,7 +67,7 @@ export interface HttpRepoHealthApiOptions {
 }
 
 /** Largest page rating-service accepts. */
-export const RANKING_PAGE_SIZE = 100
+export const RANKING_PAGE_SIZE = 20
 
 /** Entries per page of search results. */
 export const SEARCH_PAGE_SIZE = 20

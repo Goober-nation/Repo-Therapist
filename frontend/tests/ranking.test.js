@@ -372,7 +372,7 @@ test("the ranking request carries only the fact filters that are set", async () 
   const api = new HttpRepoHealthApi({
     fetcher: async (url) => {
       urls.push(url)
-      return Response.json({ entries: [], total_count: 0, page: 1, page_size: 100 })
+      return Response.json({ entries: [], total_count: 0, page: 1, page_size: 20 })
     },
   })
 
@@ -382,10 +382,10 @@ test("the ranking request carries only the fact filters that are set", async () 
   await api.getRanking(1, "score", "", false, { topic: "   " })
 
   assert.deepEqual(urls, [
-    "/api/ranking?page=1&page_size=100&sortby=score&size=medium&ci=true&security=false&topic=REST+API",
-    "/api/ranking?page=1&page_size=100&sortby=score&filter=Go&hide_low_confidence=true&ci=false",
-    "/api/ranking?page=1&page_size=100&sortby=score",
-    "/api/ranking?page=1&page_size=100&sortby=score",
+    "/api/ranking?page=1&page_size=20&sortby=score&size=medium&ci=true&security=false&topic=REST+API",
+    "/api/ranking?page=1&page_size=20&sortby=score&filter=Go&hide_low_confidence=true&ci=false",
+    "/api/ranking?page=1&page_size=20&sortby=score",
+    "/api/ranking?page=1&page_size=20&sortby=score",
   ])
 })
 

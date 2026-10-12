@@ -12,9 +12,9 @@ const (
 	LevelAttention = "attention"
 	LevelAtRisk    = "at_risk"
 
-	ExcellentFrom = 90
-	HealthyFrom   = 75
-	AttentionFrom = 60
+	ExcellentFrom = 80
+	HealthyFrom   = 70
+	AttentionFrom = 40
 )
 
 // AnalyticsParams are the limits of the platform analytics; zero values mean the defaults.

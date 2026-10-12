@@ -156,6 +156,49 @@ func (r *RepoRepository) UpdateRepository(ctx context.Context, repo domain.Repo)
 	return repo.SourcecraftUUID, nil
 }
 
+// repoDependents are the tables whose rows reference repos; none cascades on delete.
+var repoDependents = []struct{ table, column string }{
+	{"repo_lock", "sourcecraft_uuid"},
+	{"repo_grades_public", "sourcecraft_uuid"},
+	{"repo_grades_private", "sourcecraft_uuid"},
+	{"repo_llm_responses_public", "sourcecraft_uuid"},
+	{"repo_llm_responses_private", "sourcecraft_uuid"},
+	{"repo_confidence_public", "sourcecraft_uuid"},
+	{"repo_analytics_public", "sourcecraft_uuid"},
+	{"repo_analytics_private", "sourcecraft_uuid"},
+	{"repo_grade_history", "sourcecraft_uuid"},
+	{"repo_facts_public", "sourcecraft_uuid"},
+	{"grading_batch_items", "repo_id"},
+}
+
+func (r *RepoRepository) PurgeRepository(ctx context.Context, repoID uuid.UUID) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	for _, dep := range repoDependents {
+		if _, err := tx.Exec(ctx, `DELETE FROM `+dep.table+` WHERE `+dep.column+` = $1`, repoID); err != nil {
+			return fmt.Errorf("purge %s: %w", dep.table, err)
+		}
+	}
+
+	tag, err := tx.Exec(ctx, `DELETE FROM repos WHERE sourcecraft_uuid = $1`, repoID)
+	if err != nil {
+		return mapRepositoryError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return mapRepositoryError(pgx.ErrNoRows)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+
+	return nil
+}
+
 func (r *RepoRepository) DeleteRepository(ctx context.Context, repoID uuid.UUID) error {
 	tag, err := r.db.Exec(
 		ctx,

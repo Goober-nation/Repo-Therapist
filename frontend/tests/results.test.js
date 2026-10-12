@@ -604,15 +604,15 @@ test("ranking shows the backend place and links to the repository", () => {
 test("one health scale drives labels and tones", () => {
   assert.deepEqual(healthLevel(null), { label: "Нет данных", tone: "neutral" })
 
-  assert.deepEqual(healthLevel(80), healthLevel(75))
+  assert.deepEqual(healthLevel(79), healthLevel(70))
 
-  assert.equal(healthLevel(80).tone, "good")
+  assert.equal(healthLevel(70).tone, "good")
 
-  assert.equal(healthLevel(74).tone, "warning")
+  assert.equal(healthLevel(69).tone, "warning")
 
-  assert.equal(healthLevel(59).tone, "critical")
+  assert.equal(healthLevel(39).tone, "critical")
 
-  assert.equal(healthLevel(90).label, "Отличное состояние")
+  assert.equal(healthLevel(80).label, "Отличное состояние")
 })
 
 test("HTTP client preserves the browser fetch receiver and passes dynamic JSON to the mapper", async (context) => {
@@ -648,7 +648,7 @@ test("HTTP client preserves the browser fetch receiver and passes dynamic JSON t
 test("Gateway ranking supplies the real public repository catalog", async () => {
   const api = new HttpRepoHealthApi({
     fetcher: async (url, init) => {
-      assert.equal(url, "/api/ranking?page=1&page_size=100&sortby=score")
+      assert.equal(url, "/api/ranking?page=1&page_size=20&sortby=score")
 
       assert.equal(init.credentials, "include")
 
@@ -677,7 +677,7 @@ test("Gateway ranking supplies the real public repository catalog", async () => 
 
         page: 0,
 
-        page_size: 100,
+        page_size: 20,
       })
     },
   })
@@ -716,7 +716,7 @@ test("ranking asks the server for one page with its sort and language", async ()
 
       urls.push(url)
 
-      return Response.json({ entries: [], total_count: 0, page: 2, page_size: 100 })
+      return Response.json({ entries: [], total_count: 0, page: 2, page_size: 20 })
     },
   })
 
@@ -725,8 +725,8 @@ test("ranking asks the server for one page with its sort and language", async ()
   await api.getRanking()
 
   assert.deepEqual(urls, [
-    "/api/ranking?page=2&page_size=100&sortby=likes&filter=Go",
-    "/api/ranking?page=1&page_size=100&sortby=score",
+    "/api/ranking?page=2&page_size=20&sortby=likes&filter=Go",
+    "/api/ranking?page=1&page_size=20&sortby=score",
   ])
 })
 
@@ -744,8 +744,8 @@ test("the low-confidence toggle is sent only when on, and the public score is re
   const score = await api.getPublicScore("org", "my repo")
 
   assert.deepEqual(urls, [
-    "/api/ranking?page=1&page_size=100&sortby=score&hide_low_confidence=true",
-    "/api/ranking?page=1&page_size=100&sortby=score&filter=Go",
+    "/api/ranking?page=1&page_size=20&sortby=score&hide_low_confidence=true",
+    "/api/ranking?page=1&page_size=20&sortby=score&filter=Go",
     "/api/score/org/my%20repo",
   ])
   assert.equal(score.low_confidence, true)
@@ -1641,8 +1641,8 @@ test("a failed ranking shows a retry, not an empty catalog", () => {
   assert.doesNotMatch(html, /Пока нет репозиториев/)
 
   const paged = render(Ranking, {
-    repositories: [{ ...baseline, place: 101 }],
-    total: 250,
+    repositories: [{ ...baseline, place: 21 }],
+    total: 50,
     query: { page: 2, sort: "score", language: "" },
     onSelectRepository() {},
   })

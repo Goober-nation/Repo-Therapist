@@ -65,7 +65,7 @@ class GradeWireTests(unittest.TestCase):
         self.assertNotIn("required_files", event["subgrades"])
         self.assertTrue(all(type(v) is int for v in event["subgrades"].values()))
         self.assertEqual(event["advice"], [{
-            "code": "DOC_PURPOSE_UNCLEAR", "priority": "high",
+            "code": "DOC_PURPOSE_UNCLEAR", "priority": "medium",
             "text": "Уточните, какую задачу решает проект, для чего его используют и какой результат он даёт."}])
         self.assertNotIn("README.md", event["advice"][0]["text"])
         self.assertNotIn("summary", event["advice"][0]["text"])

@@ -62,7 +62,7 @@ func TestBadgeNeedsSvgSuffix(t *testing.T) {
 }
 
 func TestBadgeColorsFollowHealthLevels(t *testing.T) {
-	if badgeColor(95) == badgeColor(80) || badgeColor(80) == badgeColor(65) || badgeColor(65) == badgeColor(30) {
+	if badgeColor(90) == badgeColor(75) || badgeColor(75) == badgeColor(50) || badgeColor(50) == badgeColor(30) {
 		t.Error("each health level needs its own color")
 	}
 }

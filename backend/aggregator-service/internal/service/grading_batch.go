@@ -221,10 +221,28 @@ func (as *AggregatorService) StartBatch(ctx context.Context, actorHash string, f
 		return domain.Batch{}, domain.ErrBatchActive
 	}
 
-	// A catalog selection may hold repos the service has never seen; the items need their rows.
+	// A catalog selection may hold repos the service has never seen; the items need their rows. A repo
+	// that cannot be saved is left out of the batch (and logged) instead of failing the whole batch.
+	unsaved := map[uuid.UUID]bool{}
+
 	for _, repo := range sel.Fetched {
 		if err := as.upsertRepo(ctx, repo); err != nil {
-			return domain.Batch{}, fmt.Errorf("save repository %s/%s: %w", repo.OrgSlug, repo.RepoSlug, err)
+			log.Printf("grading batch: leaving out %s/%s: save repository: %v", repo.OrgSlug, repo.RepoSlug, err)
+			unsaved[repo.SourcecraftUUID] = true
+		}
+	}
+
+	if len(unsaved) > 0 {
+		kept := repos[:0:0]
+		for _, repo := range repos {
+			if !unsaved[repo.RepoID] {
+				kept = append(kept, repo)
+			}
+		}
+
+		repos = kept
+		if len(repos) == 0 {
+			return domain.Batch{}, domain.ErrBatchNothing
 		}
 	}
 

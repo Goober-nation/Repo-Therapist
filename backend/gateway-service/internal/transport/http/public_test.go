@@ -50,7 +50,7 @@ func TestScoreReturnsStoredGrade(t *testing.T) {
 	}
 
 	body := decode(t, rec)
-	if body["status"] != "FINISHED" || body["score"] != float64(71) || body["level"] != "attention" {
+	if body["status"] != "FINISHED" || body["score"] != float64(71) || body["level"] != "healthy" {
 		t.Errorf("body = %v", body)
 	}
 	if body["graded_at"] != "2026-10-01T12:00:00Z" || body["org"] != "org" || body["repo"] != "demo" {
@@ -132,7 +132,7 @@ func TestShieldsEndpoint(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatalf("body is not JSON: %v", err)
 	}
-	if got != (shieldsEndpoint{SchemaVersion: 1, Label: "repo health", Message: "71", Color: "yellow"}) {
+	if got != (shieldsEndpoint{SchemaVersion: 1, Label: "repo health", Message: "71", Color: "green"}) {
 		t.Errorf("shields body = %+v", got)
 	}
 }
@@ -226,7 +226,7 @@ func TestWidgetRendersCard(t *testing.T) {
 	}
 
 	body := rec.Body.String()
-	for _, want := range []string{"org/demo", ">71<", "Требует внимания", "Активность", "Документация", "Обновлено 2026-10-01", ">92<", ">n/a<", ">0<"} {
+	for _, want := range []string{"org/demo", ">71<", "Здоровый", "Активность", "Документация", "Обновлено 2026-10-01", ">92<", ">n/a<", ">0<"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("widget lacks %q", want)
 		}
@@ -285,8 +285,8 @@ func TestHealthLevelThresholdsMatchBadgeColors(t *testing.T) {
 		score *int32
 		key   string
 	}{
-		{nil, "no_data"}, {ptr(100), "excellent"}, {ptr(90), "excellent"}, {ptr(89), "healthy"},
-		{ptr(75), "healthy"}, {ptr(74), "attention"}, {ptr(60), "attention"}, {ptr(59), "at_risk"}, {ptr(0), "at_risk"},
+		{nil, "no_data"}, {ptr(100), "excellent"}, {ptr(80), "excellent"}, {ptr(79), "healthy"},
+		{ptr(70), "healthy"}, {ptr(69), "attention"}, {ptr(40), "attention"}, {ptr(39), "at_risk"}, {ptr(0), "at_risk"},
 	}
 	for _, tc := range cases {
 		if key, _ := healthLevel(tc.score); key != tc.key {
@@ -374,7 +374,7 @@ func TestScoreCarriesTheFlagWithoutTouchingTheScore(t *testing.T) {
 	summary.Confidence = &domain.Confidence{Low: true, Reasons: []domain.ConfidenceReason{{Code: "LOW_HISTORY", Text: "мало истории"}}}
 
 	body := decode(t, serve(t, &fakeService{summary: summary}, "GET", "/score/org/demo", nil))
-	if body["low_confidence"] != true || body["score"] != float64(71) || body["status"] != "FINISHED" || body["level"] != "attention" {
+	if body["low_confidence"] != true || body["score"] != float64(71) || body["status"] != "FINISHED" || body["level"] != "healthy" {
 		t.Errorf("body = %v: the flag must not change score, status or level", body)
 	}
 	if reasons := body["confidence_reasons"].([]any); len(reasons) != 1 || reasons[0].(map[string]any)["code"] != "LOW_HISTORY" {

@@ -44,11 +44,11 @@ func healthLevel(score *int32) (key, label string) {
 	switch {
 	case score == nil:
 		return "no_data", "Нет данных"
-	case *score >= 90:
+	case *score >= 80:
 		return "excellent", "Отличное состояние"
-	case *score >= 75:
+	case *score >= 70:
 		return "healthy", "Здоровый"
-	case *score >= 60:
+	case *score >= 40:
 		return "attention", "Требует внимания"
 	default:
 		return "at_risk", "Под риском"
@@ -58,11 +58,11 @@ func healthLevel(score *int32) (key, label string) {
 // shieldsColor maps a score to a named shields.io colour, matching badgeColor's thresholds.
 func shieldsColor(score int32) string {
 	switch {
-	case score >= 90:
+	case score >= 80:
 		return "brightgreen"
-	case score >= 75:
+	case score >= 70:
 		return "green"
-	case score >= 60:
+	case score >= 40:
 		return "yellow"
 	default:
 		return "red"

@@ -501,10 +501,37 @@ func (as *AggregatorService) upsertRepo(ctx context.Context, repo domain.Repo) e
 	}
 
 	_, err = as.ReposRepo.CreateRepository(ctx, repo)
-	if errors.Is(err, domain.ErrRepositoryExists) {
-		// Created concurrently by another request.
-		_, err = as.ReposRepo.UpdateRepository(ctx, repo)
+	if !errors.Is(err, domain.ErrRepositoryExists) {
+		return err
 	}
+
+	// Created concurrently by another request.
+	_, err = as.ReposRepo.UpdateRepository(ctx, repo)
+	if !errors.Is(err, domain.ErrRepositoryNotFound) {
+		return err
+	}
+
+	// The name is held by another ID: the repo was deleted in SourceCraft and recreated under the same
+	// name. The old repo no longer exists, so it goes with its grades and history (user decision).
+	old, err := as.ReposRepo.GetRepositoryBySlugs(ctx, repo.OrgSlug, repo.RepoSlug)
+	if err != nil {
+		return fmt.Errorf("find the repo holding %s/%s: %w", repo.OrgSlug, repo.RepoSlug, err)
+	}
+
+	if old.SourcecraftUUID == repo.SourcecraftUUID {
+		_, err = as.ReposRepo.UpdateRepository(ctx, repo)
+
+		return err
+	}
+
+	log.Printf("repo %s/%s was recreated in SourceCraft (%s -> %s): removing the old one and its grades",
+		repo.OrgSlug, repo.RepoSlug, old.SourcecraftUUID, repo.SourcecraftUUID)
+
+	if err := as.ReposRepo.PurgeRepository(ctx, old.SourcecraftUUID); err != nil {
+		return fmt.Errorf("remove the old repo %s: %w", old.SourcecraftUUID, err)
+	}
+
+	_, err = as.ReposRepo.CreateRepository(ctx, repo)
 
 	return err
 }

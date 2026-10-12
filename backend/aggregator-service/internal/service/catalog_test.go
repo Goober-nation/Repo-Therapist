@@ -424,3 +424,20 @@ func TestBatchSelectionReadsTheCatalog(t *testing.T) {
 		t.Errorf("wrapper calls = %d, want none while the catalog is filled", len(f.wrapper.authSeen))
 	}
 }
+
+// One catalog repo that cannot be saved is left out of the batch instead of refusing it.
+func TestBatchLeavesOutUnsaveableRepo(t *testing.T) {
+	bad := catalogRepoN(2, 5, "Go")
+	f, _ := catalogFixture(catalogRepoN(1, 1, "Go"), bad, catalogRepoN(3, 3, "Go"))
+	f.svc.BatchRepo = newMemBatches()
+	f.repos.createErrFor = map[uuid.UUID]error{bad.SourcecraftUUID: errors.New("broken row")}
+
+	batch, err := f.svc.StartBatch(context.Background(), "abc", domain.BatchFilter{Limit: 3})
+	if err != nil {
+		t.Fatalf("StartBatch: %v", err)
+	}
+	if batch.Total != 2 {
+		t.Errorf("total = %d, want the 2 repos that could be saved", batch.Total)
+	}
+	_, _ = f.svc.ControlBatch(context.Background(), "abc", batch.ID, domain.BatchActionCancel)
+}
