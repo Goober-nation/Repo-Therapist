@@ -129,6 +129,14 @@ func CloneAndUpload(ctx context.Context, org, repo, jobID, token string) (res *R
 	} else if n > 0 {
 		log.Printf("cleared %d stale S3 objects under %s", n, keyPrefix)
 	}
+	// From here on a failure is reported without an s3_prefix, so Grade never deletes this job's
+	// export: remove what was uploaded before returning, or it stays in S3 for good.
+	defer func() {
+		if err != nil {
+			removePartialExport(s3Client, keyPrefix)
+		}
+	}()
+
 	log.Printf("uploading tree to s3://%s/%s", envOrDefault("S3_BUCKET", "repo-content"), keyPrefix)
 	fileCount, err := s3Client.UploadDir(ctx, tmpDir, keyPrefix)
 	if err != nil {
@@ -490,4 +498,28 @@ func issueReplySampleLimit() int {
 		return issuedata.DefaultSampleLimit
 	}
 	return n
+}
+
+// partialExportCleanupTimeout bounds deleting a failed job's export. The job's own context is often
+// already expired by then (a clone timeout), so the delete runs on a fresh one.
+const partialExportCleanupTimeout = time.Minute
+
+type prefixDeleter interface {
+	DeletePrefix(ctx context.Context, prefix string) (int, error)
+}
+
+// removePartialExport deletes everything a failed job uploaded under keyPrefix. A failed delete is
+// only logged: the failure itself is still reported.
+func removePartialExport(s3 prefixDeleter, keyPrefix string) {
+	ctx, cancel := context.WithTimeout(context.Background(), partialExportCleanupTimeout)
+	defer cancel()
+
+	n, err := s3.DeletePrefix(ctx, keyPrefix+"/")
+	if err != nil {
+		log.Printf("removing the partial S3 export %s failed: %v", keyPrefix, err)
+		return
+	}
+	if n > 0 {
+		log.Printf("removed %d S3 objects of the failed export %s", n, keyPrefix)
+	}
 }

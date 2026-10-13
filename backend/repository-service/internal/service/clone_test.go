@@ -171,3 +171,31 @@ func TestGitCloneStillFailsWhenNothingWasCloned(t *testing.T) {
 		t.Fatal("cloning a missing repo should still fail")
 	}
 }
+
+type recordingDeleter struct {
+	prefixes []string
+	ctxErr   error
+	err      error
+}
+
+func (d *recordingDeleter) DeletePrefix(ctx context.Context, prefix string) (int, error) {
+	d.prefixes = append(d.prefixes, prefix)
+	d.ctxErr = ctx.Err()
+	return 3, d.err
+}
+
+// A failed job's partial export is deleted under its own prefix, on a live context even when the
+// job's context has already expired; a failed delete does not panic or block.
+func TestRemovePartialExport(t *testing.T) {
+	d := &recordingDeleter{}
+	removePartialExport(d, "repos/uuid/job")
+	if len(d.prefixes) != 1 || d.prefixes[0] != "repos/uuid/job/" || d.ctxErr != nil {
+		t.Fatalf("prefixes = %v ctxErr = %v, want one delete of repos/uuid/job/ on a live context", d.prefixes, d.ctxErr)
+	}
+
+	d = &recordingDeleter{err: errors.New("s3 down")}
+	removePartialExport(d, "repos/uuid/job")
+	if len(d.prefixes) != 1 {
+		t.Fatalf("prefixes = %v, want one attempt", d.prefixes)
+	}
+}
